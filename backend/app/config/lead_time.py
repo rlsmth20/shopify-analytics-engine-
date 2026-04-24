@@ -17,7 +17,7 @@ def build_lead_time_config(
     allow_mock_fallback: bool | None = None,
     vendor_lead_times: dict[str, int] | None = None,
     category_lead_times: dict[str, int] | None = None,
-    base_config: "LeadTimeConfig" | None = None,
+    base_config: LeadTimeConfig | None = None,
 ) -> LeadTimeConfig:
     source = base_config or MOCK_LEAD_TIME_CONFIG
     return LeadTimeConfig(

@@ -13,7 +13,10 @@ export function useSyncStatus(shopifyDomain: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function loadLatestSyncStatus(domainOverride?: string) {
+  async function loadLatestSyncStatus(
+    domainOverride?: string,
+    signal?: AbortSignal
+  ) {
     const normalizedDomain = (domainOverride ?? shopifyDomain).trim();
     if (!normalizedDomain) {
       setLatestSyncStatus(null);
@@ -25,9 +28,13 @@ export function useSyncStatus(shopifyDomain: string) {
     setErrorMessage(null);
 
     try {
-      const status = await fetchLatestShopifySyncStatus(normalizedDomain);
+      const status = await fetchLatestShopifySyncStatus(normalizedDomain, signal);
       setLatestSyncStatus(status);
     } catch (error) {
+      if (signal?.aborted) {
+        return;
+      }
+
       setLatestSyncStatus(null);
       setErrorMessage(
         error instanceof Error
@@ -35,7 +42,9 @@ export function useSyncStatus(shopifyDomain: string) {
           : "The latest sync status could not be loaded."
       );
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }
 
@@ -46,7 +55,9 @@ export function useSyncStatus(shopifyDomain: string) {
       return;
     }
 
-    void loadLatestSyncStatus(shopifyDomain);
+    const controller = new AbortController();
+    void loadLatestSyncStatus(shopifyDomain, controller.signal);
+    return () => controller.abort();
   }, [shopifyDomain]);
 
   return {

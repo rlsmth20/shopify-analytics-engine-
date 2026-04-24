@@ -27,17 +27,26 @@ export default function StoreSyncPage() {
 
   async function handleIngestionSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const normalizedDomain = shopifyDomain.trim();
+    const normalizedAccessToken = accessToken.trim();
+
+    if (!normalizedDomain || !normalizedAccessToken) {
+      setIngestionError("Enter both a Shopify domain and access token first.");
+      setIngestionResult(null);
+      return;
+    }
+
     setIsIngesting(true);
     setIngestionError(null);
     setIngestionResult(null);
 
     try {
       const result = await triggerShopifyIngestion({
-        shopify_domain: shopifyDomain,
-        access_token: accessToken
+        shopify_domain: normalizedDomain,
+        access_token: normalizedAccessToken
       });
       setIngestionResult(result);
-      await reloadLatestSyncStatus(shopifyDomain);
+      await reloadLatestSyncStatus(normalizedDomain);
     } catch (error) {
       setIngestionError(
         error instanceof Error

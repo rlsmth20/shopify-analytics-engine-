@@ -24,9 +24,26 @@ Near-term target:
 - swap the engine input from in-memory mock data to persisted normalized data
 - keep the current `/actions` contract stable while changing the data source
 
+## Phase 2.5: Intelligence Surface (Shipped 2026-04-23, v0.2.0)
+
+Additive layer on top of v1. All surfaces use deterministic mock data until Shopify
+ingestion is wired; every route is already public and typed end-to-end.
+
+- forecasting: Holt double-exponential smoothing, weekly seasonality, stockout prob
+- classification: ABC by revenue, XYZ by demand CV, combined scorecards
+- replenishment: safety-stock / reorder-point / EOQ, service-level segmented control
+- supplier scorecards and tiering (preferred / acceptable / at-risk)
+- bundle / kit bottleneck analysis
+- multi-location transfer recommendations
+- dead-stock liquidation plans (markdown / bundle / wholesale / write-off)
+- alert rule engine with email, SMS, Slack, and webhook delivery
+- redesigned dashboard with chart library and "What should I do today?" rail
+
 ## Later Phases
 
-- settings persistence and admin flows
-- improved forecasting and seasonality handling
-- multi-location inventory logic
-- lead times informed by restock history in addition to merchant settings
+- persist alert rules and channel config (currently in-memory)
+- Shopify ingestion swap — feed real history into the forecasting/reorder pipeline
+- lead times informed by observed restock history, not merchant input alone
+- approval / send flow for draft purchase orders
+- audit log + snapshot history for decision explainability
+- workspace roles, SSO, and multi-store account model

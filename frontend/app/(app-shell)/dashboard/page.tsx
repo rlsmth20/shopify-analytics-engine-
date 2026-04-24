@@ -1,251 +1,241 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
 
-import { ActionCard } from "@/components/action-card";
-import { ChartCard } from "@/components/chart-card";
-import { EmptyState } from "@/components/empty-state";
-import { KpiCard } from "@/components/kpi-card";
-import { SectionCard } from "@/components/section-card";
-import { SyncStatusCard } from "@/components/sync-status-card";
 import {
-  confidenceLabel,
-  currencyFormatter,
-  getActionImpactValue,
-  numberFormatter,
-  summarizeDataSource
-} from "@/lib/app-helpers";
-import { useActionFeed } from "@/lib/use-action-feed";
-import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
-import { useSyncStatus } from "@/lib/use-sync-status";
+  AreaLineChart,
+  ChartPanel,
+  DivergingBarChart,
+  DonutChart,
+  HorizontalBarChart,
+  Sparkline,
+} from "@/components/charts";
+import {
+  currency,
+  fetchDashboard,
+  type DashboardResponse,
+} from "@/lib/api-v2";
 
 export default function DashboardPage() {
-  const { actions, dataSource, isLoading, errorMessage, errorStatus } =
-    useActionFeed();
-  const { shopifyDomain } = useStoredShopDomain();
-  const { latestSyncStatus, isLoadingSyncStatus, syncStatusError } =
-    useSyncStatus(shopifyDomain);
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const urgentActions = actions.filter((action) => action.status === "urgent");
-  const topUrgentActions = (urgentActions.length > 0 ? urgentActions : actions).slice(
-    0,
-    3
-  );
-  const urgentProfitAtRisk = urgentActions.reduce(
-    (sum, action) => sum + action.estimated_profit_impact,
-    0
-  );
-  const cashTiedUp = actions
-    .filter((action) => action.status !== "urgent")
-    .reduce((sum, action) => sum + action.cash_tied_up, 0);
-  const highConfidenceCount = actions.filter(
-    (action) => action.data_quality_confidence === "high"
-  ).length;
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    fetchDashboard(controller.signal)
+      .then((res) => {
+        setData(res);
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
 
-  const statusMix = [
-    {
-      label: "Urgent",
-      value: urgentActions.length,
-      share: actions.length === 0 ? 0 : (urgentActions.length / actions.length) * 100
-    },
-    {
-      label: "Optimize",
-      value: actions.filter((action) => action.status === "optimize").length,
-      share:
-        actions.length === 0
-          ? 0
-          : (actions.filter((action) => action.status === "optimize").length /
-              actions.length) *
-            100
-    },
-    {
-      label: "Dead",
-      value: actions.filter((action) => action.status === "dead").length,
-      share:
-        actions.length === 0
-          ? 0
-          : (actions.filter((action) => action.status === "dead").length /
-              actions.length) *
-            100
-    }
-  ];
+  if (loading && !data) {
+    return <div className="page-loading">Loading command center…</div>;
+  }
 
-  const impactLeaders = [...actions]
-    .sort((left, right) => getActionImpactValue(right) - getActionImpactValue(left))
-    .slice(0, 4);
+  if (error) {
+    return (
+      <div className="page-error">
+        <p className="page-error-title">Could not load dashboard</p>
+        <p className="page-error-copy">{error}</p>
+      </div>
+    );
+  }
+
+  if (!data) return null;
 
   return (
-    <div className="page-stack">
-      <div className="kpi-grid">
-        <KpiCard
-          label="Actionable items"
-          value={isLoading ? "..." : errorMessage ? "—" : actions.length}
-          note={dataSource ? summarizeDataSource(dataSource) : "Awaiting feed"}
-        />
-        <KpiCard
-          label="Urgent items"
-          value={isLoading ? "..." : errorMessage ? "—" : urgentActions.length}
-          note="Items at immediate stockout risk"
-        />
-        <KpiCard
-          label="Urgent profit at risk"
-          value={
-            isLoading
-              ? "..."
-              : errorMessage
-                ? "—"
-                : currencyFormatter.format(urgentProfitAtRisk)
-          }
-          note="Projected exposure from urgent stockouts"
-        />
-        <KpiCard
-          label="Cash tied up"
-          value={
-            isLoading ? "..." : errorMessage ? "—" : currencyFormatter.format(cashTiedUp)
-          }
-          note={
-            isLoading || errorMessage
-              ? "Awaiting feed"
-              : `${highConfidenceCount} ${confidenceLabel.high.toLowerCase()} confidence items`
-          }
-        />
-      </div>
-
-      <div className="content-grid content-grid-2-1">
-        <SyncStatusCard
-          isLoading={isLoadingSyncStatus}
-          errorMessage={syncStatusError}
-          status={latestSyncStatus}
-        />
-
-        <ChartCard
-          title="Action mix"
-          description="Current queue composition by action type."
-        >
-          <div className="bar-list">
-            {statusMix.map((item) => (
-              <div key={item.label} className="bar-row">
-                <div className="bar-row-meta">
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </div>
-                <div className="bar-track">
-                  <div
-                    className="bar-fill"
-                    style={{ width: `${Math.max(item.share, item.value > 0 ? 8 : 0)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </ChartCard>
-      </div>
-
-      <div className="content-grid content-grid-2-1">
-        <SectionCard>
-          <div className="section-heading">
-            <div>
-              <p className="section-eyebrow">Priority Preview</p>
-              <h2 className="section-title">Top urgent decisions</h2>
-            </div>
-            <Link href="/actions" className="button button-secondary">
-              View all actions
-            </Link>
-          </div>
-
-          {isLoading ? (
-            <EmptyState
-              title="Loading action preview"
-              description="Pulling the top items from the backend queue."
-            />
-          ) : null}
-
-          {errorMessage ? (
-            <EmptyState
-              title={errorStatus === 503 ? "Live actions unavailable" : "Action preview unavailable"}
-              description={errorMessage}
-              tone="error"
-            />
-          ) : null}
-
-          {!isLoading && !errorMessage && topUrgentActions.length === 0 ? (
-            <EmptyState
-              title="No priority items yet"
-              description="Once the action engine returns inventory decisions, the most urgent items will appear here."
-            />
-          ) : null}
-
-          {!isLoading && !errorMessage && topUrgentActions.length > 0 ? (
-            <div className="action-list">
-              {topUrgentActions.map((action) => (
-                <ActionCard key={`${action.status}-${action.sku_id}`} action={action} />
-              ))}
-            </div>
-          ) : null}
-        </SectionCard>
-
-        <ChartCard
-          title="Impact concentration"
-          description="Largest current exposure across the active queue."
-        >
-          <div className="signal-list">
-            {impactLeaders.length > 0 ? (
-              impactLeaders.map((action) => (
-                <div key={`${action.status}-${action.sku_id}`} className="signal-item">
-                  <div>
-                    <p className="signal-title">{action.name}</p>
-                    <p className="signal-copy">{action.status}</p>
-                  </div>
-                  <strong>{currencyFormatter.format(getActionImpactValue(action))}</strong>
-                </div>
-              ))
-            ) : (
-              <p className="section-copy">
-                Impact ranking will appear here once the feed is available.
+    <div className="dashboard">
+      <section className="dashboard-kpis">
+        {data.kpis.map((kpi) => (
+          <div key={kpi.label} className={`kpi-card kpi-tone-${kpi.tone}`}>
+            <p className="kpi-label">{kpi.label}</p>
+            <div className="kpi-value-row">
+              <p className="kpi-value">
+                {kpi.unit === "currency"
+                  ? currency(kpi.value)
+                  : kpi.unit === "percent"
+                  ? `${kpi.value.toFixed(1)}%`
+                  : kpi.value.toLocaleString()}
               </p>
-            )}
+              {kpi.delta_pct !== null ? (
+                <span
+                  className={`kpi-delta kpi-delta-${
+                    kpi.delta_pct >= 0
+                      ? kpi.tone === "negative"
+                        ? "down"
+                        : "up"
+                      : kpi.tone === "negative"
+                      ? "up"
+                      : "down"
+                  }`}
+                >
+                  {kpi.delta_pct >= 0 ? "▲" : "▼"} {Math.abs(kpi.delta_pct).toFixed(1)}%
+                </span>
+              ) : null}
+            </div>
+            <Sparkline
+              values={sparkValues(kpi.label, data)}
+              width={140}
+              height={36}
+            />
           </div>
-        </ChartCard>
-      </div>
+        ))}
+      </section>
 
-      <div className="content-grid content-grid-2-1">
-        <ChartCard
-          title="Signal quality"
-          description="How much of the live queue is backed by stronger input quality."
+      <section className="dashboard-grid">
+        <ChartPanel
+          title="Revenue · last 30 days"
+          subtitle="Daily revenue across the full catalog"
+          accent="primary"
         >
-          <div className="stat-grid-compact">
-            {(["high", "medium", "low"] as const).map((level) => {
-              const count = actions.filter(
-                (action) => action.data_quality_confidence === level
-              ).length;
-              return (
-                <div key={level} className="stat-item stat-item-emphasis">
-                  <span className="stat-label">{confidenceLabel[level]} confidence</span>
-                  <strong>{isLoading ? "..." : count}</strong>
-                </div>
-              );
-            })}
-          </div>
-        </ChartCard>
+          <AreaLineChart
+            points={data.revenue_trend_30d}
+            height={240}
+            yFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
+          />
+        </ChartPanel>
 
-        <ChartCard
-          title="Trend placeholder"
-          description="Trend views come next once sync history and inventory snapshots are expanded."
+        <ChartPanel
+          title="Stock health"
+          subtitle="Where every SKU sits today"
         >
-          <div className="placeholder-graph">
-            {[38, 54, 46, 60, 58, 72, 68].map((value, index) => (
-              <span
-                key={index}
-                className="placeholder-bar"
-                style={{ height: `${value}%` }}
-              />
-            ))}
+          <DonutChart
+            points={data.stock_health_breakdown}
+            centerLabel="SKUs"
+            centerValue={data.stock_health_breakdown
+              .reduce((s, p) => s + p.value, 0)
+              .toString()}
+          />
+        </ChartPanel>
+
+        <ChartPanel
+          title="Top revenue movers"
+          subtitle="30-day revenue contribution by SKU"
+          accent="success"
+        >
+          <HorizontalBarChart
+            points={data.top_movers.slice(0, 8)}
+            valueFormatter={currency}
+          />
+        </ChartPanel>
+
+        <ChartPanel
+          title="ABC distribution"
+          subtitle="Revenue concentration across the catalog"
+        >
+          <DonutChart
+            points={data.abc_distribution}
+            centerLabel="SKUs"
+            centerValue={data.abc_distribution
+              .reduce((s, p) => s + p.value, 0)
+              .toString()}
+          />
+        </ChartPanel>
+
+        <ChartPanel
+          title="Cash parked by vendor"
+          subtitle="Overstock + dead stock at cost, top 6 vendors"
+          accent="warning"
+        >
+          <HorizontalBarChart
+            points={data.cash_at_risk_by_vendor}
+            valueFormatter={currency}
+            barClassName="chart-hbar chart-hbar-warning"
+          />
+        </ChartPanel>
+
+        <ChartPanel
+          title="Forecast accuracy · last 7 days"
+          subtitle="Actual vs predicted, % variance"
+        >
+          <DivergingBarChart points={data.forecast_vs_actual_7d} />
+        </ChartPanel>
+
+        <ChartPanel
+          title="Alert activity"
+          subtitle="Events fired by severity"
+          accent="danger"
+        >
+          <DonutChart
+            points={data.alert_counts_by_severity}
+            centerLabel="Events"
+            centerValue={data.alert_counts_by_severity
+              .reduce((s, p) => s + p.value, 0)
+              .toString()}
+          />
+        </ChartPanel>
+
+        <ChartPanel
+          title="What should I do today?"
+          subtitle="The three highest-impact moves right now"
+        >
+          <div className="today-list">
+            <TodayRow
+              step="1"
+              title="Reorder urgent SKUs"
+              body="Push the prioritized action queue into purchase orders — they're grouped by vendor on the PO page."
+              href="/purchase-orders"
+            />
+            <TodayRow
+              step="2"
+              title="Clear dead stock capital"
+              body="Run the liquidator — tactics are tailored by age, margin, and capital exposure."
+              href="/liquidation"
+            />
+            <TodayRow
+              step="3"
+              title="Confirm alert routing"
+              body="Make sure your email and Slack channels are verified so you hear about problems early."
+              href="/alerts"
+            />
           </div>
-          <p className="section-copy">
-            Today the product is optimized for action clarity over historical analytics.
-          </p>
-        </ChartCard>
-      </div>
+        </ChartPanel>
+      </section>
+
+      <footer className="dashboard-footer">
+        Generated {new Date(data.generated_at).toLocaleString()}
+      </footer>
     </div>
+  );
+}
+
+function sparkValues(label: string, data: DashboardResponse): number[] {
+  if (label.toLowerCase().includes("revenue")) {
+    return data.revenue_trend_30d.map((p) => p.value);
+  }
+  if (label.toLowerCase().includes("movers")) {
+    return data.top_movers.map((p) => p.value);
+  }
+  return data.revenue_trend_30d.slice(-14).map((p) => p.value);
+}
+
+function TodayRow({
+  step,
+  title,
+  body,
+  href,
+}: {
+  step: string;
+  title: string;
+  body: string;
+  href: string;
+}) {
+  return (
+    <a className="today-row" href={href}>
+      <span className="today-step">{step}</span>
+      <div>
+        <p className="today-title">{title}</p>
+        <p className="today-body">{body}</p>
+      </div>
+      <span className="today-arrow" aria-hidden>
+        →
+      </span>
+    </a>
   );
 }

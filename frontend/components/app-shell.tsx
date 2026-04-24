@@ -6,60 +6,123 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { SHOPIFY_DOMAIN_STORAGE_KEY } from "@/lib/app-helpers";
 
-const navigationItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/actions", label: "Actions" },
-  { href: "/analytics", label: "Analytics" },
-  { href: "/store-sync", label: "Store Sync" },
-  { href: "/lead-time-settings", label: "Lead Time Settings" },
-  { href: "/billing", label: "Billing" },
-  { href: "/account", label: "Account" }
+type NavItem = {
+  href: string;
+  label: string;
+  section: "Command" | "Intelligence" | "Operations" | "Settings";
+  icon: string;
+};
+
+const navigationItems: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", section: "Command", icon: "⬒" },
+  { href: "/actions", label: "Action Queue", section: "Command", icon: "◉" },
+  { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "◈" },
+  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "◎" },
+  { href: "/analytics", label: "ABC / XYZ", section: "Intelligence", icon: "◇" },
+  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "◉" },
+  { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "◎" },
+  { href: "/transfers", label: "Transfers", section: "Operations", icon: "◈" },
+  { href: "/bundles", label: "Bundles & Kits", section: "Operations", icon: "◇" },
+  { href: "/liquidation", label: "Liquidation", section: "Operations", icon: "◉" },
+  { href: "/store-sync", label: "Store Sync", section: "Settings", icon: "⬒" },
+  { href: "/lead-time-settings", label: "Lead Times", section: "Settings", icon: "◈" },
+  { href: "/billing", label: "Billing", section: "Settings", icon: "◇" },
+  { href: "/account", label: "Account", section: "Settings", icon: "◎" }
 ];
 
-const pageMeta = {
+type PageMeta = { eyebrow: string; title: string; description: string };
+
+const pageMeta: Record<string, PageMeta> = {
   "/dashboard": {
-    eyebrow: "Overview",
+    eyebrow: "Command",
     title: "Inventory command center",
     description:
-      "Executive view of urgent inventory risk, cash exposure, and sync health."
+      "Real-time view of demand, risk, and capital across your Shopify catalog."
   },
   "/actions": {
-    eyebrow: "Actions",
-    title: "Decision queue",
+    eyebrow: "Command",
+    title: "Action queue",
     description:
-      "Work the prioritized action feed with live backend ranking, filtering, and export."
+      "Ranked inventory actions — stockout risk, overstock, dead stock — ready to triage."
+  },
+  "/alerts": {
+    eyebrow: "Command",
+    title: "Alerts & notification rules",
+    description:
+      "Get pinged the moment something needs a human — email, SMS, Slack, or webhook."
+  },
+  "/forecast": {
+    eyebrow: "Intelligence",
+    title: "Demand forecast",
+    description:
+      "30/60/90-day projections with seasonality, trend, and stockout probability."
   },
   "/analytics": {
-    eyebrow: "Analytics",
-    title: "Risk and capital signals",
+    eyebrow: "Intelligence",
+    title: "ABC · XYZ scorecards",
     description:
-      "Read the current action mix, impact concentration, and lead-time pressure in one place."
+      "Segment the catalog by revenue contribution and demand variability."
+  },
+  "/suppliers": {
+    eyebrow: "Intelligence",
+    title: "Supplier scoreboard",
+    description:
+      "Vendor on-time delivery, fill rate, and lead-time stability at a glance."
+  },
+  "/purchase-orders": {
+    eyebrow: "Operations",
+    title: "Purchase order drafts",
+    description:
+      "Auto-consolidated POs by vendor, ready to review and send."
+  },
+  "/transfers": {
+    eyebrow: "Operations",
+    title: "Inter-location transfers",
+    description:
+      "Rebalance inventory between locations before placing new orders."
+  },
+  "/bundles": {
+    eyebrow: "Operations",
+    title: "Bundle & kit health",
+    description:
+      "See which bundles are bottlenecked and how much component capital is stranded."
+  },
+  "/liquidation": {
+    eyebrow: "Operations",
+    title: "Dead-stock liquidator",
+    description:
+      "Markdown, bundle, wholesale, or write-off — cash recovery plans for stale inventory."
   },
   "/store-sync": {
-    eyebrow: "Store Sync",
+    eyebrow: "Settings",
     title: "Manual Shopify sync",
     description:
-      "Run ingestion, inspect the latest sync run, and confirm the live data path is healthy."
+      "Trigger ingestion and inspect the latest sync run."
   },
   "/lead-time-settings": {
     eyebrow: "Settings",
     title: "Lead time configuration",
     description:
-      "Manage global defaults, safety buffer, mock fallback, and vendor/category overrides."
+      "Global defaults, safety buffer, and vendor/category overrides."
   },
   "/billing": {
-    eyebrow: "Billing",
+    eyebrow: "Settings",
     title: "Plan and billing",
-    description:
-      "Placeholder billing surfaces for a future commercial SaaS release."
+    description: "Plan selection and invoicing history."
   },
   "/account": {
-    eyebrow: "Account",
+    eyebrow: "Settings",
     title: "Workspace settings",
-    description:
-      "Placeholder account, workspace, and preference surfaces for the current MVP."
+    description: "User profile, team, and workspace preferences."
   }
-} as const;
+};
+
+const SECTION_ORDER: NavItem["section"][] = [
+  "Command",
+  "Intelligence",
+  "Operations",
+  "Settings"
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -72,7 +135,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [pathname]);
 
-  const meta = pageMeta[pathname as keyof typeof pageMeta] ?? pageMeta["/dashboard"];
+  const meta = pageMeta[pathname] ?? pageMeta["/dashboard"];
+
+  const groupedNav = SECTION_ORDER.map((section) => ({
+    section,
+    items: navigationItems.filter((item) => item.section === section)
+  }));
 
   return (
     <div className="app-shell">
@@ -81,31 +149,39 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="brand-mark">IC</span>
           <div>
             <p className="brand-name">Inventory Command</p>
-            <p className="brand-copy">Shopify inventory decisions</p>
+            <p className="brand-copy">Forecast · Replenish · Alert</p>
           </div>
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary">
-          {navigationItems.map((item) => {
-            const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-link${isActive ? " nav-link-active" : ""}`}
-              >
-                <span className="nav-link-label">{item.label}</span>
-              </Link>
-            );
-          })}
+          {groupedNav.map((group) => (
+            <div key={group.section} className="sidebar-nav-group">
+              <p className="sidebar-nav-heading">{group.section}</p>
+              {group.items.map((item) => {
+                const isActive =
+                  pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`nav-link${isActive ? " nav-link-active" : ""}`}
+                  >
+                    <span className="nav-link-icon" aria-hidden>
+                      {item.icon}
+                    </span>
+                    <span className="nav-link-label">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-note">
-          <p className="sidebar-note-title">Live Shopify MVP</p>
+          <p className="sidebar-note-title">Built for Shopify</p>
           <p className="sidebar-note-copy">
-            Manual sync mode with DB-backed actions and controlled mock fallback.
+            Forecasting, replenishment, supplier scoring, and multi-channel
+            alerting in one place.
           </p>
         </div>
       </aside>
@@ -122,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="header-chip header-chip-tone">
               {shopifyDomain ? shopifyDomain : "No store selected"}
             </span>
-            <span className="header-chip">Manual sync mode</span>
+            <span className="header-chip">Live mode</span>
           </div>
         </header>
 
