@@ -90,6 +90,7 @@ export default function DashboardPage() {
 
       <section className="dashboard-grid">
         <ChartPanel
+          className="col-8"
           title="Revenue · last 30 days"
           subtitle="Daily revenue across the full catalog"
           accent="primary"
@@ -102,6 +103,7 @@ export default function DashboardPage() {
         </ChartPanel>
 
         <ChartPanel
+          className="col-4"
           title="Stock health"
           subtitle="Where every SKU sits today"
         >
@@ -115,6 +117,7 @@ export default function DashboardPage() {
         </ChartPanel>
 
         <ChartPanel
+          className="col-8"
           title="Top revenue movers"
           subtitle="30-day revenue contribution by SKU"
           accent="success"
@@ -126,6 +129,7 @@ export default function DashboardPage() {
         </ChartPanel>
 
         <ChartPanel
+          className="col-4"
           title="ABC distribution"
           subtitle="Revenue concentration across the catalog"
         >
@@ -139,6 +143,7 @@ export default function DashboardPage() {
         </ChartPanel>
 
         <ChartPanel
+          className="col-8"
           title="Cash parked by vendor"
           subtitle="Overstock + dead stock at cost, top 6 vendors"
           accent="warning"
@@ -151,13 +156,7 @@ export default function DashboardPage() {
         </ChartPanel>
 
         <ChartPanel
-          title="Forecast accuracy · last 7 days"
-          subtitle="Actual vs predicted, % variance"
-        >
-          <DivergingBarChart points={data.forecast_vs_actual_7d} />
-        </ChartPanel>
-
-        <ChartPanel
+          className="col-4"
           title="Alert activity"
           subtitle="Events fired by severity"
           accent="danger"
@@ -172,6 +171,15 @@ export default function DashboardPage() {
         </ChartPanel>
 
         <ChartPanel
+          className="col-6"
+          title="Forecast accuracy · last 7 days"
+          subtitle="Actual vs predicted, % variance"
+        >
+          <DivergingBarChart points={data.forecast_vs_actual_7d} />
+        </ChartPanel>
+
+        <ChartPanel
+          className="col-6"
           title="What should I do today?"
           subtitle="The three highest-impact moves right now"
         >

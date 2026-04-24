@@ -418,15 +418,24 @@ export function ChartPanel({
   children,
   footer,
   accent,
+  className,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
   accent?: "primary" | "warning" | "danger" | "success";
+  className?: string;
 }) {
+  const classes = [
+    "chart-panel",
+    accent ? `chart-panel-${accent}` : "",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div className={`chart-panel${accent ? ` chart-panel-${accent}` : ""}`}>
+    <div className={classes}>
       <div className="chart-panel-head">
         <h3 className="chart-panel-title">{title}</h3>
         {subtitle ? <p className="chart-panel-subtitle">{subtitle}</p> : null}

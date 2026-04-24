@@ -18,7 +18,7 @@ const navigationItems: NavItem[] = [
   { href: "/actions", label: "Action Queue", section: "Command", icon: "◉" },
   { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "◈" },
   { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "◎" },
-  { href: "/analytics", label: "ABC / XYZ", section: "Intelligence", icon: "◇" },
+  { href: "/analytics", label: "Analytics", section: "Intelligence", icon: "◇" },
   { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "◉" },
   { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "◎" },
   { href: "/transfers", label: "Transfers", section: "Operations", icon: "◈" },

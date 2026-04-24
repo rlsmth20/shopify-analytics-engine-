@@ -1285,6 +1285,12 @@ code {
   grid-column: span 8;
 }
 
+/* Defensive fallback — any chart panel dropped into the grid without an
+   explicit col-* class spans half the grid instead of collapsing to ~1/12. */
+.dashboard-grid > .chart-panel:not([class*="col-"]) {
+  grid-column: span 6;
+}
+
 .kpi-card {
   display: flex;
   flex-direction: column;
@@ -1937,6 +1943,13 @@ code {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.rule-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 .severity-pill {
