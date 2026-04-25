@@ -1,7 +1,17 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -187,3 +197,47 @@ class CategoryLeadTime(Base):
     lead_time_days: Mapped[int]
 
     shop: Mapped[Shop] = relationship(back_populates="category_lead_times")
+
+
+class AlertRuleRecord(Base):
+    """Persisted alert rule.
+
+    Alerts were in-memory in v0.2; they are persisted in v0.3 so rules
+    survive restarts — a prerequisite for any paid tier.
+    """
+
+    __tablename__ = "alert_rules"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    trigger: Mapped[str] = mapped_column(String(32), index=True)
+    severity: Mapped[str] = mapped_column(String(32))
+    channels: Mapped[list[str]] = mapped_column(JSON, default=list)
+    threshold: Mapped[float] = mapped_column(Float, default=0.0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )
+    last_fired_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class NotificationChannelRecord(Base):
+    """Persisted channel configuration (email, sms, slack, webhook)."""
+
+    __tablename__ = "notification_channels"
+
+    channel: Mapped[str] = mapped_column(String(32), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    target: Mapped[str] = mapped_column(String(500), default="")
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )

@@ -1,5 +1,243 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
+
+export const metadata = {
+  title: "slelfly — The Shopify inventory tool that tells you what to do first",
+  description:
+    "Forecast 90 days. Rank every SKU. Score every supplier. Recover cash from dead stock. Shopify-first, founder-led, price-locked."
+};
+
+const pillars = [
+  {
+    kicker: "Forecasting",
+    title: "Stockout probability, not stockout guesswork.",
+    body:
+      "Holt double-exponential smoothing with weekly seasonality and a real probability of stockout on every SKU — not a moving average with a guess on top.",
+    href: "/forecast"
+  },
+  {
+    kicker: "Suppliers",
+    title: "Vendors you can measure.",
+    body:
+      "On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering. 23 of the 25 tools we studied still treat vendors as contact records.",
+    href: "/suppliers"
+  },
+  {
+    kicker: "Liquidation",
+    title: "Cash recovery on stale inventory.",
+    body:
+      "Every dead-stock SKU comes with a concrete plan: markdown, bundle, wholesale, or write-off — with the dollar impact attached. 24 of 25 competitors surface aged stock and stop.",
+    href: "/liquidation"
+  },
+  {
+    kicker: "Bundles",
+    title: "Bundles that don't lose components.",
+    body:
+      "Kits decompose at reorder time, so you never place a PO that leaves a component short. Bundle bottlenecks are called out on the dashboard.",
+    href: "/bundles"
+  },
+  {
+    kicker: "Dashboard",
+    title: "What should I do today?",
+    body:
+      "An action-ranked queue — urgent, optimize, dead — instead of a wall of dashboards. Rank the list, work it from the top.",
+    href: "/dashboard"
+  },
+  {
+    kicker: "Alerts",
+    title: "Alerts that reach you where you work.",
+    body:
+      "Email, SMS, Slack, and webhooks driven by a real rule engine. No 'email only' limitation like the rest of the market.",
+    href: "/alerts"
+  }
+];
+
+const migrationCards = [
+  {
+    eyebrow: "Leaving Stocky?",
+    date: "Shopify Stocky ends Aug 31, 2026",
+    title: "Goodbye Stocky, hello slelfly.",
+    body:
+      "Shopify sunset a tool thousands of POS Pro merchants depended on. We built the replacement you actually wanted: forecasting, supplier scorecards, and dead-stock plans in one product.",
+    cta: "See the migration path",
+    href: "/goodbye-stocky",
+    tone: "urgent"
+  },
+  {
+    eyebrow: "Leaving Genie?",
+    date: "Genie closed Aug 31, 2025",
+    title: "Genie is gone. slelfly is the upgrade.",
+    body:
+      "Genie merchants loved simple. We kept the simple and added the math — forecasting, supplier metrics, and a real reorder engine.",
+    cta: "See the migration path",
+    href: "/goodbye-genie",
+    tone: "steady"
+  }
+];
+
+const positioning = [
+  {
+    title: "Independent. Founder-led.",
+    body:
+      "Eight of the tools you evaluate have been acquired by a parent that raised prices, slowed the roadmap, or broke support. slelfly is structurally outside that pattern."
+  },
+  {
+    title: "Shopify-first, not Shopify-also.",
+    body:
+      "We ingest one shop at a time, carefully. No ERP middleware, no multi-channel compromise layer, no quote-only implementation project."
+  },
+  {
+    title: "Math you can see.",
+    body:
+      "Every recommended quantity explains itself — trailing demand, seasonality factor, service level, stockout probability. Explainability is a feature."
+  },
+  {
+    title: "Fair pricing. Locked pricing.",
+    body:
+      "We publish our tiers. We commit in writing that renewals do not raise the price on your plan. We mean it."
+  }
+];
 
 export default function HomePage() {
-  redirect("/dashboard");
+  return (
+    <div className="marketing-shell">
+      <header className="marketing-nav">
+        <Link href="/" className="marketing-brand">
+          <span className="marketing-brand-mark">sf</span>
+          <span className="marketing-brand-name">slelfly</span>
+        </Link>
+        <nav className="marketing-nav-links" aria-label="Primary">
+          <Link href="/#pillars">Product</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/about">About</Link>
+          <Link href="/changelog">Changelog</Link>
+        </nav>
+        <div className="marketing-nav-ctas">
+          <Link href="/login" className="marketing-link-subtle">
+            Sign in
+          </Link>
+          <Link href="/dashboard" className="button button-primary">
+            Open app
+          </Link>
+        </div>
+      </header>
+
+      <section className="marketing-hero">
+        <p className="marketing-eyebrow">Inventory decisions, made in order.</p>
+        <h1 className="marketing-hero-title">
+          The Shopify inventory tool that tells you what to do first.
+        </h1>
+        <p className="marketing-hero-sub">
+          Forecast the next 90 days, rank every SKU, score every supplier, and
+          recover cash from dead stock — in one Shopify-first product, at a
+          price that doesn&apos;t triple at renewal.
+        </p>
+        <div className="marketing-hero-ctas">
+          <Link href="/dashboard" className="button button-primary button-lg">
+            Try slelfly free
+          </Link>
+          <Link href="/pricing" className="button button-ghost button-lg">
+            See pricing
+          </Link>
+        </div>
+        <p className="marketing-hero-trust">
+          No credit card · Connect your store in minutes · Cancel anytime ·
+          <strong> Prices locked at renewal</strong>
+        </p>
+      </section>
+
+      <section className="marketing-migration" aria-label="Migration windows">
+        {migrationCards.map((card) => (
+          <article
+            key={card.href}
+            className={`migration-card migration-card-${card.tone}`}
+          >
+            <p className="migration-card-eyebrow">{card.eyebrow}</p>
+            <p className="migration-card-date">{card.date}</p>
+            <h2 className="migration-card-title">{card.title}</h2>
+            <p className="migration-card-body">{card.body}</p>
+            <Link href={card.href} className="migration-card-cta">
+              {card.cta} →
+            </Link>
+          </article>
+        ))}
+      </section>
+
+      <section className="marketing-section" id="pillars">
+        <p className="marketing-section-kicker">What slelfly does</p>
+        <h2 className="marketing-section-title">
+          Six things the rest of the market gets wrong.
+        </h2>
+        <p className="marketing-section-sub">
+          We studied twenty-five inventory products. These are the six gaps
+          that appeared over and over — and every one of them ships in slelfly
+          today.
+        </p>
+        <div className="pillar-grid">
+          {pillars.map((p) => (
+            <article key={p.href} className="pillar-card">
+              <p className="pillar-card-kicker">{p.kicker}</p>
+              <h3 className="pillar-card-title">{p.title}</h3>
+              <p className="pillar-card-body">{p.body}</p>
+              <Link href={p.href} className="pillar-card-link">
+                Open in app →
+              </Link>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="marketing-section marketing-section-alt">
+        <p className="marketing-section-kicker">Positioning</p>
+        <h2 className="marketing-section-title">
+          Why the rest of the market is the way it is — and why slelfly isn&apos;t.
+        </h2>
+        <div className="positioning-grid">
+          {positioning.map((p) => (
+            <article key={p.title} className="positioning-card">
+              <h3 className="positioning-card-title">{p.title}</h3>
+              <p className="positioning-card-body">{p.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="marketing-section marketing-cta-section">
+        <h2 className="marketing-section-title">
+          See what your next reorder should be.
+        </h2>
+        <p className="marketing-section-sub">
+          Connect your Shopify store and the first ranked action appears in
+          under ten minutes. No consultant, no six-month rollout, no quote.
+        </p>
+        <div className="marketing-hero-ctas">
+          <Link href="/dashboard" className="button button-primary button-lg">
+            Open the app
+          </Link>
+          <Link href="/pricing" className="button button-ghost button-lg">
+            See pricing
+          </Link>
+        </div>
+      </section>
+
+      <footer className="marketing-footer">
+        <div className="marketing-footer-brand">
+          <span className="marketing-brand-mark">sf</span>
+          <span>slelfly</span>
+        </div>
+        <div className="marketing-footer-links">
+          <Link href="/">Home</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/about">About</Link>
+          <Link href="/changelog">Changelog</Link>
+          <Link href="/goodbye-stocky">Stocky migration</Link>
+          <Link href="/goodbye-genie">Genie migration</Link>
+          <Link href="/login">Sign in</Link>
+        </div>
+        <p className="marketing-footer-fine">
+          © {new Date().getFullYear()} slelfly · Independent · Founder-led ·
+          Prices locked at renewal
+        </p>
+      </footer>
+    </div>
+  );
 }
