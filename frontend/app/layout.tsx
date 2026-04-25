@@ -4,9 +4,9 @@ import "./globals.css";
 
 
 export const metadata: Metadata = {
-  title: "Inventory Command",
+  title: "slelfly — The Shopify inventory tool that tells you what to do first",
   description:
-    "Prioritized Shopify inventory actions for stockouts, overstock, dead stock, and lead-time decisions."
+    "Forecast the next 90 days, rank every SKU, score every supplier, and recover cash from dead stock — in one Shopify-first product, at a price that doesn't triple at renewal."
 };
 
 

@@ -112,6 +112,8 @@ export default function ForecastPage() {
               <ForecastBandChart points={selected.points} />
             </ChartPanel>
 
+            <ExplainCard selected={selected} />
+
             {selected.weekly_index.length > 0 ? (
               <ChartPanel
                 title="Weekly seasonality"
@@ -143,5 +145,66 @@ function Kpi({
       <p className="kpi-label">{label}</p>
       <p className="kpi-value">{value}</p>
     </div>
+  );
+}
+
+
+function ExplainCard({ selected }: { selected: ForecastResult }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className={`explain-card${open ? " explain-card-open" : ""}`}>
+      <button
+        type="button"
+        className="explain-card-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="explain-card-icon" aria-hidden>
+          ?
+        </span>
+        <span className="explain-card-toggle-text">
+          Why this number? Show the forecasting math.
+        </span>
+        <span className="explain-card-chevron" aria-hidden>
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      {open ? (
+        <div className="explain-card-body">
+          <p className="explain-card-lead">
+            slelfly uses <strong>Holt double-exponential smoothing</strong>{" "}
+            with a weekly seasonality factor to project demand on this SKU.
+            Here is what went into the numbers above:
+          </p>
+          <dl className="explain-card-grid">
+            <div>
+              <dt>Method</dt>
+              <dd>{selected.method.replace(/_/g, " ")}</dd>
+            </div>
+            <div>
+              <dt>Confidence</dt>
+              <dd>{selected.confidence}</dd>
+            </div>
+            <div>
+              <dt>Seasonality</dt>
+              <dd>{selected.seasonality.replace(/_/g, " ")}</dd>
+            </div>
+            <div>
+              <dt>30-day stockout probability</dt>
+              <dd>{percent(selected.stockout_probability_30d, 0)}</dd>
+            </div>
+            <div>
+              <dt>Weekly seasonality detected</dt>
+              <dd>{selected.weekly_index.length > 0 ? "yes" : "no"}</dd>
+            </div>
+          </dl>
+          <p className="explain-card-explain">{selected.explain}</p>
+          <p className="explain-card-footnote">
+            This is the math the rest of the market hides. We show it because
+            if we can&apos;t explain a number, we shouldn&apos;t recommend it.
+          </p>
+        </div>
+      ) : null}
+    </section>
   );
 }

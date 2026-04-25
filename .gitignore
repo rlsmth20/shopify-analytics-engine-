@@ -23,3 +23,11 @@ frontend/out/
 frontend/tsconfig.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+# competitive-analysis deliverables (belong to user's workspace, not repo)
+Slelfly_Competitive_Data.xlsx
+Slelfly_Competitive_Gap_Analysis.docx
+.~lock.*.xlsx#
+.~lock.*.docx#
+~$*.xlsx
+~$*.docx

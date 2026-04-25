@@ -35,39 +35,39 @@ type PageMeta = { eyebrow: string; title: string; description: string };
 const pageMeta: Record<string, PageMeta> = {
   "/dashboard": {
     eyebrow: "Command",
-    title: "Inventory command center",
+    title: "What should I do today?",
     description:
-      "Real-time view of demand, risk, and capital across your Shopify catalog."
+      "An action-ranked queue over your Shopify catalog. Work it from the top."
   },
   "/actions": {
     eyebrow: "Command",
     title: "Action queue",
     description:
-      "Ranked inventory actions — stockout risk, overstock, dead stock — ready to triage."
+      "Ranked inventory actions — urgent, optimize, dead — ready to triage."
   },
   "/alerts": {
     eyebrow: "Command",
-    title: "Alerts & notification rules",
+    title: "Alerts that reach you where you work.",
     description:
-      "Get pinged the moment something needs a human — email, SMS, Slack, or webhook."
+      "Email, SMS, Slack, and webhooks driven by a real rule engine — not an 'email only' limitation."
   },
   "/forecast": {
     eyebrow: "Intelligence",
-    title: "Demand forecast",
+    title: "Stockout probability, not stockout guesswork.",
     description:
-      "30/60/90-day projections with seasonality, trend, and stockout probability."
+      "Holt double-exponential smoothing with weekly seasonality. Every recommended quantity explains itself."
   },
   "/analytics": {
     eyebrow: "Intelligence",
-    title: "ABC · XYZ scorecards",
+    title: "ABC × XYZ scorecards",
     description:
-      "Segment the catalog by revenue contribution and demand variability."
+      "Segment the catalog by revenue contribution and demand variability — meet your A-items first."
   },
   "/suppliers": {
     eyebrow: "Intelligence",
-    title: "Supplier scoreboard",
+    title: "Vendors you can measure.",
     description:
-      "Vendor on-time delivery, fill rate, and lead-time stability at a glance."
+      "On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering."
   },
   "/purchase-orders": {
     eyebrow: "Operations",
@@ -83,15 +83,15 @@ const pageMeta: Record<string, PageMeta> = {
   },
   "/bundles": {
     eyebrow: "Operations",
-    title: "Bundle & kit health",
+    title: "Bundles that don't lose components.",
     description:
-      "See which bundles are bottlenecked and how much component capital is stranded."
+      "Kits decompose at reorder time so a PO never leaves a component short."
   },
   "/liquidation": {
     eyebrow: "Operations",
-    title: "Dead-stock liquidator",
+    title: "Cash recovery on stale inventory.",
     description:
-      "Markdown, bundle, wholesale, or write-off — cash recovery plans for stale inventory."
+      "Every dead-stock SKU comes with a plan — markdown, bundle, wholesale, or write-off — and a dollar-impact estimate."
   },
   "/store-sync": {
     eyebrow: "Settings",
@@ -146,10 +146,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark">IC</span>
+          <span className="brand-mark">sf</span>
           <div>
-            <p className="brand-name">Inventory Command</p>
-            <p className="brand-copy">Forecast · Replenish · Alert</p>
+            <p className="brand-name">slelfly</p>
+            <p className="brand-copy">Forecast · Replenish · Recover</p>
           </div>
         </div>
 
@@ -178,11 +178,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="sidebar-note">
-          <p className="sidebar-note-title">Built for Shopify</p>
+          <p className="sidebar-note-title">Independent · Shopify-first</p>
           <p className="sidebar-note-copy">
-            Forecasting, replenishment, supplier scoring, and multi-channel
-            alerting in one place.
+            No PE squeeze. No surprise renewal hikes. Founder-led and
+            shipping on a public changelog.
           </p>
+          <Link href="/" className="sidebar-note-link">
+            See positioning →
+          </Link>
         </div>
       </aside>
 

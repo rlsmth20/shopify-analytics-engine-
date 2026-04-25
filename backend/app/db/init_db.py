@@ -1,7 +1,9 @@
 from app.db.base import Base
 from app.db.models import (
+    AlertRuleRecord,
     CategoryLeadTime,
     Inventory,
+    NotificationChannelRecord,
     OrderLineItem,
     Product,
     Shop,
@@ -15,8 +17,10 @@ from app.db.session import engine
 def init_db() -> None:
     # Importing model symbols ensures SQLAlchemy has registered all tables.
     _ = (
+        AlertRuleRecord,
         CategoryLeadTime,
         Inventory,
+        NotificationChannelRecord,
         OrderLineItem,
         Product,
         Shop,
