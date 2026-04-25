@@ -113,7 +113,7 @@ export default function GoodbyeStockyPage() {
           requirement.
         </p>
         <div className="marketing-hero-ctas">
-          <Link href="/dashboard" className="button button-primary button-lg">
+          <Link href="/import-stocky" className="button button-primary button-lg">
             Start migrating today
           </Link>
           <Link href="/pricing" className="button button-ghost button-lg">
@@ -178,7 +178,7 @@ export default function GoodbyeStockyPage() {
           connect Shopify, and have your next reorder ready.
         </p>
         <div className="marketing-hero-ctas">
-          <Link href="/dashboard" className="button button-primary button-lg">
+          <Link href="/import-stocky" className="button button-primary button-lg">
             Start migrating
           </Link>
           <Link href="/about" className="button button-ghost button-lg">

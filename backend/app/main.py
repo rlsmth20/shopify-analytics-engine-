@@ -13,6 +13,8 @@ from app.api.routes.health import router as health_router
 from app.api.routes.liquidation import router as liquidation_router
 from app.api.routes.reorder import router as reorder_router
 from app.api.routes.shopify_ingestion import router as shopify_ingestion_router
+from app.api.routes.stocky_import import router as stocky_import_router
+from app.api.routes.shipstation_import import router as shipstation_import_router
 from app.api.routes.shop_settings import router as shop_settings_router
 from app.api.routes.skus import router as skus_router
 from app.api.routes.suppliers import router as suppliers_router
@@ -47,6 +49,8 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(actions_router)
     app.include_router(shopify_ingestion_router)
+    app.include_router(stocky_import_router)
+    app.include_router(shipstation_import_router)
     app.include_router(shop_settings_router)
     app.include_router(skus_router)
     # v2 intelligence surfaces
