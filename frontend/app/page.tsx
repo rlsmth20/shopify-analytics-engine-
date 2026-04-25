@@ -63,6 +63,16 @@ const migrationCards = [
     tone: "urgent"
   },
   {
+    eyebrow: "Forecasting in a spreadsheet?",
+    date: "ShipStation export → Google Sheet → trailing average",
+    title: "Better than your spreadsheet.",
+    body:
+      "If your reorder math is a 6-month moving average in a Google Sheet, you\u0027re tying up cash you don\u0027t need to and missing every seasonal ramp. slelfly fixes both — drop in your ShipStation export and see real velocity in minutes.",
+    cta: "See why",
+    href: "/vs-spreadsheet",
+    tone: "steady"
+  },
+  {
     eyebrow: "Leaving Genie?",
     date: "Genie closed Aug 31, 2025",
     title: "Genie is gone. slelfly is the upgrade.",
@@ -81,9 +91,9 @@ const positioning = [
       "Eight of the tools you evaluate have been acquired by a parent that raised prices, slowed the roadmap, or broke support. slelfly is structurally outside that pattern."
   },
   {
-    title: "Shopify-first, not Shopify-also.",
+    title: "Shopify-first today. Multi-channel coming.",
     body:
-      "We ingest one shop at a time, carefully. No ERP middleware, no multi-channel compromise layer, no quote-only implementation project."
+      "Our deepest integration is Shopify. ShipStation imports already cover Amazon, eBay, and Walmart shipment history. Native Amazon and eBay writes are on the roadmap; until then, we replace the forecasting layer alongside whatever channel-sync tool you use."
   },
   {
     title: "Math you can see.",
@@ -231,6 +241,8 @@ export default function HomePage() {
           <Link href="/changelog">Changelog</Link>
           <Link href="/goodbye-stocky">Stocky migration</Link>
           <Link href="/goodbye-genie">Genie migration</Link>
+          <Link href="/vs-spreadsheet">vs. spreadsheet</Link>
+          <Link href="/import-shipstation">ShipStation import</Link>
           <Link href="/login">Sign in</Link>
         </div>
         <p className="marketing-footer-fine">
