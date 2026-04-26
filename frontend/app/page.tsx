@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { WaitlistForm } from "@/components/waitlist-form";
+
 export const metadata = {
   title: "slelfly — The Shopify inventory tool that tells you what to do first",
   description:
@@ -7,104 +9,25 @@ export const metadata = {
 };
 
 const pillars = [
-  {
-    kicker: "Forecasting",
-    title: "Stockout probability, not stockout guesswork.",
-    body:
-      "Holt double-exponential smoothing with weekly seasonality and a real probability of stockout on every SKU — not a moving average with a guess on top.",
-    href: "/forecast"
-  },
-  {
-    kicker: "Suppliers",
-    title: "Vendors you can measure.",
-    body:
-      "On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering. 23 of the 25 tools we studied still treat vendors as contact records.",
-    href: "/suppliers"
-  },
-  {
-    kicker: "Liquidation",
-    title: "Cash recovery on stale inventory.",
-    body:
-      "Every dead-stock SKU comes with a concrete plan: markdown, bundle, wholesale, or write-off — with the dollar impact attached. 24 of 25 competitors surface aged stock and stop.",
-    href: "/liquidation"
-  },
-  {
-    kicker: "Bundles",
-    title: "Bundles that don't lose components.",
-    body:
-      "Kits decompose at reorder time, so you never place a PO that leaves a component short. Bundle bottlenecks are called out on the dashboard.",
-    href: "/bundles"
-  },
-  {
-    kicker: "Dashboard",
-    title: "What should I do today?",
-    body:
-      "An action-ranked queue — urgent, optimize, dead — instead of a wall of dashboards. Rank the list, work it from the top.",
-    href: "/dashboard"
-  },
-  {
-    kicker: "Alerts",
-    title: "Alerts that reach you where you work.",
-    body:
-      "Email, SMS, Slack, and webhooks driven by a real rule engine. No 'email only' limitation like the rest of the market.",
-    href: "/alerts"
-  }
+  { kicker: "Forecasting", title: "Stockout probability, not stockout guesswork.", body: "Holt double-exponential smoothing with weekly seasonality and a real probability of stockout on every SKU — not a moving average with a guess on top.", href: "/forecast" },
+  { kicker: "Suppliers", title: "Vendors you can measure.", body: "On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering. 23 of the 25 tools we studied still treat vendors as contact records.", href: "/suppliers" },
+  { kicker: "Liquidation", title: "Cash recovery on stale inventory.", body: "Every dead-stock SKU comes with a concrete plan: markdown, bundle, wholesale, or write-off — with the dollar impact attached. 24 of 25 competitors surface aged stock and stop.", href: "/liquidation" },
+  { kicker: "Bundles", title: "Bundles that don't lose components.", body: "Kits decompose at reorder time, so you never place a PO that leaves a component short. Bundle bottlenecks are called out on the dashboard.", href: "/bundles" },
+  { kicker: "Dashboard", title: "What should I do today?", body: "An action-ranked queue — urgent, optimize, dead — instead of a wall of dashboards. Rank the list, work it from the top.", href: "/dashboard" },
+  { kicker: "Alerts", title: "Alerts that reach you where you work.", body: "Email, SMS, Slack, and webhooks driven by a real rule engine. No 'email only' limitation like the rest of the market.", href: "/alerts" }
 ];
 
 const migrationCards = [
-  {
-    eyebrow: "Leaving Stocky?",
-    date: "Shopify Stocky ends Aug 31, 2026",
-    title: "Goodbye Stocky, hello slelfly.",
-    body:
-      "Shopify sunset a tool thousands of POS Pro merchants depended on. We built the replacement you actually wanted: forecasting, supplier scorecards, and dead-stock plans in one product.",
-    cta: "See the migration path",
-    href: "/goodbye-stocky",
-    tone: "urgent"
-  },
-  {
-    eyebrow: "Forecasting in a spreadsheet?",
-    date: "ShipStation export → Google Sheet → trailing average",
-    title: "Better than your spreadsheet.",
-    body:
-      "If your reorder math is a 6-month moving average in a Google Sheet, you\u0027re tying up cash you don\u0027t need to and missing every seasonal ramp. slelfly fixes both — drop in your ShipStation export and see real velocity in minutes.",
-    cta: "See why",
-    href: "/vs-spreadsheet",
-    tone: "steady"
-  },
-  {
-    eyebrow: "Leaving Genie?",
-    date: "Genie closed Aug 31, 2025",
-    title: "Genie is gone. slelfly is the upgrade.",
-    body:
-      "Genie merchants loved simple. We kept the simple and added the math — forecasting, supplier metrics, and a real reorder engine.",
-    cta: "See the migration path",
-    href: "/goodbye-genie",
-    tone: "steady"
-  }
+  { eyebrow: "Leaving Stocky?", date: "Shopify Stocky ends Aug 31, 2026", title: "Goodbye Stocky, hello slelfly.", body: "Shopify sunset a tool thousands of POS Pro merchants depended on. We built the replacement you actually wanted: forecasting, supplier scorecards, and dead-stock plans in one product.", cta: "See the migration path", href: "/goodbye-stocky", tone: "urgent" },
+  { eyebrow: "Forecasting in a spreadsheet?", date: "ShipStation export → Google Sheet → trailing average", title: "Better than your spreadsheet.", body: "If your reorder math is a 6-month moving average in a Google Sheet, you're tying up cash you don't need to and missing every seasonal ramp. slelfly fixes both — drop in your ShipStation export and see real velocity in minutes.", cta: "See why", href: "/vs-spreadsheet", tone: "steady" },
+  { eyebrow: "Leaving Genie?", date: "Genie closed Aug 31, 2025", title: "Genie is gone. slelfly is the upgrade.", body: "Genie merchants loved simple. We kept the simple and added the math — forecasting, supplier metrics, and a real reorder engine.", cta: "See the migration path", href: "/goodbye-genie", tone: "steady" }
 ];
 
 const positioning = [
-  {
-    title: "Independent. Founder-led.",
-    body:
-      "Eight of the tools you evaluate have been acquired by a parent that raised prices, slowed the roadmap, or broke support. slelfly is structurally outside that pattern."
-  },
-  {
-    title: "Shopify-first today. Multi-channel coming.",
-    body:
-      "Our deepest integration is Shopify. ShipStation imports already cover Amazon, eBay, and Walmart shipment history. Native Amazon and eBay writes are on the roadmap; until then, we replace the forecasting layer alongside whatever channel-sync tool you use."
-  },
-  {
-    title: "Math you can see.",
-    body:
-      "Every recommended quantity explains itself — trailing demand, seasonality factor, service level, stockout probability. Explainability is a feature."
-  },
-  {
-    title: "Fair pricing. Locked pricing.",
-    body:
-      "We publish our tiers. We commit in writing that renewals do not raise the price on your plan. We mean it."
-  }
+  { title: "Independent. Founder-led.", body: "Eight of the tools you evaluate have been acquired by a parent that raised prices, slowed the roadmap, or broke support. slelfly is structurally outside that pattern." },
+  { title: "Shopify-first today. Multi-channel coming.", body: "Our deepest integration is Shopify. ShipStation imports already cover Amazon, eBay, and Walmart shipment history. Native Amazon and eBay writes are on the roadmap; until then, we replace the forecasting layer alongside whatever channel-sync tool you use." },
+  { title: "Math you can see.", body: "Every recommended quantity explains itself — trailing demand, seasonality factor, service level, stockout probability. Explainability is a feature." },
+  { title: "Fair pricing. Locked pricing.", body: "We publish our tiers. We commit in writing that renewals do not raise the price on your plan. We mean it." }
 ];
 
 export default function HomePage() {
@@ -119,68 +42,44 @@ export default function HomePage() {
           <Link href="/#pillars">Product</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/about">About</Link>
+          <Link href="/blog">Blog</Link>
           <Link href="/changelog">Changelog</Link>
         </nav>
         <div className="marketing-nav-ctas">
-          <Link href="/login" className="marketing-link-subtle">
-            Sign in
-          </Link>
-          <Link href="/dashboard" className="button button-primary">
-            Open app
-          </Link>
+          <Link href="/dashboard" className="marketing-link-subtle">View demo</Link>
         </div>
       </header>
 
       <section className="marketing-hero">
         <p className="marketing-eyebrow">Inventory decisions, made in order.</p>
-        <h1 className="marketing-hero-title">
-          The Shopify inventory tool that tells you what to do first.
-        </h1>
+        <h1 className="marketing-hero-title">The Shopify inventory tool that tells you what to do first.</h1>
         <p className="marketing-hero-sub">
-          Forecast the next 90 days, rank every SKU, score every supplier, and
-          recover cash from dead stock — in one Shopify-first product, at a
-          price that doesn&apos;t triple at renewal.
+          Forecast the next 90 days, rank every SKU, score every supplier, and recover cash from dead stock — in one Shopify-first product, at a price that doesn&apos;t triple at renewal.
         </p>
-        <div className="marketing-hero-ctas">
-          <Link href="/dashboard" className="button button-primary button-lg">
-            Try slelfly free
-          </Link>
-          <Link href="/pricing" className="button button-ghost button-lg">
-            See pricing
-          </Link>
-        </div>
+        <WaitlistForm source="home_hero" />
         <p className="marketing-hero-trust">
-          No credit card · Connect your store in minutes · Cancel anytime ·
+          We&apos;re in private beta. <Link href="/dashboard">See a live demo</Link> ·
           <strong> Prices locked at renewal</strong>
         </p>
       </section>
 
       <section className="marketing-migration" aria-label="Migration windows">
         {migrationCards.map((card) => (
-          <article
-            key={card.href}
-            className={`migration-card migration-card-${card.tone}`}
-          >
+          <article key={card.href} className={`migration-card migration-card-${card.tone}`}>
             <p className="migration-card-eyebrow">{card.eyebrow}</p>
             <p className="migration-card-date">{card.date}</p>
             <h2 className="migration-card-title">{card.title}</h2>
             <p className="migration-card-body">{card.body}</p>
-            <Link href={card.href} className="migration-card-cta">
-              {card.cta} →
-            </Link>
+            <Link href={card.href} className="migration-card-cta">{card.cta} →</Link>
           </article>
         ))}
       </section>
 
       <section className="marketing-section" id="pillars">
         <p className="marketing-section-kicker">What slelfly does</p>
-        <h2 className="marketing-section-title">
-          Six things the rest of the market gets wrong.
-        </h2>
+        <h2 className="marketing-section-title">Six things the rest of the market gets wrong.</h2>
         <p className="marketing-section-sub">
-          We studied twenty-five inventory products. These are the six gaps
-          that appeared over and over — and every one of them ships in slelfly
-          today.
+          We studied twenty-five inventory products. These are the six gaps that appeared over and over — and every one of them ships in slelfly today.
         </p>
         <div className="pillar-grid">
           {pillars.map((p) => (
@@ -188,9 +87,7 @@ export default function HomePage() {
               <p className="pillar-card-kicker">{p.kicker}</p>
               <h3 className="pillar-card-title">{p.title}</h3>
               <p className="pillar-card-body">{p.body}</p>
-              <Link href={p.href} className="pillar-card-link">
-                Open in app →
-              </Link>
+              <Link href={p.href} className="pillar-card-link">See in demo →</Link>
             </article>
           ))}
         </div>
@@ -198,9 +95,7 @@ export default function HomePage() {
 
       <section className="marketing-section marketing-section-alt">
         <p className="marketing-section-kicker">Positioning</p>
-        <h2 className="marketing-section-title">
-          Why the rest of the market is the way it is — and why slelfly isn&apos;t.
-        </h2>
+        <h2 className="marketing-section-title">Why the rest of the market is the way it is — and why slelfly isn&apos;t.</h2>
         <div className="positioning-grid">
           {positioning.map((p) => (
             <article key={p.title} className="positioning-card">
@@ -212,21 +107,11 @@ export default function HomePage() {
       </section>
 
       <section className="marketing-section marketing-cta-section">
-        <h2 className="marketing-section-title">
-          See what your next reorder should be.
-        </h2>
+        <h2 className="marketing-section-title">See what your next reorder should be.</h2>
         <p className="marketing-section-sub">
-          Connect your Shopify store and the first ranked action appears in
-          under ten minutes. No consultant, no six-month rollout, no quote.
+          Get on the list and we&apos;ll send your invite when paid plans launch. In the meantime, the demo is live.
         </p>
-        <div className="marketing-hero-ctas">
-          <Link href="/dashboard" className="button button-primary button-lg">
-            Open the app
-          </Link>
-          <Link href="/pricing" className="button button-ghost button-lg">
-            See pricing
-          </Link>
-        </div>
+        <WaitlistForm source="home_footer" />
       </section>
 
       <footer className="marketing-footer">
@@ -238,16 +123,16 @@ export default function HomePage() {
           <Link href="/">Home</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/about">About</Link>
+          <Link href="/blog">Blog</Link>
           <Link href="/changelog">Changelog</Link>
           <Link href="/goodbye-stocky">Stocky migration</Link>
           <Link href="/goodbye-genie">Genie migration</Link>
           <Link href="/vs-spreadsheet">vs. spreadsheet</Link>
-          <Link href="/import-shipstation">ShipStation import</Link>
-          <Link href="/login">Sign in</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
         </div>
         <p className="marketing-footer-fine">
-          © {new Date().getFullYear()} slelfly · Independent · Founder-led ·
-          Prices locked at renewal
+          © {new Date().getFullYear()} slelfly · Independent · Founder-led · Prices locked at renewal
         </p>
       </footer>
     </div>

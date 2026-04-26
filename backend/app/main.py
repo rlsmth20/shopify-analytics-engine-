@@ -12,19 +12,20 @@ from app.api.routes.forecast import router as forecast_router
 from app.api.routes.health import router as health_router
 from app.api.routes.liquidation import router as liquidation_router
 from app.api.routes.reorder import router as reorder_router
-from app.api.routes.shopify_ingestion import router as shopify_ingestion_router
-from app.api.routes.stocky_import import router as stocky_import_router
 from app.api.routes.shipstation_import import router as shipstation_import_router
 from app.api.routes.shop_settings import router as shop_settings_router
+from app.api.routes.shopify_ingestion import router as shopify_ingestion_router
 from app.api.routes.skus import router as skus_router
+from app.api.routes.stocky_import import router as stocky_import_router
 from app.api.routes.suppliers import router as suppliers_router
 from app.api.routes.transfers import router as transfers_router
+from app.api.routes.waitlist import router as waitlist_router
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Inventory Command API",
-        version="0.2.0",
+        title="slelfly API",
+        version="0.3.0",
         description=(
             "Forecasting, replenishment, alerting, and supplier intelligence "
             "for Shopify merchants."
@@ -51,8 +52,10 @@ def create_app() -> FastAPI:
     app.include_router(shopify_ingestion_router)
     app.include_router(stocky_import_router)
     app.include_router(shipstation_import_router)
+    app.include_router(waitlist_router)
     app.include_router(shop_settings_router)
     app.include_router(skus_router)
+
     # v2 intelligence surfaces
     app.include_router(dashboard_router)
     app.include_router(forecast_router)
@@ -63,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(transfers_router)
     app.include_router(liquidation_router)
     app.include_router(alerts_router)
+
     return app
 
 

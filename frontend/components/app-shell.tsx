@@ -190,6 +190,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="app-main">
+        <div className="demo-banner" role="status">
+          <span className="demo-banner-mark" aria-hidden>•</span>
+          <span>
+            <strong>Demo mode.</strong> This is example inventory, not your store. To connect your real Shopify data,{" "}
+            <Link href="/" className="demo-banner-link">join the waitlist</Link>.
+          </span>
+        </div>
+
         <header className="top-header">
           <div>
             <p className="header-eyebrow">{meta.eyebrow}</p>
@@ -201,7 +209,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="header-chip header-chip-tone">
               {shopifyDomain ? shopifyDomain : "No store selected"}
             </span>
-            <span className="header-chip">Live mode</span>
+            <span className="header-chip">Demo data</span>
           </div>
         </header>
 

@@ -200,11 +200,7 @@ class CategoryLeadTime(Base):
 
 
 class AlertRuleRecord(Base):
-    """Persisted alert rule.
-
-    Alerts were in-memory in v0.2; they are persisted in v0.3 so rules
-    survive restarts — a prerequisite for any paid tier.
-    """
+    """Persisted alert rule. Alerts were in-memory in v0.2; persisted in v0.3."""
 
     __tablename__ = "alert_rules"
 
@@ -240,4 +236,32 @@ class NotificationChannelRecord(Base):
         server_default=func.now(),
         default=func.now(),
         onupdate=func.now(),
+    )
+
+
+class WaitlistSignup(Base):
+    """Captures merchant interest before real auth + Stripe billing ship.
+
+    Replaces /dashboard as the entry point. Stores email + shop domain +
+    where they signed up from so we can prioritize follow-up.
+    """
+
+    __tablename__ = "waitlist_signups"
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_waitlist_email"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    shopify_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    note: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )
+    contacted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
