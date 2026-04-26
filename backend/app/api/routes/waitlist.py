@@ -4,13 +4,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.db.models import WaitlistSignup
 from app.db.session import session_scope
+from app.services.transactional_email import send_waitlist_confirmation
 
 
 router = APIRouter(prefix="/waitlist", tags=["waitlist"])
@@ -33,7 +34,10 @@ class WaitlistSignupResponse(BaseModel):
 
 
 @router.post("/signup", response_model=WaitlistSignupResponse)
-def signup(request: WaitlistSignupRequest) -> WaitlistSignupResponse:
+def signup(
+    request: WaitlistSignupRequest,
+    background_tasks: BackgroundTasks,
+) -> WaitlistSignupResponse:
     email = request.email.lower().strip()
     domain = (request.shopify_domain or "").strip().lower() or None
 
@@ -75,7 +79,7 @@ def signup(request: WaitlistSignupRequest) -> WaitlistSignupResponse:
             raise HTTPException(status_code=409, detail="Email already on the waitlist.") from exc
         session.refresh(record)
 
-        return WaitlistSignupResponse(
+        response = WaitlistSignupResponse(
             id=record.id,
             email=record.email,
             shopify_domain=record.shopify_domain,
@@ -83,6 +87,17 @@ def signup(request: WaitlistSignupRequest) -> WaitlistSignupResponse:
             created_at=record.created_at,
             already_signed_up=False,
         )
+
+    # Fire-and-forget confirmation email — only on truly new signups.
+    # send_waitlist_confirmation never raises, so a misconfigured RESEND_API_KEY
+    # cannot break the signup flow.
+    background_tasks.add_task(
+        send_waitlist_confirmation,
+        email=email,
+        shopify_domain=domain,
+    )
+
+    return response
 
 
 @router.get("/count")
