@@ -14,8 +14,7 @@ export default function OGImage() {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          background:
-            "linear-gradient(135deg, #1e3a8a 0%, #0f766e 100%)",
+          background: "linear-gradient(135deg, #1e3a8a 0%, #0f766e 100%)",
           color: "#ffffff",
           fontFamily: "system-ui, -apple-system, sans-serif",
           padding: "72px 80px",
@@ -40,17 +39,8 @@ export default function OGImage() {
           >
             sf
           </div>
-          <div
-            style={{
-              fontSize: 36,
-              fontWeight: 700,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            slelfly
-          </div>
+          <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-0.01em" }}>slelfly</div>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div
             style={{
@@ -63,19 +53,10 @@ export default function OGImage() {
           >
             The Shopify inventory tool that tells you what to do first.
           </div>
-          <div
-            style={{
-              fontSize: 28,
-              opacity: 0.9,
-              maxWidth: 1040,
-              lineHeight: 1.35,
-            }}
-          >
-            Forecast 90 days. Rank every SKU. Score every supplier. Recover
-            cash from dead stock.
+          <div style={{ fontSize: 28, opacity: 0.9, maxWidth: 1040, lineHeight: 1.35 }}>
+            Forecast 90 days. Rank every SKU. Score every supplier. Recover cash from dead stock.
           </div>
         </div>
-
         <div
           style={{
             display: "flex",
@@ -90,6 +71,6 @@ export default function OGImage() {
         </div>
       </div>
     ),
-    { ...size },
+    { ...size }
   );
 }

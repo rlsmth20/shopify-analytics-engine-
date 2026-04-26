@@ -1,0 +1,6 @@
+SKU,Product,Vendor,Type,Cost,Price,Inventory,Lead time
+SHIRT-RED-S,Classic Tee Red Small,Acme Apparel,Apparel,8.50,24.99,142,21
+SHIRT-RED-M,Classic Tee Red Medium,Acme Apparel,Apparel,8.50,24.99,87,21
+SHIRT-BLU-M,Classic Tee Blue Medium,Acme Apparel,Apparel,8.50,24.99,12,21
+MUG-WHT-12,Ceramic Mug White 12oz,Bright Pottery,Kitchen,3.20,14.99,318,30
+HAT-NVY-OS,Cotton Hat Navy One Size,Acme Apparel,Apparel,5.00,19.99,0,21

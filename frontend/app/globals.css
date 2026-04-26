@@ -4762,3 +4762,118 @@ code {
   padding-top: 24px;
   border-top: 1px solid var(--line);
 }
+
+/* =========================================================================
+   Waitlist form + demo banner (pre-launch)
+   ========================================================================= */
+
+.waitlist-form {
+  margin: 0 auto;
+  max-width: 720px;
+  width: 100%;
+}
+
+.waitlist-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.waitlist-input {
+  font-size: 15px;
+  padding: 12px 14px;
+}
+
+.waitlist-form .button {
+  white-space: nowrap;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+.waitlist-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.waitlist-error {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #b91c1c;
+  text-align: center;
+}
+
+.waitlist-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: #ecfdf3;
+  border: 1px solid rgba(2, 122, 72, 0.28);
+  color: #065f46;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.waitlist-success-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #027a48;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #fff8e0;
+  border-bottom: 1px solid rgba(181, 71, 8, 0.2);
+  color: #7c4906;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.demo-banner-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #b54708;
+  color: #ffffff;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.demo-banner strong {
+  color: #5b3504;
+  font-weight: 700;
+}
+
+.demo-banner-link {
+  font-weight: 700;
+  color: #b54708;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.demo-banner-link:hover {
+  color: #7c4906;
+}
+
+@media (max-width: 720px) {
+  .waitlist-form-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,13 +1,4 @@
-"""Stocky CSV importer.
-
-Stocky is being end-of-life'd by Shopify on August 31, 2026. This service ingests
-Stocky's product CSV export into slelfly's normalized tables so a Stocky merchant
-can land in slelfly with their catalog already populated.
-
-Stocky exports several CSVs. We accept the products export, which is the minimum
-required to drive slelfly's action engine. Vendor lead times can be configured
-afterwards on the Lead Times settings page.
-"""
+"""Stocky CSV importer."""
 from __future__ import annotations
 
 import csv
@@ -23,8 +14,6 @@ from app.db.session import session_scope
 from app.services.shop_settings import normalize_shopify_domain
 
 
-# Stocky's column names vary across export versions. We accept any of these.
-# Match is case-insensitive and ignores whitespace/punctuation.
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "sku": ("sku", "variantsku", "skucode", "barcode"),
     "name": ("product", "productname", "title", "name", "producttitle"),
@@ -59,7 +48,6 @@ def _norm_key(s: str) -> str:
 
 
 def _resolve_columns(header: list[str]) -> dict[str, str]:
-    """Return mapping of canonical name -> actual header in this CSV."""
     normalized = {_norm_key(h): h for h in header}
     resolved: dict[str, str] = {}
     for canonical, aliases in COLUMN_ALIASES.items():
@@ -76,7 +64,6 @@ def _to_decimal(raw: Any, default: str = "0") -> Decimal:
     s = str(raw).strip()
     if not s:
         return Decimal(default)
-    # Strip currency symbols and thousands separators
     s = s.replace("$", "").replace(",", "").replace("£", "").replace("€", "")
     try:
         return Decimal(s)
@@ -102,14 +89,6 @@ def import_stocky_products_csv(
     csv_bytes: bytes,
     location_label: str = "stocky-import",
 ) -> StockyImportResult:
-    """Parse Stocky's products CSV and persist rows.
-
-    Args:
-      shopify_domain: the merchant's shop domain (will be normalized).
-      csv_bytes: raw CSV file bytes.
-      location_label: a label for the synthetic location row we attach
-        inventory to. Real Shopify locations replace this on first sync.
-    """
     domain = normalize_shopify_domain(shopify_domain)
     if not domain:
         raise StockyImportError("Shopify domain is required.")
@@ -131,11 +110,9 @@ def import_stocky_products_csv(
     cols = _resolve_columns(header)
     if "sku" not in cols and "name" not in cols:
         raise StockyImportError(
-            "CSV must include either an SKU or product name column. "
-            "Recognized headers: " + ", ".join(sorted(set(a for v in COLUMN_ALIASES.values() for a in v)))
+            "CSV must include either an SKU or product name column."
         )
 
-    # Resolve column indices for fast lookup
     name_to_index = {h: i for i, h in enumerate(header)}
     idx = {canonical: name_to_index[h] for canonical, h in cols.items()}
 
@@ -149,7 +126,6 @@ def import_stocky_products_csv(
             session.flush()
         result.shop_id = shop.id
 
-        # Build a quick lookup for existing products by SKU on this shop
         existing_by_sku: dict[str, Product] = {}
         for p in session.scalars(select(Product).where(Product.shop_id == shop.id)).all():
             if p.sku:
@@ -221,8 +197,6 @@ def import_stocky_products_csv(
                     existing_by_sku[sku] = product
                 result.products_inserted += 1
 
-            # Inventory row: write a single synthetic location for now;
-            # real Shopify ingestion overrides this on first sync.
             inv = session.scalar(
                 select(Inventory).where(
                     Inventory.shop_id == shop.id,

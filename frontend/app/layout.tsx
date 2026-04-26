@@ -21,36 +21,28 @@ export const metadata: Metadata = {
     "Stocky alternative",
     "Inventory Planner alternative",
     "Cin7 alternative",
-    "Linnworks alternative",
     "supplier scorecards",
     "dead stock liquidation",
     "stockout probability",
-    "reorder point",
-    "EOQ",
-    "ABC XYZ classification",
   ],
   authors: [{ name: "slelfly" }],
   creator: "slelfly",
   publisher: "slelfly",
   applicationName: "slelfly",
   category: "business",
-  alternates: {
-    canonical: "/",
-  },
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: "slelfly",
     title: "slelfly — The Shopify inventory tool that tells you what to do first",
-    description:
-      "Forecast the next 90 days, rank every SKU, score every supplier, and recover cash from dead stock — in one Shopify-first product.",
+    description: "Forecast 90 days. Rank every SKU. Score every supplier. Recover cash from dead stock.",
     url: SITE_URL,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
     title: "slelfly — The Shopify inventory tool that tells you what to do first",
-    description:
-      "Forecast 90 days. Rank every SKU. Score every supplier. Recover cash from dead stock. Shopify-first, founder-led, price-locked.",
+    description: "Forecast 90 days. Rank every SKU. Score every supplier. Recover cash from dead stock.",
   },
   robots: {
     index: true,
@@ -73,43 +65,18 @@ const SOFTWARE_APP_LD = {
   applicationSubCategory: "Inventory Management",
   operatingSystem: "Web",
   url: SITE_URL,
-  description:
-    "Forecast 90 days, rank every SKU, score every supplier, and recover cash from dead stock — Shopify-first, founder-led, price-locked.",
+  description: "Forecast 90 days, rank every SKU, score every supplier, and recover cash from dead stock.",
   offers: [
-    {
-      "@type": "Offer",
-      name: "Starter",
-      price: "49",
-      priceCurrency: "USD",
-      url: `${SITE_URL}/pricing`,
-    },
-    {
-      "@type": "Offer",
-      name: "Growth",
-      price: "149",
-      priceCurrency: "USD",
-      url: `${SITE_URL}/pricing`,
-    },
-    {
-      "@type": "Offer",
-      name: "Scale",
-      price: "349",
-      priceCurrency: "USD",
-      url: `${SITE_URL}/pricing`,
-    },
+    { "@type": "Offer", name: "Starter", price: "49", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
+    { "@type": "Offer", name: "Growth", price: "149", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
+    { "@type": "Offer", name: "Scale", price: "349", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
   ],
-  publisher: {
-    "@type": "Organization",
-    name: "slelfly",
-    url: SITE_URL,
-  },
+  publisher: { "@type": "Organization", name: "slelfly", url: SITE_URL },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body>

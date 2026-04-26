@@ -10,6 +10,7 @@ from app.db.models import (
     ShopifySyncRun,
     ShopSettings,
     VendorLeadTime,
+    WaitlistSignup,
 )
 from app.db.session import engine
 
@@ -27,6 +28,7 @@ def init_db() -> None:
         ShopifySyncRun,
         ShopSettings,
         VendorLeadTime,
+        WaitlistSignup,
     )
     Base.metadata.create_all(bind=engine)
 

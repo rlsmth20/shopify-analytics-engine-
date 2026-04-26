@@ -1,15 +1,4 @@
-"""ShipStation CSV importer.
-
-Many merchants use ShipStation as the source of truth for shipped-out volume.
-A common workflow we observed in the wild is: export ShipStation shipments to
-CSV, paste into Google Sheets, compute a trailing 6-month moving average per
-SKU, then eyeball whether to reorder.
-
-This service ingests a ShipStation order/shipment export, persists per-SKU
-historical sales, and computes a per-SKU velocity summary that the forecasting
-engine can use directly. The output also doubles as a 'why your spreadsheet is
-wrong' diagnostic for the marketing site.
-"""
+"""ShipStation CSV importer."""
 from __future__ import annotations
 
 import csv
@@ -27,7 +16,6 @@ from app.db.session import session_scope
 from app.services.shop_settings import normalize_shopify_domain
 
 
-# ShipStation export columns vary by template. We accept any of these aliases.
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "order_id": ("ordernumber", "orderid", "ordernum", "orderno"),
     "ship_date": ("shipdate", "shippeddate", "datedelivered", "datesent"),
@@ -152,7 +140,7 @@ def import_shipstation_csv(
         try:
             text = csv_bytes.decode("latin-1")
         except UnicodeDecodeError as exc:
-            raise ShipStationImportError(f"Could not decode CSV file: {exc}") from exc
+            raise ShipStationImportError(f"Could not decode CSV: {exc}") from exc
 
     reader = csv.reader(io.StringIO(text))
     try:
@@ -183,7 +171,6 @@ def import_shipstation_csv(
             session.flush()
         result.shop_id = shop.id
 
-        # Build product lookup by SKU; create new product rows as needed
         existing_by_sku: dict[str, Product] = {}
         for p in session.scalars(select(Product).where(Product.shop_id == shop.id)).all():
             if p.sku:
@@ -263,8 +250,6 @@ def import_shipstation_csv(
         result.latest_ship_date = latest.date().isoformat()
     result.distinct_skus = len(by_sku)
 
-    # Compute velocity summary using `latest` as the anchor (so a stale
-    # export still shows useful 30/90/180 windows relative to its own data).
     if latest is not None:
         cutoff_30 = latest - timedelta(days=30)
         cutoff_90 = latest - timedelta(days=90)
