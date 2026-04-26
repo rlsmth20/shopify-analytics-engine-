@@ -3,7 +3,20 @@ import Link from "next/link";
 export const metadata = {
   title: "Better than your spreadsheet — slelfly",
   description:
-    "If your forecasting lives in a Google Sheet with a trailing 6-month average, you're tying up cash you don't need to. slelfly fixes that in ten minutes."
+    "If your forecasting lives in a Google Sheet with a trailing 6-month average, you're tying up cash you don't need to. slelfly fixes that in ten minutes.",
+  alternates: { canonical: "/vs-spreadsheet" },
+  keywords: ["Shopify forecasting", "inventory forecasting spreadsheet", "ShipStation export forecast", "Google Sheet inventory forecasting", "moving average reorder", "Holt forecasting Shopify"],
+  openGraph: {
+    title: "Your spreadsheet is overstocking you — slelfly",
+    description: "ShipStation export → Google Sheet → 6-month moving average → reorder. That math is costing you money. We fix it in 10 minutes.",
+    url: "/vs-spreadsheet",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Your spreadsheet is overstocking you",
+    description: "Six-month moving averages overstock A-items and miss every seasonal ramp. slelfly fixes both.",
+  },
 };
 
 const reasons = [

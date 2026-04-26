@@ -3,7 +3,60 @@ import Link from "next/link";
 export const metadata = {
   title: "Pricing — slelfly",
   description:
-    "Three published tiers. No quote-only pricing. A written price-lock clause that renewals cannot raise the rate on your plan."
+    "Three published tiers. No quote-only pricing. A written price-lock clause that renewals cannot raise the rate on your plan.",
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "Pricing — slelfly",
+    description:
+      "Three published tiers ($49/$149/$349) with a written price-lock pledge. The whole inventory market hides pricing and raises it at renewal. We don't.",
+    url: "/pricing",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pricing — slelfly",
+    description:
+      "Three published tiers with a written price-lock pledge. We don't hide prices and we don't raise them at renewal.",
+  },
+};
+
+const FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "Do you raise prices at renewal?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "No. Every plan has a written price-lock clause in the terms of service: we will not raise the monthly or annual rate on a plan you are already subscribed to.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Is there a free tier?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $49/mo.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How long does setup take?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Most merchants see their first ranked action in under ten minutes after connecting Shopify. We do not require a paid implementation partner.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How do you compare to Stocky / Inventory Planner / Cin7?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Compared with Stocky we add real forecasting, supplier scorecards, and dead-stock plans. Compared with Inventory Planner we publish our price and commit to not raising it. Compared with Cin7 we publish our price and do not require a 6-month implementation.",
+      },
+    },
+  ],
 };
 
 const tiers = [
@@ -226,6 +279,10 @@ export default function PricingPage() {
           Prices locked at renewal
         </p>
       </footer>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }}
+      />
     </div>
   );
 }

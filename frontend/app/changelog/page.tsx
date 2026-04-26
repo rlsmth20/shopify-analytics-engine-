@@ -3,7 +3,19 @@ import Link from "next/link";
 export const metadata = {
   title: "Changelog — slelfly",
   description:
-    "Every release lands here. Shipping transparently is how we counter the 'roadmap frozen' pattern the rest of the market has earned."
+    "Every release lands here. Shipping transparently is how we counter the 'roadmap frozen' pattern the rest of the market has earned.",
+  alternates: { canonical: "/changelog" },
+  openGraph: {
+    title: "Changelog — slelfly",
+    description: "Every release, on the record. We ship transparently so you never have to wonder whether slelfly is still being built.",
+    url: "/changelog",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Changelog — slelfly",
+    description: "Every release, on the record. We ship transparently.",
+  },
 };
 
 type ChangelogEntry = {
