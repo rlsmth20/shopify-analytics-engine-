@@ -3,7 +3,20 @@ import Link from "next/link";
 export const metadata = {
   title: "Goodbye Genie, hello slelfly — slelfly",
   description:
-    "Genie closed August 31, 2025. slelfly kept the simple Shopify-native experience Genie users loved and added the math: forecasting, supplier scorecards, dead-stock plans."
+    "Genie closed August 31, 2025. slelfly kept the simple Shopify-native experience Genie users loved and added the math: forecasting, supplier scorecards, dead-stock plans.",
+  alternates: { canonical: "/goodbye-genie" },
+  keywords: ["Genie alternative", "Genie replacement", "Genie shutdown", "Shopify Genie alternative", "Genie migration"],
+  openGraph: {
+    title: "Goodbye Genie, hello slelfly",
+    description: "Genie closed Aug 31, 2025. slelfly is the upgrade — same simplicity, with real forecasting, supplier scorecards, and reorder math.",
+    url: "/goodbye-genie",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Goodbye Genie, hello slelfly",
+    description: "Genie closed. slelfly is the upgrade.",
+  },
 };
 
 const reasons = [

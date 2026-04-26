@@ -3,7 +3,21 @@ import Link from "next/link";
 export const metadata = {
   title: "About — slelfly",
   description:
-    "Independent, founder-led, Shopify-first. No PE squeeze. No acquisition surprises. No quote-only pricing."
+    "Independent, founder-led, Shopify-first. No PE squeeze. No acquisition surprises. No quote-only pricing.",
+  alternates: { canonical: "/about" },
+  openGraph: {
+    title: "About slelfly — Independent. Founder-led. No PE squeeze.",
+    description:
+      "Eight of the inventory tools you evaluate were acquired and got worse. slelfly is structurally outside that pattern.",
+    url: "/about",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About slelfly — Independent. Founder-led. No PE squeeze.",
+    description:
+      "Eight of the inventory tools you evaluate were acquired and got worse. slelfly is built to stay independent.",
+  },
 };
 
 const beliefs = [

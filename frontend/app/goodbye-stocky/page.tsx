@@ -3,7 +3,20 @@ import Link from "next/link";
 export const metadata = {
   title: "Goodbye Stocky, hello slelfly — slelfly",
   description:
-    "Shopify Stocky ends August 31, 2026. slelfly is the Shopify-native replacement: forecasting, supplier scorecards, dead-stock plans, no POS Pro requirement."
+    "Shopify Stocky ends August 31, 2026. slelfly is the Shopify-native replacement: forecasting, supplier scorecards, dead-stock plans, no POS Pro requirement.",
+  alternates: { canonical: "/goodbye-stocky" },
+  keywords: ["Stocky alternative", "Stocky replacement", "Stocky sunset", "Shopify Stocky end of life", "Stocky migration"],
+  openGraph: {
+    title: "Goodbye Stocky, hello slelfly",
+    description: "Shopify Stocky ends August 31, 2026. We built the replacement you actually wanted: forecasting, supplier scorecards, and dead-stock plans, Shopify-native.",
+    url: "/goodbye-stocky",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Goodbye Stocky, hello slelfly",
+    description: "Shopify Stocky ends Aug 31 2026. We're the Shopify-native replacement.",
+  },
 };
 
 const compareRows = [
