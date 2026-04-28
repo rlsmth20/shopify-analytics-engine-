@@ -5249,3 +5249,19 @@ code {
   flex-wrap: wrap;
   justify-content: center;
 }
+
+/* ============================================================
+   Annual yearly-total line under each price card
+   ============================================================ */
+
+.pricing-card-year-total {
+  margin: -8px 0 18px;
+  font-size: 13px;
+  color: #475569;
+  letter-spacing: 0.01em;
+}
+
+.pricing-card-year-total strong {
+  color: #0f172a;
+  font-weight: 600;
+}

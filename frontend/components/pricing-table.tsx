@@ -12,8 +12,16 @@ type Tier = {
   limit: string;
   features: string[];
   featured: boolean;
-  monthly: { plan: "starter_monthly" | "growth_monthly" | "scale_monthly"; price: string };
-  annual: { plan: "starter_annual" | "growth_annual" | "scale_annual"; price: string };
+  monthly: {
+    plan: "starter_monthly" | "growth_monthly" | "scale_monthly";
+    price: string;
+  };
+  annual: {
+    plan: "starter_annual" | "growth_annual" | "scale_annual";
+    price: string;
+    /** Total amount billed once per year. */
+    yearTotal: string;
+  };
 };
 
 const TIERS: Tier[] = [
@@ -32,7 +40,7 @@ const TIERS: Tier[] = [
     ],
     featured: false,
     monthly: { plan: "starter_monthly", price: "$49" },
-    annual: { plan: "starter_annual", price: "$42" }, // ~15% off
+    annual: { plan: "starter_annual", price: "$42", yearTotal: "$499" },
   },
   {
     name: "Growth",
@@ -50,7 +58,7 @@ const TIERS: Tier[] = [
     ],
     featured: true,
     monthly: { plan: "growth_monthly", price: "$149" },
-    annual: { plan: "growth_annual", price: "$125" },
+    annual: { plan: "growth_annual", price: "$125", yearTotal: "$1,499" },
   },
   {
     name: "Scale",
@@ -67,7 +75,7 @@ const TIERS: Tier[] = [
     ],
     featured: false,
     monthly: { plan: "scale_monthly", price: "$349" },
-    annual: { plan: "scale_annual", price: "$292" },
+    annual: { plan: "scale_annual", price: "$292", yearTotal: "$3,499" },
   },
 ];
 
@@ -115,6 +123,11 @@ export function PricingTable() {
                 <span className="pricing-card-amount">{variant.price}</span>
                 <span className="pricing-card-cadence">{cadence}</span>
               </p>
+              {cycle === "annual" ? (
+                <p className="pricing-card-year-total">
+                  <strong>{tier.annual.yearTotal}</strong> billed once per year
+                </p>
+              ) : null}
               <p className="pricing-card-limit">{tier.limit}</p>
               <ul className="pricing-card-features">
                 {tier.features.map((f) => (
