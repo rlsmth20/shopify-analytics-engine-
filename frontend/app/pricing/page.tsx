@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PricingButton } from "@/components/pricing-button";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
@@ -24,10 +25,20 @@ const FAQ_LD = {
   ],
 };
 
-const tiers = [
-  { name: "Starter", price: "$49", cadence: "/mo", pitch: "For solo operators and Stocky migrants picking their first replacement.", limit: "Up to 500 active SKUs · 1 location · 1 seat", features: ["Ranked action feed (urgent / optimize / dead)","Holt + seasonality forecasting","ABC × XYZ classification","Supplier records (scoring on higher tiers)","Email + Slack alerts","Shopify-native ingestion","Self-serve setup"], cta: "Get early access", featured: false },
-  { name: "Growth", price: "$149", cadence: "/mo", pitch: "Most merchants land here. Full intelligence stack, multi-location, no seat gates.", limit: "Up to 5,000 active SKUs · 3 locations · unlimited seats", features: ["Everything in Starter","Supplier scorecards + tiering","Safety-stock / ROP / EOQ with service-level segmentation","Bundle / kit bottleneck analysis","Multi-location transfer recommendations","Dead-stock liquidation plans","SMS + webhook alerts","Scheduled PDF reports"], cta: "Get early access", featured: true },
-  { name: "Scale", price: "$349", cadence: "/mo", pitch: "For multi-store operators and teams that want audit + approval flows.", limit: "Up to 25,000 active SKUs · 10 locations · unlimited seats", features: ["Everything in Growth","PO approval + send flow","Audit log and decision snapshots","Workspace roles","Priority support (same-business-day response)","Onboarding concierge","SSO (Google, Microsoft)"], cta: "Get early access", featured: false }
+const tiers: Array<{
+  name: string;
+  plan: "starter_monthly" | "growth_monthly" | "scale_monthly";
+  price: string;
+  cadence: string;
+  pitch: string;
+  limit: string;
+  features: string[];
+  cta: string;
+  featured: boolean;
+}> = [
+  { name: "Starter", plan: "starter_monthly", price: "$49", cadence: "/mo", pitch: "For solo operators and Stocky migrants picking their first replacement.", limit: "Up to 500 active SKUs · 1 location · 1 seat", features: ["Ranked action feed (urgent / optimize / dead)","Holt + seasonality forecasting","ABC × XYZ classification","Supplier records (scoring on higher tiers)","Email + Slack alerts","Shopify-native ingestion","Self-serve setup"], cta: "Subscribe to Starter", featured: false },
+  { name: "Growth", plan: "growth_monthly", price: "$149", cadence: "/mo", pitch: "Most merchants land here. Full intelligence stack, multi-location, no seat gates.", limit: "Up to 5,000 active SKUs · 3 locations · unlimited seats", features: ["Everything in Starter","Supplier scorecards + tiering","Safety-stock / ROP / EOQ with service-level segmentation","Bundle / kit bottleneck analysis","Multi-location transfer recommendations","Dead-stock liquidation plans","SMS + webhook alerts","Scheduled PDF reports"], cta: "Subscribe to Growth", featured: true },
+  { name: "Scale", plan: "scale_monthly", price: "$349", cadence: "/mo", pitch: "For multi-store operators and teams that want audit + approval flows.", limit: "Up to 25,000 active SKUs · 10 locations · unlimited seats", features: ["Everything in Growth","PO approval + send flow","Audit log and decision snapshots","Workspace roles","Priority support (same-business-day response)","Onboarding concierge","SSO (Google, Microsoft)"], cta: "Subscribe to Scale", featured: false }
 ];
 
 const faqs = [
@@ -86,7 +97,11 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            <a href="#waitlist" className={`button ${tier.featured ? "button-primary" : "button-ghost"} button-full`}>{tier.cta}</a>
+            <PricingButton
+              plan={tier.plan}
+              label={tier.cta}
+              variant={tier.featured ? "primary" : "ghost"}
+            />
           </article>
         ))}
       </section>

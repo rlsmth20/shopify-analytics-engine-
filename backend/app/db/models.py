@@ -346,3 +346,73 @@ class Session(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+
+class Subscription(Base):
+    """Stripe subscription state mirrored locally per shop.
+
+    The single source of truth is Stripe; we store enough fields to render
+    `/billing` pages and gate paid features without round-tripping to Stripe
+    on every request. The webhook handler keeps this row in sync.
+    """
+
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        UniqueConstraint("shop_id", name="uq_subscriptions_shop"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(
+        ForeignKey("shops.id", ondelete="CASCADE"),
+        index=True,
+    )
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    plan: Mapped[str] = mapped_column(String(32), default="none")
+    status: Mapped[str] = mapped_column(String(32), default="inactive", index=True)
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class ShopifyConnection(Base):
+    """Per-shop Shopify OAuth tokens + sync metadata.
+
+    Created when a merchant completes the OAuth install flow. The access
+    token is the secret used to call Shopify Admin GraphQL on their behalf.
+    """
+
+    __tablename__ = "shopify_connections"
+    __table_args__ = (
+        UniqueConstraint("shop_id", name="uq_shopify_connection_shop"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(
+        ForeignKey("shops.id", ondelete="CASCADE"),
+        index=True,
+    )
+    shopify_domain: Mapped[str] = mapped_column(String(255), index=True)
+    access_token: Mapped[str] = mapped_column(String(500))
+    scope: Mapped[str] = mapped_column(String(500), default="")
+    installed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )
+    last_sync_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    uninstalled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )

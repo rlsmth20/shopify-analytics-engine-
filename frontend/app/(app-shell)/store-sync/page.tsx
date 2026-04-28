@@ -1,171 +1,205 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
-import { EmptyState } from "@/components/empty-state";
-import { KpiCard } from "@/components/kpi-card";
 import { SectionCard } from "@/components/section-card";
-import { SyncStatusCard } from "@/components/sync-status-card";
-import type { ShopifyIngestionResponse } from "@/lib/api";
-import { triggerShopifyIngestion } from "@/lib/api";
-import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
-import { useSyncStatus } from "@/lib/use-sync-status";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+type Connection = {
+  connected: boolean;
+  shopify_domain: string | null;
+  last_sync_at: string | null;
+  scope: string | null;
+};
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return "never";
+  try {
+    const dt = new Date(iso);
+    return dt.toLocaleString();
+  } catch {
+    return iso;
+  }
+}
 
 export default function StoreSyncPage() {
-  const { shopifyDomain, setShopifyDomain } = useStoredShopDomain();
-  const {
-    latestSyncStatus,
-    isLoadingSyncStatus,
-    syncStatusError,
-    reloadLatestSyncStatus
-  } = useSyncStatus(shopifyDomain);
-  const [accessToken, setAccessToken] = useState("");
-  const [isIngesting, setIsIngesting] = useState(false);
-  const [ingestionError, setIngestionError] = useState<string | null>(null);
-  const [ingestionResult, setIngestionResult] =
-    useState<ShopifyIngestionResponse | null>(null);
+  const [connection, setConnection] = useState<Connection | null>(null);
+  const [shopInput, setShopInput] = useState("");
+  const [installLoading, setInstallLoading] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    products_count?: number;
+    order_line_items_count?: number;
+  } | null>(null);
 
-  async function handleIngestionSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const normalizedDomain = shopifyDomain.trim();
-    const normalizedAccessToken = accessToken.trim();
+  async function loadConnection() {
+    try {
+      const res = await fetch(`${API_BASE}/integrations/shopify/connection`, {
+        credentials: "include",
+      });
+      if (!res.ok) return;
+      setConnection(await res.json());
+    } catch {
+      // best-effort
+    }
+  }
 
-    if (!normalizedDomain || !normalizedAccessToken) {
-      setIngestionError("Enter both a Shopify domain and access token first.");
-      setIngestionResult(null);
+  useEffect(() => {
+    void loadConnection();
+  }, []);
+
+  async function handleInstall(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setInstallError(null);
+    if (!shopInput.trim()) {
+      setInstallError("Enter your myshopify.com domain.");
       return;
     }
-
-    setIsIngesting(true);
-    setIngestionError(null);
-    setIngestionResult(null);
-
+    setInstallLoading(true);
     try {
-      const result = await triggerShopifyIngestion({
-        shopify_domain: normalizedDomain,
-        access_token: normalizedAccessToken
-      });
-      setIngestionResult(result);
-      await reloadLatestSyncStatus(normalizedDomain);
-    } catch (error) {
-      setIngestionError(
-        error instanceof Error
-          ? error.message
-          : "The Shopify ingestion request failed."
+      const res = await fetch(
+        `${API_BASE}/integrations/shopify/install?shop=${encodeURIComponent(shopInput.trim())}`,
+        { credentials: "include" }
       );
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setInstallError(body?.detail || `Install failed (${res.status}).`);
+        return;
+      }
+      if (body?.authorize_url) {
+        window.location.href = body.authorize_url;
+      }
     } finally {
-      setIsIngesting(false);
+      setInstallLoading(false);
+    }
+  }
+
+  async function handleSyncNow() {
+    setSyncError(null);
+    setSyncResult(null);
+    setSyncing(true);
+    try {
+      const res = await fetch(`${API_BASE}/integrations/shopify/sync`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setSyncError(body?.detail || `Sync failed (${res.status}).`);
+        return;
+      }
+      setSyncResult(body);
+      void loadConnection();
+    } finally {
+      setSyncing(false);
     }
   }
 
   return (
     <div className="page-stack">
-      <div className="kpi-grid kpi-grid-tight">
-        <KpiCard
-          label="Connected domain"
-          value={shopifyDomain.trim() || "Not set"}
-          note="Stored locally for the current workspace"
-        />
-        <KpiCard
-          label="Latest sync"
-          value={latestSyncStatus?.latest_run?.status ?? (isLoadingSyncStatus ? "..." : "None")}
-          note="Most recent manual ingest run"
-        />
-      </div>
-
-      <div className="content-grid content-grid-2-1">
-        <SectionCard>
-          <div className="section-heading">
-            <div>
-              <p className="section-eyebrow">Connection</p>
-              <h2 className="section-title">Manual Shopify ingest</h2>
-            </div>
-            <p className="section-copy">
-              Trigger a one-shop ingest into the backend database. Actions will
-              prefer DB-backed data when usable.
-            </p>
+      <SectionCard>
+        <div className="section-heading">
+          <div>
+            <p className="section-eyebrow">Shopify connection</p>
+            <h2 className="section-title">
+              {connection?.connected ? "Connected" : "Connect your Shopify store"}
+            </h2>
           </div>
+          {connection?.connected ? (
+            <span className="status-badge status-succeeded">Active</span>
+          ) : (
+            <span className="status-badge status-failed">Not connected</span>
+          )}
+        </div>
 
-          <form className="stack-form" onSubmit={handleIngestionSubmit}>
-            <label className="field-label">
-              <span>Shopify domain</span>
-              <input
-                className="input-control"
-                type="text"
-                name="shopify_domain"
-                placeholder="store-name.myshopify.com"
-                value={shopifyDomain}
-                onChange={(event) => setShopifyDomain(event.target.value)}
-                autoComplete="off"
-              />
-            </label>
-
-            <label className="field-label">
-              <span>Access token</span>
-              <input
-                className="input-control"
-                type="password"
-                name="access_token"
-                placeholder="shpat_..."
-                value={accessToken}
-                onChange={(event) => setAccessToken(event.target.value)}
-                autoComplete="off"
-              />
-            </label>
-
+        {connection?.connected ? (
+          <>
+            <p className="section-copy">
+              Connected to <strong>{connection.shopify_domain}</strong>. Last
+              sync: {formatRelative(connection.last_sync_at)}.
+            </p>
             <div className="button-row">
-              <button type="submit" className="button button-primary" disabled={isIngesting}>
-                {isIngesting ? "Running ingest..." : "Run Shopify ingest"}
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={handleSyncNow}
+                disabled={syncing}
+              >
+                {syncing ? "Syncing…" : "Sync now"}
               </button>
             </div>
-          </form>
+            {syncError ? (
+              <p className="auth-error" style={{ marginTop: "16px" }}>
+                {syncError}
+              </p>
+            ) : null}
+            {syncResult ? (
+              <p className="section-copy" style={{ marginTop: "16px" }}>
+                Synced{" "}
+                <strong>{(syncResult.products_count ?? 0).toLocaleString()}</strong>{" "}
+                product variants and{" "}
+                <strong>{(syncResult.order_line_items_count ?? 0).toLocaleString()}</strong>{" "}
+                order line items.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <p className="section-copy">
+              Install the slelfly app on your Shopify store. We&apos;ll pull
+              products, inventory, and the last 180 days of orders so the
+              forecast and action queue can run on real data.
+            </p>
+            <form onSubmit={handleInstall} className="auth-form" style={{ maxWidth: "440px" }}>
+              <label className="auth-field">
+                <span className="auth-field-label">Your myshopify.com domain</span>
+                <input
+                  type="text"
+                  className="auth-input"
+                  placeholder="yourshop.myshopify.com"
+                  value={shopInput}
+                  onChange={(e) => setShopInput(e.target.value)}
+                  disabled={installLoading}
+                />
+              </label>
+              {installError ? <p className="auth-error">{installError}</p> : null}
+              <button
+                type="submit"
+                className="button button-primary"
+                disabled={installLoading}
+              >
+                {installLoading ? "Redirecting…" : "Connect Shopify"}
+              </button>
+            </form>
+          </>
+        )}
+      </SectionCard>
 
-          {ingestionError ? (
-            <div className="inline-message inline-message-error" role="alert">
-              <p className="inline-message-title">Ingest failed</p>
-              <p className="inline-message-copy">{ingestionError}</p>
-            </div>
-          ) : null}
-        </SectionCard>
-
-        <SyncStatusCard
-          isLoading={isLoadingSyncStatus}
-          errorMessage={syncStatusError}
-          status={latestSyncStatus}
-        />
-      </div>
-
-      {ingestionResult ? (
-        <SectionCard>
-          <div className="section-heading">
-            <div>
-              <p className="section-eyebrow">Result</p>
-              <h2 className="section-title section-title-small">Latest ingest output</h2>
-            </div>
+      <SectionCard>
+        <div className="section-heading">
+          <div>
+            <p className="section-eyebrow">No Shopify? No problem.</p>
+            <h2 className="section-title section-title-small">CSV imports work too</h2>
           </div>
-          <div className="kpi-grid kpi-grid-tight">
-            <ProcessedCountCard label="Shops" value={ingestionResult.shops.processed} />
-            <ProcessedCountCard label="Products" value={ingestionResult.products.processed} />
-            <ProcessedCountCard
-              label="Inventory rows"
-              value={ingestionResult.inventory_rows.processed}
-            />
-            <ProcessedCountCard
-              label="Order line items"
-              value={ingestionResult.order_line_items.processed}
-            />
-          </div>
-        </SectionCard>
-      ) : (
-        <EmptyState
-          title="No ingest result yet"
-          description="Run a manual Shopify ingest to populate the store catalog and sync history."
-        />
-      )}
+        </div>
+        <p className="section-copy">
+          You can import your Stocky catalog or your ShipStation shipment
+          history as CSV today — same dashboard, same actions, no OAuth
+          required.
+        </p>
+        <div className="button-row">
+          <Link href="/import-stocky" className="button button-ghost">
+            Import Stocky CSV
+          </Link>
+          <Link href="/import-shipstation" className="button button-ghost">
+            Import ShipStation CSV
+          </Link>
+        </div>
+      </SectionCard>
     </div>
   );
-}
-
-function ProcessedCountCard({ label, value }: { label: string; value: number }) {
-  return <KpiCard label={label} value={value} note="Processed in the latest run" />;
 }

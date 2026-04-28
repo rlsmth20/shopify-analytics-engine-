@@ -8,6 +8,7 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.billing import router as billing_router, webhook_router as stripe_webhook_router
 from app.api.routes.bundles import router as bundles_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.forecast import router as forecast_router
@@ -51,6 +52,8 @@ def create_app() -> FastAPI:
     # auth + admin (always loaded first)
     app.include_router(auth_router)
     app.include_router(admin_router)
+    app.include_router(billing_router)
+    app.include_router(stripe_webhook_router)
 
     # v1 surfaces
     app.include_router(health_router)
