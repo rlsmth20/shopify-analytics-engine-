@@ -13,7 +13,9 @@ export type AuthUser = {
 };
 
 type AuthContextValue = {
-  user: AuthUser | null;
+  // Non-null inside the provider — AuthGuard only renders children when the
+  // user is loaded. Consumers can safely access user.email without a guard.
+  user: AuthUser;
   loading: boolean;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
