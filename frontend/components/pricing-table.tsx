@@ -50,7 +50,7 @@ const TIERS: Tier[] = [
     ],
     featured: true,
     monthly: { plan: "growth_monthly", price: "$149" },
-    annual: { plan: "growth_annual", price: "$127" },
+    annual: { plan: "growth_annual", price: "$125" },
   },
   {
     name: "Scale",
@@ -67,7 +67,7 @@ const TIERS: Tier[] = [
     ],
     featured: false,
     monthly: { plan: "scale_monthly", price: "$349" },
-    annual: { plan: "scale_annual", price: "$297" },
+    annual: { plan: "scale_annual", price: "$292" },
   },
 ];
 
