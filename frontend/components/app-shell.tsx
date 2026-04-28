@@ -125,16 +125,38 @@ const SECTION_ORDER: NavItem["section"][] = [
   "Settings"
 ];
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [shopifyDomain, setShopifyDomain] = useState("");
+  // hasRealData: true once the shop has any products in the DB. Hides the
+  // "Demo data" chip and the yellow demo-mode banner so paid customers
+  // don't see "demo" labels on their own data.
+  const [hasRealData, setHasRealData] = useState<boolean | null>(null);
 
   useEffect(() => {
     const storedDomain = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
     if (storedDomain) {
       setShopifyDomain(storedDomain);
     }
+  }, [pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`${API_BASE}/skus`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((skus: unknown) => {
+        if (cancelled) return;
+        setHasRealData(Array.isArray(skus) && skus.length > 0);
+      })
+      .catch(() => {
+        if (!cancelled) setHasRealData(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   const meta = pageMeta[pathname] ?? pageMeta["/dashboard"];
@@ -192,13 +214,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="app-main">
-        <div className="demo-banner" role="status">
-          <span className="demo-banner-mark" aria-hidden>•</span>
-          <span>
-            <strong>Demo mode.</strong> This is example inventory, not your store. To connect your real Shopify data,{" "}
-            <Link href="/" className="demo-banner-link">join the waitlist</Link>.
-          </span>
-        </div>
+        {hasRealData === false ? (
+          <div className="demo-banner" role="status">
+            <span className="demo-banner-mark" aria-hidden>•</span>
+            <span>
+              <strong>No data yet.</strong> Import your Stocky or ShipStation
+              CSV — or{" "}
+              <Link href="/store-sync" className="demo-banner-link">
+                connect your Shopify store
+              </Link>{" "}
+              — to see real recommendations.
+            </span>
+          </div>
+        ) : null}
 
         <header className="top-header">
           <div>
@@ -211,7 +239,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="header-chip header-chip-tone">
               {shopifyDomain ? shopifyDomain : "No store selected"}
             </span>
-            <span className="header-chip">Demo data</span>
+            {hasRealData === false ? (
+              <span className="header-chip">Demo data</span>
+            ) : null}
             <span className="header-chip header-chip-user" title={user.email}>
               {user.email}
             </span>

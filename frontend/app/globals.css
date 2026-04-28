@@ -5173,3 +5173,79 @@ code {
   color: #94a3b8;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* ============================================================
+   Pricing toggle (monthly / annual)
+   ============================================================ */
+
+.pricing-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 auto 24px;
+  padding: 6px;
+  background: #eef2f7;
+  border-radius: 14px;
+  width: fit-content;
+}
+
+.pricing-toggle-button {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pricing-toggle-button:hover {
+  color: #0f172a;
+}
+
+.pricing-toggle-active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.pricing-toggle-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+/* ============================================================
+   Home hero — signed-in CTA variant
+   ============================================================ */
+
+.hero-authed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin: 8px auto 0;
+  max-width: 560px;
+}
+
+.hero-authed-greeting {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.hero-authed-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}

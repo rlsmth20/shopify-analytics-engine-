@@ -73,9 +73,10 @@ export default function LoginPage() {
           </div>
         ) : (
           <>
-            <h1 className="auth-title">Sign in to slelfly</h1>
+            <h1 className="auth-title">Sign in or create your workspace</h1>
             <p className="auth-copy">
-              We&apos;ll email you a one-time sign-in link. No password.
+              We&apos;ll email you a one-time sign-in link. No password. New
+              email = new workspace, automatically.
             </p>
             <form onSubmit={handleSubmit} className="auth-form">
               <label className="auth-field">
@@ -101,8 +102,8 @@ export default function LoginPage() {
               </button>
             </form>
             <p className="auth-fine">
-              Don&apos;t have an account yet?{" "}
-              <Link href="/" className="auth-link">Get on the waitlist →</Link>
+              See <Link href="/pricing" className="auth-link">pricing</Link> ·{" "}
+              <Link href="/dashboard" className="auth-link">view the demo</Link>
             </p>
           </>
         )}

@@ -202,16 +202,19 @@ export async function triggerShopifyIngestion(
 }
 
 export async function fetchShopSettings(
-  shopifyDomain: string,
+  _shopifyDomain: string,
   signal?: AbortSignal
 ): Promise<ShopSettingsResponse> {
-  const query = new URLSearchParams({ shopify_domain: shopifyDomain }).toString();
-  const response = await fetch(`${API_BASE_URL}/shop-settings?${query}`, {
+  // Backend now derives the shop from the authenticated user's session.
+  // The shopifyDomain argument is kept for backwards compatibility with
+  // existing callers but is ignored.
+  const response = await fetch(`${API_BASE_URL}/shop-settings`, {
     method: "GET",
     headers: {
       Accept: "application/json"
     },
     cache: "no-store",
+    credentials: "include",
     signal
   });
 
@@ -266,6 +269,7 @@ export async function saveShopSettings(
     },
     body: JSON.stringify(payload),
     cache: "no-store",
+    credentials: "include",
     signal
   });
 
@@ -281,18 +285,18 @@ export async function saveShopSettings(
 }
 
 export async function fetchVendorLeadTimes(
-  shopifyDomain: string,
+  _shopifyDomain: string,
   signal?: AbortSignal
 ): Promise<VendorLeadTimeSettingsResponse> {
-  const query = new URLSearchParams({ shopify_domain: shopifyDomain }).toString();
   const response = await fetch(
-    `${API_BASE_URL}/shop-settings/vendor-lead-times?${query}`,
+    `${API_BASE_URL}/shop-settings/vendor-lead-times`,
     {
       method: "GET",
       headers: {
         Accept: "application/json"
       },
       cache: "no-store",
+      credentials: "include",
       signal
     }
   );
@@ -320,6 +324,7 @@ export async function saveVendorLeadTimes(
     },
     body: JSON.stringify(payload),
     cache: "no-store",
+    credentials: "include",
     signal
   });
 
@@ -335,18 +340,18 @@ export async function saveVendorLeadTimes(
 }
 
 export async function fetchCategoryLeadTimes(
-  shopifyDomain: string,
+  _shopifyDomain: string,
   signal?: AbortSignal
 ): Promise<CategoryLeadTimeSettingsResponse> {
-  const query = new URLSearchParams({ shopify_domain: shopifyDomain }).toString();
   const response = await fetch(
-    `${API_BASE_URL}/shop-settings/category-lead-times?${query}`,
+    `${API_BASE_URL}/shop-settings/category-lead-times`,
     {
       method: "GET",
       headers: {
         Accept: "application/json"
       },
       cache: "no-store",
+      credentials: "include",
       signal
     }
   );
@@ -376,6 +381,7 @@ export async function saveCategoryLeadTimes(
       },
       body: JSON.stringify(payload),
       cache: "no-store",
+      credentials: "include",
       signal
     }
   );

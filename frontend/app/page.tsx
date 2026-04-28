@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { HeroCta } from "@/components/hero-cta";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
@@ -47,6 +48,7 @@ export default function HomePage() {
         </nav>
         <div className="marketing-nav-ctas">
           <Link href="/dashboard" className="marketing-link-subtle">View demo</Link>
+          <Link href="/login" className="marketing-link-subtle">Sign in</Link>
         </div>
       </header>
 
@@ -56,7 +58,7 @@ export default function HomePage() {
         <p className="marketing-hero-sub">
           Forecast the next 90 days, rank every SKU, score every supplier, and recover cash from dead stock — in one Shopify-first product, at a price that doesn&apos;t triple at renewal.
         </p>
-        <WaitlistForm source="home_hero" />
+        <HeroCta source="home_hero" />
         <p className="marketing-hero-trust">
           We&apos;re in private beta. <Link href="/dashboard">See a live demo</Link> ·
           <strong> Prices locked at renewal</strong>
