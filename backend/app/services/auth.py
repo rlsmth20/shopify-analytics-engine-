@@ -38,7 +38,22 @@ def _sha256(value: str) -> str:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    """Naive UTC datetime.
+
+    We deliberately return a naive (no tzinfo) datetime because some DB
+    driver / column-type combinations return naive datetimes from the server,
+    and Python refuses to compare naive vs aware. Storing naive UTC across
+    the board keeps comparisons consistent without depending on whether a
+    given Postgres column was created with TIMESTAMPTZ or plain TIMESTAMP.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _as_naive_utc(dt: datetime) -> datetime:
+    """Normalize either a naive or aware datetime to naive UTC."""
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def normalize_email(email: str) -> str:
@@ -78,7 +93,7 @@ def consume_magic_link_token(db: DbSession, *, raw_token: str) -> Optional[str]:
         return None
     if record.used:
         return None
-    if record.expires_at < _now():
+    if _as_naive_utc(record.expires_at) < _now():
         return None
     record.used = True
     db.commit()
@@ -108,7 +123,7 @@ def resolve_session(db: DbSession, *, raw_token: str) -> Optional[User]:
     )
     if record is None:
         return None
-    if record.expires_at < _now():
+    if _as_naive_utc(record.expires_at) < _now():
         return None
     record.last_seen_at = _now()
     db.commit()
