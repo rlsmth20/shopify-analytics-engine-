@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { WaitlistForm } from "@/components/waitlist-form";
+
 export const metadata = {
   title: "About — slelfly",
   description: "Independent, founder-led, Shopify-first. No PE squeeze.",
@@ -92,6 +94,15 @@ export default function AboutPage() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="marketing-section marketing-cta-section">
+        <p className="marketing-section-kicker">Get early access</p>
+        <h2 className="marketing-section-title">If this take resonates, get on the list.</h2>
+        <p className="marketing-section-sub">
+          slelfly is in private beta. Drop your email — we&apos;ll send your invite when paid plans launch.
+        </p>
+        <WaitlistForm source="about" ctaLabel="Get early access" />
       </section>
 
       <footer className="marketing-footer">

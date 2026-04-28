@@ -92,9 +92,9 @@ def send_test_alert(request: TestAlertRequest) -> dict[str, str | bool]:
     record = deliver(
         channel=request.channel,
         target=request.target,
-        subject="Inventory Command — test alert",
+        subject="slelfly — test alert",
         body=(
-            "This is a test notification from Inventory Command. "
+            "This is a test notification from slelfly. "
             "If you received this, your channel is configured correctly."
         ),
     )

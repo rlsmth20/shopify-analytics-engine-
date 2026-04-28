@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { WaitlistForm } from "@/components/waitlist-form";
+
 export const metadata = {
   title: "Changelog — slelfly",
   description: "Every release lands here. Shipping transparently is how we counter the 'roadmap frozen' pattern the rest of the market has earned.",
@@ -94,6 +96,15 @@ export default function ChangelogPage() {
             </ul>
           </article>
         ))}
+      </section>
+
+      <section className="marketing-section marketing-cta-section">
+        <p className="marketing-section-kicker">Get early access</p>
+        <h2 className="marketing-section-title">Shipping a public changelog because we plan to keep doing it.</h2>
+        <p className="marketing-section-sub">
+          Drop your email — we&apos;ll send your invite when paid plans launch.
+        </p>
+        <WaitlistForm source="changelog" ctaLabel="Get early access" />
       </section>
 
       <footer className="marketing-footer">

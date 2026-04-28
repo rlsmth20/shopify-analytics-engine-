@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { WaitlistForm } from "@/components/waitlist-form";
+
 export const metadata = {
   title: "Blog — slelfly",
   description: "Posts about Shopify inventory, forecasting, supplier scoring, dead stock, and the rest of the math the spreadsheet can't do.",
@@ -51,6 +53,15 @@ export default function BlogIndex() {
             <Link href={`/blog/${p.slug}`} className="blog-list-link">Read post →</Link>
           </article>
         ))}
+      </section>
+
+      <section className="marketing-section marketing-cta-section">
+        <p className="marketing-section-kicker">Get early access</p>
+        <h2 className="marketing-section-title">Want the next post in your inbox?</h2>
+        <p className="marketing-section-sub">
+          We send the new post and the early-access invite to the same list. Drop your email — that&apos;s it.
+        </p>
+        <WaitlistForm source="blog_index" ctaLabel="Get early access" />
       </section>
 
       <footer className="marketing-footer">

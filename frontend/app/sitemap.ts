@@ -20,7 +20,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/blog/why-six-month-moving-average-overstocks-you", priority: 0.85, freq: "monthly" },
     { path: "/privacy", priority: 0.4, freq: "yearly" },
     { path: "/terms", priority: 0.4, freq: "yearly" },
-    { path: "/login", priority: 0.4, freq: "yearly" },
   ];
 
   return routes.map(({ path, priority, freq }) => ({
