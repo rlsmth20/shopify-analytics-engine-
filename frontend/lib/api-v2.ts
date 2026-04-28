@@ -229,6 +229,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     method: "GET",
     headers: { Accept: "application/json" },
     cache: "no-store",
+    credentials: "include",
     signal,
   });
   if (!response.ok) {
@@ -254,6 +255,7 @@ async function postJson<T>(
     },
     body: JSON.stringify(payload),
     cache: "no-store",
+    credentials: "include",
     signal,
   });
   if (!response.ok) {
@@ -359,7 +361,7 @@ export const deleteAlertRule = async (
 ): Promise<boolean> => {
   const response = await fetch(
     `${API_BASE_URL}/alerts/rules/${encodeURIComponent(ruleId)}`,
-    { method: "DELETE", cache: "no-store", signal }
+    { method: "DELETE", cache: "no-store", credentials: "include", signal }
   );
   return response.ok;
 };
@@ -377,6 +379,7 @@ export const toggleAlertRule = async (
       method: "PATCH",
       headers: { Accept: "application/json" },
       cache: "no-store",
+      credentials: "include",
       signal,
     }
   );

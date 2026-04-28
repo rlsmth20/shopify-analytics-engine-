@@ -2,18 +2,17 @@
 
 Fan-in of the v2 services into a single, chart-ready response the frontend
 dashboard can render without making many separate round trips.
+
+Phase 2: takes per-shop data via parameters so the same logic works for
+real-DB shops and (in tests) synthetic fixtures. The route is the only
+place that knows where the data comes from.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Callable, Sequence
 
-from app.mock_data import MOCK_SKUS
-from app.mock_data_v2 import (
-    daily_history_for_sku,
-    recent_daily_revenue,
-    start_weekday_for_history,
-    supplier_observations,
-)
+from app.schemas import SkuDetail
 from app.schemas_v2 import (
     DashboardKpi,
     DashboardResponse,
@@ -23,12 +22,24 @@ from app.services.abc_analysis import build_scorecards
 from app.services.alerts import list_recent_events
 from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.inventory_engine import build_inventory_actions
-from app.services.supplier_scoring import build_supplier_scorecards
 
 
-def build_dashboard() -> DashboardResponse:
-    skus = MOCK_SKUS
-    actions = build_inventory_actions(skus)
+# Type aliases — readability for the function-parameter signatures below.
+DailyHistoryFn = Callable[[str, int], list[int]]  # (sku_id, days) -> daily qtys
+RecentRevenueFn = Callable[[int], list[tuple[int, float]]]  # (days) -> [(offset, rev)]
+
+
+def build_dashboard(
+    skus: Sequence[SkuDetail],
+    *,
+    daily_history_fn: DailyHistoryFn,
+    recent_revenue_fn: RecentRevenueFn,
+    start_weekday: int,
+) -> DashboardResponse:
+    if not skus:
+        return _empty_dashboard()
+
+    actions = build_inventory_actions(list(skus))
 
     # KPIs
     urgent = [a for a in actions if a.status == "urgent"]
@@ -93,7 +104,7 @@ def build_dashboard() -> DashboardResponse:
     # Revenue trend
     revenue_points = [
         DashboardSeriesPoint(label=str(offset), value=value)
-        for offset, value in recent_daily_revenue(days=30)
+        for offset, value in recent_revenue_fn(30)
     ]
 
     # Stock health breakdown
@@ -113,7 +124,7 @@ def build_dashboard() -> DashboardResponse:
     ]
 
     # ABC distribution
-    scorecards = build_scorecards(skus, daily_history_for_sku)
+    scorecards = build_scorecards(list(skus), lambda sid: daily_history_fn(sid, 90))
     abc_counts = {"A": 0, "B": 0, "C": 0}
     for sc in scorecards:
         abc_counts[sc.abc_class] += 1
@@ -138,13 +149,13 @@ def build_dashboard() -> DashboardResponse:
     # Forecast vs actual 7d (simple: forecast 30d then compare days)
     forecast_vs_actual: list[DashboardSeriesPoint] = []
     for sku in top_movers[:5]:
-        history = daily_history_for_sku(sku.sku_id, days=90)
+        history = daily_history_fn(sku.sku_id, 90)
         forecast = forecast_sku(
             ForecastInputs(
                 sku_id=sku.sku_id,
                 daily_history=history[:-7],  # forecast using all but last 7 days
                 on_hand=sku.inventory,
-                start_weekday=start_weekday_for_history(),
+                start_weekday=start_weekday,
             ),
             horizon_days=7,
         )
@@ -183,3 +194,31 @@ def _vendor_for_sku(sku_id: str, skus) -> str:
         if sku.sku_id == sku_id:
             return sku.vendor
     return "Unknown"
+
+
+def _empty_dashboard() -> DashboardResponse:
+    """Render the dashboard for a shop with zero imported data.
+
+    Every series is empty rather than zero-valued — the frontend renders a
+    "no data yet" state when these come back empty, which is more honest
+    than charts at zero.
+    """
+    zero = lambda label: DashboardKpi(label=label, value=0, unit="count", delta_pct=0.0, tone="positive")
+    return DashboardResponse(
+        kpis=[
+            zero("Revenue (30d)"),
+            zero("Inventory value"),
+            zero("Cash tied up"),
+            zero("Profit at risk"),
+            zero("Urgent SKUs"),
+            zero("Dead SKUs"),
+        ],
+        revenue_trend_30d=[],
+        stock_health_breakdown=[],
+        top_movers=[],
+        abc_distribution=[],
+        cash_at_risk_by_vendor=[],
+        forecast_vs_actual_7d=[],
+        alert_counts_by_severity=[],
+        generated_at=datetime.now(timezone.utc),
+    )
