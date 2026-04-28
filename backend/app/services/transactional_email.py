@@ -134,3 +134,76 @@ def send_waitlist_confirmation(
     except Exception as exc:  # pragma: no cover — best-effort send
         logger.exception("failed to send waitlist confirmation to %s: %s", email, exc)
         return False
+
+
+def _magic_link_html(email: str, link: str) -> str:
+    return f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
+        <tr><td>
+          <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">slelfly</p>
+          <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0f172a;">Sign in to slelfly</h1>
+          <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">
+            Click the button below to sign in. The link is valid for 15 minutes and can only be used once.
+          </p>
+          <p style="margin:0 0 24px;">
+            <a href="{link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;">Sign in to slelfly &rarr;</a>
+          </p>
+          <p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.6;">
+            Or paste this URL into your browser:
+          </p>
+          <p style="margin:0 0 24px;color:#334155;font-size:13px;line-height:1.6;word-break:break-all;">
+            <a href="{link}" style="color:#334155;">{link}</a>
+          </p>
+          <p style="margin:24px 0 0;color:#64748b;font-size:13px;line-height:1.6;">
+            If you did not request this email, you can ignore it &mdash; nothing happens until the link is clicked.
+          </p>
+        </td></tr>
+      </table>
+      <p style="margin:16px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">
+        Sent to {email} &middot; slelfly
+      </p>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+def _magic_link_text(email: str, link: str) -> str:
+    return (
+        "Sign in to slelfly\n\n"
+        f"Click this link to sign in: {link}\n\n"
+        "The link is valid for 15 minutes and can only be used once.\n\n"
+        "If you did not request this email, you can ignore it — nothing "
+        "happens until the link is clicked.\n\n"
+        f"Sent to {email}\n"
+    )
+
+
+def send_magic_link_email(email: str, link: str) -> bool:
+    """Send a sign-in link. Returns True on success, False on any failure.
+
+    Designed for use as a FastAPI BackgroundTask: never raises.
+    """
+    client = _client()
+    if client is None:
+        return False
+    try:
+        params = {
+            "from": DEFAULT_FROM,
+            "to": [email],
+            "reply_to": DEFAULT_REPLY_TO,
+            "subject": "Sign in to slelfly",
+            "html": _magic_link_html(email, link),
+            "text": _magic_link_text(email, link),
+            "tags": [
+                {"name": "category", "value": "magic_link"},
+            ],
+        }
+        result = client.Emails.send(params)
+        logger.info("magic-link email sent: id=%s to=%s", result.get("id"), email)
+        return True
+    except Exception as exc:
+        logger.exception("failed to send magic-link to %s: %s", email, exc)
+        return False

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { useAuth } from "@/components/auth-guard";
 import { SHOPIFY_DOMAIN_STORAGE_KEY } from "@/lib/app-helpers";
 
 type NavItem = {
@@ -126,6 +127,7 @@ const SECTION_ORDER: NavItem["section"][] = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
   const [shopifyDomain, setShopifyDomain] = useState("");
 
   useEffect(() => {
@@ -210,6 +212,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               {shopifyDomain ? shopifyDomain : "No store selected"}
             </span>
             <span className="header-chip">Demo data</span>
+            <span className="header-chip header-chip-user" title={user.email}>
+              {user.email}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                void logout();
+              }}
+              className="header-logout"
+            >
+              Sign out
+            </button>
           </div>
         </header>
 

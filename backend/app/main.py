@@ -4,8 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.actions import router as actions_router
+from app.api.routes.admin import router as admin_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.analytics import router as analytics_router
+from app.api.routes.auth import router as auth_router
 from app.api.routes.bundles import router as bundles_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.forecast import router as forecast_router
@@ -45,6 +47,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # auth + admin (always loaded first)
+    app.include_router(auth_router)
+    app.include_router(admin_router)
 
     # v1 surfaces
     app.include_router(health_router)
