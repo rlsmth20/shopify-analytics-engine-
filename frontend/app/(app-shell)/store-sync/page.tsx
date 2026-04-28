@@ -150,7 +150,7 @@ export default function StoreSyncPage() {
         ) : (
           <>
             <p className="section-copy">
-              Install the slelfly app on your Shopify store. We&apos;ll pull
+              Install the skubase app on your Shopify store. We&apos;ll pull
               products, inventory, and the last 180 days of orders so the
               forecast and action queue can run on real data.
             </p>

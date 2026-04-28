@@ -3,11 +3,11 @@ import Link from "next/link";
 import { PricingTable } from "@/components/pricing-table";
 
 export const metadata = {
-  title: "Pricing — slelfly",
+  title: "Pricing — skubase",
   description: "Three published tiers. No quote-only pricing. A written price-lock clause that renewals cannot raise the rate on your plan.",
   alternates: { canonical: "/pricing" },
   openGraph: {
-    title: "Pricing — slelfly",
+    title: "Pricing — skubase",
     description: "Three published tiers ($49/$149/$349) with a written price-lock pledge. Pay annually, save 15%.",
     url: "/pricing",
     type: "website",
@@ -39,8 +39,8 @@ export default function PricingPage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -67,7 +67,7 @@ export default function PricingPage() {
 
       <section className="pricing-lock">
         <div className="pricing-lock-card">
-          <p className="pricing-lock-kicker">The slelfly price-lock pledge</p>
+          <p className="pricing-lock-kicker">The skubase price-lock pledge</p>
           <h2 className="pricing-lock-title">Your rate will not go up at renewal.</h2>
           <p className="pricing-lock-body">
             We built this product because the inventory market is full of tools whose prices triple at renewal after an acquisition. Inventory Planner users reported roughly a 3&times; price hike after Sage. Linnworks users reported a 681% hike after a PE rollup. We are not doing that to you.
@@ -93,8 +93,8 @@ export default function PricingPage() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -105,7 +105,7 @@ export default function PricingPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly · Prices locked at renewal</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
       </footer>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }} />

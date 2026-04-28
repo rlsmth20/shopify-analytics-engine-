@@ -13,7 +13,7 @@ const ARTICLE_LD = {
   "@type": "Article",
   headline: "Stocky alternatives for Shopify merchants in 2026",
   datePublished: "2026-04-25",
-  author: { "@type": "Organization", name: "slelfly" },
+  author: { "@type": "Organization", name: "skubase" },
 };
 
 export default function StockyAlternativesPost() {
@@ -21,8 +21,8 @@ export default function StockyAlternativesPost() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -52,9 +52,9 @@ export default function StockyAlternativesPost() {
 
         <h2 className="blog-article-h2">The replacements worth considering</h2>
 
-        <h3 className="blog-article-h3">slelfly</h3>
+        <h3 className="blog-article-h3">skubase</h3>
         <p>
-          We built slelfly partly because we couldn&apos;t find a Stocky replacement that did the math right. Holt double-exponential smoothing with weekly seasonality, stockout probability per SKU, supplier scorecards (on-time, fill rate), markdown/bundle/wholesale/write-off plans for dead stock. Pricing published, three tiers from $49/mo, with a written price-lock clause in TOS. <Link href="/goodbye-stocky">Migration page</Link>.
+          We built skubase partly because we couldn&apos;t find a Stocky replacement that did the math right. Holt double-exponential smoothing with weekly seasonality, stockout probability per SKU, supplier scorecards (on-time, fill rate), markdown/bundle/wholesale/write-off plans for dead stock. Pricing published, three tiers from $49/mo, with a written price-lock clause in TOS. <Link href="/goodbye-stocky">Migration page</Link>.
         </p>
 
         <h3 className="blog-article-h3">Inventory Planner (Sage)</h3>
@@ -91,7 +91,7 @@ export default function StockyAlternativesPost() {
           You have until August 31, 2026 — about four months from this post. Pick by June 1. Run both for two months. Cut over in August.
         </p>
 
-        <h2 className="blog-article-h2">If slelfly looks right</h2>
+        <h2 className="blog-article-h2">If skubase looks right</h2>
         <p>
           We built a one-step CSV importer for Stocky&apos;s standard product export — your SKUs, vendors, and on-hand counts intact, first ranked action in under ten minutes.
         </p>
@@ -106,8 +106,8 @@ export default function StockyAlternativesPost() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -116,7 +116,7 @@ export default function StockyAlternativesPost() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
       </footer>
     </div>
   );

@@ -118,9 +118,9 @@ def send_test_alert(
     record = deliver(
         channel=request.channel,
         target=request.target,
-        subject="slelfly — test alert",
+        subject="skubase — test alert",
         body=(
-            "This is a test notification from slelfly. "
+            "This is a test notification from skubase. "
             "If you received this, your channel is configured correctly."
         ),
     )

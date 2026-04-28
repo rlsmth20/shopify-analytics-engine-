@@ -36,7 +36,7 @@ Same 99% service level, $75,000 less working capital tied up in one SKU. Multipl
 
 ---
 
-Disclosure: I'm building a tool that does this math automatically (slelfly — Shopify-first inventory forecasting, Holt + ABC×XYZ + supplier scorecards, $49/mo published pricing locked at renewal). Long-form math post here: https://slelfly.com/blog/why-six-month-moving-average-overstocks-you
+Disclosure: I'm building a tool that does this math automatically (skubase — Shopify-first inventory forecasting, Holt + ABC×XYZ + supplier scorecards, $49/mo published pricing locked at renewal). Long-form math post here: https://skubase.io/blog/why-six-month-moving-average-overstocks-you
 
 But the math is the math regardless of which tool you use, including a fancier spreadsheet. If you want to keep the Sheet, at minimum:
 

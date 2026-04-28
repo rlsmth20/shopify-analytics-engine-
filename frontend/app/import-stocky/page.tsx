@@ -56,8 +56,8 @@ export default function ImportStockyPage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/dashboard">Dashboard</Link>
@@ -68,9 +68,9 @@ export default function ImportStockyPage() {
 
       <section className="marketing-hero marketing-hero-migration">
         <p className="marketing-eyebrow">Stocky migration</p>
-        <h1 className="marketing-hero-title">Move your Stocky catalog to slelfly.</h1>
+        <h1 className="marketing-hero-title">Move your Stocky catalog to skubase.</h1>
         <p className="marketing-hero-sub">
-          Upload your Stocky products CSV and we&apos;ll import your SKUs, vendors, and inventory into your slelfly workspace.
+          Upload your Stocky products CSV and we&apos;ll import your SKUs, vendors, and inventory into your skubase workspace.
         </p>
       </section>
 
@@ -134,7 +134,7 @@ export default function ImportStockyPage() {
         <aside className="import-side">
           <h3 className="import-side-title">What happens next</h3>
           <ol className="import-side-list">
-            <li>Your products land in slelfly&apos;s catalog.</li>
+            <li>Your products land in skubase&apos;s catalog.</li>
             <li>The action engine ranks them within seconds.</li>
             <li>Set vendor lead times on the <Link href="/lead-time-settings">Lead Times</Link> page.</li>
             <li>Connect Shopify on the <Link href="/store-sync">Store Sync</Link> page when ready.</li>
@@ -147,8 +147,8 @@ export default function ImportStockyPage() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -157,7 +157,7 @@ export default function ImportStockyPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
       </footer>
     </div>
   );

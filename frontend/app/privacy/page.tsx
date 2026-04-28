@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Privacy Policy — slelfly",
-  description: "How slelfly collects, uses, and protects your data.",
+  title: "Privacy Policy — skubase",
+  description: "How skubase collects, uses, and protects your data.",
   alternates: { canonical: "/privacy" },
   openGraph: {
-    title: "Privacy Policy — slelfly",
-    description: "How slelfly collects, uses, and protects your data.",
+    title: "Privacy Policy — skubase",
+    description: "How skubase collects, uses, and protects your data.",
     url: "/privacy",
     type: "website",
   },
@@ -17,8 +17,8 @@ export default function PrivacyPage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -34,7 +34,7 @@ export default function PrivacyPage() {
         </p>
         <h1 className="blog-article-title">Privacy Policy</h1>
         <p className="blog-article-lead">
-          slelfly (&ldquo;slelfly,&rdquo; &ldquo;we,&rdquo; &ldquo;our&rdquo;) is operated as an independent,
+          skubase (&ldquo;skubase,&rdquo; &ldquo;we,&rdquo; &ldquo;our&rdquo;) is operated as an independent,
           founder-led company. This policy describes what we collect, why we
           collect it, who we share it with, and your rights.
         </p>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
         <h2 className="blog-article-h2">Retention and deletion</h2>
         <p>
           You can delete your account and associated data at any time by
-          emailing <a href="mailto:hello@slelfly.com">hello@slelfly.com</a>.
+          emailing <a href="mailto:hello@skubase.io">hello@skubase.io</a>.
           We will purge your data from production within 30 days. Backups
           are encrypted and rotated within 90 days. Aggregated, anonymized
           metrics may be retained for service operation.
@@ -90,7 +90,7 @@ export default function PrivacyPage() {
         <p>
           You have the right to access, correct, export, and delete your
           personal data. Contact{" "}
-          <a href="mailto:privacy@slelfly.com">privacy@slelfly.com</a> for any
+          <a href="mailto:privacy@skubase.io">privacy@skubase.io</a> for any
           such request. EU residents have rights under GDPR; California
           residents have rights under CCPA; we honor both equivalently for
           all users.
@@ -122,14 +122,14 @@ export default function PrivacyPage() {
 
         <h2 className="blog-article-h2">Contact</h2>
         <p>
-          Questions about this policy: <a href="mailto:privacy@slelfly.com">privacy@slelfly.com</a>.
+          Questions about this policy: <a href="mailto:privacy@skubase.io">privacy@skubase.io</a>.
         </p>
       </article>
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -138,7 +138,7 @@ export default function PrivacyPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
       </footer>
     </div>
   );

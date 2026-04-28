@@ -10,7 +10,7 @@ Built a Shopify inventory tool because every existing one got acquired and got w
 
 ## Body
 
-I'm two months into building slelfly, a Shopify-first inventory tool. I want to share why I started, because the "why" turned into a positioning thesis I didn't expect.
+I'm two months into building skubase, a Shopify-first inventory tool. I want to share why I started, because the "why" turned into a positioning thesis I didn't expect.
 
 ### The trigger
 
@@ -33,7 +33,7 @@ The category needs a tool that's structurally outside that pattern. Founder-led,
 
 ### What I actually built
 
-Two months in, slelfly has:
+Two months in, skubase has:
 - Holt double-exponential forecasting + weekly seasonality + stockout probability (vs. competitors' moving averages)
 - ABC × XYZ classification + service-level-segmented safety stock (vs. one buffer for everything)
 - Supplier scorecards: on-time, fill rate, lead-time stability (23 of 25 competitors don't do this)
@@ -60,6 +60,6 @@ I'd love feedback on:
 2. The Stocky migration window is 4 months out. What would you do with that timeline?
 3. What's the most overlooked early-stage marketing channel for a B2B SaaS in a niche full of acquired competitors?
 
-slelfly.com if you want to poke around. Two blog posts at /blog go deep on the math (Holt forecasting and why moving averages overstock). Pricing page has the price-lock language.
+skubase.io if you want to poke around. Two blog posts at /blog go deep on the math (Holt forecasting and why moving averages overstock). Pricing page has the price-lock language.
 
 (Will reply to every comment.)

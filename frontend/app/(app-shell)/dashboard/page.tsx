@@ -61,10 +61,10 @@ export default function DashboardPage() {
     return (
       <div className="dashboard-empty">
         <div className="dashboard-empty-card">
-          <p className="dashboard-empty-eyebrow">Welcome to slelfly</p>
+          <p className="dashboard-empty-eyebrow">Welcome to skubase</p>
           <h2 className="dashboard-empty-title">No data in your workspace yet.</h2>
           <p className="dashboard-empty-copy">
-            Import your Stocky or ShipStation export and slelfly will rank
+            Import your Stocky or ShipStation export and skubase will rank
             every SKU by what to do today — urgent, optimize, dead. Most
             merchants see their first ranked action in under ten minutes.
           </p>

@@ -3,17 +3,17 @@ import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
-  title: "Changelog — slelfly",
+  title: "Changelog — skubase",
   description: "Every release lands here. Shipping transparently is how we counter the 'roadmap frozen' pattern the rest of the market has earned.",
   alternates: { canonical: "/changelog" },
-  openGraph: { title: "Changelog — slelfly", description: "Every release, on the record.", url: "/changelog", type: "website" },
+  openGraph: { title: "Changelog — skubase", description: "Every release, on the record.", url: "/changelog", type: "website" },
 };
 
 type ChangelogEntry = { version: string; date: string; title: string; items: { type: "Added" | "Changed" | "Fixed" | "Shipped"; text: string }[]; };
 
 const entries: ChangelogEntry[] = [
   { version: "v0.4.0", date: "2026-04-25", title: "Pre-launch readiness", items: [
-    { type: "Shipped", text: "Waitlist signup form replaces direct dashboard access — slelfly enters private beta." },
+    { type: "Shipped", text: "Waitlist signup form replaces direct dashboard access — skubase enters private beta." },
     { type: "Shipped", text: "Demo-mode banner on /dashboard so visitors know they're seeing example data." },
     { type: "Shipped", text: "Privacy Policy and Terms of Service pages, including the written price-lock clause." },
     { type: "Shipped", text: "Public blog at /blog with first two posts (Stocky alternatives, why moving averages overstock)." },
@@ -24,7 +24,7 @@ const entries: ChangelogEntry[] = [
     { type: "Shipped", text: "Migration landers for Stocky (Aug 31, 2026) and Genie (Aug 31, 2025)." },
     { type: "Shipped", text: "Transparent pricing with a written price-lock clause in TOS." },
     { type: "Shipped", text: "Forecast explainability: every recommended quantity explains itself." },
-    { type: "Changed", text: "Brand renamed from Inventory Command to slelfly." },
+    { type: "Changed", text: "Brand renamed from Inventory Command to skubase." },
     { type: "Added", text: "Alert rules persisted to database — they survive restarts." }
   ]},
   { version: "v0.2.0", date: "2026-04-23", title: "Intelligence surface", items: [
@@ -56,8 +56,8 @@ export default function ChangelogPage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -72,7 +72,7 @@ export default function ChangelogPage() {
         <p className="marketing-eyebrow">Changelog</p>
         <h1 className="marketing-hero-title">Every release, on the record.</h1>
         <p className="marketing-hero-sub">
-          We ship transparently so you never have to wonder whether slelfly is still being built.
+          We ship transparently so you never have to wonder whether skubase is still being built.
         </p>
       </section>
 
@@ -109,8 +109,8 @@ export default function ChangelogPage() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -120,7 +120,7 @@ export default function ChangelogPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
       </footer>
     </div>
   );

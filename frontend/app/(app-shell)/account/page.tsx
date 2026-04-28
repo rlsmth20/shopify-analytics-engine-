@@ -165,8 +165,8 @@ export default function AccountPage() {
           Team invites and SSO ship with the Scale plan. For now, this
           workspace has one signed-in user. Need help merging multiple
           workspaces or migrating an account? Email{" "}
-          <a href="mailto:hello@slelfly.com" className="auth-link">
-            hello@slelfly.com
+          <a href="mailto:hello@skubase.io" className="auth-link">
+            hello@skubase.io
           </a>
           .
         </p>

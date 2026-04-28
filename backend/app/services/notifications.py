@@ -207,7 +207,7 @@ def _body_to_simple_html(subject: str, body: str) -> str:
           <div style="color:#344054; line-height:1.6; font-size:15px;">{safe_body}</div>
           <hr style="border:none; border-top:1px solid #eaecf0; margin:20px 0;">
           <p style="font-size:12px; color:#98a2b3; margin:0;">
-            slelfly — automated alert
+            skubase — automated alert
           </p>
         </div>
       </body>

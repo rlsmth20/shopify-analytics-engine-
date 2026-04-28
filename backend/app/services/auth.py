@@ -25,7 +25,7 @@ from app.db.models import MagicLinkToken, Session as SessionModel, Shop, User
 
 # Cookie name. Frontend reads/writes nothing here — the backend sets it,
 # the browser presents it on every request, the backend reads it back.
-SESSION_COOKIE_NAME = "slelfly_session"
+SESSION_COOKIE_NAME = "skubase_session"
 
 MAGIC_LINK_TTL = timedelta(minutes=15)
 SESSION_TTL = timedelta(days=30)
@@ -169,7 +169,7 @@ def get_or_create_user_for_email(
         # Synthesize a placeholder so the NOT NULL + UNIQUE constraints hold.
         # The real Shopify domain is set later when the merchant connects.
         local = email.split("@", 1)[0].replace(".", "-").replace("+", "-")
-        domain = f"pending-{local}-{secrets.token_hex(4)}.slelfly.invalid"
+        domain = f"pending-{local}-{secrets.token_hex(4)}.skubase.invalid"
 
     shop = db.scalar(select(Shop).where(Shop.shopify_domain == domain))
     if shop is None:

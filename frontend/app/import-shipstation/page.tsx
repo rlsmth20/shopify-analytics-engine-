@@ -66,8 +66,8 @@ export default function ImportShipStationPage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/dashboard">Dashboard</Link>
@@ -77,7 +77,7 @@ export default function ImportShipStationPage() {
       </header>
 
       <section className="marketing-hero marketing-hero-migration">
-        <p className="marketing-eyebrow">ShipStation → slelfly</p>
+        <p className="marketing-eyebrow">ShipStation → skubase</p>
         <h1 className="marketing-hero-title">Bring your shipment history. Stop guessing.</h1>
         <p className="marketing-hero-sub">
           Drop in your ShipStation export and we&apos;ll compute your real per-SKU velocity, project the next 90 days, and tell you which SKUs to reorder.
@@ -171,8 +171,8 @@ export default function ImportShipStationPage() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -181,7 +181,7 @@ export default function ImportShipStationPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
       </footer>
     </div>
   );

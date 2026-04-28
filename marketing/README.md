@@ -20,6 +20,6 @@ Don't post all of these the same day. Spread them out: one post every 1–2 days
 
 - **Don't link-drop.** Lead with the insight; the link comes near the end. Reddit downvotes pure promotion fast.
 - **Don't claim numbers you can't back.** "Save 40% of working capital" is fine if you can show the math (we can — see the moving-average post). "Best inventory tool" is empty.
-- **Don't argue with detractors.** If someone calls slelfly bad, thank them and ask what would make it good. Public arguments lose.
+- **Don't argue with detractors.** If someone calls skubase bad, thank them and ask what would make it good. Public arguments lose.
 - **Don't post the same content twice.** Each platform gets a different angle. Cross-posting the same text gets flagged.
 - **Don't pretend to be a customer.** Disclose that you're the founder when you post. People notice.

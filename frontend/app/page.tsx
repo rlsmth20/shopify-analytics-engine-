@@ -4,7 +4,7 @@ import { HeroCta } from "@/components/hero-cta";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
-  title: "slelfly — The Shopify inventory tool that tells you what to do first",
+  title: "skubase — The Shopify inventory tool that tells you what to do first",
   description:
     "Forecast 90 days. Rank every SKU. Score every supplier. Recover cash from dead stock. Shopify-first, founder-led, price-locked."
 };
@@ -19,13 +19,13 @@ const pillars = [
 ];
 
 const migrationCards = [
-  { eyebrow: "Leaving Stocky?", date: "Shopify Stocky ends Aug 31, 2026", title: "Goodbye Stocky, hello slelfly.", body: "Shopify sunset a tool thousands of POS Pro merchants depended on. We built the replacement you actually wanted: forecasting, supplier scorecards, and dead-stock plans in one product.", cta: "See the migration path", href: "/goodbye-stocky", tone: "urgent" },
-  { eyebrow: "Forecasting in a spreadsheet?", date: "ShipStation export → Google Sheet → trailing average", title: "Better than your spreadsheet.", body: "If your reorder math is a 6-month moving average in a Google Sheet, you're tying up cash you don't need to and missing every seasonal ramp. slelfly fixes both — drop in your ShipStation export and see real velocity in minutes.", cta: "See why", href: "/vs-spreadsheet", tone: "steady" },
-  { eyebrow: "Leaving Genie?", date: "Genie closed Aug 31, 2025", title: "Genie is gone. slelfly is the upgrade.", body: "Genie merchants loved simple. We kept the simple and added the math — forecasting, supplier metrics, and a real reorder engine.", cta: "See the migration path", href: "/goodbye-genie", tone: "steady" }
+  { eyebrow: "Leaving Stocky?", date: "Shopify Stocky ends Aug 31, 2026", title: "Goodbye Stocky, hello skubase.", body: "Shopify sunset a tool thousands of POS Pro merchants depended on. We built the replacement you actually wanted: forecasting, supplier scorecards, and dead-stock plans in one product.", cta: "See the migration path", href: "/goodbye-stocky", tone: "urgent" },
+  { eyebrow: "Forecasting in a spreadsheet?", date: "ShipStation export → Google Sheet → trailing average", title: "Better than your spreadsheet.", body: "If your reorder math is a 6-month moving average in a Google Sheet, you're tying up cash you don't need to and missing every seasonal ramp. skubase fixes both — drop in your ShipStation export and see real velocity in minutes.", cta: "See why", href: "/vs-spreadsheet", tone: "steady" },
+  { eyebrow: "Leaving Genie?", date: "Genie closed Aug 31, 2025", title: "Genie is gone. skubase is the upgrade.", body: "Genie merchants loved simple. We kept the simple and added the math — forecasting, supplier metrics, and a real reorder engine.", cta: "See the migration path", href: "/goodbye-genie", tone: "steady" }
 ];
 
 const positioning = [
-  { title: "Independent. Founder-led.", body: "Eight of the tools you evaluate have been acquired by a parent that raised prices, slowed the roadmap, or broke support. slelfly is structurally outside that pattern." },
+  { title: "Independent. Founder-led.", body: "Eight of the tools you evaluate have been acquired by a parent that raised prices, slowed the roadmap, or broke support. skubase is structurally outside that pattern." },
   { title: "Shopify-first today. Multi-channel coming.", body: "Our deepest integration is Shopify. ShipStation imports already cover Amazon, eBay, and Walmart shipment history. Native Amazon and eBay writes are on the roadmap; until then, we replace the forecasting layer alongside whatever channel-sync tool you use." },
   { title: "Math you can see.", body: "Every recommended quantity explains itself — trailing demand, seasonality factor, service level, stockout probability. Explainability is a feature." },
   { title: "Fair pricing. Locked pricing.", body: "We publish our tiers. We commit in writing that renewals do not raise the price on your plan. We mean it." }
@@ -36,8 +36,8 @@ export default function HomePage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -78,10 +78,10 @@ export default function HomePage() {
       </section>
 
       <section className="marketing-section" id="pillars">
-        <p className="marketing-section-kicker">What slelfly does</p>
+        <p className="marketing-section-kicker">What skubase does</p>
         <h2 className="marketing-section-title">Six things the rest of the market gets wrong.</h2>
         <p className="marketing-section-sub">
-          We studied twenty-five inventory products. These are the six gaps that appeared over and over — and every one of them ships in slelfly today.
+          We studied twenty-five inventory products. These are the six gaps that appeared over and over — and every one of them ships in skubase today.
         </p>
         <div className="pillar-grid">
           {pillars.map((p) => (
@@ -97,7 +97,7 @@ export default function HomePage() {
 
       <section className="marketing-section marketing-section-alt">
         <p className="marketing-section-kicker">Positioning</p>
-        <h2 className="marketing-section-title">Why the rest of the market is the way it is — and why slelfly isn&apos;t.</h2>
+        <h2 className="marketing-section-title">Why the rest of the market is the way it is — and why skubase isn&apos;t.</h2>
         <div className="positioning-grid">
           {positioning.map((p) => (
             <article key={p.title} className="positioning-card">
@@ -118,8 +118,8 @@ export default function HomePage() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -134,7 +134,7 @@ export default function HomePage() {
           <Link href="/terms">Terms</Link>
         </div>
         <p className="marketing-footer-fine">
-          © {new Date().getFullYear()} slelfly · Independent · Founder-led · Prices locked at renewal
+          © {new Date().getFullYear()} skubase · Independent · Founder-led · Prices locked at renewal
         </p>
       </footer>
     </div>

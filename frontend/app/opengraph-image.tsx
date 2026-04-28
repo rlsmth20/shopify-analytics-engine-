@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "slelfly — The Shopify inventory tool that tells you what to do first.";
+export const alt = "skubase — The Shopify inventory tool that tells you what to do first.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -39,7 +39,7 @@ export default function OGImage() {
           >
             sf
           </div>
-          <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-0.01em" }}>slelfly</div>
+          <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-0.01em" }}>skubase</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div
@@ -67,7 +67,7 @@ export default function OGImage() {
           }}
         >
           <span>Independent · Founder-led · Prices locked at renewal</span>
-          <span style={{ fontWeight: 700 }}>slelfly.com</span>
+          <span style={{ fontWeight: 700 }}>skubase.io</span>
         </div>
       </div>
     ),

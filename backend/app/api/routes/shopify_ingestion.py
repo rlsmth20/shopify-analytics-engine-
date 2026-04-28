@@ -88,7 +88,7 @@ def callback(
 
     # Send the merchant back into the app shell.
     import os
-    frontend = os.getenv("FRONTEND_ORIGIN", "https://slelfly.com").rstrip("/")
+    frontend = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").rstrip("/")
     return RedirectResponse(url=f"{frontend}/store-sync?connected=1", status_code=302)
 
 

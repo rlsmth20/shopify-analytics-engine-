@@ -17,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     if (!email.trim()) {
-      setError("Enter the email you used to join the slelfly waitlist.");
+      setError("Enter the email you used to join the skubase waitlist.");
       return;
     }
     setSubmitting(true);
@@ -45,8 +45,8 @@ export default function LoginPage() {
     <div className="auth-shell">
       <div className="auth-card">
         <Link href="/" className="auth-brand">
-          <span className="auth-brand-mark">sf</span>
-          <span className="auth-brand-name">slelfly</span>
+          <span className="auth-brand-mark">sb</span>
+          <span className="auth-brand-name">skubase</span>
         </Link>
 
         {sent ? (

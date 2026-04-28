@@ -173,7 +173,7 @@ function ExplainCard({ selected }: { selected: ForecastResult }) {
       {open ? (
         <div className="explain-card-body">
           <p className="explain-card-lead">
-            slelfly uses <strong>Holt double-exponential smoothing</strong> with a weekly seasonality factor.
+            skubase uses <strong>Holt double-exponential smoothing</strong> with a weekly seasonality factor.
           </p>
           <dl className="explain-card-grid">
             <div><dt>Method</dt><dd>{selected.method.replace(/_/g, " ")}</dd></div>

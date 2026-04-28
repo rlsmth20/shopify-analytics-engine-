@@ -82,7 +82,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     return (
       <div className="auth-loading">
         <div className="auth-loading-spinner" aria-hidden />
-        <p className="auth-loading-text">Loading slelfly…</p>
+        <p className="auth-loading-text">Loading skubase…</p>
       </div>
     );
   }

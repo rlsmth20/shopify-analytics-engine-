@@ -3,18 +3,18 @@ import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
-  title: "Goodbye Genie, hello slelfly — slelfly",
-  description: "Genie closed August 31, 2025. slelfly kept the simple Shopify-native experience and added the math.",
+  title: "Goodbye Genie, hello skubase — skubase",
+  description: "Genie closed August 31, 2025. skubase kept the simple Shopify-native experience and added the math.",
   alternates: { canonical: "/goodbye-genie" },
   keywords: ["Genie alternative", "Genie replacement", "Genie shutdown"],
-  openGraph: { title: "Goodbye Genie, hello slelfly", description: "Genie closed Aug 31, 2025. slelfly is the upgrade.", url: "/goodbye-genie", type: "website" },
+  openGraph: { title: "Goodbye Genie, hello skubase", description: "Genie closed Aug 31, 2025. skubase is the upgrade.", url: "/goodbye-genie", type: "website" },
 };
 
 const reasons = [
-  { title: "Shopify-native simplicity, kept.", body: "Genie's appeal was that it felt like a Shopify app, not an ERP bolt-on. slelfly is built the same way." },
-  { title: "The math, added.", body: "Genie merchants told reviewers the forecasting felt basic. slelfly ships Holt double-exponential smoothing with weekly seasonality." },
-  { title: "Suppliers, measured.", body: "Genie treated vendors as contacts. slelfly scores them: on-time delivery, fill rate, lead-time stability, tiering." },
-  { title: "Dead stock, acted on.", body: "Genie surfaced aged stock. slelfly proposes a plan: markdown, bundle, wholesale, or write-off." }
+  { title: "Shopify-native simplicity, kept.", body: "Genie's appeal was that it felt like a Shopify app, not an ERP bolt-on. skubase is built the same way." },
+  { title: "The math, added.", body: "Genie merchants told reviewers the forecasting felt basic. skubase ships Holt double-exponential smoothing with weekly seasonality." },
+  { title: "Suppliers, measured.", body: "Genie treated vendors as contacts. skubase scores them: on-time delivery, fill rate, lead-time stability, tiering." },
+  { title: "Dead stock, acted on.", body: "Genie surfaced aged stock. skubase proposes a plan: markdown, bundle, wholesale, or write-off." }
 ];
 
 const steps = [
@@ -28,8 +28,8 @@ export default function GoodbyeGeniePage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -42,7 +42,7 @@ export default function GoodbyeGeniePage() {
 
       <section className="marketing-hero marketing-hero-migration">
         <p className="marketing-eyebrow">Genie closed August 31, 2025</p>
-        <h1 className="marketing-hero-title">Genie is gone. slelfly is the upgrade.</h1>
+        <h1 className="marketing-hero-title">Genie is gone. skubase is the upgrade.</h1>
         <p className="marketing-hero-sub">
           Genie merchants loved simple. We kept the simple — and added the math, the supplier scorecards, and the dead-stock plans Genie never shipped.
         </p>
@@ -83,14 +83,14 @@ export default function GoodbyeGeniePage() {
 
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">Stop improvising.</h2>
-        <p className="marketing-section-sub">The CSV exports and spreadsheets were good under pressure. slelfly is the permanent replacement.</p>
+        <p className="marketing-section-sub">The CSV exports and spreadsheets were good under pressure. skubase is the permanent replacement.</p>
         <WaitlistForm source="goodbye_genie_footer" ctaLabel="Get early access" />
       </section>
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -101,7 +101,7 @@ export default function GoodbyeGeniePage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly · Prices locked at renewal</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
       </footer>
     </div>
   );

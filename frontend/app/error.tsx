@@ -22,7 +22,7 @@ export default function ErrorPage({
         <h1 className="error-title">Something went sideways.</h1>
         <p className="error-copy">
           We&apos;ve logged the error. Try again in a moment — if it keeps
-          happening, drop us a note at hello@slelfly.com.
+          happening, drop us a note at hello@skubase.io.
         </p>
         <div className="error-actions">
           <button type="button" onClick={reset} className="button button-primary">

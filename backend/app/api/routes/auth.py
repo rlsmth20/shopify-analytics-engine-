@@ -25,7 +25,7 @@ from app.services.transactional_email import send_magic_link_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://slelfly.com").rstrip("/")
+FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").rstrip("/")
 
 
 class MagicLinkRequest(BaseModel):

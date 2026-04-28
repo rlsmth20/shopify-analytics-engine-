@@ -24,7 +24,7 @@ I'll structure this by what merchants actually use Stocky *for* — purchase ord
 ### For real forecasting (the thing Stocky was weakest at)
 - **Inventory Planner** ($299–$1,999+/mo) — historically the strong choice, but reviews post-Sage acquisition (2021) describe support and pricing regressions.
 - **Prediko** ($119–$599/mo) — newer Shopify-first AI forecasting. Multi-location is recent.
-- **slelfly** ($49–$349/mo) — full disclosure, this is what I built. Holt double-exponential smoothing, ABC × XYZ classification, supplier scorecards, dead-stock plans. Published pricing with a price-lock clause in TOS.
+- **skubase** ($49–$349/mo) — full disclosure, this is what I built. Holt double-exponential smoothing, ABC × XYZ classification, supplier scorecards, dead-stock plans. Published pricing with a price-lock clause in TOS.
 - **StockTrim** ($99–$299/mo) — forecast-only, you'd pair it with another tool for PO generation.
 
 ### For multi-channel sellers (Shopify + Amazon + eBay)
@@ -40,6 +40,6 @@ If you want one tool that does both, **Linnworks** is the obvious option but the
 3. Run Stocky and the new tool side-by-side through July. Cut over in August.
 4. Insist on published pricing — quote-only is a warning sign in this market.
 
-I wrote a longer comparison post here that goes deeper on each tool: https://slelfly.com/blog/stocky-alternatives-2026
+I wrote a longer comparison post here that goes deeper on each tool: https://skubase.io/blog/stocky-alternatives-2026
 
 What is everyone actually planning to do? Curious to hear from POS Pro merchants specifically — does Stocky's loss affect your POS Pro renewal calculation at all?

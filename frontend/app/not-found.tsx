@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Page not found · slelfly",
+  title: "Page not found · skubase",
 };
 
 export default function NotFound() {

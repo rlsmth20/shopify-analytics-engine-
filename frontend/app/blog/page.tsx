@@ -3,10 +3,10 @@ import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
-  title: "Blog — slelfly",
+  title: "Blog — skubase",
   description: "Posts about Shopify inventory, forecasting, supplier scoring, dead stock, and the rest of the math the spreadsheet can't do.",
   alternates: { canonical: "/blog" },
-  openGraph: { title: "slelfly blog", description: "Shopify inventory, forecasting, and supplier intelligence.", url: "/blog", type: "website" },
+  openGraph: { title: "skubase blog", description: "Shopify inventory, forecasting, and supplier intelligence.", url: "/blog", type: "website" },
 };
 
 const posts = [
@@ -19,8 +19,8 @@ export default function BlogIndex() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -66,8 +66,8 @@ export default function BlogIndex() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -77,7 +77,7 @@ export default function BlogIndex() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
       </footer>
     </div>
   );

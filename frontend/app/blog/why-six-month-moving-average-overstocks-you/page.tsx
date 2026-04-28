@@ -12,7 +12,7 @@ const ARTICLE_LD = {
   "@type": "Article",
   headline: "Why a 6-month moving average is overstocking you",
   datePublished: "2026-04-25",
-  author: { "@type": "Organization", name: "slelfly" },
+  author: { "@type": "Organization", name: "skubase" },
 };
 
 export default function MovingAveragePost() {
@@ -20,8 +20,8 @@ export default function MovingAveragePost() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -79,9 +79,9 @@ export default function MovingAveragePost() {
           <li>Stop reordering by averages. Even simple exponential smoothing dramatically beats trailing average.</li>
         </ol>
 
-        <h2 className="blog-article-h2">Why slelfly</h2>
+        <h2 className="blog-article-h2">Why skubase</h2>
         <p>
-          slelfly runs Holt double-exponential with weekly seasonality on every SKU, classifies on ABC × XYZ, sets safety stock per class, scores suppliers, surfaces stockout probability. The math is visible — every recommended quantity explains itself.
+          skubase runs Holt double-exponential with weekly seasonality on every SKU, classifies on ABC × XYZ, sets safety stock per class, scores suppliers, surfaces stockout probability. The math is visible — every recommended quantity explains itself.
         </p>
 
         <div className="blog-article-cta">
@@ -94,8 +94,8 @@ export default function MovingAveragePost() {
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -104,7 +104,7 @@ export default function MovingAveragePost() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
       </footer>
     </div>
   );

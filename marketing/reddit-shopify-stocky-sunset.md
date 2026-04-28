@@ -22,7 +22,7 @@ I started looking into the alternatives seriously and the landscape is messier t
 - **Sumtracker / Zoho Inventory** — cheap, light, sync hiccups in reviews.
 - **Linnworks** — not really a Stocky replacement, more an OMS, and Trustpilot has a lot of complaints about a 681% renewal price hike under their PE owner.
 
-For full disclosure: I'm building one too — slelfly. We did Holt forecasting + supplier scorecards + dead-stock plans + ABC×XYZ classification, published our pricing ($49/$149/$349) with a written price-lock clause in the TOS so we can't pull an Inventory Planner on you. Wrote a longer comparison post here: https://slelfly.com/blog/stocky-alternatives-2026 — happy to be told it's wrong.
+For full disclosure: I'm building one too — skubase. We did Holt forecasting + supplier scorecards + dead-stock plans + ABC×XYZ classification, published our pricing ($49/$149/$349) with a written price-lock clause in the TOS so we can't pull an Inventory Planner on you. Wrote a longer comparison post here: https://skubase.io/blog/stocky-alternatives-2026 — happy to be told it's wrong.
 
 But honestly the real question is: **what are you actually planning to do?** I'd rather hear what merchants here are leaning toward than tell you. Especially if you've already trialed something and have opinions.
 

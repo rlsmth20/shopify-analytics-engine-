@@ -170,9 +170,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark">sf</span>
+          <span className="brand-mark">sb</span>
           <div>
-            <p className="brand-name">slelfly</p>
+            <p className="brand-name">skubase</p>
             <p className="brand-copy">Forecast · Replenish · Recover</p>
           </div>
         </div>

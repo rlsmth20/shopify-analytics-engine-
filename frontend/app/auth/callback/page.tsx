@@ -58,8 +58,8 @@ function CallbackInner() {
     <div className="auth-shell">
       <div className="auth-card">
         <Link href="/" className="auth-brand">
-          <span className="auth-brand-mark">sf</span>
-          <span className="auth-brand-name">slelfly</span>
+          <span className="auth-brand-mark">sb</span>
+          <span className="auth-brand-name">skubase</span>
         </Link>
         {status === "verifying" ? (
           <>

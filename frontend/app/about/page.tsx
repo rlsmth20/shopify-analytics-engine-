@@ -3,14 +3,14 @@ import Link from "next/link";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
-  title: "About — slelfly",
+  title: "About — skubase",
   description: "Independent, founder-led, Shopify-first. No PE squeeze.",
   alternates: { canonical: "/about" },
-  openGraph: { title: "About slelfly — Independent. Founder-led. No PE squeeze.", description: "Eight of the inventory tools you evaluate were acquired and got worse. slelfly is structurally outside that pattern.", url: "/about", type: "website" },
+  openGraph: { title: "About skubase — Independent. Founder-led. No PE squeeze.", description: "Eight of the inventory tools you evaluate were acquired and got worse. skubase is structurally outside that pattern.", url: "/about", type: "website" },
 };
 
 const beliefs = [
-  { title: "Inventory is a decision problem, not a reporting problem.", body: "Most inventory tools are dashboards — they tell you what happened and leave you to act. slelfly ranks the decisions: what to reorder, what is overstocked, what is dead, what to do first." },
+  { title: "Inventory is a decision problem, not a reporting problem.", body: "Most inventory tools are dashboards — they tell you what happened and leave you to act. skubase ranks the decisions: what to reorder, what is overstocked, what is dead, what to do first." },
   { title: "Math should be visible.", body: "Every recommended quantity explains itself. Trailing demand, seasonality factor, service level, stockout probability — all on the card, all clickable." },
   { title: "Suppliers are measurable.", body: "23 of 25 tools we studied treat vendors as contact records. We treat them as performers. On-time delivery, fill rate, lead-time stability, tiering. Facts, not feelings." },
   { title: "Dead stock is a cash recovery problem.", body: "24 of 25 tools flag aged inventory and stop. We propose the specific plan — markdown, bundle, wholesale, or write-off — with the dollar impact attached." },
@@ -33,8 +33,8 @@ export default function AboutPage() {
     <div className="marketing-shell">
       <header className="marketing-nav">
         <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span className="marketing-brand-name">slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span className="marketing-brand-name">skubase</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
           <Link href="/#pillars">Product</Link>
@@ -46,10 +46,10 @@ export default function AboutPage() {
       </header>
 
       <section className="marketing-hero">
-        <p className="marketing-eyebrow">About slelfly</p>
+        <p className="marketing-eyebrow">About skubase</p>
         <h1 className="marketing-hero-title">Independent. Founder-led. Shopify-first.</h1>
         <p className="marketing-hero-sub">
-          Eight of the 25 inventory tools we benchmark against have been acquired by a parent that raised prices, slowed the roadmap, or broke support. slelfly is structurally outside that pattern.
+          Eight of the 25 inventory tools we benchmark against have been acquired by a parent that raised prices, slowed the roadmap, or broke support. skubase is structurally outside that pattern.
         </p>
       </section>
 
@@ -100,15 +100,15 @@ export default function AboutPage() {
         <p className="marketing-section-kicker">Get early access</p>
         <h2 className="marketing-section-title">If this take resonates, get on the list.</h2>
         <p className="marketing-section-sub">
-          slelfly is in private beta. Drop your email — we&apos;ll send your invite when paid plans launch.
+          skubase is in private beta. Drop your email — we&apos;ll send your invite when paid plans launch.
         </p>
         <WaitlistForm source="about" ctaLabel="Get early access" />
       </section>
 
       <footer className="marketing-footer">
         <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sf</span>
-          <span>slelfly</span>
+          <span className="marketing-brand-mark">sb</span>
+          <span>skubase</span>
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
@@ -119,7 +119,7 @@ export default function AboutPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} slelfly · Independent · Founder-led</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Independent · Founder-led</p>
       </footer>
     </div>
   );

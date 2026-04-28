@@ -27,7 +27,7 @@ from app.api.routes.waitlist import router as waitlist_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="slelfly API",
+        title="skubase API",
         version="0.3.0",
         description=(
             "Forecasting, replenishment, alerting, and supplier intelligence "

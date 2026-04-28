@@ -14,9 +14,9 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Defaults are safe to ship. Override via env vars on Railway.
-DEFAULT_FROM = os.getenv("WAITLIST_FROM_EMAIL", "slelfly <hello@slelfly.com>")
-DEFAULT_REPLY_TO = os.getenv("WAITLIST_REPLY_TO", "hello@slelfly.com")
-DEFAULT_PRODUCT_URL = os.getenv("PRODUCT_URL", "https://slelfly.com")
+DEFAULT_FROM = os.getenv("WAITLIST_FROM_EMAIL", "skubase <hello@skubase.io>")
+DEFAULT_REPLY_TO = os.getenv("WAITLIST_REPLY_TO", "hello@skubase.io")
+DEFAULT_PRODUCT_URL = os.getenv("PRODUCT_URL", "https://skubase.io")
 
 
 def _client():
@@ -52,17 +52,17 @@ def _waitlist_html(email: str, shopify_domain: Optional[str]) -> str:
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
         <tr><td>
-          <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">slelfly</p>
+          <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase</p>
           <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0f172a;">You&rsquo;re on the list.</h1>
           <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">
-            Thanks for signing up at <a href="{DEFAULT_PRODUCT_URL}" style="color:#0f172a;">slelfly.com</a>.
+            Thanks for signing up at <a href="{DEFAULT_PRODUCT_URL}" style="color:#0f172a;">skubase.io</a>.
             We&rsquo;re a Shopify-first inventory tool that ranks every SKU by what to do today &mdash;
             forecast, supplier scorecards, dead-stock plans, in one product.
           </p>
           {domain_block}
           <p style="margin:0 0 16px;color:#334155;font-size:16px;line-height:1.6;">
             We&rsquo;ll send your invite when paid plans launch. In the meantime,
-            the live demo is up at <a href="{DEFAULT_PRODUCT_URL}/dashboard" style="color:#0f172a;">slelfly.com/dashboard</a> &mdash;
+            the live demo is up at <a href="{DEFAULT_PRODUCT_URL}/dashboard" style="color:#0f172a;">skubase.io/dashboard</a> &mdash;
             it runs on example data so you can poke around without connecting your store.
           </p>
           <p style="margin:24px 0 0;color:#334155;font-size:16px;line-height:1.6;">
@@ -70,12 +70,12 @@ def _waitlist_html(email: str, shopify_domain: Optional[str]) -> str:
             what&rsquo;s broken about it, what you&rsquo;d need to switch. The first hundred
             replies shape the roadmap.
           </p>
-          <p style="margin:24px 0 0;color:#475569;font-size:14px;">&mdash; Rainer, slelfly</p>
+          <p style="margin:24px 0 0;color:#475569;font-size:14px;">&mdash; Rainer, skubase</p>
         </td></tr>
       </table>
       <p style="margin:16px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">
-        You&rsquo;re receiving this because you signed up at slelfly.com with {email}.<br>
-        slelfly &middot; Independent &middot; Founder-led &middot; Prices locked at renewal
+        You&rsquo;re receiving this because you signed up at skubase.io with {email}.<br>
+        skubase &middot; Independent &middot; Founder-led &middot; Prices locked at renewal
       </p>
     </td></tr>
   </table>
@@ -89,18 +89,18 @@ def _waitlist_text(email: str, shopify_domain: Optional[str]) -> str:
         else ""
     )
     return (
-        "You're on the slelfly waitlist.\n\n"
-        f"Thanks for signing up at {DEFAULT_PRODUCT_URL}. slelfly is a Shopify-first inventory tool that "
+        "You're on the skubase waitlist.\n\n"
+        f"Thanks for signing up at {DEFAULT_PRODUCT_URL}. skubase is a Shopify-first inventory tool that "
         "ranks every SKU by what to do today — forecast, supplier scorecards, dead-stock plans, in one product.\n\n"
         f"{domain_line}"
         f"We'll send your invite when paid plans launch. In the meantime, the live demo is up at {DEFAULT_PRODUCT_URL}/dashboard — "
         "it runs on example data so you can poke around without connecting your store.\n\n"
         "Just hit reply if you want to tell us about your stack — what you use today, what's broken about it, "
         "what you'd need to switch. The first hundred replies shape the roadmap.\n\n"
-        "— Rainer, slelfly\n\n"
+        "— Rainer, skubase\n\n"
         "---\n"
-        f"You're receiving this because you signed up at slelfly.com with {email}.\n"
-        "slelfly · Independent · Founder-led · Prices locked at renewal\n"
+        f"You're receiving this because you signed up at skubase.io with {email}.\n"
+        "skubase · Independent · Founder-led · Prices locked at renewal\n"
     )
 
 
@@ -121,7 +121,7 @@ def send_waitlist_confirmation(
             "from": DEFAULT_FROM,
             "to": [email],
             "reply_to": DEFAULT_REPLY_TO,
-            "subject": "You're on the slelfly waitlist",
+            "subject": "You're on the skubase waitlist",
             "html": _waitlist_html(email, shopify_domain),
             "text": _waitlist_text(email, shopify_domain),
             "tags": [
@@ -143,13 +143,13 @@ def _magic_link_html(email: str, link: str) -> str:
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
         <tr><td>
-          <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">slelfly</p>
-          <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0f172a;">Sign in to slelfly</h1>
+          <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase</p>
+          <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0f172a;">Sign in to skubase</h1>
           <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">
             Click the button below to sign in. The link is valid for 15 minutes and can only be used once.
           </p>
           <p style="margin:0 0 24px;">
-            <a href="{link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;">Sign in to slelfly &rarr;</a>
+            <a href="{link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;">Sign in to skubase &rarr;</a>
           </p>
           <p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.6;">
             Or paste this URL into your browser:
@@ -163,7 +163,7 @@ def _magic_link_html(email: str, link: str) -> str:
         </td></tr>
       </table>
       <p style="margin:16px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">
-        Sent to {email} &middot; slelfly
+        Sent to {email} &middot; skubase
       </p>
     </td></tr>
   </table>
@@ -172,7 +172,7 @@ def _magic_link_html(email: str, link: str) -> str:
 
 def _magic_link_text(email: str, link: str) -> str:
     return (
-        "Sign in to slelfly\n\n"
+        "Sign in to skubase\n\n"
         f"Click this link to sign in: {link}\n\n"
         "The link is valid for 15 minutes and can only be used once.\n\n"
         "If you did not request this email, you can ignore it — nothing "
@@ -194,7 +194,7 @@ def send_magic_link_email(email: str, link: str) -> bool:
             "from": DEFAULT_FROM,
             "to": [email],
             "reply_to": DEFAULT_REPLY_TO,
-            "subject": "Sign in to slelfly",
+            "subject": "Sign in to skubase",
             "html": _magic_link_html(email, link),
             "text": _magic_link_text(email, link),
             "tags": [

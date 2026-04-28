@@ -8,13 +8,13 @@
 
 ## Title
 
-Show HN: Slelfly – Shopify inventory forecasting that beats your spreadsheet
+Show HN: Skubase – Shopify inventory forecasting that beats your spreadsheet
 
 (HN auto-prefixes "Show HN:" but include it explicitly in the submission title field. Keep under 80 chars. Avoid emoji. Avoid hype words.)
 
 ## URL
 
-https://slelfly.com
+https://skubase.io
 
 ## First comment (post immediately after submission)
 
@@ -22,7 +22,7 @@ Hey HN. I've been studying why Shopify merchants forecast inventory with Google 
 
 The summary: most inventory tools in the Shopify ecosystem either (a) got acquired and got worse — Inventory Planner under Sage, Linnworks under Marlin, Veeqo under Amazon, Cin7 Core, Brightpearl under Sage — or (b) are quote-only enterprise products that aren't a fit for SMBs. The remaining tools mostly use trailing-average forecasting, treat vendors as contact records, and have no real plan for dead stock beyond a flag.
 
-Slelfly does:
+Skubase does:
 
 - Holt double-exponential smoothing with a weekly seasonality factor and a stockout probability on every SKU (instead of moving averages)
 - ABC × XYZ classification and service-level-segmented safety stock (instead of one buffer for everything)

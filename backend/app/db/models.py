@@ -268,7 +268,7 @@ class WaitlistSignup(Base):
 
 
 class User(Base):
-    """Authenticated user of the slelfly app.
+    """Authenticated user of the skubase app.
 
     A User belongs to exactly one Shop (workspace). Multi-shop owners are
     handled by giving them multiple User rows for now — keeps the data model
