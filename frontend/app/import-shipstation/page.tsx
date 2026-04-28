@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type Velocity = {
@@ -27,7 +28,7 @@ type ImportResult = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function ImportShipStationPage() {
-  const [domain, setDomain] = useState("");
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,14 +38,20 @@ export default function ImportShipStationPage() {
     e.preventDefault();
     setError(null);
     setResult(null);
-    if (!domain.trim()) return setError("Please enter your Shopify domain.");
     if (!file) return setError("Please choose your ShipStation CSV.");
     setSubmitting(true);
     try {
       const fd = new FormData();
-      fd.append("shopify_domain", domain.trim());
       fd.append("csv_file", file);
-      const res = await fetch(`${API_BASE}/integrations/shipstation/import`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/integrations/shipstation/import`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.detail || `Import failed (${res.status}).`);
       setResult(body as ImportResult);
@@ -63,11 +70,9 @@ export default function ImportShipStationPage() {
           <span className="marketing-brand-name">slelfly</span>
         </Link>
         <nav className="marketing-nav-links" aria-label="Primary">
-          <Link href="/#pillars">Product</Link>
+          <Link href="/dashboard">Dashboard</Link>
           <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
           <Link href="/blog">Blog</Link>
-          <Link href="/changelog">Changelog</Link>
         </nav>
       </header>
 
@@ -83,23 +88,6 @@ export default function ImportShipStationPage() {
         <form className="import-card" onSubmit={handleSubmit}>
           <div className="import-step">
             <span className="import-step-num">1</span>
-            <div className="import-step-body">
-              <label htmlFor="domain" className="import-label">Your Shopify domain</label>
-              <input
-                id="domain"
-                type="text"
-                className="input-control import-input"
-                placeholder="yourshop.myshopify.com"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                disabled={submitting}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="import-step">
-            <span className="import-step-num">2</span>
             <div className="import-step-body">
               <label htmlFor="file" className="import-label">ShipStation orders/shipments CSV</label>
               <input
@@ -118,7 +106,7 @@ export default function ImportShipStationPage() {
           </div>
 
           <div className="import-step">
-            <span className="import-step-num">3</span>
+            <span className="import-step-num">2</span>
             <div className="import-step-body">
               <button type="submit" className="button button-primary button-lg" disabled={submitting}>
                 {submitting ? "Crunching the numbers…" : "Compute my velocity"}
@@ -174,6 +162,9 @@ export default function ImportShipStationPage() {
           <h3 className="import-side-title">Multi-channel?</h3>
           <p className="import-side-note">
             ShipStation typically aggregates Shopify, Amazon, eBay, Walmart. Your import will include all of them.
+          </p>
+          <p className="import-help" style={{ marginTop: "16px" }}>
+            You need to be signed in to import. <Link href="/login">Sign in</Link> if you haven&apos;t already.
           </p>
         </aside>
       </section>

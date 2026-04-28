@@ -1,10 +1,18 @@
-from fastapi import APIRouter, Query
+from typing import Annotated
 
-from app.mock_data import MOCK_SKUS
-from app.mock_data_v2 import daily_history_for_sku
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session as DbSession
+
+from app.api.deps import get_current_user
+from app.db.models import User
+from app.db.session import get_db_session
 from app.schemas_v2 import PurchaseOrderDraftsResponse, ReorderFeedResponse
 from app.services.purchase_orders import build_purchase_order_drafts
 from app.services.reorder_optimizer import build_reorder_suggestions, build_vendor_totals
+from app.services.shop_skus import (
+    load_daily_history_for_shop_sku,
+    load_skus_for_shop,
+)
 
 
 router = APIRouter(prefix="/reorder", tags=["reorder"])
@@ -12,11 +20,21 @@ router = APIRouter(prefix="/reorder", tags=["reorder"])
 
 @router.get("", response_model=ReorderFeedResponse)
 def list_reorder_suggestions(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
 ) -> ReorderFeedResponse:
+    skus = load_skus_for_shop(db, user.shop_id)
+    if not skus:
+        return ReorderFeedResponse(
+            service_level=service_level,
+            suggestions=[],
+            total_extended_cost=0.0,
+            vendor_totals=[],
+        )
     suggestions = build_reorder_suggestions(
-        MOCK_SKUS,
-        daily_history_for_sku,
+        skus,
+        lambda sku_id, days=90: load_daily_history_for_shop_sku(db, user.shop_id, sku_id, days),
         service_level=service_level,
     )
     totals = build_vendor_totals(suggestions)
@@ -30,11 +48,16 @@ def list_reorder_suggestions(
 
 @router.get("/purchase-orders", response_model=PurchaseOrderDraftsResponse)
 def list_po_drafts(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
 ) -> PurchaseOrderDraftsResponse:
+    skus = load_skus_for_shop(db, user.shop_id)
+    if not skus:
+        return PurchaseOrderDraftsResponse(drafts=[], total_capital_required=0.0)
     suggestions = build_reorder_suggestions(
-        MOCK_SKUS,
-        daily_history_for_sku,
+        skus,
+        lambda sku_id, days=90: load_daily_history_for_shop_sku(db, user.shop_id, sku_id, days),
         service_level=service_level,
     )
     drafts = build_purchase_order_drafts(suggestions)

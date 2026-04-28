@@ -49,6 +49,34 @@ export default function DashboardPage() {
 
   if (!data) return null;
 
+  // Empty-state: a brand-new shop with no imported data. Every chart array
+  // is empty when the backend has no rows to aggregate. Show an explicit
+  // import CTA instead of empty charts that look broken.
+  const hasNoData =
+    data.revenue_trend_30d.length === 0 &&
+    data.stock_health_breakdown.length === 0 &&
+    data.top_movers.length === 0;
+
+  if (hasNoData) {
+    return (
+      <div className="dashboard-empty">
+        <div className="dashboard-empty-card">
+          <p className="dashboard-empty-eyebrow">Welcome to slelfly</p>
+          <h2 className="dashboard-empty-title">No data in your workspace yet.</h2>
+          <p className="dashboard-empty-copy">
+            Import your Stocky or ShipStation export and slelfly will rank
+            every SKU by what to do today — urgent, optimize, dead. Most
+            merchants see their first ranked action in under ten minutes.
+          </p>
+          <div className="dashboard-empty-actions">
+            <a href="/import-stocky" className="button button-primary button-lg">Import Stocky CSV</a>
+            <a href="/import-shipstation" className="button button-ghost button-lg">Import ShipStation CSV</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard">
       <section className="dashboard-kpis">
