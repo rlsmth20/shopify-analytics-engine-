@@ -1,9 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "Why a 6-month moving average is overstocking you",
-  description: "If you reorder Shopify inventory when cover drops below six months, you're carrying more than you need to.",
+  description: "If you reorder Shopify inventory when cover drops below six months, you''re carrying more than you need to.",
   alternates: { canonical: "/blog/why-six-month-moving-average-overstocks-you" },
   openGraph: { title: "Why a 6-month moving average is overstocking you", description: "The math, and the fix.", url: "/blog/why-six-month-moving-average-overstocks-you", type: "article" },
 };
@@ -44,18 +44,18 @@ export default function MovingAveragePost() {
         </p>
 
         <h2 className="blog-article-h2">Why one buffer per SKU is wrong</h2>
-        <p className="blog-article-formula">Safety stock = z Ã— Ïƒ_LT</p>
+        <p className="blog-article-formula">Safety stock = z × Ïƒ_LT</p>
         <p>
-          The point of <em>z</em> is that <strong>different SKUs deserve different service levels.</strong> Top-revenue A-items want 99% (z â‰ˆ 2.33). Lumpy C-items might be fine at 90%. A flat &quot;6 months&quot; applies the same z to everything. Result: overstocking C-items, understocking A-items, usually both.
+          The point of <em>z</em> is that <strong>different SKUs deserve different service levels.</strong> Top-revenue A-items want 99% (z ≈ 2.33). Lumpy C-items might be fine at 90%. A flat &quot;6 months&quot; applies the same z to everything. Result: overstocking C-items, understocking A-items, usually both.
         </p>
 
         <h2 className="blog-article-h2">A worked example</h2>
         <p>
-          A-item shipping 150/wk, Ïƒ=20, lead time 30 days. Average lead-time demand â‰ˆ 643 units. Ïƒ_LT â‰ˆ 47 units.
+          A-item shipping 150/wk, Ïƒ=20, lead time 30 days. Average lead-time demand ≈ 643 units. Ïƒ_LT ≈ 47 units.
         </p>
         <ul className="blog-article-ul">
-          <li><strong>6-month rule:</strong> 150 Ã— 26 = 3,900 units of cover. At $25/unit = $97,500 parked.</li>
-          <li><strong>Service-level-segmented at 99%:</strong> ROP â‰ˆ 753, plus cycle stock â‰ˆ 900 total. At $25 = $22,500.</li>
+          <li><strong>6-month rule:</strong> 150 × 26 = 3,900 units of cover. At $25/unit = $97,500 parked.</li>
+          <li><strong>Service-level-segmented at 99%:</strong> ROP ≈ 753, plus cycle stock ≈ 900 total. At $25 = $22,500.</li>
         </ul>
         <p>
           Same 99% service level, <strong>$75,000 less working capital tied up in one SKU</strong>. Multiply across a hundred A-items and the number gets very large.
@@ -70,7 +70,7 @@ export default function MovingAveragePost() {
 
         <h2 className="blog-article-h2">Why skubase</h2>
         <p>
-          skubase runs Holt double-exponential with weekly seasonality on every SKU, classifies on ABC Ã— XYZ, sets safety stock per class, scores suppliers, surfaces stockout probability. The math is visible — every recommended quantity explains itself.
+          skubase runs Holt double-exponential with weekly seasonality on every SKU, classifies on ABC × XYZ, sets safety stock per class, scores suppliers, surfaces stockout probability. The math is visible — every recommended quantity explains itself.
         </p>
 
         <div className="blog-article-cta">
@@ -90,4 +90,12 @@ export default function MovingAveragePost() {
           <Link href="/">Home</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/pricing">Pricing</Link>
-          <Link href="/privacy">Pr
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
+      </footer>
+    </div>
+  );
+}
+

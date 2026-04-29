@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
@@ -56,7 +56,7 @@ export default function StockyAlternativesPost() {
           Newer Shopify-first AI forecasting. Strong forecasting surface but Shopify-only. Multi-location is recent. $119–$599/mo, published.
         </p>
 
-        <h3 className=”blog-article-h3”>Cin7 Core (DEAR)</h3>
+        <h3 className="blog-article-h3">Cin7 Core (DEAR)</h3>
         <p>
           Mid-market IMS. Heavier than Stocky. Quoted $349–$999/mo plus implementation, often with a partner consultant. Probably overkill if Stocky was enough.
         </p>
@@ -103,4 +103,11 @@ export default function StockyAlternativesPost() {
           <Link href="/blog">Blog</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/privacy">Privacy</Link>
-          
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
+      </footer>
+    </div>
+  );
+}
+

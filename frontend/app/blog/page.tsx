@@ -36,13 +36,13 @@ export default function BlogIndex() {
           <article key={p.slug} className="blog-list-item">
             <p className="blog-list-meta">
               <time dateTime={p.date}>{p.date}</time>
-              <span> · {p.minutes} min read</span>
+              <span> &middot; {p.minutes} min read</span>
             </p>
             <h2 className="blog-list-title">
               <Link href={`/blog/${p.slug}`}>{p.title}</Link>
             </h2>
             <p className="blog-list-desc">{p.description}</p>
-            <Link href={`/blog/${p.slug}`} className="blog-list-link">Read post →</Link>
+            <Link href={`/blog/${p.slug}`} className="blog-list-link">Read post &rarr;</Link>
           </article>
         ))}
       </section>
@@ -51,7 +51,7 @@ export default function BlogIndex() {
         <p className="marketing-section-kicker">Get early access</p>
         <h2 className="marketing-section-title">Want the next post in your inbox?</h2>
         <p className="marketing-section-sub">
-          We send the new post and the early-access invite to the same list. Drop your email — that&apos;s it.
+          We send the new post and the early-access invite to the same list. Drop your email &mdash; that&apos;s it.
         </p>
         <WaitlistForm source="blog_index" ctaLabel="Get early access" />
       </section>
@@ -67,4 +67,10 @@ export default function BlogIndex() {
           <Link href="/about">About</Link>
           <Link href="/changelog">Changelog</Link>
           <Link href="/privacy">Privacy</Link>
-          <Link hr
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">&copy; {new Date().getFullYear()} skubase</p>
+      </footer>
+    </div>
+  );
+}

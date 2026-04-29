@@ -1,11 +1,11 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "Changelog — skubase",
-  description: "Every release lands here. Shipping transparently is how we counter the 'roadmap frozen' pattern the rest of the market has earned.",
+  description: "Every release lands here. Shipping transparently is how we counter the ''roadmap frozen'' pattern the rest of the market has earned.",
   alternates: { canonical: "/changelog" },
   openGraph: { title: "Changelog — skubase", description: "Every release, on the record.", url: "/changelog", type: "website" },
 };
@@ -15,7 +15,7 @@ type ChangelogEntry = { version: string; date: string; title: string; items: { t
 const entries: ChangelogEntry[] = [
   { version: "v0.4.0", date: "2026-04-25", title: "Pre-launch readiness", items: [
     { type: "Shipped", text: "Waitlist signup form replaces direct dashboard access — skubase enters private beta." },
-    { type: "Shipped", text: "Demo-mode banner on /dashboard so visitors know they're seeing example data." },
+    { type: "Shipped", text: "Demo-mode banner on /dashboard so visitors know they''re seeing example data." },
     { type: "Shipped", text: "Privacy Policy and Terms of Service pages, including the written price-lock clause." },
     { type: "Shipped", text: "Public blog at /blog with first two posts (Stocky alternatives, why moving averages overstock)." },
     { type: "Shipped", text: "Stocky and ShipStation CSV importers with sample test data." }
@@ -30,7 +30,7 @@ const entries: ChangelogEntry[] = [
   ]},
   { version: "v0.2.0", date: "2026-04-23", title: "Intelligence surface", items: [
     { type: "Shipped", text: "Holt double-exponential smoothing with weekly seasonality and stockout probability." },
-    { type: "Shipped", text: "ABC Ã— XYZ classification and scorecards." },
+    { type: "Shipped", text: "ABC × XYZ classification and scorecards." },
     { type: "Shipped", text: "Service-level-segmented safety stock, ROP, and EOQ." },
     { type: "Shipped", text: "Supplier scorecards and tiering." },
     { type: "Shipped", text: "Bundle / kit bottleneck analysis." },
@@ -107,4 +107,11 @@ export default function ChangelogPage() {
           <Link href="/about">About</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/privacy">Privacy</Link>
-      
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
+      </footer>
+    </div>
+  );
+}
+

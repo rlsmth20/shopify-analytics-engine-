@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
@@ -19,7 +19,7 @@ const beliefs = [
 ];
 
 const notLikeUs = [
-  { competitor: "Inventory Planner", owner: "Sage (2021)", pattern: "Users reported ~3Ã— price hikes and support regression after the acquisition." },
+  { competitor: "Inventory Planner", owner: "Sage (2021)", pattern: "Users reported ~3× price hikes and support regression after the acquisition." },
   { competitor: "Linnworks", owner: "Marlin Equity (PE)", pattern: "Trustpilot reviews cite a 681% renewal price hike and support collapse." },
   { competitor: "Veeqo", owner: "Amazon (2021)", pattern: "Non-Amazon merchants raised data concerns; roadmap visibly slowed." },
   { competitor: "Skubana", owner: "Extensiv", pattern: "Forced platform migration created documented churn and billing confusion." },
@@ -106,4 +106,11 @@ export default function AboutPage() {
           <Link href="/blog">Blog</Link>
           <Link href="/changelog">Changelog</Link>
           <Link href="/privacy">Privacy</Link>
-          <Link href="/terms"
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Independent · Founder-led</p>
+      </footer>
+    </div>
+  );
+}
+
