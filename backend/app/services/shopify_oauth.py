@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 SCOPES = "read_products,read_inventory,read_orders,read_locations"
 
-FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").rstrip("/")
+FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 BACKEND_URL = os.getenv("BACKEND_PUBLIC_URL", "").rstrip("/")
 
 

@@ -25,7 +25,7 @@ from app.services.transactional_email import send_magic_link_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").rstrip("/")
+FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 
 
 def _check_admin_bootstrap(token: Optional[str]) -> None:

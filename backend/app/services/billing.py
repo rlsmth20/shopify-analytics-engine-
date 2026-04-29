@@ -36,7 +36,7 @@ PLAN_BY_PRICE_ID: dict[str, str] = {
     pid: name for name, pid in PRICE_IDS.items() if pid
 }
 
-FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").rstrip("/")
+FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 
 
 def _stripe():

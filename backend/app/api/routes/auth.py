@@ -25,7 +25,10 @@ from app.services.transactional_email import send_magic_link_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").rstrip("/")
+# Canonical frontend URL used for outbound links (magic-link emails, redirects).
+# FRONTEND_ORIGIN may be comma-separated for CORS — use the first entry as the
+# canonical link target.
+FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 
 
 class MagicLinkRequest(BaseModel):
