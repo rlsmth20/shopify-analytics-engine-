@@ -31,7 +31,7 @@ export default function PrivacyPage() {
 
         <h2 className="blog-article-h2">What we collect</h2>
         <p>
-          When you sign up for the waitlist or create an account we collect:
+          When you start a free trial or create an account we collect:
           your email address, optional Shopify domain, and the source page you
           signed up from. When you connect a Shopify store we collect: product
           catalog, inventory levels, vendor records, and order history
@@ -63,8 +63,8 @@ export default function PrivacyPage() {
           <li><strong>Vercel</strong> — frontend hosting, analytics, speed insights.</li>
           <li><strong>Railway</strong> — backend hosting and managed PostgreSQL.</li>
           <li><strong>Shopify</strong> — source of catalog, inventory, and order data when you connect a store.</li>
-          <li><strong>Resend</strong> — transactional email delivery (planned).</li>
-          <li><strong>Stripe</strong> — payment processing (when paid plans launch).</li>
+          <li><strong>Resend</strong> — transactional email delivery (magic-link sign-in).</li>
+          <li><strong>Stripe</strong> — payment processing for paid subscriptions.</li>
         </ul>
 
         <h2 className="blog-article-h2">Retention and deletion</h2>
