@@ -152,9 +152,25 @@ export class ApiError extends Error {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+function isDemo(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      sessionStorage.getItem("skubase_demo") === "1" ||
+      new URLSearchParams(window.location.search).get("demo") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchInventoryActions(
   signal?: AbortSignal
 ): Promise<ActionFeedResponse> {
+  if (isDemo()) {
+    const { DEMO_ACTION_FEED } = await import("@/lib/demo-data");
+    return DEMO_ACTION_FEED as ActionFeedResponse;
+  }
   const response = await fetch(`${API_BASE_URL}/actions`, {
     method: "GET",
     headers: {

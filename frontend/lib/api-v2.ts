@@ -1,8 +1,68 @@
 // V2 API client for forecast, analytics, reorder, suppliers, bundles, transfers,
 // liquidation, alerts, and dashboard endpoints.
 
+import {
+  DEMO_ALERT_CHANNELS,
+  DEMO_ALERT_EVENTS,
+  DEMO_ALERT_RULES,
+  DEMO_BUNDLES,
+  DEMO_DASHBOARD,
+  DEMO_FORECASTS,
+  DEMO_LIQUIDATION,
+  DEMO_PURCHASE_ORDERS,
+  DEMO_REORDER,
+  DEMO_SCORECARDS,
+  DEMO_SUPPLIERS,
+  DEMO_TRANSFERS,
+} from "@/lib/demo-data";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+// ---------------------------------------------------------------------------
+// Demo-mode detection
+// ---------------------------------------------------------------------------
+
+function isDemo(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      sessionStorage.getItem("skubase_demo") === "1" ||
+      new URLSearchParams(window.location.search).get("demo") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Map API paths to their demo fixtures.
+// Keys are path prefixes (longest match wins).
+const DEMO_FIXTURES: Record<string, unknown> = {
+  "/dashboard": DEMO_DASHBOARD,
+  "/forecast": DEMO_FORECASTS,
+  "/analytics/scorecards": DEMO_SCORECARDS,
+  "/reorder/purchase-orders": DEMO_PURCHASE_ORDERS,
+  "/reorder": DEMO_REORDER,
+  "/suppliers": DEMO_SUPPLIERS,
+  "/bundles": DEMO_BUNDLES,
+  "/transfers": DEMO_TRANSFERS,
+  "/liquidation": DEMO_LIQUIDATION,
+  "/alerts/rules": DEMO_ALERT_RULES,
+  "/alerts/events": DEMO_ALERT_EVENTS,
+  "/alerts/channels": DEMO_ALERT_CHANNELS,
+};
+
+function getDemoFixture<T>(path: string): T {
+  // Strip query string for matching
+  const bare = path.split("?")[0];
+  // Longest matching prefix wins
+  const key = Object.keys(DEMO_FIXTURES)
+    .filter((k) => bare === k || bare.startsWith(k + "/") || bare.startsWith(k + "?"))
+    .sort((a, b) => b.length - a.length)[0];
+  if (key) return DEMO_FIXTURES[key] as T;
+  // Fallback: return an empty shell so pages don't crash
+  return {} as T;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -225,6 +285,7 @@ export type DashboardResponse = {
 // ---------------------------------------------------------------------------
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  if (isDemo()) return getDemoFixture<T>(path);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -247,6 +308,7 @@ async function postJson<T>(
   payload: unknown,
   signal?: AbortSignal
 ): Promise<T> {
+  if (isDemo()) return getDemoFixture<T>(path);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: {
