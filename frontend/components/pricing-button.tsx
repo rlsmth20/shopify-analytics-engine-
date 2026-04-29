@@ -26,12 +26,12 @@ export function PricingButton({
   async function handleClick() {
     setLoading(true);
     try {
-      // First confirm the user is authenticated. If not, scroll to the
-      // waitlist anchor — they'll join the list rather than see a 401.
-      const meRes = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
-      if (!meRes.ok) {
-        const el = document.getElementById("waitlist");
-        if (el) el.scrollIntoView({ behavior: "smooth" });
+      // Check if user is already authenticated.
+      const meRes = await fetch(`${API_BASE}/auth/me`, { credentials: "include" }).catch(() => null);
+      if (!meRes || !meRes.ok) {
+        // Not signed in — send to login. After magic-link sign-in the user
+        // lands on /dashboard; they can return to /pricing and subscribe.
+        window.location.href = `/login?next=${encodeURIComponent("/pricing")}`;
         return;
       }
 
@@ -44,10 +44,9 @@ export function PricingButton({
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        // 503 means Stripe not configured yet — fall back to waitlist.
         if (res.status === 503) {
-          const el = document.getElementById("waitlist");
-          if (el) el.scrollIntoView({ behavior: "smooth" });
+          // Billing not yet wired — fall back to the waitlist.
+          window.location.href = "/#waitlist";
           return;
         }
         alert(body?.detail || `Could not start checkout (${res.status}).`);
@@ -56,8 +55,9 @@ export function PricingButton({
       if (body?.url) {
         window.location.href = body.url;
       }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+    } catch {
+      // Network error — fall back gracefully to login.
+      window.location.href = `/login?next=${encodeURIComponent("/pricing")}`;
     } finally {
       setLoading(false);
     }

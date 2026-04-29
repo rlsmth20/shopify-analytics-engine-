@@ -40,7 +40,7 @@ const TIERS: Tier[] = [
     ],
     featured: false,
     monthly: { plan: "starter_monthly", price: "$49" },
-    annual: { plan: "starter_annual", price: "$42", yearTotal: "$499" },
+    annual: { plan: "starter_annual", price: "$41.58", yearTotal: "$499" },
   },
   {
     name: "Growth",
@@ -58,7 +58,7 @@ const TIERS: Tier[] = [
     ],
     featured: true,
     monthly: { plan: "growth_monthly", price: "$149" },
-    annual: { plan: "growth_annual", price: "$125", yearTotal: "$1,499" },
+    annual: { plan: "growth_annual", price: "$124.92", yearTotal: "$1,499" },
   },
   {
     name: "Scale",
@@ -75,7 +75,7 @@ const TIERS: Tier[] = [
     ],
     featured: false,
     monthly: { plan: "scale_monthly", price: "$349" },
-    annual: { plan: "scale_annual", price: "$292", yearTotal: "$3,499" },
+    annual: { plan: "scale_annual", price: "$291.58", yearTotal: "$3,499" },
   },
 ];
 

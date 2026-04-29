@@ -214,7 +214,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="app-main">
-        {hasRealData === false ? (
+        {user.id === 0 ? (
+          // Demo mode — synthetic user injected by AuthGuard when ?demo=1.
+          <div className="demo-banner demo-banner-preview" role="status">
+            <span className="demo-banner-mark" aria-hidden>◎</span>
+            <span>
+              <strong>Demo mode.</strong> You&apos;re viewing sample data.{" "}
+              <Link href="/login" className="demo-banner-link">
+                Sign up free
+              </Link>{" "}
+              to connect your Shopify store and see your own inventory.
+            </span>
+          </div>
+        ) : hasRealData === false ? (
           <div className="demo-banner" role="status">
             <span className="demo-banner-mark" aria-hidden>•</span>
             <span>
@@ -242,18 +254,24 @@ export function AppShell({ children }: { children: ReactNode }) {
             {hasRealData === false ? (
               <span className="header-chip">Demo data</span>
             ) : null}
-            <span className="header-chip header-chip-user" title={user.email}>
-              {user.email}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                void logout();
-              }}
-              className="header-logout"
-            >
-              Sign out
-            </button>
+            {user.id !== 0 ? (
+              <span className="header-chip header-chip-user" title={user.email}>
+                {user.email}
+              </span>
+            ) : null}
+            {user.id !== 0 ? (
+              <button
+                type="button"
+                onClick={() => { void logout(); }}
+                className="header-logout"
+              >
+                Sign out
+              </button>
+            ) : (
+              <Link href="/login" className="button button-primary button-sm">
+                Sign up free
+              </Link>
+            )}
           </div>
         </header>
 

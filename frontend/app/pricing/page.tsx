@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { PricingTable } from "@/components/pricing-table";
+import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "Pricing — skubase",
@@ -37,23 +38,7 @@ const faqs = [
 export default function PricingPage() {
   return (
     <div className="marketing-shell">
-      <header className="marketing-nav">
-        <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span className="marketing-brand-name">skubase</span>
-        </Link>
-        <nav className="marketing-nav-links" aria-label="Primary">
-          <Link href="/#pillars">Product</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/changelog">Changelog</Link>
-        </nav>
-        <div className="marketing-nav-ctas">
-          <Link href="/dashboard" className="marketing-link-subtle">View demo</Link>
-          <Link href="/login" className="marketing-link-subtle">Sign in</Link>
-        </div>
-      </header>
+      <MarketingNav />
 
       <section className="marketing-hero">
         <p className="marketing-eyebrow">Pricing</p>
@@ -102,13 +87,13 @@ export default function PricingPage() {
           <Link href="/about">About</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/changelog">Changelog</Link>
+          <Link href="/goodbye-stocky">Stocky migration</Link>
+          <Link href="/goodbye-genie">Genie migration</Link>
+          <Link href="/vs-spreadsheet">vs. spreadsheet</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
         <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
       </footer>
 
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }} />
-    </div>
-  );
-}
+      <script type="ap

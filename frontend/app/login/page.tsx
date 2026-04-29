@@ -103,7 +103,8 @@ export default function LoginPage() {
             </form>
             <p className="auth-fine">
               See <Link href="/pricing" className="auth-link">pricing</Link> ·{" "}
-              <Link href="/dashboard" className="auth-link">view the demo</Link>
+              <Link href="/" className="auth-link">back to home</Link> ·{" "}
+              <Link href="/dashboard?demo=1" className="auth-link">view the demo →</Link>
             </p>
           </>
         )}

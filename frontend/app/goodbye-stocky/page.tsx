@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { WaitlistForm } from "@/components/waitlist-form";
+import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "Goodbye Stocky, hello skubase — skubase",
@@ -30,19 +31,7 @@ const steps = [
 export default function GoodbyeStockyPage() {
   return (
     <div className="marketing-shell">
-      <header className="marketing-nav">
-        <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span className="marketing-brand-name">skubase</span>
-        </Link>
-        <nav className="marketing-nav-links" aria-label="Primary">
-          <Link href="/#pillars">Product</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/changelog">Changelog</Link>
-        </nav>
-      </header>
+      <MarketingNav />
 
       <section className="marketing-hero marketing-hero-migration">
         <p className="marketing-eyebrow">Stocky sunset · August 31, 2026</p>
@@ -52,7 +41,7 @@ export default function GoodbyeStockyPage() {
         </p>
         <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
-          Free during the first 30 days of migration · <strong>Prices locked at renewal</strong>
+          14-day trial · No credit card · <strong>Prices locked at renewal</strong>
         </p>
       </section>
 
@@ -111,8 +100,4 @@ export default function GoodbyeStockyPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
-      </footer>
-    </div>
-  );
-}
+        <p className="

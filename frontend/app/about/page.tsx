@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { WaitlistForm } from "@/components/waitlist-form";
+import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "About — skubase",
@@ -31,19 +32,7 @@ const notLikeUs = [
 export default function AboutPage() {
   return (
     <div className="marketing-shell">
-      <header className="marketing-nav">
-        <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span className="marketing-brand-name">skubase</span>
-        </Link>
-        <nav className="marketing-nav-links" aria-label="Primary">
-          <Link href="/#pillars">Product</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/changelog">Changelog</Link>
-        </nav>
-      </header>
+      <MarketingNav />
 
       <section className="marketing-hero">
         <p className="marketing-eyebrow">About skubase</p>
@@ -119,8 +108,4 @@ export default function AboutPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Independent · Founder-led</p>
-      </footer>
-    </div>
-  );
-}
+        <p c

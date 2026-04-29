@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { HeroCta } from "@/components/hero-cta";
 import { WaitlistForm } from "@/components/waitlist-form";
+import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "skubase — The Shopify inventory tool that tells you what to do first",
@@ -34,23 +35,7 @@ const positioning = [
 export default function HomePage() {
   return (
     <div className="marketing-shell">
-      <header className="marketing-nav">
-        <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span className="marketing-brand-name">skubase</span>
-        </Link>
-        <nav className="marketing-nav-links" aria-label="Primary">
-          <Link href="/#pillars">Product</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/changelog">Changelog</Link>
-        </nav>
-        <div className="marketing-nav-ctas">
-          <Link href="/dashboard" className="marketing-link-subtle">View demo</Link>
-          <Link href="/login" className="marketing-link-subtle">Sign in</Link>
-        </div>
-      </header>
+      <MarketingNav />
 
       <section className="marketing-hero">
         <p className="marketing-eyebrow">Inventory decisions, made in order.</p>
@@ -60,7 +45,7 @@ export default function HomePage() {
         </p>
         <HeroCta source="home_hero" />
         <p className="marketing-hero-trust">
-          We&apos;re in private beta. <Link href="/dashboard">See a live demo</Link> ·
+          We&apos;re in private beta. <Link href="/login">Sign in or create your workspace</Link> ·
           <strong> Prices locked at renewal</strong>
         </p>
       </section>
@@ -89,7 +74,6 @@ export default function HomePage() {
               <p className="pillar-card-kicker">{p.kicker}</p>
               <h3 className="pillar-card-title">{p.title}</h3>
               <p className="pillar-card-body">{p.body}</p>
-              <Link href={p.href} className="pillar-card-link">See in demo →</Link>
             </article>
           ))}
         </div>
@@ -140,3 +124,4 @@ export default function HomePage() {
     </div>
   );
 }
+                                                                                                                                                              

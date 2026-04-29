@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "Stocky alternatives for Shopify merchants in 2026",
@@ -19,19 +20,7 @@ const ARTICLE_LD = {
 export default function StockyAlternativesPost() {
   return (
     <div className="marketing-shell">
-      <header className="marketing-nav">
-        <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span className="marketing-brand-name">skubase</span>
-        </Link>
-        <nav className="marketing-nav-links" aria-label="Primary">
-          <Link href="/#pillars">Product</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/changelog">Changelog</Link>
-        </nav>
-      </header>
+      <MarketingNav />
 
       <article className="blog-article">
         <p className="blog-article-meta">
@@ -114,10 +103,4 @@ export default function StockyAlternativesPost() {
           <Link href="/blog">Blog</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
-      </footer>
-    </div>
-  );
-}
+          <Link href="/terms">Terms</Lin
