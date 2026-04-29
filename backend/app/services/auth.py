@@ -162,6 +162,9 @@ def get_or_create_user_for_email(
     user = db.scalar(select(User).where(User.email == email))
     if user is not None:
         user.last_login_at = _now()
+        # Back-fill trial for waitlist users who existed before trial launch.
+        if user.trial_ends_at is None:
+            user.trial_ends_at = _now() + TRIAL_TTL
         db.commit()
         return user
 
