@@ -247,17 +247,18 @@ function RulesPanel({ rules, onChange }: { rules: AlertRule[]; onChange: () => v
               )}
             </div>
             <div className="rule-card-actions">
-              <button
-                type="button"
-                className={`toggle-switch${rule.enabled ? " toggle-on" : ""}`}
-                onClick={async () => {
-                  await toggleAlertRule(rule.id, !rule.enabled);
-                  onChange();
-                }}
-              >
-                <span className="toggle-thumb" />
-                {rule.enabled ? "Enabled" : "Disabled"}
-              </button>
+              <span className="toggle-row">
+                <button
+                  type="button"
+                  className={`toggle-switch${rule.enabled ? " toggle-switch-on" : ""}`}
+                  aria-label={rule.enabled ? "Disable rule" : "Enable rule"}
+                  onClick={async () => {
+                    await toggleAlertRule(rule.id, !rule.enabled);
+                    onChange();
+                  }}
+                />
+                <span className="toggle-label">{rule.enabled ? "Enabled" : "Disabled"}</span>
+              </span>
               <button
                 type="button"
                 className="button-danger-link"
