@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { PricingTable } from "@/components/pricing-table";
 import { MarketingNav } from "@/components/marketing-nav";
@@ -87,11 +87,14 @@ export default function PricingPage() {
           <Link href="/about">About</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/changelog">Changelog</Link>
-          <Link href="/goodbye-stocky">Stocky migration</Link>
-          <Link href="/goodbye-genie">Genie migration</Link>
-          <Link href="/vs-spreadsheet">vs. spreadsheet</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
         <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
-      </foot
+      </footer>
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }} />
+    </div>
+  );
+}
+

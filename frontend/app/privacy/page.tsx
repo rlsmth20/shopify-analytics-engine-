@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
@@ -125,4 +125,12 @@ export default function PrivacyPage() {
           <Link href="/">Home</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/about">About</Link>
-        
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
+      </footer>
+    </div>
+  );
+}
+
