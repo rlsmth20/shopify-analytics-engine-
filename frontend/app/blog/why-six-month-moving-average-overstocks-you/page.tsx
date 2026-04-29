@@ -2,7 +2,7 @@
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Why a 6-month moving average is overstocking you",
+  title: "Why a 6-month moving average is overstocking you — skubase",
   description: "If you reorder Shopify inventory when cover drops below six months, you''re carrying more than you need to.",
   alternates: { canonical: "/blog/why-six-month-moving-average-overstocks-you" },
   openGraph: { title: "Why a 6-month moving average is overstocking you", description: "The math, and the fix.", url: "/blog/why-six-month-moving-average-overstocks-you", type: "article" },

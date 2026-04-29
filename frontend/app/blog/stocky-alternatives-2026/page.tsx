@@ -2,7 +2,7 @@
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Stocky alternatives for Shopify merchants in 2026",
+  title: "Stocky alternatives for Shopify merchants in 2026 — skubase",
   description: "Shopify is shutting down Stocky on August 31, 2026. Here are the realistic replacements.",
   alternates: { canonical: "/blog/stocky-alternatives-2026" },
   keywords: ["Stocky alternative", "Stocky shutdown", "Shopify Stocky end of life"],

@@ -93,6 +93,7 @@ export default function GoodbyeStockyPage() {
         </div>
         <div className="marketing-footer-links">
           <Link href="/">Home</Link>
+          <Link href="/blog">Blog</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/about">About</Link>
           <Link href="/goodbye-stocky">Stocky migration</Link>
