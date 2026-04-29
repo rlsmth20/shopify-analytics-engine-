@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
@@ -99,4 +99,10 @@ export default function GoodbyeStockyPage() {
           <Link href="/goodbye-genie">Genie migration</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
-      
+        </div>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
+      </footer>
+    </div>
+  );
+}
+
