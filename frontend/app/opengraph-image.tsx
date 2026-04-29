@@ -37,8 +37,8 @@ export default function OGImage() {
               letterSpacing: "0.04em",
             }}
           >
-            sf
-          </div>
+            sb
+</div>
           <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-0.01em" }}>skubase</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
