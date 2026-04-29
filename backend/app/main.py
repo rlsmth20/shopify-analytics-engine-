@@ -1,7 +1,10 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.db.init_db import init_db
 
 from app.api.routes.actions import router as actions_router
 from app.api.routes.admin import router as admin_router
@@ -25,6 +28,12 @@ from app.api.routes.transfers import router as transfers_router
 from app.api.routes.waitlist import router as waitlist_router
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="skubase API",
@@ -33,6 +42,7 @@ def create_app() -> FastAPI:
             "Forecasting, replenishment, alerting, and supplier intelligence "
             "for Shopify merchants."
         ),
+        lifespan=lifespan,
     )
 
     allowed_origins = [

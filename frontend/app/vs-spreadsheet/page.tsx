@@ -51,7 +51,7 @@ export default function VsSpreadsheetPage() {
         <p className="marketing-hero-sub">
           If your forecasting lives in a Google Sheet — ShipStation export pasted in, six-month trailing average computed, reorder when cover drops below six months — you&apos;re carrying more inventory than you need to and you&apos;re still missing seasonality. skubase fixes both, in under ten minutes.
         </p>
-        <WaitlistForm source="vs_spreadsheet_hero" ctaLabel="Get early access" />
+        <WaitlistForm source="vs_spreadsheet_hero" ctaLabel="Start free trial" />
         <p className="marketing-hero-trust">
           14-day free trial · No credit card · <strong>Prices locked at renewal</strong>
         </p>
@@ -112,7 +112,7 @@ export default function VsSpreadsheetPage() {
         <p className="marketing-section-sub">
           The spreadsheet was a heroic fix. skubase is the permanent one.
         </p>
-        <WaitlistForm source="vs_spreadsheet_footer" ctaLabel="Get early access" />
+        <WaitlistForm source="vs_spreadsheet_footer" ctaLabel="Start free trial" />
       </section>
 
       <footer className="marketing-footer">

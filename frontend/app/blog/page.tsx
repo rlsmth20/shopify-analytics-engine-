@@ -53,7 +53,7 @@ export default function BlogIndex() {
         <p className="marketing-section-sub">
           We send the new post and the early-access invite to the same list. Drop your email &mdash; that&apos;s it.
         </p>
-        <WaitlistForm source="blog_index" ctaLabel="Get early access" />
+        <WaitlistForm source="blog_index" ctaLabel="Start free trial" />
       </section>
 
       <footer className="marketing-footer">

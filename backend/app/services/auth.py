@@ -29,6 +29,7 @@ SESSION_COOKIE_NAME = "skubase_session"
 
 MAGIC_LINK_TTL = timedelta(minutes=15)
 SESSION_TTL = timedelta(days=30)
+TRIAL_TTL = timedelta(days=14)
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "production").lower() != "development"
 
@@ -181,6 +182,7 @@ def get_or_create_user_for_email(
         email=email,
         shop_id=shop.id,
         is_admin=False,
+        trial_ends_at=_now() + TRIAL_TTL,
         last_login_at=_now(),
     )
     db.add(user)

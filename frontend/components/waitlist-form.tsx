@@ -16,8 +16,8 @@ type Props = {
 export function WaitlistForm({
   source,
   variant = "primary",
-  ctaLabel = "Get early access",
-  successLabel = "You're on the list — we'll be in touch.",
+  ctaLabel = "Start free trial",
+  successLabel = "Check your email — we sent you a sign-in link.",
   className = "",
 }: Props) {
   const [email, setEmail] = useState("");
@@ -35,18 +35,17 @@ export function WaitlistForm({
     }
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/waitlist/signup`, {
+      const res = await fetch(`${API_BASE}/auth/magic-link/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
           shopify_domain: domain.trim() || null,
-          source,
         }),
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(body?.detail || `Signup failed (${res.status}).`);
+        throw new Error(body?.detail || `Request failed (${res.status}).`);
       }
       setSuccess(true);
       setEmail("");
@@ -99,7 +98,7 @@ export function WaitlistForm({
           className="button button-primary"
           disabled={submitting}
         >
-          {submitting ? "Adding…" : ctaLabel}
+          {submitting ? "Sending…" : ctaLabel}
         </button>
       </div>
       {error ? (
@@ -108,7 +107,7 @@ export function WaitlistForm({
         </p>
       ) : (
         <p className="waitlist-hint">
-          14-day trial. No card. Prices locked at renewal.
+          14-day free trial. No card required. Prices locked at renewal.
         </p>
       )}
     </form>

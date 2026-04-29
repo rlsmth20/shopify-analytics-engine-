@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Request, Response, status
@@ -48,6 +49,24 @@ class MeResponse(BaseModel):
     email: str
     shop_id: int
     is_admin: bool
+    trial_ends_at: Optional[str]
+    in_trial: bool
+
+
+def _build_me_response(user: User) -> MeResponse:
+    now = datetime.now(timezone.utc)
+    trial_ends_at = user.trial_ends_at
+    if trial_ends_at is not None and trial_ends_at.tzinfo is None:
+        trial_ends_at = trial_ends_at.replace(tzinfo=timezone.utc)
+    in_trial = trial_ends_at is not None and trial_ends_at > now
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        shop_id=user.shop_id,
+        is_admin=user.is_admin,
+        trial_ends_at=trial_ends_at.isoformat() if trial_ends_at else None,
+        in_trial=in_trial,
+    )
 
 
 @router.post("/magic-link/request", response_model=MagicLinkResponse)
@@ -93,12 +112,7 @@ def verify_magic_link(
         value=raw_session,
         **cookie_kwargs(max_age_seconds=int(SESSION_TTL.total_seconds())),
     )
-    return MeResponse(
-        id=user.id,
-        email=user.email,
-        shop_id=user.shop_id,
-        is_admin=user.is_admin,
-    )
+    return _build_me_response(user)
 
 
 @router.post("/logout")
@@ -116,9 +130,4 @@ def logout(
 
 @router.get("/me", response_model=MeResponse)
 def me(user: Annotated[User, Depends(get_current_user)]) -> MeResponse:
-    return MeResponse(
-        id=user.id,
-        email=user.email,
-        shop_id=user.shop_id,
-        is_admin=user.is_admin,
-    )
+    return _build_me_response(user)

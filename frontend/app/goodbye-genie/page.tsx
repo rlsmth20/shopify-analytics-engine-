@@ -35,7 +35,7 @@ export default function GoodbyeGeniePage() {
         <p className="marketing-hero-sub">
           Genie merchants loved simple. We kept the simple — and added the math, the supplier scorecards, and the dead-stock plans Genie never shipped.
         </p>
-        <WaitlistForm source="goodbye_genie_hero" ctaLabel="Get early access" />
+        <WaitlistForm source="goodbye_genie_hero" ctaLabel="Start free trial" />
         <p className="marketing-hero-trust">
           14-day trial · No credit card · <strong>Prices locked at renewal</strong>
         </p>
@@ -73,7 +73,7 @@ export default function GoodbyeGeniePage() {
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">Stop improvising.</h2>
         <p className="marketing-section-sub">The CSV exports and spreadsheets were good under pressure. skubase is the permanent replacement.</p>
-        <WaitlistForm source="goodbye_genie_footer" ctaLabel="Get early access" />
+        <WaitlistForm source="goodbye_genie_footer" ctaLabel="Start free trial" />
       </section>
 
       <footer className="marketing-footer">
@@ -91,9 +91,4 @@ export default function GoodbyeGeniePage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
-      </footer>
-    </div>
-  );
-}
-
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewa

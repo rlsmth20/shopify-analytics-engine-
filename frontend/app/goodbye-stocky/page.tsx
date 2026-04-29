@@ -39,7 +39,7 @@ export default function GoodbyeStockyPage() {
         <p className="marketing-hero-sub">
           Shopify is ending Stocky on August 31, 2026. We built the replacement — real forecasting, supplier scorecards, dead-stock plans, Shopify-native, no POS Pro requirement.
         </p>
-        <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Get early access" />
+        <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Start free trial" />
         <p className="marketing-hero-trust">
           14-day trial · No credit card · <strong>Prices locked at renewal</strong>
         </p>
@@ -83,7 +83,7 @@ export default function GoodbyeStockyPage() {
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">Get a head start on August.</h2>
         <p className="marketing-section-sub">Migrating early means you don&apos;t have to rush in July.</p>
-        <WaitlistForm source="goodbye_stocky_footer" ctaLabel="Get early access" />
+        <WaitlistForm source="goodbye_stocky_footer" ctaLabel="Start free trial" />
       </section>
 
       <footer className="marketing-footer">
@@ -101,9 +101,4 @@ export default function GoodbyeStockyPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
-      </footer>
-    </div>
-  );
-}
-
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewa

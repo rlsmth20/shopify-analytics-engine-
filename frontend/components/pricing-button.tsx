@@ -46,7 +46,7 @@ export function PricingButton({
       if (!res.ok) {
         if (res.status === 503) {
           // Billing not yet wired — fall back to the waitlist.
-          window.location.href = "/#waitlist";
+          window.location.href = "/login";
           return;
         }
         alert(body?.detail || `Could not start checkout (${res.status}).`);
@@ -70,7 +70,4 @@ export function PricingButton({
       disabled={loading}
       className={`button ${variant === "primary" ? "button-primary" : "button-ghost"} button-full`}
     >
-      {loading ? "One moment…" : label}
-    </button>
-  );
-}
+      {loading ? "One momen
