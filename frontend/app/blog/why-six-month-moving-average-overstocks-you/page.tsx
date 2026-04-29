@@ -44,14 +44,14 @@ export default function MovingAveragePost() {
         </p>
 
         <h2 className="blog-article-h2">Why one buffer per SKU is wrong</h2>
-        <p className="blog-article-formula">Safety stock = z × Ïƒ_LT</p>
+        <p className="blog-article-formula">Safety stock = z × σ_LT</p>
         <p>
           The point of <em>z</em> is that <strong>different SKUs deserve different service levels.</strong> Top-revenue A-items want 99% (z ≈ 2.33). Lumpy C-items might be fine at 90%. A flat &quot;6 months&quot; applies the same z to everything. Result: overstocking C-items, understocking A-items, usually both.
         </p>
 
         <h2 className="blog-article-h2">A worked example</h2>
         <p>
-          A-item shipping 150/wk, Ïƒ=20, lead time 30 days. Average lead-time demand ≈ 643 units. Ïƒ_LT ≈ 47 units.
+          A-item shipping 150/wk, σ=20, lead time 30 days. Average lead-time demand ≈ 643 units. σ_LT ≈ 47 units.
         </p>
         <ul className="blog-article-ul">
           <li><strong>6-month rule:</strong> 150 × 26 = 3,900 units of cover. At $25/unit = $97,500 parked.</li>
