@@ -136,6 +136,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   // don't see "demo" labels on their own data.
   const [hasRealData, setHasRealData] = useState<boolean | null>(null);
 
+  // Trial countdown — only meaningful for real (non-demo) users.
+  const trialDaysLeft: number | null = (() => {
+    if (user.id === 0 || !user.trial_ends_at) return null;
+    const ms = new Date(user.trial_ends_at).getTime() - Date.now();
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  })();
+
   useEffect(() => {
     const storedDomain = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
     if (storedDomain) {
@@ -239,6 +247,30 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           </div>
         ) : null}
+        {user.id !== 0 && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
+          <div className={`demo-banner ${trialDaysLeft <= 2 ? "demo-banner-preview" : ""}`} role="status">
+            <span className="demo-banner-mark" aria-hidden>◈</span>
+            <span>
+              {trialDaysLeft === 0 ? (
+                <>
+                  <strong>Your trial has ended.</strong>{" "}
+                  <Link href="/pricing" className="demo-banner-link">
+                    Choose a plan
+                  </Link>{" "}
+                  to keep access to your data and recommendations.
+                </>
+              ) : (
+                <>
+                  <strong>{trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} left in your trial.</strong>{" "}
+                  <Link href="/pricing" className="demo-banner-link">
+                    See plans
+                  </Link>{" "}
+                  — 14-day free, no credit card required at signup.
+                </>
+              )}
+            </span>
+          </div>
+        ) : null}
 
         <header className="top-header">
           <div>
@@ -251,32 +283,4 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="header-chip header-chip-tone">
               {shopifyDomain ? shopifyDomain : "No store selected"}
             </span>
-            {hasRealData === false ? (
-              <span className="header-chip">Demo data</span>
-            ) : null}
-            {user.id !== 0 ? (
-              <span className="header-chip header-chip-user" title={user.email}>
-                {user.email}
-              </span>
-            ) : null}
-            {user.id !== 0 ? (
-              <button
-                type="button"
-                onClick={() => { void logout(); }}
-                className="header-logout"
-              >
-                Sign out
-              </button>
-            ) : (
-              <Link href="/login" className="button button-primary button-sm">
-                Sign up free
-              </Link>
-            )}
-          </div>
-        </header>
-
-        <main className="page-container">{children}</main>
-      </div>
-    </div>
-  );
-}
+            {hasReal

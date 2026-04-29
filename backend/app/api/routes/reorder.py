@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import PurchaseOrderDraftsResponse, ReorderFeedResponse
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/reorder", tags=["reorder"])
 
 @router.get("", response_model=ReorderFeedResponse)
 def list_reorder_suggestions(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
 ) -> ReorderFeedResponse:
@@ -48,7 +48,7 @@ def list_reorder_suggestions(
 
 @router.get("/purchase-orders", response_model=PurchaseOrderDraftsResponse)
 def list_po_drafts(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
 ) -> PurchaseOrderDraftsResponse:

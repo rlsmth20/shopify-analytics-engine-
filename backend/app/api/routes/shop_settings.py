@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import Shop, User
 from app.db.session import get_db_session
 from app.schemas import (
@@ -41,7 +41,7 @@ def _user_shop_domain(db: DbSession, user: User) -> str:
 
 @router.get("", response_model=ShopSettingsResponse)
 def read_shop_settings(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> ShopSettingsResponse:
     domain = _user_shop_domain(db, user)
@@ -62,7 +62,7 @@ def read_shop_settings(
 @router.put("", response_model=ShopSettingsResponse)
 def update_shop_settings(
     payload: UpdateShopSettingsRequest,
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> ShopSettingsResponse:
     domain = _user_shop_domain(db, user)
@@ -87,7 +87,7 @@ def update_shop_settings(
 
 @router.get("/vendor-lead-times", response_model=VendorLeadTimeSettingsResponse)
 def read_vendor_lead_times(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> VendorLeadTimeSettingsResponse:
     domain = _user_shop_domain(db, user)
@@ -108,7 +108,7 @@ def read_vendor_lead_times(
 @router.put("/vendor-lead-times", response_model=VendorLeadTimeSettingsResponse)
 def update_vendor_lead_times(
     payload: UpdateVendorLeadTimesRequest,
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> VendorLeadTimeSettingsResponse:
     domain = _user_shop_domain(db, user)
@@ -134,7 +134,7 @@ def update_vendor_lead_times(
 
 @router.get("/category-lead-times", response_model=CategoryLeadTimeSettingsResponse)
 def read_category_lead_times(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> CategoryLeadTimeSettingsResponse:
     domain = _user_shop_domain(db, user)
@@ -155,7 +155,7 @@ def read_category_lead_times(
 @router.put("/category-lead-times", response_model=CategoryLeadTimeSettingsResponse)
 def update_category_lead_times(
     payload: UpdateCategoryLeadTimesRequest,
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> CategoryLeadTimeSettingsResponse:
     domain = _user_shop_domain(db, user)

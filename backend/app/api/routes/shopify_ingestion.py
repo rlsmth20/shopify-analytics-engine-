@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.services.shopify_oauth import (
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/integrations/shopify", tags=["shopify"])
 
 @router.get("/install")
 def install(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     shop: str = Query(..., description="The merchant's myshopify domain (e.g. yourshop.myshopify.com)."),
 ) -> dict:
@@ -94,7 +94,7 @@ def callback(
 
 @router.get("/connection")
 def my_connection(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> dict:
     """Return whether the current user's shop has an active Shopify connection."""
@@ -121,7 +121,7 @@ def my_connection(
 
 @router.post("/sync")
 def trigger_sync(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> dict:
     """Run a one-shot ingestion against this shop's Shopify connection."""
@@ -130,5 +130,4 @@ def trigger_sync(
     try:
         result = sync_shop_now(db, shop_id=user.shop_id)
     except RuntimeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return result
+        raise HTTPException(status_code=400, detail=str(exc)) from 

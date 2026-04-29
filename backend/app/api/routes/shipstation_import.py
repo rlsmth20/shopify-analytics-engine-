@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import Shop, User
 from app.db.session import get_db_session
 from app.services.shipstation_import import (
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/integrations/shipstation", tags=["shipstation"])
 
 @router.post("/import")
 async def import_shipstation(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     csv_file: UploadFile = File(...),
 ) -> dict:

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import (
     Inventory,
     OrderLineItem,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/actions", tags=["actions"])
 
 @router.get("", response_model=ActionFeedResponse)
 def read_actions(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> ActionFeedResponse:
     skus = load_skus_for_shop(db, user.shop_id)
@@ -35,7 +35,7 @@ def read_actions(
 
 @router.get("/debug-summary", response_model=ActionDataHealthSummaryResponse)
 def read_action_data_health(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> ActionDataHealthSummaryResponse:
     shop_count = 1  # The current user's shop only.

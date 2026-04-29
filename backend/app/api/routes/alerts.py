@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import (
@@ -45,7 +45,7 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 @router.get("/rules", response_model=AlertListResponse)
 def read_rules(
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
 ) -> AlertListResponse:
     seed_default_rules_and_channels()
     return AlertListResponse(rules=list_rules())
@@ -54,7 +54,7 @@ def read_rules(
 @router.post("/rules", response_model=AlertRule)
 def create_alert_rule(
     request: CreateAlertRuleRequest,
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
 ) -> AlertRule:
     seed_default_rules_and_channels()
     return create_rule(
@@ -70,7 +70,7 @@ def create_alert_rule(
 @router.delete("/rules/{rule_id}")
 def remove_rule(
     rule_id: str,
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
 ) -> dict[str, bool]:
     ok = delete_rule(rule_id)
     if not ok:
@@ -82,7 +82,7 @@ def remove_rule(
 def toggle_alert_rule(
     rule_id: str,
     enabled: bool,
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
 ) -> AlertRule:
     updated = toggle_rule(rule_id, enabled)
     if updated is None:
@@ -92,7 +92,7 @@ def toggle_alert_rule(
 
 @router.get("/channels", response_model=NotificationChannelsResponse)
 def read_channels(
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
 ) -> NotificationChannelsResponse:
     seed_default_rules_and_channels()
     return NotificationChannelsResponse(channels=list_channel_configs())
@@ -101,7 +101,7 @@ def read_channels(
 @router.post("/channels", response_model=NotificationChannelConfig)
 def update_channel(
     request: UpdateNotificationChannelRequest,
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
 ) -> NotificationChannelConfig:
     return update_channel_config(
         channel=request.channel,
@@ -113,7 +113,7 @@ def update_channel(
 @router.post("/test")
 def send_test_alert(
     request: TestAlertRequest,
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
 ) -> dict[str, str | bool]:
     record = deliver(
         channel=request.channel,
@@ -132,7 +132,7 @@ def send_test_alert(
 
 @router.get("/events", response_model=AlertEventsResponse)
 def read_events(
-    _user: Annotated[User, Depends(get_current_user)],
+    _user: Annotated[User, Depends(require_active_access)],
     limit: int = 50,
 ) -> AlertEventsResponse:
     seed_default_rules_and_channels()
@@ -141,7 +141,7 @@ def read_events(
 
 @router.post("/evaluate", response_model=AlertEventsResponse)
 def evaluate_now(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     dry_run: bool = True,
 ) -> AlertEventsResponse:

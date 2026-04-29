@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import ForecastFeedResponse, ForecastResult
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/forecast", tags=["forecast"])
 
 @router.get("", response_model=ForecastFeedResponse)
 def list_forecasts(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     horizon_days: int = 30,
 ) -> ForecastFeedResponse:
@@ -49,7 +49,7 @@ def list_forecasts(
 @router.get("/{sku_id}", response_model=ForecastResult)
 def get_forecast(
     sku_id: str,
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     horizon_days: int = 30,
 ) -> ForecastResult:

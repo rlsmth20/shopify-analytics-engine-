@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas import SkuDetail
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/skus", tags=["skus"])
 
 @router.get("", response_model=list[SkuDetail])
 def read_skus(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> list[SkuDetail]:
     return load_skus_for_shop(db, user.shop_id)
@@ -24,7 +24,7 @@ def read_skus(
 @router.get("/{sku_id}", response_model=SkuDetail)
 def read_sku(
     sku_id: str,
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> SkuDetail:
     skus = load_skus_for_shop(db, user.shop_id)

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import LiquidationResponse
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/liquidation", tags=["liquidation"])
 
 @router.get("", response_model=LiquidationResponse)
 def read_liquidation_plan(
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> LiquidationResponse:
     skus = load_skus_for_shop(db, user.shop_id)

@@ -55,3 +55,43 @@ def require_admin(
             detail="Admin access required.",
         )
     return user
+
+
+def require_active_access(
+    db: Annotated[DbSession, Depends(get_db_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Require an active trial or paid subscription.
+
+    Returns the user if access is granted. Raises HTTP 402 if:
+    - No trial (trial_ends_at is None or has passed), AND
+    - No active Stripe subscription for the shop.
+
+    Admin users always pass (useful for support access).
+    """
+    if user.is_admin:
+        return user
+
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.db.models import Subscription
+
+    # Check trial window.
+    trial_ends = user.trial_ends_at
+    if trial_ends is not None:
+        if trial_ends.tzinfo is None:
+            trial_ends = trial_ends.replace(tzinfo=timezone.utc)
+        if trial_ends > datetime.now(timezone.utc):
+            return user  # still in trial
+
+    # Check paid subscription.
+    sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+    if sub is not None and sub.status == "active":
+        return user
+
+    raise HTTPException(
+        status_code=402,
+        detail="Your trial has ended. Subscribe to continue using skubase.",
+    )

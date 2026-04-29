@@ -17,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     if (!email.trim()) {
-      setError("Enter the email you used to join the skubase waitlist.");
+      setError("Enter your email to sign in or start a free trial.");
       return;
     }
     setSubmitting(true);
@@ -104,11 +104,4 @@ export default function LoginPage() {
             <p className="auth-fine">
               See <Link href="/pricing" className="auth-link">pricing</Link> ·{" "}
               <Link href="/" className="auth-link">back to home</Link> ·{" "}
-              <Link href="/dashboard?demo=1" className="auth-link">view the demo →</Link>
-            </p>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+              <Link href="/dashboard?demo=1" className="auth-link">view the
