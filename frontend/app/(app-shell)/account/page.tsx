@@ -95,34 +95,49 @@ export default function AccountPage() {
 
       <div className="content-grid content-grid-2-1">
         <SectionCard>
-          <div className="section-heading">
-            <div>
-              <p className="section-eyebrow">Plan</p>
-              <h2 className="section-title section-title-small">
-                {PLAN_LABELS[sub?.plan ?? "none"] ?? sub?.plan}
-              </h2>
-            </div>
-            {sub ? (
-              <span
-                className={`status-badge ${
-                  sub.status === "active" || sub.status === "trialing"
-                    ? "status-succeeded"
-                    : "status-failed"
-                }`}
-              >
-                {sub.status}
-              </span>
-            ) : null}
-          </div>
-          <p className="section-copy">
-            Plan details, invoice history, and payment method are managed
-            in the Stripe Customer Portal.
-          </p>
-          <div className="button-row">
-            <Link href="/billing" className="button button-primary">
-              Open billing
-            </Link>
-          </div>
+          {(() => {
+            const isActive = sub?.status === "active" || sub?.status === "trialing";
+            const trialDaysLeft: number | null = (() => {
+              if (!user.trial_ends_at) return null;
+              const ms = new Date(user.trial_ends_at).getTime() - Date.now();
+              const d = Math.ceil(ms / (1000 * 60 * 60 * 24));
+              return d > 0 ? d : 0;
+            })();
+            const planLabel = isActive
+              ? (PLAN_LABELS[sub!.plan] ?? sub!.plan)
+              : user.in_trial
+              ? trialDaysLeft === 0
+                ? "Trial ended"
+                : `Free Trial — ${trialDaysLeft}d left`
+              : (PLAN_LABELS[sub?.plan ?? "none"] ?? sub?.plan ?? "No active plan");
+            const badgeClass = isActive || (user.in_trial && (trialDaysLeft ?? 0) > 0)
+              ? "status-succeeded"
+              : "status-failed";
+            const badgeLabel = isActive ? sub!.status : user.in_trial ? "trial" : "inactive";
+            return (
+              <>
+                <div className="section-heading">
+                  <div>
+                    <p className="section-eyebrow">Plan</p>
+                    <h2 className="section-title section-title-small">{planLabel}</h2>
+                  </div>
+                  <span className={`status-badge ${badgeClass}`}>{badgeLabel}</span>
+                </div>
+                <p className="section-copy">
+                  {isActive
+                    ? "Plan details, invoice history, and payment method are managed in the Stripe Customer Portal."
+                    : user.in_trial
+                    ? "You're on a free trial. Subscribe on the billing page before your trial ends."
+                    : "No active subscription. Pick a plan to keep your access."}
+                </p>
+                <div className="button-row">
+                  <Link href="/billing" className="button button-primary">
+                    {isActive ? "Open billing" : "See plans"}
+                  </Link>
+                </div>
+              </>
+            );
+          })()}
         </SectionCard>
 
         <SectionCard>

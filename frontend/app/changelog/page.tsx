@@ -13,6 +13,19 @@ export const metadata = {
 type ChangelogEntry = { version: string; date: string; title: string; items: { type: "Added" | "Changed" | "Fixed" | "Shipped"; text: string }[]; };
 
 const entries: ChangelogEntry[] = [
+  { version: "v0.5.0", date: "2026-04-29", title: "14-day free trial + paywall", items: [
+    { type: "Shipped", text: "14-day free trial for all new accounts — no credit card required. trial_ends_at set at signup." },
+    { type: "Shipped", text: "Backend access gate: require_active_access() on all 15 protected routes (402 when trial expired or no active subscription)." },
+    { type: "Shipped", text: "Frontend paywall: trial countdown banner in app shell (shows at ≤7 days, urgent at ≤2)." },
+    { type: "Shipped", text: "api-v2: any 402 redirects to /pricing?trial_expired=1." },
+    { type: "Shipped", text: "Pricing page: trial-expired banner shown via ?trial_expired=1 query param." },
+    { type: "Shipped", text: "Billing page: trial status card with days remaining and subscribe CTA." },
+    { type: "Shipped", text: "Account page: plan card shows trial status and days remaining." },
+    { type: "Changed", text: "Waitlist signup replaced by magic-link trial signup across all marketing CTAs." },
+    { type: "Changed", text: "Dashboard empty state: 4-step onboarding guide (Stocky CSV, ShipStation, Shopify sync, lead times)." },
+    { type: "Changed", text: "goodbye-genie and goodbye-stocky step 1: trial language replaces waitlist language." },
+    { type: "Fixed", text: "login page: stale 'waitlist' error copy replaced with trial-era copy." },
+  ]},
   { version: "v0.4.0", date: "2026-04-25", title: "Pre-launch readiness", items: [
     { type: "Shipped", text: "Waitlist signup form replaces direct dashboard access — skubase enters private beta." },
     { type: "Shipped", text: "Demo-mode banner on /dashboard so visitors know they''re seeing example data." },
@@ -88,12 +101,11 @@ export default function ChangelogPage() {
       </section>
 
       <section className="marketing-section marketing-cta-section">
-        <p className="marketing-section-kicker">Get early access</p>
         <h2 className="marketing-section-title">Shipping a public changelog because we plan to keep doing it.</h2>
         <p className="marketing-section-sub">
-          Drop your email — we&apos;ll send your invite when paid plans launch.
+          14-day free trial, no credit card. The demo is live if you want to look first.
         </p>
-        <WaitlistForm source="changelog" ctaLabel="Get early access" />
+        <WaitlistForm source="changelog" ctaLabel="Start free trial" />
       </section>
 
       <footer className="marketing-footer">

@@ -86,7 +86,7 @@ export default function StockyAlternativesPost() {
         </p>
 
         <div className="blog-article-cta">
-          <Link href="/" className="button button-primary button-lg">Get early access</Link>
+          <Link href="/login" className="button button-primary button-lg">Start free trial</Link>
           <Link href="/goodbye-stocky" className="button button-ghost button-lg">See migration details</Link>
         </div>
       </article>

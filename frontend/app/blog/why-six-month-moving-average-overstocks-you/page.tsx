@@ -74,7 +74,7 @@ export default function MovingAveragePost() {
         </p>
 
         <div className="blog-article-cta">
-          <Link href="/" className="button button-primary button-lg">Get early access</Link>
+          <Link href="/login" className="button button-primary button-lg">Start free trial</Link>
           <Link href="/vs-spreadsheet" className="button button-ghost button-lg">More: vs. spreadsheet</Link>
         </div>
       </article>

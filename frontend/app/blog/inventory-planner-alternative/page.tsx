@@ -141,7 +141,7 @@ export default function InventoryPlannerAlternativePage() {
 
         <h2 className="blog-article-h2">If you want to try skubase</h2>
         <p>
-          We&apos;re in early access. The demo is live and needs no account — see your data in under ten minutes
+          14-day free trial, no credit card required. The demo is also live — see your data in under ten minutes
           with a ShipStation export or Shopify connection.
         </p>
 

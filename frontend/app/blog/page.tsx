@@ -48,10 +48,9 @@ export default function BlogIndex() {
       </section>
 
       <section className="marketing-section marketing-cta-section">
-        <p className="marketing-section-kicker">Get early access</p>
-        <h2 className="marketing-section-title">Want the next post in your inbox?</h2>
+        <h2 className="marketing-section-title">See what your inventory is telling you.</h2>
         <p className="marketing-section-sub">
-          We send the new post and the early-access invite to the same list. Drop your email &mdash; that&apos;s it.
+          14-day free trial. No credit card. Drop your ShipStation export or Stocky CSV and see real velocity in minutes.
         </p>
         <WaitlistForm source="blog_index" ctaLabel="Start free trial" />
       </section>

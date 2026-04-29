@@ -86,12 +86,11 @@ export default function AboutPage() {
       </section>
 
       <section className="marketing-section marketing-cta-section">
-        <p className="marketing-section-kicker">Get early access</p>
-        <h2 className="marketing-section-title">If this take resonates, get on the list.</h2>
+        <h2 className="marketing-section-title">If this take resonates, try it.</h2>
         <p className="marketing-section-sub">
-          skubase is in private beta. Drop your email — we&apos;ll send your invite when paid plans launch.
+          14-day free trial. No credit card. The demo is also live at <Link href="/dashboard?demo=1" className="auth-link">skubase.io/dashboard?demo=1</Link> if you want to look first.
         </p>
-        <WaitlistForm source="about" ctaLabel="Get early access" />
+        <WaitlistForm source="about" ctaLabel="Start free trial" />
       </section>
 
       <footer className="marketing-footer">
