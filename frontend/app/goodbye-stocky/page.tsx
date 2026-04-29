@@ -22,7 +22,7 @@ const compareRows = [
 ];
 
 const steps = [
-  { number: "1", title: "Get on the early-access list", body: "Drop your email and Shopify domain. We'll send your invite when paid plans launch — well before August." },
+  { number: "1", title: "Start your free trial", body: "Drop your email and Shopify domain. You'll get a sign-in link instantly — 14-day trial, no credit card." },
   { number: "2", title: "Bring your Stocky data", body: "Export your Stocky Inventory On Hand and Vendor List. Our importer maps them in one step." },
   { number: "3", title: "See your first ranked action", body: "Under ten minutes, no consultant. Urgent / optimize / dead — work the queue from the top." },
   { number: "4", title: "Run side-by-side through August", body: "Use Stocky and skubase together. We don't charge for the migration window." }

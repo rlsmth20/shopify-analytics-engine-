@@ -19,7 +19,7 @@ const reasons = [
 ];
 
 const steps = [
-  { number: "1", title: "Get on the early-access list", body: "Drop your email. We'll send your invite when we open up." },
+  { number: "1", title: "Start your free trial", body: "Drop your email and get a sign-in link instantly — 14-day trial, no credit card required." },
   { number: "2", title: "Bring your Genie CSV", body: "If you exported your Genie data before the sunset, our importer maps vendors and lead-time settings." },
   { number: "3", title: "See your first ranked action", body: "Under ten minutes, no consultant. The dashboard prioritizes urgent reorders." }
 ];

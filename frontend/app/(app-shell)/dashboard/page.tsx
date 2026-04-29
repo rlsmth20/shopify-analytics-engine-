@@ -68,9 +68,39 @@ export default function DashboardPage() {
             every SKU by what to do today — urgent, optimize, dead. Most
             merchants see their first ranked action in under ten minutes.
           </p>
-          <div className="dashboard-empty-actions">
-            <a href="/import-stocky" className="button button-primary button-lg">Import Stocky CSV</a>
-            <a href="/import-shipstation" className="button button-ghost button-lg">Import ShipStation CSV</a>
+          <div className="dashboard-empty-steps">
+            <a href="/import-stocky" className="dashboard-empty-step">
+              <span className="dashboard-empty-step-num">1</span>
+              <div>
+                <p className="dashboard-empty-step-title">Import Stocky CSV</p>
+                <p className="dashboard-empty-step-body">Export Inventory On Hand from Stocky — maps in one step.</p>
+              </div>
+              <span aria-hidden>→</span>
+            </a>
+            <a href="/import-shipstation" className="dashboard-empty-step">
+              <span className="dashboard-empty-step-num">2</span>
+              <div>
+                <p className="dashboard-empty-step-title">Import ShipStation CSV</p>
+                <p className="dashboard-empty-step-body">Drop in your ShipStation shipment export to seed velocity data.</p>
+              </div>
+              <span aria-hidden>→</span>
+            </a>
+            <a href="/store-sync" className="dashboard-empty-step">
+              <span className="dashboard-empty-step-num">3</span>
+              <div>
+                <p className="dashboard-empty-step-title">Connect your Shopify store</p>
+                <p className="dashboard-empty-step-body">Pull live inventory, orders, and variants directly from Shopify.</p>
+              </div>
+              <span aria-hidden>→</span>
+            </a>
+            <a href="/lead-time-settings" className="dashboard-empty-step">
+              <span className="dashboard-empty-step-num">4</span>
+              <div>
+                <p className="dashboard-empty-step-title">Set lead times</p>
+                <p className="dashboard-empty-step-body">Global default + vendor overrides — drives every reorder calculation.</p>
+              </div>
+              <span aria-hidden>→</span>
+            </a>
           </div>
         </div>
       </div>

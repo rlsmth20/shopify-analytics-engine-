@@ -2,6 +2,7 @@
 
 import { PricingTable } from "@/components/pricing-table";
 import { MarketingNav } from "@/components/marketing-nav";
+import { TrialExpiredBanner } from "@/components/trial-expired-banner";
 
 export const metadata = {
   title: "Pricing — skubase",
@@ -39,6 +40,7 @@ export default function PricingPage() {
   return (
     <div className="marketing-shell">
       <MarketingNav />
+      <TrialExpiredBanner />
 
       <section className="marketing-hero">
         <p className="marketing-eyebrow">Pricing</p>
