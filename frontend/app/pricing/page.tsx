@@ -1,14 +1,14 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { PricingTable } from "@/components/pricing-table";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Pricing — skubase",
+  title: "Pricing â€” skubase",
   description: "Three published tiers. No quote-only pricing. A written price-lock clause that renewals cannot raise the rate on your plan.",
   alternates: { canonical: "/pricing" },
   openGraph: {
-    title: "Pricing — skubase",
+    title: "Pricing â€” skubase",
     description: "Three published tiers ($49/$149/$349) with a written price-lock pledge. Pay annually, save 15%.",
     url: "/pricing",
     type: "website",
@@ -22,7 +22,7 @@ const FAQ_LD = {
     { "@type": "Question", name: "Do you raise prices at renewal?", acceptedAnswer: { "@type": "Answer", text: "No. Every plan has a written price-lock clause in the terms of service: we will not raise the monthly or annual rate on a plan you are already subscribed to." } },
     { "@type": "Question", name: "Is there a free tier?", acceptedAnswer: { "@type": "Answer", text: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $49/mo." } },
     { "@type": "Question", name: "How long does setup take?", acceptedAnswer: { "@type": "Answer", text: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." } },
-    { "@type": "Question", name: "Can I pay annually?", acceptedAnswer: { "@type": "Answer", text: "Yes — pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." } },
+    { "@type": "Question", name: "Can I pay annually?", acceptedAnswer: { "@type": "Answer", text: "Yes â€” pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." } },
   ],
 };
 
@@ -31,7 +31,7 @@ const faqs = [
   { q: "What happens if I exceed my SKU or location limit?", a: "We notify you by email, the app shows a soft banner, and you get thirty days to decide whether to upgrade or prune. We will never silently auto-upgrade your plan." },
   { q: "Is there a free tier?", a: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $49/mo." },
   { q: "How long does setup take?", a: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." },
-  { q: "Can I pay annually?", a: "Yes — pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." },
+  { q: "Can I pay annually?", a: "Yes â€” pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." },
   { q: "How do you compare to Stocky / Inventory Planner / Cin7?", a: "Compared with Stocky we add real forecasting, supplier scorecards, and dead-stock plans. Compared with Inventory Planner we publish our price and commit to not raising it. Compared with Cin7 we publish our price and do not require a 6-month implementation." }
 ];
 
@@ -87,13 +87,14 @@ export default function PricingPage() {
           <Link href="/about">About</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/changelog">Changelog</Link>
-          <Link href="/goodbye-stocky">Stocky migration</Link>
-          <Link href="/goodbye-genie">Genie migration</Link>
-          <Link href="/vs-spreadsheet">vs. spreadsheet</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
+        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase Â· Prices locked at renewal</p>
       </footer>
 
-      <script type="ap
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }} />
+    </div>
+  );
+}
+

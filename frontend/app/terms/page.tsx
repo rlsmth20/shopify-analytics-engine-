@@ -1,12 +1,12 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Terms of Service — skubase",
+  title: "Terms of Service â€” skubase",
   description: "The agreement that governs your use of skubase. Includes the price-lock clause.",
   alternates: { canonical: "/terms" },
   openGraph: {
-    title: "Terms of Service — skubase",
+    title: "Terms of Service â€” skubase",
     description: "The agreement that governs your use of skubase. Includes the price-lock clause.",
     url: "/terms",
     type: "website",
@@ -44,7 +44,7 @@ export default function TermsPage() {
           <Link href="/privacy">Privacy Policy</Link> for detail.
         </p>
 
-        <h2 className="blog-article-h2">3. Pricing — the price-lock clause</h2>
+        <h2 className="blog-article-h2">3. Pricing â€” the price-lock clause</h2>
         <p>
           <strong>The skubase price-lock pledge:</strong> the monthly or
           annual rate you start a subscription at will not increase for as
@@ -55,7 +55,7 @@ export default function TermsPage() {
         <p>
           We reserve the right to pass through changes mandated by Shopify
           (e.g., Shopify Plus surcharges), Stripe (payment processing fees),
-          or government taxes — these are external costs that do not
+          or government taxes â€” these are external costs that do not
           benefit skubase. All other pricing is locked.
         </p>
         <p>
@@ -141,3 +141,11 @@ export default function TermsPage() {
           <Link href="/pricing">Pricing</Link>
           <Link href="/about">About</Link>
           <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase</p>
+      </footer>
+    </div>
+  );
+}
+

@@ -1,10 +1,10 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Goodbye Genie, hello skubase — skubase",
+  title: "Goodbye Genie, hello skubase â€” skubase",
   description: "Genie closed August 31, 2025. skubase kept the simple Shopify-native experience and added the math.",
   alternates: { canonical: "/goodbye-genie" },
   keywords: ["Genie alternative", "Genie replacement", "Genie shutdown"],
@@ -12,14 +12,14 @@ export const metadata = {
 };
 
 const reasons = [
-  { title: "Shopify-native simplicity, kept.", body: "Genie's appeal was that it felt like a Shopify app, not an ERP bolt-on. skubase is built the same way." },
+  { title: "Shopify-native simplicity, kept.", body: "Genie''s appeal was that it felt like a Shopify app, not an ERP bolt-on. skubase is built the same way." },
   { title: "The math, added.", body: "Genie merchants told reviewers the forecasting felt basic. skubase ships Holt double-exponential smoothing with weekly seasonality." },
   { title: "Suppliers, measured.", body: "Genie treated vendors as contacts. skubase scores them: on-time delivery, fill rate, lead-time stability, tiering." },
   { title: "Dead stock, acted on.", body: "Genie surfaced aged stock. skubase proposes a plan: markdown, bundle, wholesale, or write-off." }
 ];
 
 const steps = [
-  { number: "1", title: "Get on the early-access list", body: "Drop your email. We'll send your invite when we open up." },
+  { number: "1", title: "Get on the early-access list", body: "Drop your email. We''ll send your invite when we open up." },
   { number: "2", title: "Bring your Genie CSV", body: "If you exported your Genie data before the sunset, our importer maps vendors and lead-time settings." },
   { number: "3", title: "See your first ranked action", body: "Under ten minutes, no consultant. The dashboard prioritizes urgent reorders." }
 ];
@@ -33,11 +33,11 @@ export default function GoodbyeGeniePage() {
         <p className="marketing-eyebrow">Genie closed August 31, 2025</p>
         <h1 className="marketing-hero-title">Genie is gone. skubase is the upgrade.</h1>
         <p className="marketing-hero-sub">
-          Genie merchants loved simple. We kept the simple — and added the math, the supplier scorecards, and the dead-stock plans Genie never shipped.
+          Genie merchants loved simple. We kept the simple â€” and added the math, the supplier scorecards, and the dead-stock plans Genie never shipped.
         </p>
         <WaitlistForm source="goodbye_genie_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
-          14-day trial · No credit card · <strong>Prices locked at renewal</strong>
+          Free 30-day trial Â· No credit card Â· <strong>Prices locked at renewal</strong>
         </p>
       </section>
 
@@ -90,4 +90,9 @@ export default function GoodbyeGeniePage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p clas
+        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase Â· Prices locked at renewal</p>
+      </footer>
+    </div>
+  );
+}
+

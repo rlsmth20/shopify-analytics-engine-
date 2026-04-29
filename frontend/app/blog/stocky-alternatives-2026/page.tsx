@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
@@ -24,7 +24,7 @@ export default function StockyAlternativesPost() {
 
       <article className="blog-article">
         <p className="blog-article-meta">
-          <time dateTime="2026-04-25">April 25, 2026</time> · 8 min read · Migration
+          <time dateTime="2026-04-25">April 25, 2026</time> Â· 8 min read Â· Migration
         </p>
         <h1 className="blog-article-title">Stocky alternatives for Shopify merchants in 2026</h1>
         <p className="blog-article-lead">
@@ -48,17 +48,17 @@ export default function StockyAlternativesPost() {
 
         <h3 className="blog-article-h3">Inventory Planner (Sage)</h3>
         <p>
-          Historically the go-to. Acquired by Sage in 2021. Customers report ~3× price hikes and slower support post-acquisition. Strong forecasting math, but the post-acquisition trajectory has cost it goodwill.
+          Historically the go-to. Acquired by Sage in 2021. Customers report ~3Ã— price hikes and slower support post-acquisition. Strong forecasting math, but the post-acquisition trajectory has cost it goodwill.
         </p>
 
         <h3 className="blog-article-h3">Prediko</h3>
         <p>
-          Newer Shopify-first AI forecasting. Strong forecasting surface but Shopify-only. Multi-location is recent. $119–$599/mo, published.
+          Newer Shopify-first AI forecasting. Strong forecasting surface but Shopify-only. Multi-location is recent. $119â€“$599/mo, published.
         </p>
 
         <h3 className="blog-article-h3">Cin7 Core (DEAR)</h3>
         <p>
-          Mid-market IMS. Heavier than Stocky. Quoted $349–$999/mo plus implementation, often with a partner consultant. Probably overkill if Stocky was enough.
+          Mid-market IMS. Heavier than Stocky. Quoted $349â€“$999/mo plus implementation, often with a partner consultant. Probably overkill if Stocky was enough.
         </p>
 
         <h3 className="blog-article-h3">Sumtracker</h3>
@@ -77,12 +77,12 @@ export default function StockyAlternativesPost() {
 
         <h2 className="blog-article-h2">A note on the timeline</h2>
         <p>
-          You have until August 31, 2026 — about four months from this post. Pick by June 1. Run both for two months. Cut over in August.
+          You have until August 31, 2026 â€” about four months from this post. Pick by June 1. Run both for two months. Cut over in August.
         </p>
 
         <h2 className="blog-article-h2">If skubase looks right</h2>
         <p>
-          We built a one-step CSV importer for Stocky&apos;s standard product export — your SKUs, vendors, and on-hand counts intact, first ranked action in under ten minutes.
+          We built a one-step CSV importer for Stocky&apos;s standard product export â€” your SKUs, vendors, and on-hand counts intact, first ranked action in under ten minutes.
         </p>
 
         <div className="blog-article-cta">
@@ -103,4 +103,11 @@ export default function StockyAlternativesPost() {
           <Link href="/blog">Blog</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Lin
+          <Link href="/terms">Terms</Link>
+        </div>
+        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase</p>
+      </footer>
+    </div>
+  );
+}
+
