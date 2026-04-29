@@ -41,7 +41,7 @@ export default function GoodbyeStockyPage() {
         </p>
         <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
-          Free during the first 30 days of migration Â· <strong>Prices locked at renewal</strong>
+          14-day trial Â· No credit card Â· <strong>Prices locked at renewal</strong>
         </p>
       </section>
 

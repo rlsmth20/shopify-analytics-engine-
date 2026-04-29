@@ -87,6 +87,9 @@ export default function PricingPage() {
           <Link href="/about">About</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/changelog">Changelog</Link>
+          <Link href="/goodbye-stocky">Stocky migration</Link>
+          <Link href="/goodbye-genie">Genie migration</Link>
+          <Link href="/vs-spreadsheet">vs. spreadsheet</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>

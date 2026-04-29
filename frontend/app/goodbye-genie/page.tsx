@@ -37,7 +37,7 @@ export default function GoodbyeGeniePage() {
         </p>
         <WaitlistForm source="goodbye_genie_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
-          Free 30-day trial Â· No credit card Â· <strong>Prices locked at renewal</strong>
+          14-day trial Â· No credit card Â· <strong>Prices locked at renewal</strong>
         </p>
       </section>
 

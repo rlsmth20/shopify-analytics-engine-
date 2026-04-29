@@ -11,12 +11,12 @@ export const metadata = {
 };
 
 const pillars = [
-  { kicker: "Forecasting", title: "Stockout probability, not stockout guesswork.", body: "Holt double-exponential smoothing with weekly seasonality and a real probability of stockout on every SKU â€” not a moving average with a guess on top.", href: "/forecast" },
-  { kicker: "Suppliers", title: "Vendors you can measure.", body: "On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering. 23 of the 25 tools we studied still treat vendors as contact records.", href: "/suppliers" },
-  { kicker: "Liquidation", title: "Cash recovery on stale inventory.", body: "Every dead-stock SKU comes with a concrete plan: markdown, bundle, wholesale, or write-off â€” with the dollar impact attached. 24 of 25 competitors surface aged stock and stop.", href: "/liquidation" },
-  { kicker: "Bundles", title: "Bundles that don''t lose components.", body: "Kits decompose at reorder time, so you never place a PO that leaves a component short. Bundle bottlenecks are called out on the dashboard.", href: "/bundles" },
-  { kicker: "Dashboard", title: "What should I do today?", body: "An action-ranked queue â€” urgent, optimize, dead â€” instead of a wall of dashboards. Rank the list, work it from the top.", href: "/dashboard" },
-  { kicker: "Alerts", title: "Alerts that reach you where you work.", body: "Email, SMS, Slack, and webhooks driven by a real rule engine. No ''email only'' limitation like the rest of the market.", href: "/alerts" }
+  { kicker: “Forecasting”, title: “Stockout probability, not stockout guesswork.”, body: “Holt double-exponential smoothing with weekly seasonality and a real probability of stockout on every SKU â€” not a moving average with a guess on top.”, href: “/forecast?demo=1” },
+  { kicker: “Suppliers”, title: “Vendors you can measure.”, body: “On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering. 23 of the 25 tools we studied still treat vendors as contact records.”, href: “/suppliers?demo=1” },
+  { kicker: “Liquidation”, title: “Cash recovery on stale inventory.”, body: “Every dead-stock SKU comes with a concrete plan: markdown, bundle, wholesale, or write-off â€” with the dollar impact attached. 24 of 25 competitors surface aged stock and stop.”, href: “/liquidation?demo=1” },
+  { kicker: “Bundles”, title: “Bundles that don''t lose components.”, body: “Kits decompose at reorder time, so you never place a PO that leaves a component short. Bundle bottlenecks are called out on the dashboard.”, href: “/bundles?demo=1” },
+  { kicker: “Dashboard”, title: “What should I do today?”, body: “An action-ranked queue â€” urgent, optimize, dead â€” instead of a wall of dashboards. Rank the list, work it from the top.”, href: “/dashboard?demo=1” },
+  { kicker: “Alerts”, title: “Alerts that reach you where you work.”, body: “Email, SMS, Slack, and webhooks driven by a real rule engine. No ''email only'' limitation like the rest of the market.”, href: “/alerts?demo=1” }
 ];
 
 const migrationCards = [
@@ -45,7 +45,7 @@ export default function HomePage() {
         </p>
         <HeroCta source="home_hero" />
         <p className="marketing-hero-trust">
-          We&apos;re in private beta. <Link href="/dashboard">See a live demo</Link> Â·
+          We&apos;re in private beta. <Link href="/dashboard?demo=1">See a live demo</Link> Â·
           <strong> Prices locked at renewal</strong>
         </p>
       </section>
