@@ -1,12 +1,12 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Privacy Policy â€” skubase",
+  title: "Privacy Policy — skubase",
   description: "How skubase collects, uses, and protects your data.",
   alternates: { canonical: "/privacy" },
   openGraph: {
-    title: "Privacy Policy â€” skubase",
+    title: "Privacy Policy — skubase",
     description: "How skubase collects, uses, and protects your data.",
     url: "/privacy",
     type: "website",
@@ -60,11 +60,11 @@ export default function PrivacyPage() {
           Each receives only the minimum data necessary for its function:
         </p>
         <ul className="blog-article-ul">
-          <li><strong>Vercel</strong> â€” frontend hosting, analytics, speed insights.</li>
-          <li><strong>Railway</strong> â€” backend hosting and managed PostgreSQL.</li>
-          <li><strong>Shopify</strong> â€” source of catalog, inventory, and order data when you connect a store.</li>
-          <li><strong>Resend</strong> â€” transactional email delivery (planned).</li>
-          <li><strong>Stripe</strong> â€” payment processing (when paid plans launch).</li>
+          <li><strong>Vercel</strong> — frontend hosting, analytics, speed insights.</li>
+          <li><strong>Railway</strong> — backend hosting and managed PostgreSQL.</li>
+          <li><strong>Shopify</strong> — source of catalog, inventory, and order data when you connect a store.</li>
+          <li><strong>Resend</strong> — transactional email delivery (planned).</li>
+          <li><strong>Stripe</strong> — payment processing (when paid plans launch).</li>
         </ul>
 
         <h2 className="blog-article-h2">Retention and deletion</h2>
@@ -125,12 +125,4 @@ export default function PrivacyPage() {
           <Link href="/">Home</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/about">About</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase</p>
-      </footer>
-    </div>
-  );
-}
-
+        

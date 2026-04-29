@@ -1,26 +1,26 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 
 import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Better than your spreadsheet â€” skubase",
-  description: "If your forecasting lives in a Google Sheet with a trailing 6-month average, you''re tying up cash you don''t need to. skubase fixes that in ten minutes.",
+  title: "Better than your spreadsheet — skubase",
+  description: "If your forecasting lives in a Google Sheet with a trailing 6-month average, you're tying up cash you don't need to. skubase fixes that in ten minutes.",
   alternates: { canonical: "/vs-spreadsheet" },
   openGraph: {
-    title: "Your spreadsheet is overstocking you â€” skubase",
-    description: "ShipStation export â†’ Google Sheet â†’ 6-month moving average â†’ reorder. That math is costing you money.",
+    title: "Your spreadsheet is overstocking you — skubase",
+    description: "ShipStation export → Google Sheet → 6-month moving average → reorder. That math is costing you money.",
     url: "/vs-spreadsheet",
     type: "website",
   },
 };
 
 const reasons = [
-  { title: "A 6-month rule of thumb is a tax on your working capital.", body: "Holding 6 months of cover for an A-item with steady demand is statistically wasteful â€” that''s a 95th-percentile-plus stockout rule applied to SKUs that only need 30â€“60 days. The cash gap is real, and it compounds across every reorder cycle." },
-  { title: "Trailing averages miss seasonality and trend.", body: "A 6-month moving average is half-blind on every Q4 ramp. skubase fits a Holt double-exponential model with a weekly seasonality factor, so a back-to-school SKU isn''t reordered like a steady-state one." },
-  { title: "All SKUs are not equal.", body: "Your A-items deserve a 99% service level; your C-items don''t. skubase segments by ABC Ã— XYZ and sets safety stock per class â€” the math the spreadsheet can''t do without becoming a part-time job." },
-  { title: "Your suppliers are unmeasured.", body: "If your spreadsheet doesn''t track which vendors miss promised lead times, you''re carrying their failures as your stockouts. skubase scores every vendor on on-time, fill rate, and lead-time stability." },
-  { title: "Dead stock is a cash recovery problem your sheet ignores.", body: "The Sheet shows you what you have. It does not propose a markdown plan, a bundle, a wholesale list, or a write-off. skubase does â€” with the dollar impact attached." }
+  { title: "A 6-month rule of thumb is a tax on your working capital.", body: "Holding 6 months of cover for an A-item with steady demand is statistically wasteful — that's a 95th-percentile-plus stockout rule applied to SKUs that only need 30â€“60 days. The cash gap is real, and it compounds across every reorder cycle." },
+  { title: "Trailing averages miss seasonality and trend.", body: "A 6-month moving average is half-blind on every Q4 ramp. skubase fits a Holt double-exponential model with a weekly seasonality factor, so a back-to-school SKU isn't reordered like a steady-state one." },
+  { title: "All SKUs are not equal.", body: "Your A-items deserve a 99% service level; your C-items don't. skubase segments by ABC Ã— XYZ and sets safety stock per class — the math the spreadsheet can't do without becoming a part-time job." },
+  { title: "Your suppliers are unmeasured.", body: "If your spreadsheet doesn't track which vendors miss promised lead times, you're carrying their failures as your stockouts. skubase scores every vendor on on-time, fill rate, and lead-time stability." },
+  { title: "Dead stock is a cash recovery problem your sheet ignores.", body: "The Sheet shows you what you have. It does not propose a markdown plan, a bundle, a wholesale list, or a write-off. skubase does — with the dollar impact attached." }
 ];
 
 const compare = [
@@ -30,13 +30,13 @@ const compare = [
   { metric: "Supplier accuracy", sheet: "Not tracked", skubase: "On-time %, fill rate, lead-time stability, tiered" },
   { metric: "Bundle/kit logic", sheet: "Manual decomposition", skubase: "Auto-decomposes at reorder time" },
   { metric: "Dead stock action", sheet: "None", skubase: "Markdown / bundle / wholesale / write-off plans" },
-  { metric: "Time to update", sheet: "30â€“60 minutes per week", skubase: "Zero â€” recomputes when shipments land" },
+  { metric: "Time to update", sheet: "30â€“60 minutes per week", skubase: "Zero — recomputes when shipments land" },
   { metric: "Auditability", sheet: "Whoever last touched it", skubase: "Every recommended quantity explains itself" }
 ];
 
 const steps = [
-  { n: "1", title: "Drop in your ShipStation export", body: "We accept the standard Orders or Shipments CSV â€” SKU, quantity, ship date are all we need. ShipStation aggregates Shopify, Amazon, eBay, Walmart, and most other channels, so the import covers everywhere you sell." },
-  { n: "2", title: "See your real velocity", body: "Per-SKU 30 / 90 / 180-day shipped units. The number you''ve been eyeballing in the spreadsheet, computed correctly." },
+  { n: "1", title: "Drop in your ShipStation export", body: "We accept the standard Orders or Shipments CSV — SKU, quantity, ship date are all we need. ShipStation aggregates Shopify, Amazon, eBay, Walmart, and most other channels, so the import covers everywhere you sell." },
+  { n: "2", title: "See your real velocity", body: "Per-SKU 30 / 90 / 180-day shipped units. The number you've been eyeballing in the spreadsheet, computed correctly." },
   { n: "3", title: "Get ranked actions", body: "Skubase ranks every SKU into urgent reorders, overstock to draw down, and dead stock to liquidate. Work the queue; close the spreadsheet." }
 ];
 
@@ -49,17 +49,17 @@ export default function VsSpreadsheetPage() {
         <p className="marketing-eyebrow">vs. your forecasting spreadsheet</p>
         <h1 className="marketing-hero-title">Your reorder math is costing you money.</h1>
         <p className="marketing-hero-sub">
-          If your forecasting lives in a Google Sheet â€” ShipStation export pasted in, six-month trailing average computed, reorder when cover drops below six months â€” you&apos;re carrying more inventory than you need to and you&apos;re still missing seasonality. skubase fixes both, in under ten minutes.
+          If your forecasting lives in a Google Sheet — ShipStation export pasted in, six-month trailing average computed, reorder when cover drops below six months — you&apos;re carrying more inventory than you need to and you&apos;re still missing seasonality. skubase fixes both, in under ten minutes.
         </p>
         <WaitlistForm source="vs_spreadsheet_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
-          14-day free trial Â· No credit card Â· <strong>Prices locked at renewal</strong>
+          14-day free trial · No credit card · <strong>Prices locked at renewal</strong>
         </p>
       </section>
 
       <section className="marketing-section">
         <p className="marketing-section-kicker">Why the spreadsheet is wrong</p>
-        <h2 className="marketing-section-title">Five things your sheet can&apos;t do â€” and skubase does by default.</h2>
+        <h2 className="marketing-section-title">Five things your sheet can&apos;t do — and skubase does by default.</h2>
         <div className="beliefs-grid">
           {reasons.map((r) => (
             <article key={r.title} className="belief-card">
@@ -129,9 +129,4 @@ export default function VsSpreadsheetPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase Â· Prices locked at renewal</p>
-      </footer>
-    </div>
-  );
-}
-
+        <p className="marketing-footer-fine">© {new Dat

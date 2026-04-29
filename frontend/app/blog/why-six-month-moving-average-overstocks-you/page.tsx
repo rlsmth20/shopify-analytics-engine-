@@ -1,9 +1,9 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
   title: "Why a 6-month moving average is overstocking you",
-  description: "If you reorder Shopify inventory when cover drops below six months, you''re carrying more than you need to.",
+  description: "If you reorder Shopify inventory when cover drops below six months, you're carrying more than you need to.",
   alternates: { canonical: "/blog/why-six-month-moving-average-overstocks-you" },
   openGraph: { title: "Why a 6-month moving average is overstocking you", description: "The math, and the fix.", url: "/blog/why-six-month-moving-average-overstocks-you", type: "article" },
 };
@@ -23,7 +23,7 @@ export default function MovingAveragePost() {
 
       <article className="blog-article">
         <p className="blog-article-meta">
-          <time dateTime="2026-04-25">April 25, 2026</time> Â· 7 min read Â· Forecasting
+          <time dateTime="2026-04-25">April 25, 2026</time> · 7 min read · Forecasting
         </p>
         <h1 className="blog-article-title">Why a 6-month moving average is overstocking you</h1>
         <p className="blog-article-lead">
@@ -37,7 +37,7 @@ export default function MovingAveragePost() {
 
         <h2 className="blog-article-h2">Why moving averages miss seasonality</h2>
         <p>
-          A six-month moving average gives equal weight to every week. If you&apos;re forecasting an October reorder using April-through-September data, your average is dominated by summer demand â€” which has nothing to do with what your customers buy in November.
+          A six-month moving average gives equal weight to every week. If you&apos;re forecasting an October reorder using April-through-September data, your average is dominated by summer demand — which has nothing to do with what your customers buy in November.
         </p>
         <p>
           The fix is exponential smoothing (Holt-Winters or Holt double-exponential), which weights recent observations more heavily and decomposes the signal into level, trend, and seasonal components.
@@ -70,7 +70,7 @@ export default function MovingAveragePost() {
 
         <h2 className="blog-article-h2">Why skubase</h2>
         <p>
-          skubase runs Holt double-exponential with weekly seasonality on every SKU, classifies on ABC Ã— XYZ, sets safety stock per class, scores suppliers, surfaces stockout probability. The math is visible â€” every recommended quantity explains itself.
+          skubase runs Holt double-exponential with weekly seasonality on every SKU, classifies on ABC Ã— XYZ, sets safety stock per class, scores suppliers, surfaces stockout probability. The math is visible — every recommended quantity explains itself.
         </p>
 
         <div className="blog-article-cta">
@@ -90,12 +90,4 @@ export default function MovingAveragePost() {
           <Link href="/">Home</Link>
           <Link href="/blog">Blog</Link>
           <Link href="/pricing">Pricing</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase</p>
-      </footer>
-    </div>
-  );
-}
-
+          <Link href="/privacy">Pr

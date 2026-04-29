@@ -18,6 +18,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/blog", priority: 0.85, freq: "weekly" },
     { path: "/blog/stocky-alternatives-2026", priority: 0.85, freq: "monthly" },
     { path: "/blog/why-six-month-moving-average-overstocks-you", priority: 0.85, freq: "monthly" },
+    { path: "/blog/inventory-planner-alternative", priority: 0.9, freq: "monthly" },
+    { path: "/blog/shopify-safety-stock-formula", priority: 0.85, freq: "monthly" },
+    { path: "/blog/how-to-clear-dead-stock-shopify", priority: 0.85, freq: "monthly" },
     { path: "/privacy", priority: 0.4, freq: "yearly" },
     { path: "/terms", priority: 0.4, freq: "yearly" },
   ];
