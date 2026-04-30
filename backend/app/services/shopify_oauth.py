@@ -37,7 +37,7 @@ BACKEND_URL = os.getenv("BACKEND_PUBLIC_URL", "").rstrip("/")
 
 
 def is_configured() -> bool:
-    return bool(os.getenv("SHOPIFY_API_KEY") and os.getenv("SHOPIFY_API_SECRET"))
+    return bool(os.getenv("SHOPIFY_CLIENT_ID") and os.getenv("SHOPIFY_CLIENT_SECRET"))
 
 
 def normalize_shop_domain(shop: str) -> Optional[str]:
@@ -60,9 +60,9 @@ def build_install_url(*, shop_domain: str, state: str) -> str:
     """Build the Shopify authorize URL the user is redirected to."""
     if not BACKEND_URL:
         raise RuntimeError("BACKEND_PUBLIC_URL is not set on the server.")
-    api_key = os.getenv("SHOPIFY_API_KEY", "")
+    api_key = os.getenv("SHOPIFY_CLIENT_ID", "")
     if not api_key:
-        raise RuntimeError("SHOPIFY_API_KEY is not set on the server.")
+        raise RuntimeError("SHOPIFY_CLIENT_ID is not set on the server.")
 
     redirect_uri = f"{BACKEND_URL}/integrations/shopify/callback"
     params = {
@@ -127,7 +127,7 @@ def consume_oauth_state(db: DbSession, *, raw_state: str) -> Optional[tuple[int,
 
 def verify_callback_hmac(query_params: dict[str, str]) -> bool:
     """Verify the HMAC Shopify includes on every callback redirect."""
-    secret = os.getenv("SHOPIFY_API_SECRET", "")
+    secret = os.getenv("SHOPIFY_CLIENT_SECRET", "")
     if not secret:
         return False
     received_hmac = query_params.get("hmac")
@@ -146,8 +146,8 @@ def verify_callback_hmac(query_params: dict[str, str]) -> bool:
 
 def exchange_code_for_token(*, shop_domain: str, code: str) -> Optional[dict]:
     """Exchange the OAuth code for an access token via Shopify's OAuth API."""
-    api_key = os.getenv("SHOPIFY_API_KEY", "")
-    api_secret = os.getenv("SHOPIFY_API_SECRET", "")
+    api_key = os.getenv("SHOPIFY_CLIENT_ID", "")
+    api_secret = os.getenv("SHOPIFY_CLIENT_SECRET", "")
     if not api_key or not api_secret:
         return None
 
