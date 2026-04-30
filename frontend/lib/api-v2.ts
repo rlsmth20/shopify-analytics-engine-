@@ -300,6 +300,12 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     }
     throw new Error("Trial expired. Redirecting to pricing.");
   }
+  if (response.status === 402) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/pricing?trial_expired=1";
+    }
+    throw new Error("Trial expired. Redirecting to pricing.");
+  }
   if (!response.ok) {
     throw new Error(
       `${path} failed with ${response.status}: ${await response
@@ -327,12 +333,6 @@ async function postJson<T>(
     credentials: "include",
     signal,
   });
-  if (response.status === 402) {
-    if (typeof window !== "undefined") {
-      window.location.href = "/pricing?trial_expired=1";
-    }
-    throw new Error("Trial expired. Redirecting to pricing.");
-  }
   if (!response.ok) {
     throw new Error(
       `${path} failed with ${response.status}: ${await response
@@ -409,4 +409,71 @@ export const updateChannel = (
 export const sendTestAlert = (
   payload: { channel: NotificationChannel; target: string },
   signal?: AbortSignal
-) => postJson<{ delivered: boolean; error: string }>("/alerts/test
+) => postJson<{ delivered: boolean; error: string }>("/alerts/test", payload, signal);
+
+export const evaluateAlertsNow = (dryRun: boolean, signal?: AbortSignal) =>
+  postJson<{ events: AlertEvent[] }>(
+    `/alerts/evaluate?dry_run=${dryRun ? "true" : "false"}`,
+    {},
+    signal
+  );
+
+export const createAlertRule = (
+  payload: {
+    name: string;
+    trigger: AlertTrigger;
+    severity: AlertSeverity;
+    channels: NotificationChannel[];
+    threshold: number;
+    enabled: boolean;
+  },
+  signal?: AbortSignal
+) => postJson<AlertRule>("/alerts/rules", payload, signal);
+
+export const deleteAlertRule = async (
+  ruleId: string,
+  signal?: AbortSignal
+): Promise<boolean> => {
+  const response = await fetch(
+    `${API_BASE_URL}/alerts/rules/${encodeURIComponent(ruleId)}`,
+    { method: "DELETE", cache: "no-store", credentials: "include", signal }
+  );
+  return response.ok;
+};
+
+export const toggleAlertRule = async (
+  ruleId: string,
+  enabled: boolean,
+  signal?: AbortSignal
+): Promise<AlertRule> => {
+  const response = await fetch(
+    `${API_BASE_URL}/alerts/rules/${encodeURIComponent(
+      ruleId
+    )}/toggle?enabled=${enabled ? "true" : "false"}`,
+    {
+      method: "PATCH",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      credentials: "include",
+      signal,
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`toggle failed with ${response.status}`);
+  }
+  return (await response.json()) as AlertRule;
+};
+
+// ---------------------------------------------------------------------------
+// Formatters
+// ---------------------------------------------------------------------------
+
+export const currency = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+export const percent = (n: number, fractionDigits = 0) =>
+  `${(n * 100).toFixed(fractionDigits)}%`;

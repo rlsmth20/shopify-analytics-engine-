@@ -22,7 +22,7 @@ const compareRows = [
 ];
 
 const steps = [
-  { number: "1", title: "Start your free trial", body: "Drop your email and Shopify domain. You'll get a sign-in link instantly — 14-day trial, no credit card." },
+  { number: "1", title: "Get on the early-access list", body: "Drop your email and Shopify domain. We'll send your invite when paid plans launch — well before August." },
   { number: "2", title: "Bring your Stocky data", body: "Export your Stocky Inventory On Hand and Vendor List. Our importer maps them in one step." },
   { number: "3", title: "See your first ranked action", body: "Under ten minutes, no consultant. Urgent / optimize / dead — work the queue from the top." },
   { number: "4", title: "Run side-by-side through August", body: "Use Stocky and skubase together. We don't charge for the migration window." }
@@ -39,7 +39,7 @@ export default function GoodbyeStockyPage() {
         <p className="marketing-hero-sub">
           Shopify is ending Stocky on August 31, 2026. We built the replacement — real forecasting, supplier scorecards, dead-stock plans, Shopify-native, no POS Pro requirement.
         </p>
-        <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Start free trial" />
+        <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
           14-day trial · No credit card · <strong>Prices locked at renewal</strong>
         </p>
@@ -83,7 +83,7 @@ export default function GoodbyeStockyPage() {
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">Get a head start on August.</h2>
         <p className="marketing-section-sub">Migrating early means you don&apos;t have to rush in July.</p>
-        <WaitlistForm source="goodbye_stocky_footer" ctaLabel="Start free trial" />
+        <WaitlistForm source="goodbye_stocky_footer" ctaLabel="Get early access" />
       </section>
 
       <footer className="marketing-footer">
@@ -101,4 +101,9 @@ export default function GoodbyeStockyPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewa
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
+      </footer>
+    </div>
+  );
+}
+

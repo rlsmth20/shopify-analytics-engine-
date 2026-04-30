@@ -19,7 +19,7 @@ const reasons = [
 ];
 
 const steps = [
-  { number: "1", title: "Start your free trial", body: "Drop your email and get a sign-in link instantly — 14-day trial, no credit card required." },
+  { number: "1", title: "Get on the early-access list", body: "Drop your email. We'll send your invite when we open up." },
   { number: "2", title: "Bring your Genie CSV", body: "If you exported your Genie data before the sunset, our importer maps vendors and lead-time settings." },
   { number: "3", title: "See your first ranked action", body: "Under ten minutes, no consultant. The dashboard prioritizes urgent reorders." }
 ];
@@ -35,7 +35,7 @@ export default function GoodbyeGeniePage() {
         <p className="marketing-hero-sub">
           Genie merchants loved simple. We kept the simple — and added the math, the supplier scorecards, and the dead-stock plans Genie never shipped.
         </p>
-        <WaitlistForm source="goodbye_genie_hero" ctaLabel="Start free trial" />
+        <WaitlistForm source="goodbye_genie_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
           14-day trial · No credit card · <strong>Prices locked at renewal</strong>
         </p>
@@ -73,7 +73,7 @@ export default function GoodbyeGeniePage() {
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">Stop improvising.</h2>
         <p className="marketing-section-sub">The CSV exports and spreadsheets were good under pressure. skubase is the permanent replacement.</p>
-        <WaitlistForm source="goodbye_genie_footer" ctaLabel="Start free trial" />
+        <WaitlistForm source="goodbye_genie_footer" ctaLabel="Get early access" />
       </section>
 
       <footer className="marketing-footer">
@@ -91,4 +91,9 @@ export default function GoodbyeGeniePage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewa
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
+      </footer>
+    </div>
+  );
+}
+

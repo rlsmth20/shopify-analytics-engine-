@@ -247,6 +247,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           </div>
         ) : null}
+
         {user.id !== 0 && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
           <div className={`demo-banner ${trialDaysLeft <= 2 ? "demo-banner-preview" : ""}`} role="status">
             <span className="demo-banner-mark" aria-hidden>◈</span>
@@ -271,7 +272,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           </div>
         ) : null}
-
         <header className="top-header">
           <div>
             <p className="header-eyebrow">{meta.eyebrow}</p>
@@ -283,4 +283,32 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="header-chip header-chip-tone">
               {shopifyDomain ? shopifyDomain : "No store selected"}
             </span>
-            {hasReal
+            {hasRealData === false ? (
+              <span className="header-chip">Demo data</span>
+            ) : null}
+            {user.id !== 0 ? (
+              <span className="header-chip header-chip-user" title={user.email}>
+                {user.email}
+              </span>
+            ) : null}
+            {user.id !== 0 ? (
+              <button
+                type="button"
+                onClick={() => { void logout(); }}
+                className="header-logout"
+              >
+                Sign out
+              </button>
+            ) : (
+              <Link href="/login" className="button button-primary button-sm">
+                Sign up free
+              </Link>
+            )}
+          </div>
+        </header>
+
+        <main className="page-container">{children}</main>
+      </div>
+    </div>
+  );
+}

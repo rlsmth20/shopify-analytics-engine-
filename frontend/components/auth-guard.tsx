@@ -88,4 +88,50 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         method: "POST",
         credentials: "include",
       });
-    } catch 
+    } catch {
+      // best-effort; clear locally regardless
+    }
+    // Clear demo session too.
+    try { sessionStorage.removeItem("skubase_demo"); } catch { /* ignore */ }
+    setUser(null);
+    setIsDemo(false);
+    router.replace("/");
+  }
+
+  useEffect(() => {
+    if (detectDemo()) {
+      setIsDemo(true);
+      setUser(DEMO_USER);
+      setLoading(false);
+      return;
+    }
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!loading && user === null && !isDemo) {
+      router.replace("/login");
+    }
+  }, [loading, user, router, isDemo]);
+
+  if (loading) {
+    return (
+      <div className="auth-loading">
+        <div className="auth-loading-spinner" aria-hidden />
+        <p className="auth-loading-text">Loading skubase…</p>
+      </div>
+    );
+  }
+
+  if (user === null) {
+    // Redirect is in flight via useEffect above; render nothing.
+    return null;
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, refresh, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
