@@ -10,7 +10,13 @@ DEFAULT_DATABASE_URL = "sqlite:///./shopify_analytics_engine.db"
 
 
 def get_database_url() -> str:
-    return os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    url = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    # Railway (and most providers) supply postgresql:// URLs, but we use
+    # psycopg v3 (not psycopg2).  SQLAlchemy needs the +psycopg dialect tag.
+    if url.startswith("postgresql://") or url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
 
 
 def is_sqlite_database_url(database_url: str) -> bool:
