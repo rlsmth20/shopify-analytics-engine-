@@ -130,4 +130,5 @@ def trigger_sync(
     try:
         result = sync_shop_now(db, shop_id=user.shop_id)
     except RuntimeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from 
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
