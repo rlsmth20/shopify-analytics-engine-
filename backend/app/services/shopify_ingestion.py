@@ -20,7 +20,7 @@ from app.integrations.shopify_mapper import (
 from app.services.shop_settings import normalize_shopify_domain
 
 
-DEFAULT_ORDER_LOOKBACK_DAYS = 60
+DEFAULT_ORDER_LOOKBACK_DAYS = 365
 SYNC_STATUS_RUNNING = "running"
 SYNC_STATUS_SUCCEEDED = "succeeded"
 SYNC_STATUS_FAILED = "failed"

@@ -151,7 +151,7 @@ export default function StoreSyncPage() {
           <>
             <p className="section-copy">
               Install the skubase app on your Shopify store. We&apos;ll pull
-              products, inventory, and the last 180 days of orders so the
+              products, inventory, and the last 12 months of orders so the
               forecast and action queue can run on real data.
             </p>
             <form onSubmit={handleInstall} className="auth-form" style={{ maxWidth: "440px" }}>
