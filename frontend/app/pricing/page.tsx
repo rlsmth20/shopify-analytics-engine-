@@ -10,7 +10,7 @@ export const metadata = {
   alternates: { canonical: "/pricing" },
   openGraph: {
     title: "Pricing — skubase",
-    description: "Three published tiers ($29/$149/$349) with a written price-lock pledge. Pay annually, save 15%.",
+    description: "Three published tiers ($29/$99/$199) with a written price-lock pledge. Pay annually, save 15%.",
     url: "/pricing",
     type: "website",
   },

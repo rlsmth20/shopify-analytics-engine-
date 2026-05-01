@@ -59,8 +59,8 @@ const TIERS: Tier[] = [
       "Scheduled PDF reports",
     ],
     featured: true,
-    monthly: { plan: "growth_monthly", price: "$149" },
-    annual: { plan: "growth_annual", price: "$124.92", yearTotal: "$1,499" },
+    monthly: { plan: "growth_monthly", price: "$99" },
+    annual: { plan: "growth_annual", price: "$84.15", yearTotal: "$1,010" },
   },
   {
     name: "Scale",
@@ -76,8 +76,8 @@ const TIERS: Tier[] = [
       "SSO (Google, Microsoft)",
     ],
     featured: false,
-    monthly: { plan: "scale_monthly", price: "$349" },
-    annual: { plan: "scale_annual", price: "$291.58", yearTotal: "$3,499" },
+    monthly: { plan: "scale_monthly", price: "$199" },
+    annual: { plan: "scale_annual", price: "$169.15", yearTotal: "$2,030" },
   },
 ];
 
