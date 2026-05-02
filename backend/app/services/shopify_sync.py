@@ -294,7 +294,7 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                 )
                 count += 1
         db.commit()
-        page_info = result.get("data", {}).get("orders", {}).get("pageInfo", {})
+        page_info = (((result.get("data") or {}).get("orders") or {}).get("pageInfo")) or {}
         if not page_info.get("hasNextPage"):
             break
         cursor = page_info.get("endCursor")
