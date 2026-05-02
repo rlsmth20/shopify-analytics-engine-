@@ -108,6 +108,11 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
     count = 0
     while True:
         result = _gql(domain, token, PRODUCTS_QUERY, {"cursor": cursor})
+        # Surface GraphQL-level errors so we can see scope / permission failures.
+        gql_errors = result.get("errors")
+        if gql_errors:
+            logger.error("Shopify products GraphQL errors: %s", gql_errors)
+            raise RuntimeError(f"Shopify products query failed: {gql_errors}")
         # Use `or {}` after every .get() because Shopify's GraphQL can return
         # explicit nulls that dict.get() does NOT replace with its default.
         data = result.get("data") or {}
@@ -212,10 +217,15 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
 
 def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days_back: int = 180) -> int:
     """Pull orders within the last `days_back` days. Returns count of line items."""
-    since = (datetime.now(timezone.utc) - timedelta(days=days_back)).isoformat()
+    # Shopify's search-query language wants ISO 8601 without microseconds and
+    # ideally with a Z suffix (not +00:00). datetime.isoformat() produces
+    # the latter, which Shopify silently rejects → zero orders returned.
+    since_dt = datetime.now(timezone.utc) - timedelta(days=days_back)
+    since = since_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     query = f"created_at:>={since}"
     cursor = None
     count = 0
+    pages_seen = 0
 
     # Pre-build a variant -> product_id map for fast joins.
     variant_to_product: dict[str, int] = {}
@@ -226,13 +236,27 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
         if vid:
             variant_to_product[str(vid)] = int(pid)
 
+    logger.info(
+        "orders ingest start: shop_id=%s since=%s products_indexed=%s",
+        shop_id, since, len(variant_to_product),
+    )
+
     while True:
         result = _gql(domain, token, ORDERS_QUERY, {"cursor": cursor, "query": query})
-        # Defensive: every dict lookup uses `or {}` because Shopify can return
-        # explicit nulls that dict.get(key, default) does NOT replace.
+        # Surface GraphQL-level errors (invalid query syntax, bad scope, etc.)
+        # so we know WHY orders are missing instead of silently getting zero.
+        gql_errors = result.get("errors")
+        if gql_errors:
+            logger.error("Shopify orders GraphQL errors: %s", gql_errors)
+            raise RuntimeError(f"Shopify orders query failed: {gql_errors}")
         data = result.get("data") or {}
         orders = data.get("orders") or {}
         edges = orders.get("edges") or []
+        pages_seen += 1
+        logger.info(
+            "orders page %s: edges=%s cursor=%s",
+            pages_seen, len(edges), cursor,
+        )
         for edge in edges:
             order = edge.get("node") or {}
             if not order:
