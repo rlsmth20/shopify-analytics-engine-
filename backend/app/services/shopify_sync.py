@@ -331,6 +331,14 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
         select(ShopifyConnection).where(ShopifyConnection.shop_id == shop_id)
     )
     if conn is None or not conn.access_token or conn.uninstalled_at is not None:
+        logger.error(
+            "Shopify sync precondition failed: shop_id=%s conn_exists=%s has_token=%s uninstalled_at=%s shopify_domain=%s",
+            shop_id,
+            conn is not None,
+            bool(conn and conn.access_token),
+            conn.uninstalled_at if conn else None,
+            conn.shopify_domain if conn else None,
+        )
         raise RuntimeError("No active Shopify connection for this workspace.")
 
     run = ShopifySyncRun(shop_id=shop_id, status="running")
