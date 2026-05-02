@@ -108,16 +108,30 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
     count = 0
     while True:
         result = _gql(domain, token, PRODUCTS_QUERY, {"cursor": cursor})
-        edges = result.get("data", {}).get("products", {}).get("edges", []) or []
+        # Use `or {}` after every .get() because Shopify's GraphQL can return
+        # explicit nulls that dict.get() does NOT replace with its default.
+        data = result.get("data") or {}
+        products = data.get("products") or {}
+        edges = products.get("edges") or []
         for edge in edges:
-            node = edge["node"]
-            shopify_product_id = _shopify_id_to_str(node["id"])
+            node = edge.get("node") or {}
+            if not node:
+                continue
+            shopify_product_id = _shopify_id_to_str(node.get("id") or "")
+            if not shopify_product_id:
+                continue
             vendor = (node.get("vendor") or "").strip() or None
             category = (node.get("productType") or "").strip() or None
             base_name = node.get("title") or "Untitled product"
-            for vedge in (node.get("variants", {}).get("edges", []) or []):
-                v = vedge["node"]
-                shopify_variant_id = _shopify_id_to_str(v["id"])
+            variants = node.get("variants") or {}
+            v_edges = variants.get("edges") or []
+            for vedge in v_edges:
+                v = vedge.get("node") or {}
+                if not v:
+                    continue
+                shopify_variant_id = _shopify_id_to_str(v.get("id") or "")
+                if not shopify_variant_id:
+                    continue
                 sku = (v.get("sku") or "").strip() or None
                 variant_title = (v.get("title") or "").strip() or None
                 if variant_title and variant_title.lower() == "default title":
@@ -189,7 +203,7 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
                     inv.quantity = qty
                 count += 1
         db.commit()
-        page_info = result.get("data", {}).get("products", {}).get("pageInfo", {})
+        page_info = (((result.get("data") or {}).get("products") or {}).get("pageInfo")) or {}
         if not page_info.get("hasNextPage"):
             break
         cursor = page_info.get("endCursor")
@@ -214,23 +228,38 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
 
     while True:
         result = _gql(domain, token, ORDERS_QUERY, {"cursor": cursor, "query": query})
-        edges = result.get("data", {}).get("orders", {}).get("edges", []) or []
+        # Defensive: every dict lookup uses `or {}` because Shopify can return
+        # explicit nulls that dict.get(key, default) does NOT replace.
+        data = result.get("data") or {}
+        orders = data.get("orders") or {}
+        edges = orders.get("edges") or []
         for edge in edges:
-            order = edge["node"]
-            order_id = _shopify_id_to_str(order["id"])
+            order = edge.get("node") or {}
+            if not order:
+                continue
+            order_id = _shopify_id_to_str(order.get("id") or "")
+            if not order_id:
+                continue
             try:
-                created_at = datetime.fromisoformat(order["createdAt"].replace("Z", "+00:00"))
+                created_at_raw = order.get("createdAt") or ""
+                created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
             except Exception:
                 created_at = datetime.now(timezone.utc)
-            for liedge in (order.get("lineItems", {}).get("edges", []) or []):
-                li = liedge["node"]
+            line_items = order.get("lineItems") or {}
+            li_edges = line_items.get("edges") or []
+            for liedge in li_edges:
+                li = liedge.get("node") or {}
+                if not li:
+                    continue
                 variant = li.get("variant") or {}
-                variant_gid = _shopify_id_to_str(variant.get("id", "")) if variant else ""
+                variant_gid = _shopify_id_to_str(variant.get("id") or "")
                 product_id = variant_to_product.get(variant_gid)
                 if not product_id:
                     continue  # Skip line items we can't map to a known product.
                 qty = int(li.get("quantity") or 0)
-                amount = ((li.get("originalUnitPriceSet") or {}).get("shopMoney") or {}).get("amount") or "0"
+                price_set = li.get("originalUnitPriceSet") or {}
+                shop_money = price_set.get("shopMoney") or {}
+                amount = shop_money.get("amount") or "0"
                 try:
                     price = Decimal(str(amount))
                 except Exception:
@@ -240,7 +269,9 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                 # Idempotency: avoid double-inserting the same line item
                 # by anchoring on the Shopify line item id encoded into
                 # shopify_order_id field for now.
-                line_id = _shopify_id_to_str(li["id"])
+                line_id = _shopify_id_to_str(li.get("id") or "")
+                if not line_id:
+                    continue
                 exists = db.scalar(
                     select(OrderLineItem.id).where(
                         OrderLineItem.shop_id == shop_id,
