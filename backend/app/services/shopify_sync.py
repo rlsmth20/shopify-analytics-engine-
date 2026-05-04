@@ -367,6 +367,16 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
             "duration_seconds": (run.finished_at - started_at).total_seconds(),
         }
     except urllib.error.HTTPError as exc:
+        # Log Shopify HTTP errors loudly so 401/403/429 are visible in Railway
+        # logs immediately, not just propagated as a 400 response message.
+        try:
+            body_preview = exc.read().decode("utf-8", errors="replace")[:500]
+        except Exception:
+            body_preview = "<unavailable>"
+        logger.error(
+            "Shopify HTTP error for shop_id=%s: code=%s reason=%s body=%s",
+            shop_id, exc.code, exc.reason, body_preview,
+        )
         run.status = "failed"
         run.error_message = f"Shopify HTTP error: {exc.code} {exc.reason}"
         run.finished_at = datetime.now(timezone.utc)
