@@ -72,23 +72,29 @@ def require_active_access(
     if user.is_admin:
         return user
 
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     from sqlalchemy import select
 
     from app.db.models import Subscription
 
-    # Check trial window.
+    # Check trial window. Backfill trial_ends_at for accounts created before
+    # the column was added — they get a fresh 14-day window on first access.
     trial_ends = user.trial_ends_at
-    if trial_ends is not None:
-        if trial_ends.tzinfo is None:
-            trial_ends = trial_ends.replace(tzinfo=timezone.utc)
-        if trial_ends > datetime.now(timezone.utc):
-            return user  # still in trial
+    if trial_ends is None:
+        trial_ends = datetime.now(timezone.utc) + timedelta(days=14)
+        user.trial_ends_at = trial_ends
+        db.add(user)
+        db.commit()
 
-    # Check paid subscription.
+    if trial_ends.tzinfo is None:
+        trial_ends = trial_ends.replace(tzinfo=timezone.utc)
+    if trial_ends > datetime.now(timezone.utc):
+        return user  # still in trial
+
+    # Check paid subscription. Accept both active and trialing Stripe states.
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
-    if sub is not None and sub.status == "active":
+    if sub is not None and sub.status in ("active", "trialing"):
         return user
 
     raise HTTPException(

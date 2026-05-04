@@ -1635,7 +1635,6 @@ code {
   color: var(--muted-strong);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  margin-left: auto;
 }
 
 /* Diverging bar (surplus vs shortfall) */
@@ -1646,7 +1645,7 @@ code {
 
 .diverging-row {
   display: grid;
-  grid-template-columns: minmax(100px, 22%) 1fr 1fr 72px;
+  grid-template-columns: minmax(40px, 22%) 1fr 52px;
   align-items: center;
   gap: 10px;
 }
@@ -5006,10 +5005,27 @@ code {
   line-height: 1.6;
 }
 
+.auth-trial-callout {
+  background: var(--surface-muted, #f8fafc);
+  border: 1px solid var(--line, rgba(15,23,42,0.08));
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 20px 0 0;
+}
+
+.auth-trial-callout-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #667085);
+  margin: 0 0 10px;
+}
+
 .auth-checklist {
   list-style: none;
   padding: 0;
-  margin: 0 0 20px;
+  margin: 0 0 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;

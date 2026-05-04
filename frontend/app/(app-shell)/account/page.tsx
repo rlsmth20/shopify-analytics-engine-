@@ -24,9 +24,9 @@ type Connection = {
 };
 
 const PLAN_LABELS: Record<string, string> = {
-  starter_monthly: "Starter ($49/mo)",
-  growth_monthly: "Growth ($149/mo)",
-  scale_monthly: "Scale ($349/mo)",
+  starter_monthly: "Starter ($29/mo)",
+  growth_monthly: "Growth ($99/mo)",
+  scale_monthly: "Scale ($199/mo)",
   starter_annual: "Starter (annual)",
   growth_annual: "Growth (annual)",
   scale_annual: "Scale (annual)",
@@ -106,9 +106,9 @@ export default function AccountPage() {
             const planLabel = isActive
               ? (PLAN_LABELS[sub!.plan] ?? sub!.plan)
               : user.in_trial
-              ? trialDaysLeft === 0
-                ? "Trial ended"
-                : `Free Trial — ${trialDaysLeft}d left`
+              ? trialDaysLeft === null || trialDaysLeft > 0
+                ? trialDaysLeft !== null ? `Free Trial — ${trialDaysLeft}d left` : "Free Trial"
+                : "Trial ended"
               : (PLAN_LABELS[sub?.plan ?? "none"] ?? sub?.plan ?? "No active plan");
             const badgeClass = isActive || (user.in_trial && (trialDaysLeft ?? 0) > 0)
               ? "status-succeeded"
@@ -169,23 +169,6 @@ export default function AccountPage() {
         </SectionCard>
       </div>
 
-      <SectionCard>
-        <div className="section-heading">
-          <div>
-            <p className="section-eyebrow">Workspace</p>
-            <h2 className="section-title section-title-small">Team & data</h2>
-          </div>
-        </div>
-        <p className="section-copy">
-          Team invites and SSO ship with the Scale plan. For now, this
-          workspace has one signed-in user. Need help merging multiple
-          workspaces or migrating an account? Email{" "}
-          <a href="mailto:hello@skubase.io" className="auth-link">
-            hello@skubase.io
-          </a>
-          .
-        </p>
-      </SectionCard>
     </div>
   );
 }

@@ -105,7 +105,11 @@ export default function ForecastPage() {
                 }
               />
               <Kpi label="Confidence" value={selected.confidence} />
-              <Kpi label="Method" value={selected.method.replace("_", " ")} />
+              <Kpi label="Method" value={
+                selected.method === "holt_double_exponential" ? "Holt DES"
+                : selected.method === "moving_average" ? "Moving avg"
+                : selected.method.replace(/_/g, " ")
+              } />
             </div>
 
             <ChartPanel

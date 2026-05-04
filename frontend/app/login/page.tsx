@@ -54,7 +54,7 @@ export default function LoginPage() {
             <h1 className="auth-title">Check your inbox.</h1>
             <p className="auth-copy">
               We sent a sign-in link to <strong>{email}</strong>. Click it to
-              start your free trial — the link expires in 15 minutes.
+              continue — the link expires in 15 minutes.
             </p>
             <p className="auth-fine">
               Didn&apos;t arrive within 30 seconds? Check spam, then{" "}
@@ -73,18 +73,11 @@ export default function LoginPage() {
           </div>
         ) : (
           <>
-            <h1 className="auth-title">Start your free 14-day trial</h1>
+            <h1 className="auth-title">Sign in to skubase</h1>
             <p className="auth-copy">
               Enter your email and we&apos;ll send you a one-click sign-in link.
-              No password. No credit card. You&apos;ll be looking at your own
-              inventory in under 10 minutes.
+              No password required.
             </p>
-
-            <ul className="auth-checklist">
-              <li>✓ Connects to Shopify in one click</li>
-              <li>✓ Pulls 12 months of order history automatically</li>
-              <li>✓ Shows your reorder queue, forecast, and dead stock on day one</li>
-            </ul>
 
             <form onSubmit={handleSubmit} className="auth-form">
               <label className="auth-field">
@@ -106,15 +99,21 @@ export default function LoginPage() {
                 disabled={submitting}
                 className="button button-primary button-full"
               >
-                {submitting ? "Sending link..." : "Start free trial — no card required"}
+                {submitting ? "Sending link..." : "Send sign-in link"}
               </button>
-              <p className="auth-fine" style={{ textAlign: "center", marginTop: "8px" }}>
-                14 days free · Cancel any time · Plans from $29/mo after trial
-              </p>
             </form>
+
+            <div className="auth-trial-callout">
+              <p className="auth-trial-callout-title">New to skubase?</p>
+              <ul className="auth-checklist">
+                <li>✓ Free 14-day trial — no credit card required</li>
+                <li>✓ Connects to Shopify in one click</li>
+                <li>✓ Shows your reorder queue, forecast, and dead stock on day one</li>
+              </ul>
+              <p className="auth-fine">Plans from $29/mo after trial · Cancel any time</p>
+            </div>
+
             <p className="auth-fine">
-              Already have an account?{" "}
-              <Link href="/pricing" className="auth-link">See pricing</Link> ·{" "}
               <Link href="/dashboard?demo=1" className="auth-link">View demo first →</Link>
             </p>
           </>
