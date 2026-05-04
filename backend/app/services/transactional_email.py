@@ -181,6 +181,100 @@ def _magic_link_text(email: str, link: str) -> str:
     )
 
 
+def send_contact_notification(
+    name: str,
+    email: str,
+    contact_type: str,
+    message: str,
+) -> bool:
+    """Forward a contact form submission to Rainer. Never raises."""
+    client = _client()
+    if client is None:
+        return False
+
+    OWNER_EMAIL = os.getenv("OWNER_EMAIL", "rlsmth20@gmail.com")
+    label = contact_type.capitalize()
+    subject = f"[skubase {label}] from {name} <{email}>"
+    html = f"""<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:32px 16px;">
+  <table role="presentation" width="560" style="max-width:560px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:28px;margin:0 auto;">
+    <tr><td>
+      <p style="margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;">skubase · {label}</p>
+      <h2 style="margin:0 0 20px;font-size:20px;color:#0f172a;">{name}</h2>
+      <p style="margin:0 0 4px;font-size:13px;color:#64748b;">From</p>
+      <p style="margin:0 0 16px;font-size:15px;color:#0f172a;"><a href="mailto:{email}" style="color:#0f172a;">{email}</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#64748b;">Message</p>
+      <p style="margin:0;font-size:15px;color:#334155;white-space:pre-wrap;line-height:1.6;">{message}</p>
+    </td></tr>
+  </table>
+</body></html>"""
+    text = f"[skubase {label}]\nFrom: {name} <{email}>\n\n{message}\n"
+
+    try:
+        params = {
+            "from": DEFAULT_FROM,
+            "to": [OWNER_EMAIL],
+            "reply_to": email,
+            "subject": subject,
+            "html": html,
+            "text": text,
+            "tags": [{"name": "category", "value": "contact_form"}],
+        }
+        result = client.Emails.send(params)
+        logger.info("contact notification sent: id=%s from=%s", result.get("id"), email)
+        return True
+    except Exception as exc:
+        logger.exception("failed to send contact notification from %s: %s", email, exc)
+        return False
+
+
+def send_alert_email(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+) -> bool:
+    """Send an inventory alert email via Resend. Never raises."""
+    client = _client()
+    if client is None:
+        return False
+
+    safe_body = body.replace("\n", "<br>")
+    html = f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
+        <tr><td>
+          <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase alert</p>
+          <h2 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#0f172a;">{subject}</h2>
+          <p style="margin:0 0 24px;color:#334155;font-size:15px;line-height:1.6;">{safe_body}</p>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">skubase &middot; automated inventory alert</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    try:
+        params = {
+            "from": DEFAULT_FROM,
+            "to": [to],
+            "reply_to": DEFAULT_REPLY_TO,
+            "subject": subject,
+            "html": html,
+            "text": f"{subject}\n\n{body}\n\n--\nskubase automated alert",
+            "tags": [{"name": "category", "value": "alert"}],
+        }
+        result = client.Emails.send(params)
+        logger.info("alert email sent: id=%s to=%s", result.get("id"), to)
+        return True
+    except Exception as exc:
+        logger.exception("failed to send alert email to %s: %s", to, exc)
+        return False
+
+
 def send_magic_link_email(email: str, link: str) -> bool:
     """Send a sign-in link. Returns True on success, False on any failure.
 

@@ -16,12 +16,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-import smtplib
-import ssl
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import Optional
 from urllib import request as urllib_request
 from urllib.error import URLError
@@ -100,30 +96,12 @@ def deliver(
 # ---------------------------------------------------------------------------
 
 def _send_email(target: str, subject: str, body: str) -> None:
-    host = os.getenv("SMTP_HOST")
-    if not host:
-        # Dev mode — treat as delivered and log. Record goes into the sink.
+    from app.services.transactional_email import send_alert_email
+
+    sent = send_alert_email(to=target, subject=subject, body=body)
+    if not sent:
+        # Resend not configured — fall back to dev-log so alerts don't crash.
         logger.info("[dev-email] to=%s subject=%s", target, subject)
-        return
-
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER", "")
-    password = os.getenv("SMTP_PASS", "")
-    sender = os.getenv("SMTP_FROM", user or "no-reply@inventory-command.app")
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = target
-    msg.attach(MIMEText(body, "plain"))
-    msg.attach(MIMEText(_body_to_simple_html(subject, body), "html"))
-
-    context = ssl.create_default_context()
-    with smtplib.SMTP(host, port, timeout=10) as server:
-        server.starttls(context=context)
-        if user:
-            server.login(user, password)
-        server.sendmail(sender, [target], msg.as_string())
 
 
 def _send_sms(target: str, body: str) -> None:
@@ -195,21 +173,3 @@ def _send_webhook(target: str, subject: str, body: str) -> None:
             pass
     except URLError as exc:
         raise RuntimeError(f"Webhook delivery failed: {exc}") from exc
-
-
-def _body_to_simple_html(subject: str, body: str) -> str:
-    safe_body = body.replace("\n", "<br>")
-    return f"""
-    <html>
-      <body style="font-family: -apple-system, 'Segoe UI', Arial, sans-serif; background:#f7f8fb; padding:24px;">
-        <div style="max-width:560px; margin:0 auto; background:#fff; padding:28px; border-radius:14px; box-shadow:0 1px 3px rgba(16,24,40,0.08);">
-          <h2 style="margin:0 0 12px; color:#101828;">{subject}</h2>
-          <div style="color:#344054; line-height:1.6; font-size:15px;">{safe_body}</div>
-          <hr style="border:none; border-top:1px solid #eaecf0; margin:20px 0;">
-          <p style="font-size:12px; color:#98a2b3; margin:0;">
-            skubase — automated alert
-          </p>
-        </div>
-      </body>
-    </html>
-    """.strip()
