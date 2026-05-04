@@ -28,7 +28,8 @@ const navigationItems: NavItem[] = [
   { href: "/store-sync", label: "Store Sync", section: "Settings", icon: "⬒" },
   { href: "/lead-time-settings", label: "Lead Times", section: "Settings", icon: "◈" },
   { href: "/billing", label: "Billing", section: "Settings", icon: "◇" },
-  { href: "/account", label: "Account", section: "Settings", icon: "◎" }
+  { href: "/account", label: "Account", section: "Settings", icon: "◎" },
+  { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "◉" }
 ];
 
 type PageMeta = { eyebrow: string; title: string; description: string };
@@ -115,6 +116,11 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Settings",
     title: "Workspace settings",
     description: "User profile, team, and workspace preferences."
+  },
+  "/feedback": {
+    eyebrow: "Support",
+    title: "Contact us",
+    description: "Report a bug, ask a question, or share feedback — we reply within one business day."
   }
 };
 
@@ -227,11 +233,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="demo-banner demo-banner-preview" role="status">
             <span className="demo-banner-mark" aria-hidden>◎</span>
             <span>
-              <strong>Demo mode.</strong> You&apos;re viewing sample data.{" "}
+              <strong>This is sample data — not your store.</strong>{" "}
               <Link href="/login" className="demo-banner-link">
-                Sign up free
+                Start your free 14-day trial
               </Link>{" "}
-              to connect your Shopify store and see your own inventory.
+              to connect Shopify and see your actual stockouts, reorder queue, and dead stock. No credit card required.
             </span>
           </div>
         ) : hasRealData === false ? (

@@ -1615,10 +1615,9 @@ code {
 }
 
 .donut-legend-item {
-  display: grid;
-  grid-template-columns: 14px 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-size: 0.88rem;
 }
 
@@ -1636,6 +1635,7 @@ code {
   color: var(--muted-strong);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  margin-left: auto;
 }
 
 /* Diverging bar (surplus vs shortfall) */
@@ -5004,6 +5004,21 @@ code {
   font-size: 13px;
   color: #64748b;
   line-height: 1.6;
+}
+
+.auth-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-checklist li {
+  font-size: 13px;
+  color: var(--ink-soft, #475569);
+  line-height: 1.5;
 }
 
 .auth-link {
