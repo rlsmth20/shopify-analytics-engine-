@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { SectionCard } from "@/components/section-card";
@@ -24,7 +24,7 @@ import {
 import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
 
 export default function LeadTimeSettingsPage() {
-  const { shopifyDomain, setShopifyDomain } = useStoredShopDomain();
+  const { shopifyDomain, setShopifyDomain, hasHydrated } = useStoredShopDomain();
   const [defaultLeadTimeDays, setDefaultLeadTimeDays] = useState("14");
   const [safetyBufferDays, setSafetyBufferDays] = useState("7");
   const [allowMockFallback, setAllowMockFallback] = useState(true);
@@ -36,9 +36,11 @@ export default function LeadTimeSettingsPage() {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
 
-  async function handleLoadSettings() {
-    if (!shopifyDomain.trim()) {
-      setSettingsError("Enter a Shopify domain first.");
+  async function loadSettings(domain: string, options?: { requireDomain?: boolean }) {
+    if (!domain.trim()) {
+      if (options?.requireDomain) {
+        setSettingsError("Enter a Shopify domain first.");
+      }
       return;
     }
 
@@ -48,11 +50,12 @@ export default function LeadTimeSettingsPage() {
 
     try {
       const [settings, vendorLeadTimes, categoryLeadTimes] = await Promise.all([
-        fetchShopSettings(shopifyDomain),
-        fetchVendorLeadTimes(shopifyDomain),
-        fetchCategoryLeadTimes(shopifyDomain)
+        fetchShopSettings(domain),
+        fetchVendorLeadTimes(domain),
+        fetchCategoryLeadTimes(domain)
       ]);
       applyShopSettings(settings);
+      setShopifyDomain(settings.shopify_domain);
       setVendorLeadTimesText(formatVendorLeadTimes(vendorLeadTimes.items));
       setCategoryLeadTimesText(formatCategoryLeadTimes(categoryLeadTimes.items));
       setSettingsNotice(
@@ -69,6 +72,15 @@ export default function LeadTimeSettingsPage() {
     } finally {
       setIsLoadingSettings(false);
     }
+  }
+
+  async function handleLoadSettings() {
+    if (!shopifyDomain.trim()) {
+      setSettingsError("Enter a Shopify domain first.");
+      return;
+    }
+
+    await loadSettings(shopifyDomain, { requireDomain: true });
   }
 
   async function handleSaveSettings(event: FormEvent<HTMLFormElement>) {
@@ -149,6 +161,15 @@ export default function LeadTimeSettingsPage() {
     setAllowMockFallback(settings.allow_mock_fallback);
     setSettingsPersisted(settings.is_persisted);
   }
+
+  useEffect(() => {
+    if (!hasHydrated) {
+      return;
+    }
+
+    void loadSettings(shopifyDomain.trim() || "current-shop");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHydrated]);
 
   return (
     <div className="page-stack">
