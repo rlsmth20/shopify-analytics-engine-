@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Callable, Sequence
 
+from app.config.lead_time import LeadTimeConfig, MOCK_LEAD_TIME_CONFIG
 from app.schemas import SkuDetail
 from app.schemas_v2 import (
     DashboardKpi,
@@ -35,11 +36,12 @@ def build_dashboard(
     daily_history_fn: DailyHistoryFn,
     recent_revenue_fn: RecentRevenueFn,
     start_weekday: int,
+    lead_time_config: LeadTimeConfig = MOCK_LEAD_TIME_CONFIG,
 ) -> DashboardResponse:
     if not skus:
         return _empty_dashboard()
 
-    actions = build_inventory_actions(list(skus))
+    actions = build_inventory_actions(list(skus), lead_time_config=lead_time_config)
 
     # KPIs
     urgent = [a for a in actions if a.status == "urgent"]

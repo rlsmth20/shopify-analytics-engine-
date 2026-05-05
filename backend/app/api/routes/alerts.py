@@ -32,6 +32,7 @@ from app.services.alerts import (
 from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.inventory_engine import build_inventory_actions
 from app.services.notifications import deliver
+from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
     load_daily_history_for_shop_sku,
     load_skus_for_shop,
@@ -152,7 +153,11 @@ def evaluate_now(
     if not skus:
         return AlertEventsResponse(events=[])
 
-    actions = build_inventory_actions(skus)
+    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    if settings is None:
+        settings = build_default_shop_settings()
+
+    actions = build_inventory_actions(skus, lead_time_config=settings.to_lead_time_config())
     start_weekday = start_weekday_for_shop_history(db, user.shop_id, 90)
     forecasts = [
         forecast_sku(

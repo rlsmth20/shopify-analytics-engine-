@@ -11,6 +11,7 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import DashboardResponse
 from app.services.dashboard import build_dashboard
+from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
     load_daily_history_for_shop_sku,
     load_recent_daily_revenue_for_shop,
@@ -35,9 +36,14 @@ def read_dashboard(
     def recent_revenue(days: int) -> list[tuple[int, float]]:
         return load_recent_daily_revenue_for_shop(db, user.shop_id, days)
 
+    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    if settings is None:
+        settings = build_default_shop_settings()
+
     return build_dashboard(
         skus,
         daily_history_fn=daily_history,
         recent_revenue_fn=recent_revenue,
         start_weekday=start_weekday_for_shop_history(db, user.shop_id),
+        lead_time_config=settings.to_lead_time_config(),
     )
