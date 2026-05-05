@@ -79,7 +79,7 @@ def _calculate_metrics(
     stockout_risk = daily_velocity > 0 and sku.inventory < target_inventory_units
     overstock_risk = days_of_inventory > 75
     dead_stock = sku.days_since_last_sale > 45
-    profit_per_unit = sku.price - sku.cost
+    profit_per_unit = max(sku.price - sku.cost, 0.0)
 
     return InventoryMetrics(
         sku=sku,
