@@ -19,6 +19,18 @@ from app.services.shop_skus import load_skus_for_shop
 
 
 router = APIRouter(prefix="/actions", tags=["actions"])
+auth_scoped_router = APIRouter(prefix="/auth/actions", tags=["actions"])
+
+
+def _build_action_feed(
+    db: Annotated[DbSession, Depends(get_db_session)],
+    user: User,
+) -> ActionFeedResponse:
+    skus = load_skus_for_shop(db, user.shop_id)
+    if not skus:
+        return ActionFeedResponse(data_source="db", actions=[])
+    actions = build_inventory_actions(skus)
+    return ActionFeedResponse(data_source="db", actions=actions)
 
 
 @router.get("", response_model=ActionFeedResponse)
@@ -26,11 +38,15 @@ def read_actions(
     user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> ActionFeedResponse:
-    skus = load_skus_for_shop(db, user.shop_id)
-    if not skus:
-        return ActionFeedResponse(data_source="db", actions=[])
-    actions = build_inventory_actions(skus)
-    return ActionFeedResponse(data_source="db", actions=actions)
+    return _build_action_feed(db, user)
+
+
+@auth_scoped_router.get("", response_model=ActionFeedResponse)
+def read_auth_scoped_actions(
+    user: Annotated[User, Depends(require_active_access)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> ActionFeedResponse:
+    return _build_action_feed(db, user)
 
 
 @router.get("/debug-summary", response_model=ActionDataHealthSummaryResponse)

@@ -171,14 +171,11 @@ export async function fetchInventoryActions(
     const { DEMO_ACTION_FEED } = await import("@/lib/demo-data");
     return DEMO_ACTION_FEED as ActionFeedResponse;
   }
-  const response = await fetch(`${API_BASE_URL}/actions`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json"
-    },
-    cache: "no-store",
-    signal
-  });
+  let response = await fetchActionFeed("/actions", signal);
+
+  if (response.status === 401) {
+    response = await fetchActionFeed("/auth/actions", signal);
+  }
 
   if (!response.ok) {
     throw new ApiError(
@@ -189,6 +186,18 @@ export async function fetchInventoryActions(
   }
 
   return (await response.json()) as ActionFeedResponse;
+}
+
+function fetchActionFeed(path: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(`${API_BASE_URL}${path}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json"
+    },
+    cache: "no-store",
+    credentials: "include",
+    signal
+  });
 }
 
 export async function triggerShopifyIngestion(
