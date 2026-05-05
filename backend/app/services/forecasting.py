@@ -73,12 +73,26 @@ def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> Fo
             )
         )
 
-    projected_30 = sum(p.expected_units for p in points[: min(30, horizon_days)])
-    projected_60 = projected_30 + (level + trend * 45) * 30 if horizon_days < 60 else sum(
-        p.expected_units for p in points[: min(60, horizon_days)]
+    projected_30 = _project_future_demand(
+        level=level,
+        trend=trend,
+        weekly_index=weekly_index,
+        start_weekday=next_weekday,
+        days=30,
     )
-    projected_90 = projected_60 + (level + trend * 75) * 30 if horizon_days < 90 else sum(
-        p.expected_units for p in points[: min(90, horizon_days)]
+    projected_60 = _project_future_demand(
+        level=level,
+        trend=trend,
+        weekly_index=weekly_index,
+        start_weekday=next_weekday,
+        days=60,
+    )
+    projected_90 = _project_future_demand(
+        level=level,
+        trend=trend,
+        weekly_index=weekly_index,
+        start_weekday=next_weekday,
+        days=90,
     )
 
     trend_label = _classify_trend(trend, level, residuals, sigma)
@@ -116,6 +130,22 @@ def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> Fo
 def _clean_history(history: list[float]) -> list[float]:
     cleaned = [max(0.0, float(v)) for v in history[-MAX_HISTORY_DAYS:]]
     return cleaned
+
+
+def _project_future_demand(
+    *,
+    level: float,
+    trend: float,
+    weekly_index: list[float],
+    start_weekday: int,
+    days: int,
+) -> float:
+    total = 0.0
+    for i in range(days):
+        weekday = (start_weekday + i) % 7
+        multiplier = weekly_index[weekday] if weekly_index else 1.0
+        total += max(level + trend * (i + 1), 0.0) * multiplier
+    return total
 
 
 def _naive_forecast(
