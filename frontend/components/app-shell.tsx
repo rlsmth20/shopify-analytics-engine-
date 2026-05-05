@@ -15,21 +15,21 @@ type NavItem = {
 };
 
 const navigationItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", section: "Command", icon: "⬒" },
-  { href: "/actions", label: "Action Queue", section: "Command", icon: "◉" },
-  { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "◈" },
-  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "◎" },
-  { href: "/analytics", label: "Analytics", section: "Intelligence", icon: "◇" },
-  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "◉" },
-  { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "◎" },
-  { href: "/transfers", label: "Transfers", section: "Operations", icon: "◈" },
-  { href: "/bundles", label: "Bundles & Kits", section: "Operations", icon: "◇" },
-  { href: "/liquidation", label: "Liquidation", section: "Operations", icon: "◉" },
-  { href: "/store-sync", label: "Store Sync", section: "Settings", icon: "⬒" },
-  { href: "/lead-time-settings", label: "Lead Times", section: "Settings", icon: "◈" },
-  { href: "/billing", label: "Billing", section: "Settings", icon: "◇" },
-  { href: "/account", label: "Account", section: "Settings", icon: "◎" },
-  { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "◉" }
+  { href: "/dashboard", label: "Dashboard", section: "Command", icon: ">" },
+  { href: "/actions", label: "Action Queue", section: "Command", icon: "o" },
+  { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "*" },
+  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "o" },
+  { href: "/analytics", label: "Analytics", section: "Intelligence", icon: "<>" },
+  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o" },
+  { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "o" },
+  { href: "/transfers", label: "Transfers", section: "Operations", icon: "*" },
+  { href: "/bundles", label: "Bundles & Kits", section: "Operations", icon: "<>" },
+  { href: "/liquidation", label: "Liquidation", section: "Operations", icon: "o" },
+  { href: "/store-sync", label: "Store Sync", section: "Settings", icon: ">" },
+  { href: "/lead-time-settings", label: "Lead Times", section: "Settings", icon: "*" },
+  { href: "/billing", label: "Billing", section: "Settings", icon: "<>" },
+  { href: "/account", label: "Account", section: "Settings", icon: "o" },
+  { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "o" }
 ];
 
 type PageMeta = { eyebrow: string; title: string; description: string };
@@ -45,13 +45,13 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Command",
     title: "Action queue",
     description:
-      "Ranked inventory actions — urgent, optimize, dead — ready to triage."
+      "Ranked inventory actions - urgent, optimize, dead - ready to triage."
   },
   "/alerts": {
     eyebrow: "Command",
     title: "Alerts that reach you where you work.",
     description:
-      "Email, SMS, Slack, and webhooks driven by a real rule engine — not an 'email only' limitation."
+      "Email, SMS, Slack, and webhooks driven by a real rule engine - not an 'email only' limitation."
   },
   "/forecast": {
     eyebrow: "Intelligence",
@@ -61,9 +61,9 @@ const pageMeta: Record<string, PageMeta> = {
   },
   "/analytics": {
     eyebrow: "Intelligence",
-    title: "ABC × XYZ scorecards",
+    title: "ABC x XYZ scorecards",
     description:
-      "Segment the catalog by revenue contribution and demand variability — meet your A-items first."
+      "Segment the catalog by revenue contribution and demand variability - meet your A-items first."
   },
   "/suppliers": {
     eyebrow: "Intelligence",
@@ -93,7 +93,7 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Operations",
     title: "Cash recovery on stale inventory.",
     description:
-      "Every dead-stock SKU comes with a plan — markdown, bundle, wholesale, or write-off — and a dollar-impact estimate."
+      "Every dead-stock SKU comes with a plan - markdown, bundle, wholesale, or write-off - and a dollar-impact estimate."
   },
   "/store-sync": {
     eyebrow: "Settings",
@@ -120,7 +120,7 @@ const pageMeta: Record<string, PageMeta> = {
   "/feedback": {
     eyebrow: "Support",
     title: "Contact us",
-    description: "Report a bug, ask a question, or share feedback — we reply within one business day."
+    description: "Report a bug, ask a question, or share feedback - we reply within one business day."
   }
 };
 
@@ -142,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // don't see "demo" labels on their own data.
   const [hasRealData, setHasRealData] = useState<boolean | null>(null);
 
-  // Trial countdown — only meaningful for real (non-demo) users.
+  // Trial countdown - only meaningful for real (non-demo) users.
   const trialDaysLeft: number | null = (() => {
     if (user.id === 0 || !user.trial_ends_at) return null;
     const ms = new Date(user.trial_ends_at).getTime() - Date.now();
@@ -187,7 +187,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="brand-mark">sb</span>
           <div>
             <p className="brand-name">skubase</p>
-            <p className="brand-copy">Forecast · Replenish · Recover</p>
+            <p className="brand-copy">Forecast - Replenish - Recover</p>
           </div>
         </div>
 
@@ -216,24 +216,24 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="sidebar-note">
-          <p className="sidebar-note-title">Independent · Shopify-first</p>
+          <p className="sidebar-note-title">Independent - Shopify-first</p>
           <p className="sidebar-note-copy">
             No PE squeeze. No surprise renewal hikes. Founder-led and
             shipping on a public changelog.
           </p>
           <Link href="/" className="sidebar-note-link">
-            See positioning →
+            See positioning -&gt;
           </Link>
         </div>
       </aside>
 
       <div className="app-main">
         {user.id === 0 ? (
-          // Demo mode — synthetic user injected by AuthGuard when ?demo=1.
+          // Demo mode - synthetic user injected by AuthGuard when ?demo=1.
           <div className="demo-banner demo-banner-preview" role="status">
-            <span className="demo-banner-mark" aria-hidden>◎</span>
+            <span className="demo-banner-mark" aria-hidden>o</span>
             <span>
-              <strong>This is sample data — not your store.</strong>{" "}
+              <strong>This is sample data - not your store.</strong>{" "}
               <Link href="/login" className="demo-banner-link">
                 Start your free 14-day trial
               </Link>{" "}
@@ -242,21 +242,21 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : hasRealData === false ? (
           <div className="demo-banner" role="status">
-            <span className="demo-banner-mark" aria-hidden>•</span>
+            <span className="demo-banner-mark" aria-hidden>*</span>
             <span>
               <strong>No data yet.</strong> Import your Stocky or ShipStation
-              CSV — or{" "}
+              CSV - or{" "}
               <Link href="/store-sync" className="demo-banner-link">
                 connect your Shopify store
               </Link>{" "}
-              — to see real recommendations.
+              - to see real recommendations.
             </span>
           </div>
         ) : null}
 
         {user.id !== 0 && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
           <div className={`demo-banner ${trialDaysLeft <= 2 ? "demo-banner-preview" : ""}`} role="status">
-            <span className="demo-banner-mark" aria-hidden>◈</span>
+            <span className="demo-banner-mark" aria-hidden>*</span>
             <span>
               {trialDaysLeft === 0 ? (
                 <>
@@ -272,7 +272,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Link href="/pricing" className="demo-banner-link">
                     See plans
                   </Link>{" "}
-                  — 14-day free, no credit card required at signup.
+                  - 14-day free, no credit card required at signup.
                 </>
               )}
             </span>

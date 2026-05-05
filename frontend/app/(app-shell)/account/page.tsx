@@ -107,7 +107,7 @@ export default function AccountPage() {
               ? (PLAN_LABELS[sub!.plan] ?? sub!.plan)
               : user.in_trial
               ? trialDaysLeft === null || trialDaysLeft > 0
-                ? trialDaysLeft !== null ? `Free Trial — ${trialDaysLeft}d left` : "Free Trial"
+                ? trialDaysLeft !== null ? `Free Trial - ${trialDaysLeft}d left` : "Free Trial"
                 : "Trial ended"
               : (PLAN_LABELS[sub?.plan ?? "none"] ?? sub?.plan ?? "No active plan");
             const badgeClass = isActive || (user.in_trial && (trialDaysLeft ?? 0) > 0)

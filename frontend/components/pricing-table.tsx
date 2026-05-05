@@ -28,13 +28,13 @@ const TIERS: Tier[] = [
   {
     name: "Starter",
     pitch: "For solo operators and Stocky migrants picking their first replacement.",
-    limit: "Up to 500 active SKUs · 1 location · 3 seats",
+    limit: "Up to 500 active SKUs - 1 location - 3 seats",
     features: [
       "Ranked action feed (urgent / optimize / dead)",
       "AI-powered demand forecasting (Holt + seasonality)",
-      "ABC × XYZ classification",
-      "Supplier records + basic scorecards",
-      "Purchase orders (create + PDF export)",
+      "ABC x XYZ classification",
+      "Supplier lead-time settings",
+      "Purchase order drafts with CSV export",
       "Email + Slack alerts",
       "Shopify-native ingestion",
       "Self-serve setup",
@@ -46,13 +46,13 @@ const TIERS: Tier[] = [
   {
     name: "Growth",
     pitch: "Most merchants land here. Full intelligence stack, multi-location, no seat gates.",
-    limit: "Up to 5,000 active SKUs · 3 locations · unlimited seats",
+    limit: "Up to 5,000 active SKUs - 3 locations - unlimited seats",
     features: [
       "Everything in Starter",
-      "Supplier scorecards + tiering",
+      "Supplier scorecards + tiering when PO/receipt history is connected",
       "Safety-stock / ROP / EOQ with service-level segmentation",
-      "Bundle / kit bottleneck analysis",
-      "Multi-location transfer recommendations",
+      "Bundle / kit bottleneck analysis when component mappings are configured",
+      "Multi-location transfer recommendations when location inventory is connected",
       "Dead-stock liquidation plans",
       "PO approval workflows",
       "SMS + webhook alerts",
@@ -65,7 +65,7 @@ const TIERS: Tier[] = [
   {
     name: "Scale",
     pitch: "For multi-store operators and teams that want audit + approval flows.",
-    limit: "Up to 25,000 active SKUs · 10 locations · unlimited seats",
+    limit: "Up to 25,000 active SKUs - 10 locations - unlimited seats",
     features: [
       "Everything in Growth",
       "Advanced PO approval + send flow",

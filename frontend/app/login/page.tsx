@@ -35,7 +35,7 @@ export default function LoginPage() {
       }
       setSent(true);
     } catch {
-      setError("Network error — check your connection and try again.");
+      setError("Network error - check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -54,7 +54,7 @@ export default function LoginPage() {
             <h1 className="auth-title">Check your inbox.</h1>
             <p className="auth-copy">
               We sent a sign-in link to <strong>{email}</strong>. Click it to
-              continue — the link expires in 15 minutes.
+              continue - the link expires in 15 minutes.
             </p>
             <p className="auth-fine">
               Didn&apos;t arrive within 30 seconds? Check spam, then{" "}
@@ -106,15 +106,15 @@ export default function LoginPage() {
             <div className="auth-trial-callout">
               <p className="auth-trial-callout-title">New to skubase?</p>
               <ul className="auth-checklist">
-                <li>✓ Free 14-day trial — no credit card required</li>
+                <li>✓ Free 14-day trial - no credit card required</li>
                 <li>✓ Connects to Shopify in one click</li>
                 <li>✓ Shows your reorder queue, forecast, and dead stock on day one</li>
               </ul>
-              <p className="auth-fine">Plans from $29/mo after trial · Cancel any time</p>
+              <p className="auth-fine">Plans from $29/mo after trial - Cancel any time</p>
             </div>
 
             <p className="auth-fine">
-              <Link href="/dashboard?demo=1" className="auth-link">View demo first →</Link>
+              <Link href="/dashboard?demo=1" className="auth-link">View demo first -&gt;</Link>
             </p>
           </>
         )}

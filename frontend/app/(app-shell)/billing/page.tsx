@@ -18,9 +18,9 @@ type Subscription = {
 };
 
 const PLAN_LABELS: Record<string, string> = {
-  starter_monthly: "Starter ($49/mo)",
-  growth_monthly: "Growth ($149/mo)",
-  scale_monthly: "Scale ($349/mo)",
+  starter_monthly: "Starter ($29/mo)",
+  growth_monthly: "Growth ($99/mo)",
+  scale_monthly: "Scale ($199/mo)",
   starter_annual: "Starter (annual)",
   growth_annual: "Growth (annual)",
   scale_annual: "Scale (annual)",
@@ -28,7 +28,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try {
     return new Date(iso).toLocaleDateString(undefined, {
       year: "numeric",
@@ -82,7 +82,7 @@ export default function BillingPage() {
   }
 
   if (loading) {
-    return <div className="page-loading">Loading billing…</div>;
+    return <div className="page-loading">Loading billing...</div>;
   }
   if (error) {
     return (
@@ -162,7 +162,7 @@ export default function BillingPage() {
             </p>
             {sub.cancel_at_period_end ? (
               <p className="section-copy" style={{ marginTop: "8px", color: "#b91c1c" }}>
-                Set to cancel at period end — your access continues until {formatDate(sub.current_period_end)}.
+                Set to cancel at period end - your access continues until {formatDate(sub.current_period_end)}.
               </p>
             ) : null}
           </div>
@@ -175,7 +175,7 @@ export default function BillingPage() {
                 onClick={openPortal}
                 disabled={portalLoading}
               >
-                {portalLoading ? "Opening…" : "Manage billing"}
+                {portalLoading ? "Opening..." : "Manage billing"}
               </button>
             ) : (
               <Link href="/pricing" className="button button-primary">

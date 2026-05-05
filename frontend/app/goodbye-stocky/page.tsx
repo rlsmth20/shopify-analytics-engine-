@@ -4,7 +4,7 @@ import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export const metadata = {
-  title: "Goodbye Stocky, hello skubase — skubase",
+  title: "Goodbye Stocky, hello skubase - skubase",
   description: "Shopify Stocky ends August 31, 2026. skubase is the Shopify-native replacement.",
   alternates: { canonical: "/goodbye-stocky" },
   keywords: ["Stocky alternative", "Stocky replacement", "Stocky sunset"],
@@ -17,14 +17,14 @@ const compareRows = [
   { capability: "Dead-stock plans", stocky: "Aged-stock flag.", skubase: "Markdown / bundle / wholesale / write-off plans." },
   { capability: "Reorder math", stocky: "Manual reorder point.", skubase: "Service-level-segmented safety stock + ROP + EOQ." },
   { capability: "Alerts", stocky: "Basic.", skubase: "Rule engine for email, SMS, Slack, webhooks." },
-  { capability: "Pricing", stocky: "POS Pro $89/mo.", skubase: "Published from $49/mo. No POS Pro requirement." },
+  { capability: "Pricing", stocky: "POS Pro $89/mo.", skubase: "Published from $29/mo. No POS Pro requirement." },
   { capability: "Future", stocky: "Ending August 31, 2026.", skubase: "Independent, founder-led, public changelog." }
 ];
 
 const steps = [
-  { number: "1", title: "Get on the early-access list", body: "Drop your email and Shopify domain. We'll send your invite when paid plans launch — well before August." },
+  { number: "1", title: "Get on the early-access list", body: "Drop your email and Shopify domain. We'll send your invite when paid plans launch - well before August." },
   { number: "2", title: "Bring your Stocky data", body: "Export your Stocky Inventory On Hand and Vendor List. Our importer maps them in one step." },
-  { number: "3", title: "See your first ranked action", body: "Under ten minutes, no consultant. Urgent / optimize / dead — work the queue from the top." },
+  { number: "3", title: "See your first ranked action", body: "Under ten minutes, no consultant. Urgent / optimize / dead - work the queue from the top." },
   { number: "4", title: "Run side-by-side through August", body: "Use Stocky and skubase together. We don't charge for the migration window." }
 ];
 
@@ -34,14 +34,14 @@ export default function GoodbyeStockyPage() {
       <MarketingNav />
 
       <section className="marketing-hero marketing-hero-migration">
-        <p className="marketing-eyebrow">Stocky sunset · August 31, 2026</p>
+        <p className="marketing-eyebrow">Stocky sunset - August 31, 2026</p>
         <h1 className="marketing-hero-title">Goodbye Stocky. Hello skubase.</h1>
         <p className="marketing-hero-sub">
-          Shopify is ending Stocky on August 31, 2026. We built the replacement — real forecasting, supplier scorecards, dead-stock plans, Shopify-native, no POS Pro requirement.
+          Shopify is ending Stocky on August 31, 2026. We built the replacement - real forecasting, supplier scorecards, dead-stock plans, Shopify-native, no POS Pro requirement.
         </p>
         <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Get early access" />
         <p className="marketing-hero-trust">
-          14-day trial · No credit card · <strong>Prices locked at renewal</strong>
+          14-day trial - No credit card - <strong>Prices locked at renewal</strong>
         </p>
       </section>
 
@@ -101,9 +101,8 @@ export default function GoodbyeStockyPage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
+        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase - Prices locked at renewal</p>
       </footer>
     </div>
   );
 }
-

@@ -87,7 +87,7 @@ export default function AlertsPage() {
         </button>
       </div>
 
-      {loading ? <p className="page-loading">Loading…</p> : null}
+      {loading ? <p className="page-loading">Loading...</p> : null}
       {error ? <p className="page-error-copy">{error}</p> : null}
 
       {tab === "rules" ? <RulesPanel rules={rules} onChange={refresh} /> : null}
@@ -122,7 +122,7 @@ function RulesPanel({ rules, onChange }: { rules: AlertRule[]; onChange: () => v
       <form className="alert-rule-form" onSubmit={handleCreate}>
         <h3 className="panel-section-title">Add a rule</h3>
         <p className="panel-section-subtitle">
-          Build a custom rule — mix triggers, channels, and thresholds to fit how your team operates.
+          Build a custom rule - mix triggers, channels, and thresholds to fit how your team operates.
         </p>
         <div className="form-grid">
           <label className="form-field">
@@ -228,7 +228,7 @@ function RulesPanel({ rules, onChange }: { rules: AlertRule[]; onChange: () => v
                   {TRIGGER_OPTIONS.find((t) => t.value === rule.trigger)?.label ??
                     rule.trigger}
                 </strong>
-                {" · threshold "}
+                {" - threshold "}
                 {rule.threshold}
               </p>
               <div className="rule-card-channels">
@@ -381,7 +381,7 @@ function EventsPanel({ events }: { events: AlertEvent[] }) {
       <div className="empty-state">
         <p className="empty-state-title">No alerts have fired yet</p>
         <p className="empty-state-copy">
-          Run an evaluation above — any rule that matches your current state will produce a dry-run event here.
+          Run an evaluation above - any rule that matches your current state will produce a dry-run event here.
         </p>
       </div>
     );
