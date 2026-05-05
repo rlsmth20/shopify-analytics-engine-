@@ -128,6 +128,7 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
         "name": metrics.sku.name,
         "status": status,
         "recommended_action": _build_recommended_action(metrics, status),
+        "explanation": _build_explanation(metrics, status),
         "days_of_inventory": round(metrics.days_of_inventory, 1),
         "lead_time_days_used": metrics.lead_time_days_used,
         "safety_buffer_days": metrics.safety_buffer_days,
@@ -212,6 +213,34 @@ def _build_recommended_action(
         )
 
     return "No immediate action. Inventory cover is within the target operating range."
+
+
+def _build_explanation(metrics: InventoryMetrics, status: Classification) -> str:
+    if status == "urgent":
+        target_units = math.ceil(metrics.target_inventory_units)
+        units_short = max(target_units - metrics.sku.inventory, 0)
+        return (
+            f"On-hand inventory is {units_short} units below the lead-time, buffer, "
+            f"and demand-variability target. Current cover is {metrics.days_of_inventory:.1f} days."
+        )
+
+    if status == "optimize":
+        excess_units = _calculate_excess_units(metrics, status)
+        return (
+            f"Inventory cover is {metrics.days_of_inventory:.1f} days, above the "
+            f"{OPTIMIZE_DAYS_THRESHOLD}-day optimization threshold by roughly {excess_units} units."
+        )
+
+    if metrics.sku.days_since_last_sale >= MAX_DAYS_OF_INVENTORY:
+        return (
+            "No sales are recorded for this SKU in the imported order history. "
+            "Verify sales coverage before clearing it, then use the liquidation plan if it is truly stale."
+        )
+
+    return (
+        f"No sale has been recorded in {metrics.sku.days_since_last_sale} days, "
+        "so this SKU is tying up capital without recent demand."
+    )
 
 
 def _estimate_profit_impact(metrics: InventoryMetrics) -> float:
