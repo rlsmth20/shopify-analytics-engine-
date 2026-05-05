@@ -14,6 +14,7 @@ const TACTIC_LABELS: Record<LiquidationSuggestion["tactic"], string> = {
   wholesale: "Wholesale",
   donate_write_off: "Write-off",
 };
+const NEVER_SOLD_DAYS = 999;
 
 export default function LiquidationPage() {
   const [suggestions, setSuggestions] = useState<LiquidationSuggestion[]>([]);
@@ -84,8 +85,12 @@ export default function LiquidationPage() {
             <div className="liquidation-stats">
               <Stat label="On hand" value={s.on_hand.toString()} />
               <Stat
-                label="Days stale"
-                value={`${s.days_since_last_sale}d`}
+                label={s.days_since_last_sale >= NEVER_SOLD_DAYS ? "Sales age" : "Days stale"}
+                value={
+                  s.days_since_last_sale >= NEVER_SOLD_DAYS
+                    ? "No sales"
+                    : `${s.days_since_last_sale}d`
+                }
               />
               <Stat
                 label="Markdown"

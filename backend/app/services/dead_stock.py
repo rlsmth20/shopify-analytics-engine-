@@ -16,6 +16,7 @@ from app.schemas_v2 import LiquidationSuggestion
 
 
 DEAD_STOCK_THRESHOLD_DAYS = 45
+NEVER_SOLD_DAYS = 999
 
 
 def build_liquidation_plan(skus: list[SkuDetail]) -> list[LiquidationSuggestion]:
@@ -96,6 +97,12 @@ def _rationale(
     sku: SkuDetail, tactic: str, markdown_pct: float, projected: float
 ) -> str:
     if tactic == "donate_write_off":
+        if sku.days_since_last_sale >= NEVER_SOLD_DAYS:
+            return (
+                "No sales are recorded for this SKU. Write off or donate for tax "
+                "purposes if it is truly unsellable; otherwise verify the sales import "
+                "before clearing it."
+            )
         return (
             f"Inventory has been stale {sku.days_since_last_sale} days with no movement. "
             "Write off or donate for tax purposes — the shelf space is worth more."
