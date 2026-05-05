@@ -24,6 +24,19 @@ export default function SuppliersPage() {
   }
   if (error) return <p className="page-error-copy">{error}</p>;
 
+  if (vendors.length === 0) {
+    return (
+      <div className="empty-state">
+        <p className="empty-state-title">Supplier performance needs receipt history</p>
+        <p className="empty-state-copy">
+          Vendor names come from Shopify product data. On-time rate, fill rate, lead variance,
+          and cost stability need purchase order and receiving observations before skubase can
+          score suppliers honestly.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="suppliers-page">
       <div className="tier-summary">

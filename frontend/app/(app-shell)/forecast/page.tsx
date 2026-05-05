@@ -43,6 +43,17 @@ export default function ForecastPage() {
   }
   if (error) return <p className="page-error-copy">{error}</p>;
 
+  if (forecasts.length === 0) {
+    return (
+      <div className="empty-state">
+        <p className="empty-state-title">Forecasts need sales history</p>
+        <p className="empty-state-copy">
+          Import products, inventory, and recent order history before skubase can project demand.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="forecast-page">
       <aside className="forecast-list">

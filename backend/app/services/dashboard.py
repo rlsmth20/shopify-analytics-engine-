@@ -61,42 +61,42 @@ def build_dashboard(
             label="Revenue (30d)",
             value=round(revenue_30d, 0),
             unit="currency",
-            delta_pct=8.2,
+            delta_pct=None,
             tone="positive",
         ),
         DashboardKpi(
             label="Inventory value",
             value=round(inventory_value, 0),
             unit="currency",
-            delta_pct=-2.4,
+            delta_pct=None,
             tone="positive",
         ),
         DashboardKpi(
             label="Cash tied up",
             value=round(cash_tied_up, 0),
             unit="currency",
-            delta_pct=3.1,
+            delta_pct=None,
             tone="negative",
         ),
         DashboardKpi(
             label="Profit at risk",
             value=round(profit_at_risk, 0),
             unit="currency",
-            delta_pct=12.7,
+            delta_pct=None,
             tone="negative",
         ),
         DashboardKpi(
             label="Urgent SKUs",
             value=len(urgent),
             unit="count",
-            delta_pct=50.0,
+            delta_pct=None,
             tone="negative",
         ),
         DashboardKpi(
             label="Dead SKUs",
             value=len(dead),
             unit="count",
-            delta_pct=-14.3,
+            delta_pct=None,
             tone="positive",
         ),
     ]
@@ -203,7 +203,7 @@ def _empty_dashboard() -> DashboardResponse:
     "no data yet" state when these come back empty, which is more honest
     than charts at zero.
     """
-    zero = lambda label: DashboardKpi(label=label, value=0, unit="count", delta_pct=0.0, tone="positive")
+    zero = lambda label: DashboardKpi(label=label, value=0, unit="count", delta_pct=None, tone="positive")
     return DashboardResponse(
         kpis=[
             zero("Revenue (30d)"),

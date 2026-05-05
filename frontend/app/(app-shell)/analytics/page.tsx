@@ -153,21 +153,12 @@ export default function AnalyticsPage() {
 
           <ChartCard
             title="Inventory risk trend"
-            description="Placeholder trend surface until deeper historical analytics land."
+            description="Trend history appears after repeated inventory snapshots."
           >
-            <div className="placeholder-graph">
-              {[32, 48, 44, 56, 52, 66, 61, 70].map((value, index) => (
-                <span
-                  key={index}
-                  className="placeholder-bar"
-                  style={{ height: `${value}%` }}
-                />
-              ))}
-            </div>
-            <p className="section-copy">
-              Trend history will become real once sync runs accumulate enough
-              inventory snapshots.
-            </p>
+            <EmptyState
+              title="Waiting for snapshot history"
+              description="Run a few Shopify syncs over time to build a real inventory risk trend."
+            />
           </ChartCard>
         </div>
       ) : null}

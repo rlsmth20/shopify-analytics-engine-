@@ -27,9 +27,10 @@ export default function TransfersPage() {
   if (transfers.length === 0) {
     return (
       <div className="empty-state">
-        <p className="empty-state-title">Inventory is balanced</p>
+        <p className="empty-state-title">Transfers need multi-location inventory data</p>
         <p className="empty-state-copy">
-          No inter-location transfers would meaningfully rebalance cover right now.
+          Shopify location-level inventory is not available in this workspace yet. Once it is connected,
+          skubase can recommend where to move units between locations.
         </p>
       </div>
     );

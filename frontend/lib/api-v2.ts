@@ -300,12 +300,6 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     }
     throw new Error("Trial expired. Redirecting to pricing.");
   }
-  if (response.status === 402) {
-    if (typeof window !== "undefined") {
-      window.location.href = "/pricing?trial_expired=1";
-    }
-    throw new Error("Trial expired. Redirecting to pricing.");
-  }
   if (!response.ok) {
     throw new Error(
       `${path} failed with ${response.status}: ${await response

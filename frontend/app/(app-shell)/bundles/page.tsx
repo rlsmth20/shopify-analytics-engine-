@@ -24,6 +24,18 @@ export default function BundlesPage() {
   }
   if (error) return <p className="page-error-copy">{error}</p>;
 
+  if (bundles.length === 0) {
+    return (
+      <div className="empty-state">
+        <p className="empty-state-title">Bundle definitions are not configured yet</p>
+        <p className="empty-state-copy">
+          Add bundle/component mappings before using bundle health. Live Shopify products are not
+          treated as bundles unless those relationships are known.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bundles-page">
       {bundles.map((b) => (
