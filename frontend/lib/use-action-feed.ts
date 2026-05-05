@@ -1,11 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/components/auth-guard";
 import { ApiError, fetchInventoryActions, type ActionDataSource, type InventoryAction } from "@/lib/api";
 import { buildActionErrorMessage } from "@/lib/app-helpers";
 
 export function useActionFeed() {
+  const router = useRouter();
+  const { refresh } = useAuth();
   const [actions, setActions] = useState<InventoryAction[]>([]);
   const [dataSource, setDataSource] = useState<ActionDataSource | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +32,15 @@ export function useActionFeed() {
 
       setActions([]);
       setDataSource(null);
+
+      if (error instanceof ApiError && error.status === 401) {
+        setErrorStatus(null);
+        setErrorMessage(null);
+        await refresh();
+        router.replace("/login");
+        return;
+      }
+
       setErrorStatus(error instanceof ApiError ? error.status : null);
       setErrorMessage(buildActionErrorMessage(error));
     } finally {
