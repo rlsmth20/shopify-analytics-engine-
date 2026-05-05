@@ -12,6 +12,7 @@ letting the frontend render a "no data yet" state).
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import List
 
 from sqlalchemy import case, func, select
@@ -19,6 +20,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Inventory, OrderLineItem, Product
 from app.schemas import SkuDetail
+
+DEFAULT_COST_RATIO = Decimal("0.40")
 
 
 def _now_naive_utc() -> datetime:
@@ -101,6 +104,9 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
 
     skus: list[SkuDetail] = []
     for p in products:
+        if p.id not in on_hand_by_product:
+            continue
+
         sales = sales_by_product.get(p.id, {})
         last_sale = sales.get("last_sale_at")
         if last_sale is None:
@@ -118,7 +124,7 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
                 vendor=p.vendor or "Unassigned",
                 category=p.category or "uncategorized",
                 price=float(p.price or 0),
-                cost=float(p.cost or 0),
+                cost=_resolve_unit_cost(p),
                 inventory=on_hand_by_product.get(p.id, 0),
                 last_30_day_sales=sales.get("sales_30d", 0),
                 last_7_day_sales=sales.get("sales_7d", 0),
@@ -128,6 +134,16 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
         )
 
     return skus
+
+
+def _resolve_unit_cost(product: Product) -> float:
+    if product.cost is not None and product.cost > 0:
+        return float(product.cost)
+
+    if product.price is not None and product.price > 0:
+        return float((product.price * DEFAULT_COST_RATIO).quantize(Decimal("0.01")))
+
+    return 0.0
 
 
 def _slugified_sku_id_for_product(p: Product) -> str:

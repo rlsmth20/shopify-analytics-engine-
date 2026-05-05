@@ -84,9 +84,9 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
     order_up_to = reorder_point + inputs.review_period_days * mean_daily
 
     annual_demand = mean_daily * 365
-    unit_cost = max(sku.cost, 0.01)
+    unit_cost = max(sku.cost, 0.0)
     holding_cost = unit_cost * inputs.holding_rate
-    if holding_cost <= 0 or annual_demand <= 0:
+    if unit_cost <= 0 or holding_cost <= 0 or annual_demand <= 0:
         eoq = 0
     else:
         eoq = int(math.ceil(math.sqrt((2 * annual_demand * inputs.order_cost) / holding_cost)))
