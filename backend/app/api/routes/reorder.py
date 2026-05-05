@@ -9,6 +9,7 @@ from app.db.session import get_db_session
 from app.schemas_v2 import PurchaseOrderDraftsResponse, ReorderFeedResponse
 from app.services.purchase_orders import build_purchase_order_drafts
 from app.services.reorder_optimizer import build_reorder_suggestions, build_vendor_totals
+from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
     load_daily_history_for_shop_sku,
     load_skus_for_shop,
@@ -30,11 +31,15 @@ def list_reorder_suggestions(
             service_level=service_level,
             suggestions=[],
             total_extended_cost=0.0,
-            vendor_totals=[],
+            vendor_totals={},
         )
+    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    if settings is None:
+        settings = build_default_shop_settings()
     suggestions = build_reorder_suggestions(
         skus,
         lambda sku_id, days=90: load_daily_history_for_shop_sku(db, user.shop_id, sku_id, days),
+        lead_time_config=settings.to_lead_time_config(),
         service_level=service_level,
     )
     totals = build_vendor_totals(suggestions)
@@ -55,9 +60,13 @@ def list_po_drafts(
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
         return PurchaseOrderDraftsResponse(drafts=[], total_capital_required=0.0)
+    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    if settings is None:
+        settings = build_default_shop_settings()
     suggestions = build_reorder_suggestions(
         skus,
         lambda sku_id, days=90: load_daily_history_for_shop_sku(db, user.shop_id, sku_id, days),
+        lead_time_config=settings.to_lead_time_config(),
         service_level=service_level,
     )
     drafts = build_purchase_order_drafts(suggestions)

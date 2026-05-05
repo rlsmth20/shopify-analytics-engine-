@@ -16,12 +16,16 @@ from app.schemas import (
 
 OPTIMIZE_DAYS_THRESHOLD = 75
 MAX_DAYS_OF_INVENTORY = 999.0
+DEFAULT_SERVICE_LEVEL_Z = 1.65
 
 
 @dataclass(frozen=True)
 class InventoryMetrics:
     sku: SkuDetail
     daily_velocity: float
+    volatility_units_per_day: float
+    safety_stock_units: float
+    target_inventory_units: float
     days_of_inventory: float
     reorder_point: float
     stockout_risk: bool
@@ -51,9 +55,19 @@ def _calculate_metrics(
     sku: SkuDetail, lead_time_config: LeadTimeConfig
 ) -> InventoryMetrics:
     daily_velocity = sku.last_30_day_sales / 30
+    volatility_units_per_day = _estimate_daily_volatility(sku, daily_velocity)
     lead_time_days_used, lead_time_source = _resolve_lead_time(sku, lead_time_config)
     safety_buffer_days = lead_time_config.global_safety_buffer_days
     target_coverage_days = lead_time_days_used + safety_buffer_days
+    safety_stock_units = (
+        DEFAULT_SERVICE_LEVEL_Z
+        * volatility_units_per_day
+        * math.sqrt(max(lead_time_days_used, 1))
+    )
+    target_inventory_units = (
+        daily_velocity * target_coverage_days
+        + safety_stock_units
+    )
 
     # Days of cover uses on-hand inventory divided by trailing 30-day daily velocity.
     if daily_velocity > 0:
@@ -61,8 +75,8 @@ def _calculate_metrics(
     else:
         days_of_inventory = MAX_DAYS_OF_INVENTORY
 
-    reorder_point = daily_velocity * lead_time_days_used
-    stockout_risk = daily_velocity > 0 and days_of_inventory < target_coverage_days
+    reorder_point = daily_velocity * lead_time_days_used + safety_stock_units
+    stockout_risk = daily_velocity > 0 and sku.inventory < target_inventory_units
     overstock_risk = days_of_inventory > 75
     dead_stock = sku.days_since_last_sale > 45
     profit_per_unit = sku.price - sku.cost
@@ -70,6 +84,9 @@ def _calculate_metrics(
     return InventoryMetrics(
         sku=sku,
         daily_velocity=daily_velocity,
+        volatility_units_per_day=volatility_units_per_day,
+        safety_stock_units=safety_stock_units,
+        target_inventory_units=target_inventory_units,
         days_of_inventory=days_of_inventory,
         reorder_point=reorder_point,
         stockout_risk=stockout_risk,
@@ -159,18 +176,25 @@ def _build_recommended_action(
     metrics: InventoryMetrics, status: Classification
 ) -> str:
     if status == "urgent":
-        target_units = math.ceil(metrics.daily_velocity * metrics.target_coverage_days)
+        target_units = math.ceil(metrics.target_inventory_units)
         reorder_quantity = max(target_units - metrics.sku.inventory, 0)
         post_reorder_units = metrics.sku.inventory + reorder_quantity
         post_reorder_coverage = _calculate_coverage_days(
             post_reorder_units, metrics.daily_velocity
         )
-        reorder_window_days = _calculate_reorder_window_days(metrics.days_of_inventory)
+        reorder_window_days = _calculate_reorder_window_days(metrics)
+        safety_phrase = ""
+        if metrics.safety_stock_units >= 1:
+            safety_phrase = (
+                f" Includes ~{math.ceil(metrics.safety_stock_units)} safety-stock units "
+                "for demand variability."
+            )
         return (
             f"Reorder {reorder_quantity} units -> restores inventory to "
             f"~{post_reorder_coverage:.0f} days (target ~{metrics.target_coverage_days:.0f} days). "
             f"Reorder within {reorder_window_days} day"
             f"{'' if reorder_window_days == 1 else 's'}."
+            f"{safety_phrase}"
         )
 
     if status == "optimize":
@@ -191,11 +215,8 @@ def _build_recommended_action(
 
 
 def _estimate_profit_impact(metrics: InventoryMetrics) -> float:
-    uncovered_days = max(
-        metrics.target_coverage_days - metrics.days_of_inventory,
-        1.0,
-    )
-    units_at_risk = max(metrics.daily_velocity * uncovered_days, metrics.daily_velocity)
+    target_units = max(metrics.target_inventory_units, metrics.daily_velocity)
+    units_at_risk = max(target_units - metrics.sku.inventory, metrics.daily_velocity)
     return round(units_at_risk * metrics.profit_per_unit, 2)
 
 
@@ -207,8 +228,14 @@ def _determine_urgency_level(days_until_stockout: float) -> UrgencyLevel:
     return "medium"
 
 
-def _calculate_reorder_window_days(days_until_stockout: float) -> int:
-    return max(1, math.ceil((days_until_stockout - 1) / 2))
+def _calculate_reorder_window_days(metrics: InventoryMetrics) -> int:
+    if metrics.daily_velocity <= 0:
+        return 1
+
+    days_until_reorder_point = (
+        (metrics.sku.inventory - metrics.reorder_point) / metrics.daily_velocity
+    )
+    return max(1, math.floor(days_until_reorder_point))
 
 
 def _calculate_coverage_days(units: int, daily_velocity: float) -> float:
@@ -216,6 +243,19 @@ def _calculate_coverage_days(units: int, daily_velocity: float) -> float:
         return 0.0
 
     return units / daily_velocity
+
+
+def _estimate_daily_volatility(sku: SkuDetail, daily_velocity: float) -> float:
+    if daily_velocity <= 0:
+        return 0.0
+
+    last_7_daily = sku.last_7_day_sales / 7
+    recent_shift = abs(last_7_daily - daily_velocity)
+
+    # With only 7d/30d aggregates available in the action queue, use recent
+    # demand shift as the best live proxy for daily demand variability.
+    baseline = max(daily_velocity * 0.2, 0.15)
+    return max(recent_shift, baseline)
 
 
 def _calculate_excess_units(metrics: InventoryMetrics, status: Classification) -> int:

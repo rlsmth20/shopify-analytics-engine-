@@ -15,6 +15,7 @@ from app.db.models import (
 from app.db.session import get_db_session
 from app.schemas import ActionDataHealthSummaryResponse, ActionFeedResponse
 from app.services.inventory_engine import build_inventory_actions
+from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import load_skus_for_shop
 
 
@@ -29,7 +30,10 @@ def _build_action_feed(
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
         return ActionFeedResponse(data_source="db", actions=[])
-    actions = build_inventory_actions(skus)
+    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    if settings is None:
+        settings = build_default_shop_settings()
+    actions = build_inventory_actions(skus, lead_time_config=settings.to_lead_time_config())
     return ActionFeedResponse(data_source="db", actions=actions)
 
 
