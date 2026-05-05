@@ -37,7 +37,8 @@ export default function LeadTimeSettingsPage() {
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
 
   async function loadSettings(domain: string, options?: { requireDomain?: boolean }) {
-    if (!domain.trim()) {
+    const targetDomain = domain.trim() || "current-shop";
+    if (!targetDomain) {
       if (options?.requireDomain) {
         setSettingsError("Enter a Shopify domain first.");
       }
@@ -50,9 +51,9 @@ export default function LeadTimeSettingsPage() {
 
     try {
       const [settings, vendorLeadTimes, categoryLeadTimes] = await Promise.all([
-        fetchShopSettings(domain),
-        fetchVendorLeadTimes(domain),
-        fetchCategoryLeadTimes(domain)
+        fetchShopSettings(targetDomain),
+        fetchVendorLeadTimes(targetDomain),
+        fetchCategoryLeadTimes(targetDomain)
       ]);
       applyShopSettings(settings);
       setShopifyDomain(settings.shopify_domain);
@@ -75,21 +76,12 @@ export default function LeadTimeSettingsPage() {
   }
 
   async function handleLoadSettings() {
-    if (!shopifyDomain.trim()) {
-      setSettingsError("Enter a Shopify domain first.");
-      return;
-    }
-
     await loadSettings(shopifyDomain, { requireDomain: true });
   }
 
   async function handleSaveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!shopifyDomain.trim()) {
-      setSettingsError("Enter a Shopify domain first.");
-      return;
-    }
+    const targetDomain = shopifyDomain.trim() || "current-shop";
 
     const nextDefaultLeadTimeDays = Number.parseInt(defaultLeadTimeDays, 10);
     const nextSafetyBufferDays = Number.parseInt(safetyBufferDays, 10);
@@ -124,21 +116,22 @@ export default function LeadTimeSettingsPage() {
       const [settings, savedVendorLeadTimes, savedCategoryLeadTimes] =
         await Promise.all([
           saveShopSettings({
-            shopify_domain: shopifyDomain,
+            shopify_domain: targetDomain,
             global_default_lead_time_days: nextDefaultLeadTimeDays,
             global_safety_buffer_days: nextSafetyBufferDays,
             allow_mock_fallback: allowMockFallback
           }),
           saveVendorLeadTimes({
-            shopify_domain: shopifyDomain,
+            shopify_domain: targetDomain,
             items: vendorLeadTimes
           }),
           saveCategoryLeadTimes({
-            shopify_domain: shopifyDomain,
+            shopify_domain: targetDomain,
             items: categoryLeadTimes
           })
         ]);
       applyShopSettings(settings);
+      setShopifyDomain(settings.shopify_domain);
       setVendorLeadTimesText(formatVendorLeadTimes(savedVendorLeadTimes.items));
       setCategoryLeadTimesText(
         formatCategoryLeadTimes(savedCategoryLeadTimes.items)
