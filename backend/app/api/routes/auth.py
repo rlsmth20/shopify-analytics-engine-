@@ -125,9 +125,21 @@ def logout(
         revoke_session(db, raw_token=session_token)
     # Clear the cookie regardless. max_age=0 expires it on receipt.
     response.set_cookie(value="", **cookie_kwargs(max_age_seconds=0))
+    legacy_auth_cookie = cookie_kwargs(max_age_seconds=0)
+    legacy_auth_cookie["path"] = "/auth"
+    response.set_cookie(value="", **legacy_auth_cookie)
     return {"ok": True}
 
 
 @router.get("/me", response_model=MeResponse)
-def me(user: Annotated[User, Depends(get_current_user)]) -> MeResponse:
+def me(
+    response: Response,
+    user: Annotated[User, Depends(get_current_user)],
+    session_token: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
+) -> MeResponse:
+    if session_token:
+        response.set_cookie(
+            value=session_token,
+            **cookie_kwargs(max_age_seconds=int(SESSION_TTL.total_seconds())),
+        )
     return _build_me_response(user)
