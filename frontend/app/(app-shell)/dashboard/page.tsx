@@ -133,7 +133,8 @@ export default function DashboardPage() {
                       : "down"
                   }`}
                 >
-                  {kpi.delta_pct >= 0 ? "▲" : "▼"} {Math.abs(kpi.delta_pct).toFixed(1)}%
+                  {kpi.delta_pct >= 0 ? "+" : "-"}
+                  {Math.abs(kpi.delta_pct).toFixed(1)}%
                 </span>
               ) : null}
             </div>
