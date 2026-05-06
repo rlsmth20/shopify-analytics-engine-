@@ -36,7 +36,9 @@ export default function AlertsPage() {
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [channels, setChannels] = useState<NotificationChannelConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<"rules" | "channels" | "history">("rules");
 
   useEffect(() => {
@@ -62,6 +64,30 @@ export default function AlertsPage() {
     }
   }
 
+  async function runEvaluation() {
+    setEvaluating(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await evaluateAlertsNow(true);
+      setEvents(result.events);
+      setTab("history");
+      setNotice(
+        result.events.length > 0
+          ? `Evaluation complete: ${result.events.length} matching alert${
+              result.events.length === 1 ? "" : "s"
+            } found.`
+          : "Evaluation complete: no rules matched the current inventory state."
+      );
+      await refresh();
+      setTab("history");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setEvaluating(false);
+    }
+  }
+
   return (
     <div className="alerts-page">
       <div className="tab-bar">
@@ -78,17 +104,16 @@ export default function AlertsPage() {
         <button
           type="button"
           className="button-ghost tab-bar-trailing"
-          onClick={async () => {
-            await evaluateAlertsNow(true);
-            await refresh();
-          }}
+          disabled={evaluating}
+          onClick={() => void runEvaluation()}
         >
-          Run evaluation now
+          {evaluating ? "Evaluating..." : "Run evaluation now"}
         </button>
       </div>
 
       {loading ? <p className="page-loading">Loading...</p> : null}
       {error ? <p className="page-error-copy">{error}</p> : null}
+      {notice ? <p className="muted small">{notice}</p> : null}
 
       {tab === "rules" ? <RulesPanel rules={rules} onChange={refresh} /> : null}
       {tab === "channels" ? (
