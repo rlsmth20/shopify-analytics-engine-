@@ -9,7 +9,7 @@ from app.db.session import get_db_session
 from app.schemas_v2 import ScorecardResponse
 from app.services.abc_analysis import build_scorecards
 from app.services.shop_skus import (
-    load_daily_history_for_shop_sku,
+    load_daily_history_for_shop_skus,
     load_skus_for_shop,
 )
 
@@ -25,9 +25,15 @@ def read_scorecards(
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
         return ScorecardResponse(scorecards=[], a_count=0, b_count=0, c_count=0)
+    histories = load_daily_history_for_shop_skus(
+        db,
+        user.shop_id,
+        [sku.sku_id for sku in skus],
+        90,
+    )
     cards = build_scorecards(
         skus,
-        lambda sku_id: load_daily_history_for_shop_sku(db, user.shop_id, sku_id, 90),
+        lambda sku_id: histories.get(sku_id, []),
     )
     return ScorecardResponse(
         scorecards=cards,

@@ -159,11 +159,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    void fetch(`${API_BASE}/skus`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((skus: unknown) => {
+    void fetch(`${API_BASE}/skus/summary`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { product_count: 0 }))
+      .then((summary: unknown) => {
         if (cancelled) return;
-        setHasRealData(Array.isArray(skus) && skus.length > 0);
+        const productCount =
+          typeof summary === "object" &&
+          summary !== null &&
+          "product_count" in summary &&
+          typeof summary.product_count === "number"
+            ? summary.product_count
+            : 0;
+        setHasRealData(productCount > 0);
       })
       .catch(() => {
         if (!cancelled) setHasRealData(false);

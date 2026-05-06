@@ -34,7 +34,7 @@ from app.services.inventory_engine import build_inventory_actions
 from app.services.notifications import deliver
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
-    load_daily_history_for_shop_sku,
+    load_daily_history_for_shop_skus,
     load_skus_for_shop,
     start_weekday_for_shop_history,
 )
@@ -159,11 +159,17 @@ def evaluate_now(
 
     actions = build_inventory_actions(skus, lead_time_config=settings.to_lead_time_config())
     start_weekday = start_weekday_for_shop_history(db, user.shop_id, 90)
+    histories = load_daily_history_for_shop_skus(
+        db,
+        user.shop_id,
+        [sku.sku_id for sku in skus],
+        90,
+    )
     forecasts = [
         forecast_sku(
             ForecastInputs(
                 sku_id=sku.sku_id,
-                daily_history=load_daily_history_for_shop_sku(db, user.shop_id, sku.sku_id, 90),
+                daily_history=histories.get(sku.sku_id, []),
                 on_hand=sku.inventory,
                 start_weekday=start_weekday,
             )

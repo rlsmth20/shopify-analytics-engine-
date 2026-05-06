@@ -1,10 +1,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.api.deps import get_current_user, require_active_access
-from app.db.models import User
+from app.db.models import Product, User
 from app.db.session import get_db_session
 from app.schemas import SkuDetail
 from app.services.shop_skus import load_skus_for_shop
@@ -19,6 +20,17 @@ def read_skus(
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> list[SkuDetail]:
     return load_skus_for_shop(db, user.shop_id)
+
+
+@router.get("/summary")
+def read_sku_summary(
+    user: Annotated[User, Depends(require_active_access)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> dict[str, int]:
+    product_count = db.scalar(
+        select(func.count()).select_from(Product).where(Product.shop_id == user.shop_id)
+    ) or 0
+    return {"product_count": int(product_count)}
 
 
 @router.get("/{sku_id}", response_model=SkuDetail)

@@ -219,6 +219,73 @@ def load_daily_history_for_shop_sku(
     return history
 
 
+def load_daily_history_for_shop_skus(
+    db: Session,
+    shop_id: int,
+    sku_ids: list[str],
+    days: int = 90,
+) -> dict[str, List[int]]:
+    """Return daily histories for many SKUs with one aggregate query.
+
+    This avoids the per-SKU query loop on forecast, analytics, dashboard, and
+    reorder endpoints. Unknown SKUs still receive an all-zero history so callers
+    can treat the result exactly like repeated load_daily_history_for_shop_sku.
+    """
+    if days <= 0 or not sku_ids:
+        return {sku_id: [] for sku_id in sku_ids}
+
+    products = db.scalars(
+        select(Product).where(Product.shop_id == shop_id)
+    ).all()
+    product_id_by_sku: dict[str, int] = {}
+    for product in products:
+        product_id_by_sku[_slugified_sku_id_for_product(product)] = int(product.id)
+        if product.sku:
+            product_id_by_sku[product.sku] = int(product.id)
+
+    product_ids = {
+        product_id_by_sku[sku_id]
+        for sku_id in sku_ids
+        if sku_id in product_id_by_sku
+    }
+    empty_history = [0] * days
+    if not product_ids:
+        return {sku_id: list(empty_history) for sku_id in sku_ids}
+
+    now = _now_naive_utc()
+    start = now - timedelta(days=days)
+    rows = db.execute(
+        select(
+            OrderLineItem.product_id,
+            func.date(OrderLineItem.created_at).label("day"),
+            func.coalesce(func.sum(OrderLineItem.quantity), 0).label("qty"),
+        )
+        .where(OrderLineItem.shop_id == shop_id)
+        .where(OrderLineItem.product_id.in_(product_ids))
+        .where(OrderLineItem.created_at >= start)
+        .group_by(OrderLineItem.product_id, func.date(OrderLineItem.created_at))
+    ).all()
+
+    qty_by_product_day: dict[int, dict[str, int]] = {}
+    for row in rows:
+        qty_by_product_day.setdefault(int(row.product_id), {})[str(row.day)] = int(row.qty or 0)
+
+    histories: dict[str, List[int]] = {}
+    day_keys = [
+        (now - timedelta(days=offset)).date().isoformat()
+        for offset in range(days, 0, -1)
+    ]
+    for sku_id in sku_ids:
+        product_id = product_id_by_sku.get(sku_id)
+        if product_id is None:
+            histories[sku_id] = list(empty_history)
+            continue
+        qty_by_day = qty_by_product_day.get(product_id, {})
+        histories[sku_id] = [qty_by_day.get(day, 0) for day in day_keys]
+
+    return histories
+
+
 def load_recent_daily_revenue_for_shop(
     db: Session,
     shop_id: int,

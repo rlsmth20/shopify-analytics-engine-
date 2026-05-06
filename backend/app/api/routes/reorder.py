@@ -11,7 +11,7 @@ from app.services.purchase_orders import build_purchase_order_drafts
 from app.services.reorder_optimizer import build_reorder_suggestions, build_vendor_totals
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
-    load_daily_history_for_shop_sku,
+    load_daily_history_for_shop_skus,
     load_skus_for_shop,
 )
 
@@ -36,9 +36,20 @@ def list_reorder_suggestions(
     settings = load_effective_shop_settings_map(db).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
+    histories = load_daily_history_for_shop_skus(
+        db,
+        user.shop_id,
+        [sku.sku_id for sku in skus],
+        90,
+    )
+
+    def daily_history(sku_id: str, days: int = 90) -> list[int]:
+        history = histories.get(sku_id, [])
+        return history[-days:] if days < len(history) else history
+
     suggestions = build_reorder_suggestions(
         skus,
-        lambda sku_id, days=90: load_daily_history_for_shop_sku(db, user.shop_id, sku_id, days),
+        daily_history,
         lead_time_config=settings.to_lead_time_config(),
         service_level=service_level,
     )
@@ -63,9 +74,20 @@ def list_po_drafts(
     settings = load_effective_shop_settings_map(db).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
+    histories = load_daily_history_for_shop_skus(
+        db,
+        user.shop_id,
+        [sku.sku_id for sku in skus],
+        90,
+    )
+
+    def daily_history(sku_id: str, days: int = 90) -> list[int]:
+        history = histories.get(sku_id, [])
+        return history[-days:] if days < len(history) else history
+
     suggestions = build_reorder_suggestions(
         skus,
-        lambda sku_id, days=90: load_daily_history_for_shop_sku(db, user.shop_id, sku_id, days),
+        daily_history,
         lead_time_config=settings.to_lead_time_config(),
         service_level=service_level,
     )

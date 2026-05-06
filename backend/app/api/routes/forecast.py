@@ -10,6 +10,7 @@ from app.schemas_v2 import ForecastFeedResponse, ForecastResult
 from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.shop_skus import (
     load_daily_history_for_shop_sku,
+    load_daily_history_for_shop_skus,
     load_skus_for_shop,
     start_weekday_for_shop_history,
 )
@@ -28,9 +29,15 @@ def list_forecasts(
     if not skus:
         return ForecastFeedResponse(forecasts=[])
     start_weekday = start_weekday_for_shop_history(db, user.shop_id, days=90)
+    histories = load_daily_history_for_shop_skus(
+        db,
+        user.shop_id,
+        [sku.sku_id for sku in skus],
+        90,
+    )
     forecasts: list[ForecastResult] = []
     for sku in skus:
-        history = load_daily_history_for_shop_sku(db, user.shop_id, sku.sku_id, 90)
+        history = histories.get(sku.sku_id, [])
         forecasts.append(
             forecast_sku(
                 ForecastInputs(
