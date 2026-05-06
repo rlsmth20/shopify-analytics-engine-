@@ -121,6 +121,11 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Support",
     title: "Contact us",
     description: "Report a bug, ask a question, or share feedback - we reply within one business day."
+  },
+  "/contact": {
+    eyebrow: "Support",
+    title: "Contact us",
+    description: "Report a bug, ask a question, or share feedback - we reply within one business day."
   }
 };
 

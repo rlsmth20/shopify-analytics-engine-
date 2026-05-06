@@ -29,6 +29,7 @@ from app.api.routes.stocky_import import router as stocky_import_router
 from app.api.routes.suppliers import router as suppliers_router
 from app.api.routes.transfers import router as transfers_router
 from app.api.routes.waitlist import router as waitlist_router
+from app.api.routes.contact import router as contact_router
 
 
 @asynccontextmanager
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(stocky_import_router)
     app.include_router(shipstation_import_router)
     app.include_router(waitlist_router)
+    app.include_router(contact_router)
     app.include_router(shop_settings_router)
     app.include_router(skus_router)
 
