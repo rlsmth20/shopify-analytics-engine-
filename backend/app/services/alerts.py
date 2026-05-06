@@ -346,7 +346,7 @@ def _forecast_events(rule, context, now, deliver_channels, channels_by_key):
 
 def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_key):
     channels_sent = []
-    delivered = True
+    delivered = not deliver_channels
 
     if deliver_channels:
         for channel in rule.channels:
@@ -361,8 +361,7 @@ def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_ke
             )
             if record.delivered:
                 channels_sent.append(channel)
-            else:
-                delivered = False
+                delivered = True
 
     with SessionLocal() as session:
         rule_record = session.get(AlertRuleRecord, rule.id)

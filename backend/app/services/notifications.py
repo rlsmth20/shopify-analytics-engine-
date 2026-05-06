@@ -100,8 +100,9 @@ def _send_email(target: str, subject: str, body: str) -> None:
 
     sent = send_alert_email(to=target, subject=subject, body=body)
     if not sent:
-        # Resend not configured — fall back to dev-log so alerts don't crash.
-        logger.info("[dev-email] to=%s subject=%s", target, subject)
+        raise RuntimeError(
+            "Email provider is not configured or rejected the alert email."
+        )
 
 
 def _send_sms(target: str, body: str) -> None:

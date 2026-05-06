@@ -37,6 +37,7 @@ export default function AlertsPage() {
   const [channels, setChannels] = useState<NotificationChannelConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<"rules" | "channels" | "history">("rules");
@@ -64,27 +65,41 @@ export default function AlertsPage() {
     }
   }
 
-  async function runEvaluation() {
-    setEvaluating(true);
+  async function runEvaluation(dryRun: boolean) {
+    if (dryRun) {
+      setEvaluating(true);
+    } else {
+      setSending(true);
+    }
     setError(null);
     setNotice(null);
     try {
-      const result = await evaluateAlertsNow(true);
+      const result = await evaluateAlertsNow(dryRun);
       setEvents(result.events);
       setTab("history");
-      setNotice(
-        result.events.length > 0
-          ? `Evaluation complete: ${result.events.length} matching alert${
-              result.events.length === 1 ? "" : "s"
-            } found.`
-          : "Evaluation complete: no rules matched the current inventory state."
-      );
+      if (result.events.length === 0) {
+        setNotice("Evaluation complete: no rules matched the current inventory state.");
+      } else if (dryRun) {
+        setNotice(
+          `Preview complete: ${result.events.length} matching alert${
+            result.events.length === 1 ? "" : "s"
+          } found. No notifications were sent.`
+        );
+      } else {
+        const deliveredCount = result.events.filter((event) => event.delivered).length;
+        setNotice(
+          `Send complete: ${result.events.length} matching alert${
+            result.events.length === 1 ? "" : "s"
+          } found; ${deliveredCount} delivered through enabled channels.`
+        );
+      }
       await refresh();
       setTab("history");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setEvaluating(false);
+      setSending(false);
     }
   }
 
@@ -104,10 +119,18 @@ export default function AlertsPage() {
         <button
           type="button"
           className="button-ghost tab-bar-trailing"
-          disabled={evaluating}
-          onClick={() => void runEvaluation()}
+          disabled={evaluating || sending}
+          onClick={() => void runEvaluation(true)}
         >
-          {evaluating ? "Evaluating..." : "Run evaluation now"}
+          {evaluating ? "Evaluating..." : "Preview evaluation"}
+        </button>
+        <button
+          type="button"
+          className="button-primary"
+          disabled={evaluating || sending}
+          onClick={() => void runEvaluation(false)}
+        >
+          {sending ? "Sending..." : "Send matching alerts"}
         </button>
       </div>
 
@@ -406,7 +429,7 @@ function EventsPanel({ events }: { events: AlertEvent[] }) {
       <div className="empty-state">
         <p className="empty-state-title">No alerts have fired yet</p>
         <p className="empty-state-copy">
-          Run an evaluation above - any rule that matches your current state will produce a dry-run event here.
+          Preview an evaluation above to inspect matches, or send matching alerts to deliver notifications.
         </p>
       </div>
     );
@@ -433,8 +456,10 @@ function EventsPanel({ events }: { events: AlertEvent[] }) {
                 {event.sku_name ? <span>SKU: {event.sku_name}</span> : null}
                 {event.channels_sent.length > 0 ? (
                   <span>Delivered via: {event.channels_sent.join(", ")}</span>
+                ) : event.delivered ? (
+                  <span>Preview only</span>
                 ) : (
-                  <span>Dry run</span>
+                  <span>No enabled channel delivered this alert</span>
                 )}
               </div>
             </div>
