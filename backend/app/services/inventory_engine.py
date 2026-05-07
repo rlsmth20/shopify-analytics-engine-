@@ -186,18 +186,11 @@ def _build_recommended_action(
         reorder_quantity = max(target_units - metrics.sku.inventory, 0)
         post_reorder_units = metrics.sku.inventory + reorder_quantity
         reorder_window_days = _calculate_reorder_window_days(metrics)
-        demand_cover_units = math.ceil(
-            metrics.daily_velocity * metrics.target_coverage_days
-        )
-        safety_phrase = ""
-        if metrics.safety_stock_units >= 1:
-            safety_phrase = (
-                f" + ~{math.ceil(metrics.safety_stock_units)} safety-stock units"
-            )
+        safety_phrase = " plus safety stock" if metrics.safety_stock_units >= 1 else ""
         return (
-            f"Reorder {reorder_quantity} units -> reaches target stock position of "
-            f"{post_reorder_units} units ({metrics.target_coverage_days:.0f} days demand cover, "
-            f"~{demand_cover_units} demand units{safety_phrase}). "
+            f"Reorder {reorder_quantity} units. Target stock position is "
+            f"{post_reorder_units} units ({metrics.target_coverage_days:.0f} days "
+            f"of demand cover{safety_phrase}). "
             f"Reorder within {reorder_window_days} day"
             f"{'' if reorder_window_days == 1 else 's'}."
         )
