@@ -61,8 +61,16 @@ export function ActionCard({
 
       <dl className="action-metadata">
         <div>
+          <dt>On hand</dt>
+          <dd>{numberFormatter.format(action.current_on_hand)}</dd>
+        </div>
+        <div>
           <dt>Days of inventory</dt>
           <dd>{numberFormatter.format(action.days_of_inventory)}</dd>
+        </div>
+        <div>
+          <dt>Daily velocity</dt>
+          <dd>{numberFormatter.format(action.daily_velocity)} / day</dd>
         </div>
         <div>
           <dt>Lead time used</dt>
@@ -76,8 +84,20 @@ export function ActionCard({
           <dt>Target coverage</dt>
           <dd>{action.target_coverage_days} days</dd>
         </div>
+        <div>
+          <dt>Target units</dt>
+          <dd>{numberFormatter.format(action.target_inventory_units)}</dd>
+        </div>
+        <div>
+          <dt>Safety stock</dt>
+          <dd>{numberFormatter.format(action.safety_stock_units)}</dd>
+        </div>
         {action.status === "urgent" ? (
           <>
+            <div>
+              <dt>Reorder point</dt>
+              <dd>{numberFormatter.format(action.reorder_point_units)}</dd>
+            </div>
             <div>
               <dt>Days until stockout</dt>
               <dd>{numberFormatter.format(action.days_until_stockout)}</dd>

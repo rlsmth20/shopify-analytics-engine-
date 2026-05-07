@@ -113,6 +113,11 @@ class BaseInventoryAction(ApiModel):
     status: ActionableStatus
     recommended_action: str
     explanation: str | None = None
+    current_on_hand: int
+    daily_velocity: float
+    safety_stock_units: int
+    target_inventory_units: int
+    reorder_point_units: int
     days_of_inventory: float
     lead_time_days_used: int
     safety_buffer_days: int

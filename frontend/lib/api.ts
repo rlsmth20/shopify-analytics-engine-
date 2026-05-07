@@ -99,6 +99,11 @@ type BaseInventoryAction = {
   status: ActionableStatus;
   recommended_action: string;
   explanation: string | null;
+  current_on_hand: number;
+  daily_velocity: number;
+  safety_stock_units: number;
+  target_inventory_units: number;
+  reorder_point_units: number;
   days_of_inventory: number;
   lead_time_days_used: number;
   safety_buffer_days: number;

@@ -129,6 +129,11 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
         "status": status,
         "recommended_action": _build_recommended_action(metrics, status),
         "explanation": _build_explanation(metrics, status),
+        "current_on_hand": metrics.sku.inventory,
+        "daily_velocity": round(metrics.daily_velocity, 2),
+        "safety_stock_units": math.ceil(metrics.safety_stock_units),
+        "target_inventory_units": math.ceil(metrics.target_inventory_units),
+        "reorder_point_units": math.ceil(metrics.reorder_point),
         "days_of_inventory": round(metrics.days_of_inventory, 1),
         "lead_time_days_used": metrics.lead_time_days_used,
         "safety_buffer_days": metrics.safety_buffer_days,
@@ -180,22 +185,21 @@ def _build_recommended_action(
         target_units = math.ceil(metrics.target_inventory_units)
         reorder_quantity = max(target_units - metrics.sku.inventory, 0)
         post_reorder_units = metrics.sku.inventory + reorder_quantity
-        post_reorder_coverage = _calculate_coverage_days(
-            post_reorder_units, metrics.daily_velocity
-        )
         reorder_window_days = _calculate_reorder_window_days(metrics)
+        demand_cover_units = math.ceil(
+            metrics.daily_velocity * metrics.target_coverage_days
+        )
         safety_phrase = ""
         if metrics.safety_stock_units >= 1:
             safety_phrase = (
-                f" Includes ~{math.ceil(metrics.safety_stock_units)} safety-stock units "
-                "for demand variability."
+                f" + ~{math.ceil(metrics.safety_stock_units)} safety-stock units"
             )
         return (
-            f"Reorder {reorder_quantity} units -> restores inventory to "
-            f"~{post_reorder_coverage:.0f} days (target ~{metrics.target_coverage_days:.0f} days). "
+            f"Reorder {reorder_quantity} units -> reaches target stock position of "
+            f"{post_reorder_units} units ({metrics.target_coverage_days:.0f} days demand cover, "
+            f"~{demand_cover_units} demand units{safety_phrase}). "
             f"Reorder within {reorder_window_days} day"
             f"{'' if reorder_window_days == 1 else 's'}."
-            f"{safety_phrase}"
         )
 
     if status == "optimize":
@@ -265,13 +269,6 @@ def _calculate_reorder_window_days(metrics: InventoryMetrics) -> int:
         (metrics.sku.inventory - metrics.reorder_point) / metrics.daily_velocity
     )
     return max(1, math.floor(days_until_reorder_point))
-
-
-def _calculate_coverage_days(units: int, daily_velocity: float) -> float:
-    if daily_velocity <= 0:
-        return 0.0
-
-    return units / daily_velocity
 
 
 def _estimate_daily_volatility(sku: SkuDetail, daily_velocity: float) -> float:
