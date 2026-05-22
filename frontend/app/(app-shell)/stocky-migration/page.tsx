@@ -91,14 +91,14 @@ export default function StockyMigrationPage() {
         </div>
       </div>
 
-      <div className="signal-list">
+      <div className="signal-list migration-checklist">
         {STEPS.map((step, index) => (
-          <div key={step.id} className="signal-item">
+          <div key={step.id} className="signal-item migration-checklist-row">
             <div>
               <p className="signal-title">{index + 1}. {step.title}</p>
               <p className="signal-copy">{step.body}</p>
             </div>
-            <div className="button-row">
+            <div className="migration-step-actions">
               <button
                 type="button"
                 className={`button ${done[step.id] ? "button-ghost" : "button-primary"}`}

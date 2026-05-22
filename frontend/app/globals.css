@@ -881,6 +881,24 @@ code {
   gap: 10px;
 }
 
+.migration-checklist .migration-checklist-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 304px;
+  align-items: center;
+}
+
+.migration-step-actions {
+  display: grid;
+  grid-template-columns: 118px 174px;
+  gap: 12px;
+  justify-content: end;
+}
+
+.migration-step-actions .button {
+  width: 100%;
+  white-space: nowrap;
+}
+
 .placeholder-graph {
   display: flex;
   align-items: flex-end;
@@ -3413,6 +3431,16 @@ code {
 
   .rule-form-row {
     grid-template-columns: 1fr;
+  }
+
+  .migration-checklist .migration-checklist-row {
+    grid-template-columns: 1fr;
+  }
+
+  .migration-step-actions {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    justify-content: stretch;
   }
 
   .transfer-flow {
