@@ -225,6 +225,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     subscription?.status === "active" || subscription?.status === "trialing"
       ? planToTier(subscription.plan)
       : null;
+  const hasActiveSubscription = paidTier !== null;
   const unlockAll = user.id === 0 || Boolean(user.in_trial) || Boolean(user.is_admin);
 
   return (
@@ -312,7 +313,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        {user.id !== 0 && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
+        {user.id !== 0 && !hasActiveSubscription && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
           <div className={`demo-banner ${trialDaysLeft <= 2 ? "demo-banner-preview" : ""}`} role="status">
             <span className="demo-banner-mark" aria-hidden>*</span>
             <span>

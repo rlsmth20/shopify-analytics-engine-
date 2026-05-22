@@ -136,6 +136,24 @@ def _get_first_item_price_id(subscription: object) -> str:
     return str(getattr(price, "id", "") or "")
 
 
+def _get_subscription_period_end(subscription: object) -> datetime | None:
+    period_end = _get_attr(subscription, "current_period_end")
+    if isinstance(period_end, (int, float)):
+        return datetime.fromtimestamp(int(period_end), tz=timezone.utc)
+
+    if isinstance(subscription, dict):
+        items = subscription.get("items", {}).get("data", [])
+    else:
+        items = getattr(getattr(subscription, "items", None), "data", [])
+
+    for item in items or []:
+        item_period_end = _get_attr(item, "current_period_end")
+        if isinstance(item_period_end, (int, float)):
+            return datetime.fromtimestamp(int(item_period_end), tz=timezone.utc)
+
+    return None
+
+
 def _get_attr(obj: object, key: str, default=None):
     if isinstance(obj, dict):
         return obj.get(key, default)
@@ -161,9 +179,9 @@ def _mirror_stripe_subscription(
         _get_attr(stripe_subscription, "cancel_at_period_end", False)
     )
 
-    period_end = _get_attr(stripe_subscription, "current_period_end")
-    if isinstance(period_end, (int, float)):
-        sub.current_period_end = datetime.fromtimestamp(int(period_end), tz=timezone.utc)
+    period_end = _get_subscription_period_end(stripe_subscription)
+    if period_end is not None:
+        sub.current_period_end = period_end
 
     price_id = _get_first_item_price_id(stripe_subscription)
     if price_id in PLAN_BY_PRICE_ID:
@@ -363,7 +381,13 @@ def verify_webhook_signature(*, payload: bytes, signature_header: str) -> Option
 def current_subscription_summary(db: DbSession, *, user: User) -> dict:
     """Frontend-friendly view of the current user's subscription."""
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
-    if sub is None or sub.status not in ACTIVE_SUBSCRIPTION_STATUSES:
+    should_reconcile = (
+        sub is None
+        or sub.status not in ACTIVE_SUBSCRIPTION_STATUSES
+        or sub.plan in (None, "", "none")
+        or sub.current_period_end is None
+    )
+    if should_reconcile:
         reconciled = reconcile_subscription_from_stripe(db, user=user)
         if reconciled is not None:
             sub = reconciled
