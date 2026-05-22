@@ -106,6 +106,47 @@ class ScorecardResponse(ApiModel):
     cutoff_b_pct: float = 0.95
 
 
+class InventoryHealthKpi(ApiModel):
+    label: str
+    value: float
+    unit: Literal["currency", "count", "percent", "days"]
+    tone: Literal["positive", "negative", "neutral"] = "neutral"
+    note: str
+
+
+class InventoryHealthBucket(ApiModel):
+    label: str
+    value: float
+    tone: Literal["positive", "negative", "neutral"] = "neutral"
+
+
+class InventoryHealthSku(ApiModel):
+    sku_id: str
+    name: str
+    vendor: str
+    value: float
+    note: str
+    severity: Literal["critical", "warning", "info"]
+
+
+class InventoryHealthInsight(ApiModel):
+    title: str
+    severity: Literal["critical", "warning", "info"]
+    description: str
+    metric_label: str
+    metric_value: str
+
+
+class InventoryHealthResponse(ApiModel):
+    kpis: list[InventoryHealthKpi]
+    health_buckets: list[InventoryHealthBucket]
+    forecast_confidence: list[InventoryHealthBucket]
+    top_cash_trapped: list[InventoryHealthSku]
+    top_stockout_risk: list[InventoryHealthSku]
+    insights: list[InventoryHealthInsight]
+    generated_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # Reorder optimizer
 # ---------------------------------------------------------------------------

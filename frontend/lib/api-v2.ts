@@ -8,6 +8,7 @@ import {
   DEMO_BUNDLES,
   DEMO_DASHBOARD,
   DEMO_FORECASTS,
+  DEMO_INVENTORY_HEALTH,
   DEMO_LIQUIDATION,
   DEMO_PURCHASE_ORDERS,
   DEMO_REORDER,
@@ -39,6 +40,7 @@ function isDemo(): boolean {
 // Keys are path prefixes (longest match wins).
 const DEMO_FIXTURES: Record<string, unknown> = {
   "/dashboard": DEMO_DASHBOARD,
+  "/analytics/inventory-health": DEMO_INVENTORY_HEALTH,
   "/forecast": DEMO_FORECASTS,
   "/analytics/scorecards": DEMO_SCORECARDS,
   "/reorder/purchase-orders": DEMO_PURCHASE_ORDERS,
@@ -129,6 +131,47 @@ export type SkuScorecard = {
   sell_through_30d: number;
   inventory_on_hand: number;
   classification_note: string;
+};
+
+export type InventoryHealthKpi = {
+  label: string;
+  value: number;
+  unit: "currency" | "count" | "percent" | "days";
+  tone: "positive" | "negative" | "neutral";
+  note: string;
+};
+
+export type InventoryHealthBucket = {
+  label: string;
+  value: number;
+  tone: "positive" | "negative" | "neutral";
+};
+
+export type InventoryHealthSku = {
+  sku_id: string;
+  name: string;
+  vendor: string;
+  value: number;
+  note: string;
+  severity: "critical" | "warning" | "info";
+};
+
+export type InventoryHealthInsight = {
+  title: string;
+  severity: "critical" | "warning" | "info";
+  description: string;
+  metric_label: string;
+  metric_value: string;
+};
+
+export type InventoryHealthResponse = {
+  kpis: InventoryHealthKpi[];
+  health_buckets: InventoryHealthBucket[];
+  forecast_confidence: InventoryHealthBucket[];
+  top_cash_trapped: InventoryHealthSku[];
+  top_stockout_risk: InventoryHealthSku[];
+  insights: InventoryHealthInsight[];
+  generated_at: string;
 };
 
 export type ReorderSuggestion = {
@@ -368,6 +411,9 @@ export const fetchScorecards = (signal?: AbortSignal) =>
     cutoff_a_pct: number;
     cutoff_b_pct: number;
   }>("/analytics/scorecards", signal);
+
+export const fetchInventoryHealth = (signal?: AbortSignal) =>
+  get<InventoryHealthResponse>("/analytics/inventory-health", signal);
 
 export const fetchReorderSuggestions = (
   serviceLevel: number,

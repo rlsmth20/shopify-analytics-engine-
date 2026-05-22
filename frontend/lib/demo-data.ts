@@ -91,6 +91,137 @@ export const DEMO_DASHBOARD = {
   generated_at: new Date().toISOString(),
 };
 
+export const DEMO_INVENTORY_HEALTH = {
+  kpis: [
+    {
+      label: "Inventory cost on hand",
+      value: 62400,
+      unit: "currency" as const,
+      tone: "neutral" as const,
+      note: "$156,000 at retail across 443 SKUs.",
+    },
+    {
+      label: "Stockout revenue risk",
+      value: 14200,
+      unit: "currency" as const,
+      tone: "negative" as const,
+      note: "$8,900 estimated gross margin exposed.",
+    },
+    {
+      label: "Dead-stock capital",
+      value: 18400,
+      unit: "currency" as const,
+      tone: "negative" as const,
+      note: "29% of inventory cost is stale 90+ days.",
+    },
+    {
+      label: "High-confidence forecasts",
+      value: 0.63,
+      unit: "percent" as const,
+      tone: "positive" as const,
+      note: "12 forecast data-quality notes need review.",
+    },
+    {
+      label: "Average days of cover",
+      value: 42,
+      unit: "days" as const,
+      tone: "neutral" as const,
+      note: "Based on current 30-day sales velocity.",
+    },
+  ],
+  health_buckets: [
+    { label: "Healthy", value: 312, tone: "positive" as const },
+    { label: "Stockout risk", value: 23, tone: "negative" as const },
+    { label: "Overstock", value: 67, tone: "negative" as const },
+    { label: "Dead stock", value: 41, tone: "negative" as const },
+    { label: "No signal", value: 18, tone: "neutral" as const },
+  ],
+  forecast_confidence: [
+    { label: "High", value: 279, tone: "positive" as const },
+    { label: "Medium", value: 118, tone: "neutral" as const },
+    { label: "Low", value: 46, tone: "negative" as const },
+  ],
+  top_cash_trapped: [
+    {
+      sku_id: "sku_organic-cotton-hoodie-black-xl",
+      name: "Organic Cotton Hoodie - Black XL",
+      vendor: "NorthThread Supply",
+      value: 6634,
+      note: "214 on hand, 82 days since last sale.",
+      severity: "warning" as const,
+    },
+    {
+      sku_id: "sku_denim-jacket-indigo-l",
+      name: "Denim Jacket - Indigo L",
+      vendor: "BlueLine Imports",
+      value: 4820,
+      note: "96 on hand, 126 days since last sale.",
+      severity: "critical" as const,
+    },
+    {
+      sku_id: "sku_canvas-tote-bag-natural",
+      name: "Canvas Tote Bag - Natural",
+      vendor: "Pacific Goods Ltd.",
+      value: 3760,
+      note: "188 on hand, 54 days since last sale.",
+      severity: "warning" as const,
+    },
+  ],
+  top_stockout_risk: [
+    {
+      sku_id: "sku_premium-linen-shirt-navy-m",
+      name: "Premium Linen Shirt - Navy M",
+      vendor: "Coastal Apparel Co.",
+      value: 5120,
+      note: "74% stockout risk, 186 units forecast.",
+      severity: "warning" as const,
+    },
+    {
+      sku_id: "sku_wool-blend-sweater-grey-l",
+      name: "Wool Blend Sweater - Grey L",
+      vendor: "NorthThread Supply",
+      value: 3960,
+      note: "61% stockout risk, 142 units forecast.",
+      severity: "warning" as const,
+    },
+    {
+      sku_id: "sku_silk-scarf-burgundy",
+      name: "Silk Scarf - Burgundy",
+      vendor: "Atlas Basics",
+      value: 2510,
+      note: "53% stockout risk, 98 units forecast.",
+      severity: "warning" as const,
+    },
+  ],
+  insights: [
+    {
+      title: "Protect revenue first",
+      severity: "critical" as const,
+      description:
+        "Several SKUs are forecast to sell more units than are currently on hand. Review the stockout-risk list before placing broad replenishment orders.",
+      metric_label: "Revenue exposed",
+      metric_value: "$14,200",
+    },
+    {
+      title: "Recover trapped cash",
+      severity: "warning" as const,
+      description:
+        "Dead and over-covered inventory is tying up cash that could fund higher-velocity buys.",
+      metric_label: "Stale cost",
+      metric_value: "$18,400 (29%)",
+    },
+    {
+      title: "Improve forecast trust",
+      severity: "info" as const,
+      description:
+        "Low-confidence forecasts usually mean limited history, sparse demand, or stockout-limited sales. Use the forecast page warnings before acting on large buys.",
+      metric_label: "High confidence",
+      metric_value: "63%",
+    },
+  ],
+  generated_at: new Date().toISOString(),
+};
+
 // ── Forecasts ────────────────────────────────────────────────────────────────
 
 function buildForecastPoints(baseDemand: number, horizon = 30) {
