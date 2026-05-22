@@ -19,11 +19,11 @@ import {
 const ONBOARDING_STORAGE_KEY = "skubase_stocky_migration_steps";
 const ONBOARDING_DISMISSED_KEY = "skubase_dashboard_onboarding_dismissed";
 const ONBOARDING_STEPS = [
-  { id: "stocky", label: "Import Stocky CSV", href: "/import-stocky" },
-  { id: "shipstation", label: "Seed sales history", href: "/import-shipstation" },
-  { id: "shopify", label: "Connect Shopify", href: "/store-sync" },
+  { id: "connect-shopify", label: "Connect Shopify", href: "/store-sync" },
+  { id: "upload-stocky", label: "Import sales history", href: "/import-stocky" },
   { id: "lead-times", label: "Set lead times", href: "/lead-time-settings" },
-  { id: "po", label: "Save first PO", href: "/purchase-orders" },
+  { id: "forecast-review", label: "Review forecast trust", href: "/forecast" },
+  { id: "purchase-orders", label: "Save first PO", href: "/purchase-orders" },
 ] as const;
 
 export default function DashboardPage() {
@@ -49,7 +49,7 @@ export default function DashboardPage() {
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
-      setCompletedOnboardingSteps(stored ? JSON.parse(stored) : []);
+      setCompletedOnboardingSteps(parseCompletedOnboardingSteps(stored));
       setOnboardingDismissed(
         window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1"
       );
@@ -345,6 +345,20 @@ export default function DashboardPage() {
       </footer>
     </div>
   );
+}
+
+function parseCompletedOnboardingSteps(stored: string | null): string[] {
+  if (!stored) return [];
+  const parsed = JSON.parse(stored) as unknown;
+  if (Array.isArray(parsed)) {
+    return parsed.filter((value): value is string => typeof value === "string");
+  }
+  if (parsed && typeof parsed === "object") {
+    return Object.entries(parsed)
+      .filter(([, value]) => Boolean(value))
+      .map(([key]) => key);
+  }
+  return [];
 }
 
 function sparkValues(label: string, data: DashboardResponse): number[] {
