@@ -13,6 +13,7 @@ from app.schemas_v2 import (
     AlertListResponse,
     AlertRule,
     CreateAlertRuleRequest,
+    NotificationChannel,
     NotificationChannelConfig,
     NotificationChannelsResponse,
     TestAlertRequest,
