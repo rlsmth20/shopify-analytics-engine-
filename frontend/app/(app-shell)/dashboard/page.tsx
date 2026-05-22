@@ -16,10 +16,22 @@ import {
   type DashboardResponse,
 } from "@/lib/api-v2";
 
+const ONBOARDING_STORAGE_KEY = "skubase_stocky_migration_steps";
+const ONBOARDING_DISMISSED_KEY = "skubase_dashboard_onboarding_dismissed";
+const ONBOARDING_STEPS = [
+  { id: "stocky", label: "Import Stocky CSV", href: "/import-stocky" },
+  { id: "shipstation", label: "Seed sales history", href: "/import-shipstation" },
+  { id: "shopify", label: "Connect Shopify", href: "/store-sync" },
+  { id: "lead-times", label: "Set lead times", href: "/lead-time-settings" },
+  { id: "po", label: "Save first PO", href: "/purchase-orders" },
+] as const;
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [completedOnboardingSteps, setCompletedOnboardingSteps] = useState<string[]>([]);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -32,6 +44,19 @@ export default function DashboardPage() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
     return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+      setCompletedOnboardingSteps(stored ? JSON.parse(stored) : []);
+      setOnboardingDismissed(
+        window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1"
+      );
+    } catch {
+      setCompletedOnboardingSteps([]);
+      setOnboardingDismissed(false);
+    }
   }, []);
 
   if (loading && !data) {
@@ -146,6 +171,56 @@ export default function DashboardPage() {
           </div>
         ))}
       </section>
+
+      {!onboardingDismissed ? (
+        <section className="section-card">
+          <div className="section-heading">
+            <div>
+              <p className="section-eyebrow">Setup progress</p>
+              <h2 className="section-title section-title-small">
+                Finish the workflow that turns analytics into orders
+              </h2>
+              <p className="muted section-copy">
+                These are the remaining setup moves most likely to make the
+                dashboard actionable for day-to-day buying.
+              </p>
+            </div>
+            <div className="button-row">
+              <a className="button button-primary" href="/stocky-migration">
+                Open checklist
+              </a>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => {
+                  window.localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+                  setOnboardingDismissed(true);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+          <div className="signal-list">
+            {ONBOARDING_STEPS.map((step) => {
+              const complete = completedOnboardingSteps.includes(step.id);
+              return (
+                <a key={step.id} className="signal-item" href={step.href}>
+                  <div>
+                    <p className="signal-title">{step.label}</p>
+                    <p className="muted small">
+                      {complete ? "Complete" : "Recommended next action"}
+                    </p>
+                  </div>
+                  <span className={`po-status po-status-${complete ? "received" : "ready"}`}>
+                    {complete ? "done" : "next"}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="dashboard-grid">
         <ChartPanel

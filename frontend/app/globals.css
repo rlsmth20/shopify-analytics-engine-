@@ -2997,8 +2997,20 @@ code {
 
 .po-card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.po-receipt-form {
+  display: grid;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.po-receipt-form .input-control {
+  max-width: 140px;
 }
 
 /* Transfers --------------------------------------------------------- */

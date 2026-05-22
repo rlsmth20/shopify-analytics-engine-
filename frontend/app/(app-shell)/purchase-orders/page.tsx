@@ -12,6 +12,8 @@ import {
 } from "@/lib/api-v2";
 
 const SERVICE_LEVELS = [0.9, 0.95, 0.975, 0.99];
+type ReceiptDraftLine = { qty: string; cost: string };
+type ReceiptDrafts = Record<string, Record<string, ReceiptDraftLine>>;
 
 export default function PurchaseOrdersPage() {
   const [drafts, setDrafts] = useState<PurchaseOrderDraft[]>([]);
@@ -21,6 +23,8 @@ export default function PurchaseOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busyPo, setBusyPo] = useState<string | null>(null);
+  const [receivingPo, setReceivingPo] = useState<string | null>(null);
+  const [receiptDrafts, setReceiptDrafts] = useState<ReceiptDrafts>({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -140,6 +144,14 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     className="button button-ghost"
+                    onClick={() => startPartialReceipt(po)}
+                    disabled={busyPo === po.po_id}
+                  >
+                    Receive partial
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-ghost"
                     onClick={() => void receiveAll(po)}
                     disabled={busyPo === po.po_id}
                   >
@@ -153,6 +165,87 @@ export default function PurchaseOrdersPage() {
                     Export CSV
                   </button>
                 </div>
+                {receivingPo === po.po_id ? (
+                  <div className="po-receipt-form">
+                    <div className="section-heading">
+                      <div>
+                        <p className="section-eyebrow">Receiving</p>
+                        <h3>Record shipment quantities</h3>
+                      </div>
+                    </div>
+                    <table className="po-table">
+                      <thead>
+                        <tr>
+                          <th>SKU</th>
+                          <th>Ordered</th>
+                          <th>Received qty</th>
+                          <th>Unit cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {po.lines.map((line) => {
+                          const draftLine = receiptDrafts[po.po_id]?.[line.sku_id] ?? {
+                            qty: String(line.qty),
+                            cost: line.unit_cost.toFixed(2),
+                          };
+                          return (
+                            <tr key={line.sku_id}>
+                              <td>{line.name}</td>
+                              <td>{line.qty}</td>
+                              <td>
+                                <input
+                                  className="input-control"
+                                  type="number"
+                                  min="0"
+                                  max={line.qty}
+                                  step="1"
+                                  value={draftLine.qty}
+                                  onChange={(event) =>
+                                    updateReceiptLine(po.po_id, line.sku_id, {
+                                      qty: event.target.value,
+                                    })
+                                  }
+                                />
+                              </td>
+                              <td>
+                                <input
+                                  className="input-control"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={draftLine.cost}
+                                  onChange={(event) =>
+                                    updateReceiptLine(po.po_id, line.sku_id, {
+                                      cost: event.target.value,
+                                    })
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div className="button-row">
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={() => void recordPartialReceipt(po)}
+                        disabled={busyPo === po.po_id}
+                      >
+                        Record receipt
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-ghost"
+                        onClick={() => setReceivingPo(null)}
+                        disabled={busyPo === po.po_id}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -182,6 +275,70 @@ export default function PurchaseOrdersPage() {
     try {
       await savePurchaseOrder(po);
       await updatePurchaseOrderStatus(po.po_id, status);
+      await refresh();
+    } finally {
+      setBusyPo(null);
+    }
+  }
+
+  function startPartialReceipt(po: PurchaseOrderDraft) {
+    setReceivingPo(po.po_id);
+    setReceiptDrafts((current) => {
+      if (current[po.po_id]) return current;
+      return {
+        ...current,
+        [po.po_id]: Object.fromEntries(
+          po.lines.map((line) => [
+            line.sku_id,
+            { qty: String(line.qty), cost: line.unit_cost.toFixed(2) },
+          ])
+        ),
+      };
+    });
+  }
+
+  function updateReceiptLine(
+    poId: string,
+    skuId: string,
+    patch: Partial<ReceiptDraftLine>
+  ) {
+    setReceiptDrafts((current) => ({
+      ...current,
+      [poId]: {
+        ...current[poId],
+        [skuId]: {
+          qty: current[poId]?.[skuId]?.qty ?? "",
+          cost: current[poId]?.[skuId]?.cost ?? "",
+          ...patch,
+        },
+      },
+    }));
+  }
+
+  async function recordPartialReceipt(po: PurchaseOrderDraft) {
+    const draft = receiptDrafts[po.po_id];
+    const lines = po.lines
+      .map((line) => {
+        const receiptLine = draft?.[line.sku_id];
+        const receivedQty = Number(receiptLine?.qty ?? 0);
+        const receivedUnitCost = Number(receiptLine?.cost ?? line.unit_cost);
+        return {
+          sku_id: line.sku_id,
+          received_qty: Number.isFinite(receivedQty) ? receivedQty : 0,
+          received_unit_cost: Number.isFinite(receivedUnitCost)
+            ? receivedUnitCost
+            : line.unit_cost,
+        };
+      })
+      .filter((line) => line.received_qty > 0);
+
+    if (lines.length === 0) return;
+
+    setBusyPo(po.po_id);
+    try {
+      await savePurchaseOrder(po);
+      await receivePurchaseOrder(po.po_id, { lines });
+      setReceivingPo(null);
       await refresh();
     } finally {
       setBusyPo(null);
