@@ -122,6 +122,12 @@ export default function StoreSyncPage() {
               Connected to <strong>{connection.shopify_domain}</strong>. Last
               sync: {formatRelative(connection.last_sync_at)}.
             </p>
+            <div className="sync-safety-note" role="status">
+              <strong>Read-only sync.</strong> skubase imports products,
+              inventory, and order history for forecasting. It does not change
+              Shopify inventory quantities, prices, products, or orders from
+              this screen.
+            </div>
             <div className="button-row">
               <button
                 type="button"
@@ -130,6 +136,24 @@ export default function StoreSyncPage() {
                 disabled={syncing}
               >
                 {syncing ? "Syncing…" : "Sync now"}
+              </button>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={async () => {
+                  const domain = connection?.shopify_domain || "";
+                  if (!domain) return;
+                  const res = await fetch(
+                    `${API_BASE}/integrations/shopify/install?shop=${encodeURIComponent(domain)}`,
+                    { credentials: "include" }
+                  );
+                  const body = await res.json().catch(() => null);
+                  if (body?.authorize_url) {
+                    window.location.href = body.authorize_url;
+                  }
+                }}
+              >
+                Reconnect
               </button>
             </div>
             {syncError ? (
@@ -154,6 +178,11 @@ export default function StoreSyncPage() {
               products, inventory, and the last 12 months of orders so the
               forecast and action queue can run on real data.
             </p>
+            <div className="sync-safety-note" role="status">
+              <strong>Safe by default.</strong> Initial Shopify access is
+              read-only for planning. Any future write-back flow should require
+              a preview and explicit approval before touching Shopify stock.
+            </div>
             <form onSubmit={handleInstall} className="auth-form" style={{ maxWidth: "440px" }}>
               <label className="auth-field">
                 <span className="auth-field-label">Your myshopify.com domain</span>

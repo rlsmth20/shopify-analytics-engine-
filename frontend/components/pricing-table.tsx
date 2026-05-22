@@ -3,86 +3,10 @@
 import { useState } from "react";
 
 import { PricingButton } from "@/components/pricing-button";
-
-type Cycle = "monthly" | "annual";
-
-type Tier = {
-  name: string;
-  pitch: string;
-  limit: string;
-  features: string[];
-  featured: boolean;
-  monthly: {
-    plan: "starter_monthly" | "growth_monthly" | "scale_monthly";
-    price: string;
-  };
-  annual: {
-    plan: "starter_annual" | "growth_annual" | "scale_annual";
-    price: string;
-    /** Total amount billed once per year. */
-    yearTotal: string;
-  };
-};
-
-const TIERS: Tier[] = [
-  {
-    name: "Starter",
-    pitch: "For solo operators and Stocky migrants picking their first replacement.",
-    limit: "Up to 500 active SKUs - 1 location - 3 seats",
-    features: [
-      "Ranked action feed (urgent / optimize / dead)",
-      "AI-powered demand forecasting (Holt + seasonality)",
-      "ABC x XYZ classification",
-      "Supplier lead-time settings",
-      "Purchase order drafts with CSV export",
-      "Email + Slack alerts",
-      "Shopify-native ingestion",
-      "Self-serve setup",
-    ],
-    featured: false,
-    monthly: { plan: "starter_monthly", price: "$29" },
-    annual: { plan: "starter_annual", price: "$24.65", yearTotal: "$296" },
-  },
-  {
-    name: "Growth",
-    pitch: "Most merchants land here. Full intelligence stack, multi-location, no seat gates.",
-    limit: "Up to 5,000 active SKUs - 3 locations - unlimited seats",
-    features: [
-      "Everything in Starter",
-      "Supplier scorecards + tiering when PO/receipt history is connected",
-      "Safety-stock / ROP / EOQ with service-level segmentation",
-      "Bundle / kit bottleneck analysis when component mappings are configured",
-      "Multi-location transfer recommendations when location inventory is connected",
-      "Dead-stock liquidation plans",
-      "PO approval workflows",
-      "SMS + webhook alerts",
-      "Scheduled PDF reports",
-    ],
-    featured: true,
-    monthly: { plan: "growth_monthly", price: "$99" },
-    annual: { plan: "growth_annual", price: "$84.15", yearTotal: "$1,010" },
-  },
-  {
-    name: "Scale",
-    pitch: "For multi-store operators and teams that want audit + approval flows.",
-    limit: "Up to 25,000 active SKUs - 10 locations - unlimited seats",
-    features: [
-      "Everything in Growth",
-      "Advanced PO approval + send flow",
-      "Audit log and decision snapshots",
-      "Workspace roles",
-      "Priority support (same-business-day response)",
-      "Onboarding concierge",
-      "SSO (Google, Microsoft)",
-    ],
-    featured: false,
-    monthly: { plan: "scale_monthly", price: "$199" },
-    annual: { plan: "scale_annual", price: "$169.15", yearTotal: "$2,030" },
-  },
-];
+import { PRICING_TIERS, type BillingCycle } from "@/lib/plans";
 
 export function PricingTable() {
-  const [cycle, setCycle] = useState<Cycle>("monthly");
+  const [cycle, setCycle] = useState<BillingCycle>("monthly");
 
   return (
     <>
@@ -108,9 +32,10 @@ export function PricingTable() {
       </div>
 
       <section className="pricing-grid">
-        {TIERS.map((tier) => {
+        {PRICING_TIERS.map((tier) => {
           const variant = cycle === "monthly" ? tier.monthly : tier.annual;
           const cadence = cycle === "monthly" ? "/mo" : "/mo (billed annually)";
+
           return (
             <article
               key={tier.name}
@@ -132,10 +57,15 @@ export function PricingTable() {
               ) : null}
               <p className="pricing-card-limit">{tier.limit}</p>
               <ul className="pricing-card-features">
-                {tier.features.map((f) => (
-                  <li key={f}>
-                    <span className="pricing-feature-tick" aria-hidden>✓</span>
-                    <span>{f}</span>
+                {tier.features.map((feature) => (
+                  <li
+                    key={feature.label}
+                    className={feature.included ? "" : "pricing-feature-muted"}
+                  >
+                    <span className="pricing-feature-tick" aria-hidden>
+                      {feature.included ? "+" : "-"}
+                    </span>
+                    <span>{feature.label}</span>
                   </li>
                 ))}
               </ul>

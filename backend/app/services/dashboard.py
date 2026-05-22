@@ -33,6 +33,7 @@ RecentRevenueFn = Callable[[int], list[tuple[int, float]]]  # (days) -> [(offset
 def build_dashboard(
     skus: Sequence[SkuDetail],
     *,
+    shop_id: int,
     daily_history_fn: DailyHistoryFn,
     recent_revenue_fn: RecentRevenueFn,
     start_weekday: int,
@@ -170,7 +171,7 @@ def build_dashboard(
         )
 
     # Alert counts by severity (from recent events registry)
-    events = list_recent_events(limit=500)
+    events = list_recent_events(shop_id, limit=500)
     severity_counts = {"critical": 0, "warning": 0, "info": 0}
     for event in events:
         severity_counts[event.severity] = severity_counts.get(event.severity, 0) + 1

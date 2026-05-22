@@ -64,6 +64,12 @@ class ForecastResult(ApiModel):
     stockout_probability_30d: float = Field(ge=0, le=1)
     points: list[ForecastPoint] = Field(default_factory=list)
     explain: str
+    history_days: int = Field(ge=0)
+    adjusted_stockout_days: int = Field(
+        ge=0,
+        description="Recent zero-sales days adjusted because the SKU appears stockout-limited.",
+    )
+    data_quality_warnings: list[str] = Field(default_factory=list)
 
 
 class ForecastFeedResponse(ApiModel):

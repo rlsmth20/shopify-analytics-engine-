@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
+import { PLAN_LABELS } from "@/lib/plans";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -21,16 +22,6 @@ type Connection = {
   connected: boolean;
   shopify_domain: string | null;
   last_sync_at: string | null;
-};
-
-const PLAN_LABELS: Record<string, string> = {
-  starter_monthly: "Starter ($29/mo)",
-  growth_monthly: "Growth ($99/mo)",
-  scale_monthly: "Scale ($199/mo)",
-  starter_annual: "Starter (annual)",
-  growth_annual: "Growth (annual)",
-  scale_annual: "Scale (annual)",
-  none: "No active plan",
 };
 
 export default function AccountPage() {

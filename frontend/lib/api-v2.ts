@@ -109,6 +109,9 @@ export type ForecastResult = {
   stockout_probability_30d: number;
   points: ForecastPoint[];
   explain: string;
+  history_days: number;
+  adjusted_stockout_days: number;
+  data_quality_warnings: string[];
 };
 
 export type SkuScorecard = {
@@ -293,12 +296,12 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     credentials: "include",
     signal,
   });
-  if (response.status === 402) {
+  if (response.status === 402 || response.status === 403) {
     // Trial expired or no active subscription — send to pricing.
     if (typeof window !== "undefined") {
       window.location.href = "/pricing?trial_expired=1";
     }
-    throw new Error("Trial expired. Redirecting to pricing.");
+    throw new Error("Plan upgrade required. Redirecting to pricing.");
   }
   if (!response.ok) {
     throw new Error(
@@ -327,6 +330,12 @@ async function postJson<T>(
     credentials: "include",
     signal,
   });
+  if (response.status === 402 || response.status === 403) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/pricing?trial_expired=1";
+    }
+    throw new Error("Plan upgrade required. Redirecting to pricing.");
+  }
   if (!response.ok) {
     throw new Error(
       `${path} failed with ${response.status}: ${await response

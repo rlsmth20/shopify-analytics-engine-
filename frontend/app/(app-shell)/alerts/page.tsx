@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/components/auth-guard";
 import {
   createAlertRule,
   deleteAlertRule,
@@ -19,6 +20,9 @@ import {
   type NotificationChannel,
   type NotificationChannelConfig,
 } from "@/lib/api-v2";
+import { planToTier, tierAllows, type PlanTierKey } from "@/lib/plans";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 const TRIGGER_OPTIONS: { value: AlertTrigger; label: string; help: string }[] = [
   { value: "stockout_risk", label: "Stockout risk", help: "Fires when a SKU has fewer days of cover than the threshold" },
@@ -30,8 +34,15 @@ const TRIGGER_OPTIONS: { value: AlertTrigger; label: string; help: string }[] = 
 
 const SEVERITY_OPTIONS: AlertSeverity[] = ["info", "warning", "critical"];
 const CHANNEL_OPTIONS: NotificationChannel[] = ["email", "sms", "slack", "webhook"];
+const CHANNEL_MIN_TIER: Record<NotificationChannel, PlanTierKey> = {
+  email: "starter",
+  slack: "starter",
+  sms: "growth",
+  webhook: "growth",
+};
 
 export default function AlertsPage() {
+  const { user } = useAuth();
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [channels, setChannels] = useState<NotificationChannelConfig[]>([]);
@@ -41,10 +52,25 @@ export default function AlertsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<"rules" | "channels" | "history">("rules");
+  const [plan, setPlan] = useState<string | null>(null);
+
+  const paidTier = planToTier(plan) ?? "starter";
+  const unlockAll = user.id === 0 || user.in_trial || user.is_admin;
+  const isChannelAllowed = (channel: NotificationChannel) =>
+    unlockAll || tierAllows(paidTier, CHANNEL_MIN_TIER[channel]);
 
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    if (user.id === 0) return;
+
+    void fetch(`${API_BASE}/billing/me`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { plan?: string } | null) => setPlan(data?.plan ?? null))
+      .catch(() => setPlan(null));
+  }, [user.id]);
 
   async function refresh() {
     setLoading(true);
@@ -138,16 +164,34 @@ export default function AlertsPage() {
       {error ? <p className="page-error-copy">{error}</p> : null}
       {notice ? <p className="muted small">{notice}</p> : null}
 
-      {tab === "rules" ? <RulesPanel rules={rules} onChange={refresh} /> : null}
+      {tab === "rules" ? (
+        <RulesPanel
+          rules={rules}
+          onChange={refresh}
+          isChannelAllowed={isChannelAllowed}
+        />
+      ) : null}
       {tab === "channels" ? (
-        <ChannelsPanel channels={channels} onChange={refresh} />
+        <ChannelsPanel
+          channels={channels}
+          onChange={refresh}
+          isChannelAllowed={isChannelAllowed}
+        />
       ) : null}
       {tab === "history" ? <EventsPanel events={events} /> : null}
     </div>
   );
 }
 
-function RulesPanel({ rules, onChange }: { rules: AlertRule[]; onChange: () => void }) {
+function RulesPanel({
+  rules,
+  onChange,
+  isChannelAllowed,
+}: {
+  rules: AlertRule[];
+  onChange: () => void;
+  isChannelAllowed: (channel: NotificationChannel) => boolean;
+}) {
   const [newRule, setNewRule] = useState({
     name: "",
     trigger: "stockout_risk" as AlertTrigger,
@@ -231,11 +275,14 @@ function RulesPanel({ rules, onChange }: { rules: AlertRule[]; onChange: () => v
             <div className="channel-chips">
               {CHANNEL_OPTIONS.map((c) => {
                 const active = newRule.channels.includes(c);
+                const allowed = isChannelAllowed(c);
                 return (
                   <button
                     key={c}
                     type="button"
                     className={`channel-chip${active ? " channel-chip-active" : ""}`}
+                    disabled={!allowed}
+                    title={allowed ? undefined : `${c} alerts are included on Growth and Scale.`}
                     onClick={() =>
                       setNewRule({
                         ...newRule,
@@ -245,7 +292,7 @@ function RulesPanel({ rules, onChange }: { rules: AlertRule[]; onChange: () => v
                       })
                     }
                   >
-                    {c}
+                    {allowed ? c : `${c} (Growth)`}
                   </button>
                 );
               })}
@@ -328,9 +375,11 @@ function RulesPanel({ rules, onChange }: { rules: AlertRule[]; onChange: () => v
 function ChannelsPanel({
   channels,
   onChange,
+  isChannelAllowed,
 }: {
   channels: NotificationChannelConfig[];
   onChange: () => void;
+  isChannelAllowed: (channel: NotificationChannel) => boolean;
 }) {
   return (
     <div className="channels-panel">
@@ -339,7 +388,12 @@ function ChannelsPanel({
       </p>
       <div className="channels-grid">
         {channels.map((c) => (
-          <ChannelCard key={c.channel} channel={c} onChange={onChange} />
+          <ChannelCard
+            key={c.channel}
+            channel={c}
+            locked={!isChannelAllowed(c.channel)}
+            onChange={onChange}
+          />
         ))}
       </div>
     </div>
@@ -348,9 +402,11 @@ function ChannelsPanel({
 
 function ChannelCard({
   channel,
+  locked,
   onChange,
 }: {
   channel: NotificationChannelConfig;
+  locked: boolean;
   onChange: () => void;
 }) {
   const [target, setTarget] = useState(channel.target);
@@ -396,6 +452,7 @@ function ChannelCard({
           <input
             type="checkbox"
             checked={enabled}
+            disabled={locked}
             onChange={(e) => setEnabled(e.target.checked)}
           />
           {enabled ? "On" : "Off"}
@@ -407,14 +464,15 @@ function ChannelCard({
           type="text"
           placeholder={placeholder}
           value={target}
+          disabled={locked}
           onChange={(e) => setTarget(e.target.value)}
         />
       </label>
       <div className="channel-card-actions">
-        <button type="button" className="button-primary" onClick={handleSave}>
-          Save
+        <button type="button" className="button-primary" onClick={handleSave} disabled={locked}>
+          {locked ? "Growth plan" : "Save"}
         </button>
-        <button type="button" className="button-ghost" onClick={handleTest}>
+        <button type="button" className="button-ghost" onClick={handleTest} disabled={locked}>
           Send test
         </button>
       </div>

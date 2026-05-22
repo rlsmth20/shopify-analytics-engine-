@@ -34,7 +34,7 @@ from app.services.notifications import deliver
 
 
 # Events remain in-memory (log-style). Rules + channels are persisted.
-_EVENTS: list[AlertEvent] = []
+_EVENTS: list[tuple[int, AlertEvent]] = []
 
 
 def _record_to_rule(record: AlertRuleRecord) -> AlertRule:
@@ -51,27 +51,38 @@ def _record_to_rule(record: AlertRuleRecord) -> AlertRule:
     )
 
 
+def _channel_storage_key(shop_id: int, channel: str) -> str:
+    return f"{shop_id}:{channel}"
+
+
+def _channel_from_storage_key(key: str) -> str:
+    return key.split(":", 1)[1] if ":" in key else key
+
+
 def _record_to_channel(record: NotificationChannelRecord) -> NotificationChannelConfig:
     return NotificationChannelConfig(
-        channel=cast(NotificationChannel, record.channel),
+        channel=cast(NotificationChannel, _channel_from_storage_key(record.channel)),
         enabled=record.enabled,
         target=record.target,
         verified=record.verified,
     )
 
 
-def seed_default_rules_and_channels() -> None:
-    """Idempotent seed. If the rules table is empty, insert the defaults."""
+def seed_default_rules_and_channels(shop_id: int) -> None:
+    """Idempotent seed scoped to one shop."""
     with SessionLocal() as session:
-        existing = session.scalar(select(AlertRuleRecord).limit(1))
+        existing = session.scalar(
+            select(AlertRuleRecord).where(AlertRuleRecord.shop_id == shop_id).limit(1)
+        )
         if existing is not None:
-            _seed_missing_channels(session)
+            _seed_missing_channels(session, shop_id)
             session.commit()
             return
 
         defaults = [
             dict(
                 id=str(uuid.uuid4()),
+                shop_id=shop_id,
                 name="Critical stockout risk",
                 trigger="stockout_risk",
                 severity="critical",
@@ -81,6 +92,7 @@ def seed_default_rules_and_channels() -> None:
             ),
             dict(
                 id=str(uuid.uuid4()),
+                shop_id=shop_id,
                 name="Dead stock capital review",
                 trigger="dead_stock",
                 severity="warning",
@@ -90,6 +102,7 @@ def seed_default_rules_and_channels() -> None:
             ),
             dict(
                 id=str(uuid.uuid4()),
+                shop_id=shop_id,
                 name="Overstock hitting 90+ days",
                 trigger="overstock",
                 severity="warning",
@@ -99,6 +112,7 @@ def seed_default_rules_and_channels() -> None:
             ),
             dict(
                 id=str(uuid.uuid4()),
+                shop_id=shop_id,
                 name="Forecast miss > 20%",
                 trigger="forecast_miss",
                 severity="info",
@@ -108,6 +122,7 @@ def seed_default_rules_and_channels() -> None:
             ),
             dict(
                 id=str(uuid.uuid4()),
+                shop_id=shop_id,
                 name="Supplier slipping on-time delivery",
                 trigger="supplier_slip",
                 severity="warning",
@@ -119,20 +134,25 @@ def seed_default_rules_and_channels() -> None:
         for row in defaults:
             session.add(AlertRuleRecord(**row))
 
-        _seed_missing_channels(session)
+        _seed_missing_channels(session, shop_id)
         session.commit()
 
 
-def _seed_missing_channels(session) -> None:
+def _seed_missing_channels(session, shop_id: int) -> None:
     existing_channels = {
-        c.channel for c in session.scalars(select(NotificationChannelRecord)).all()
+        _channel_from_storage_key(c.channel)
+        for c in session.scalars(
+            select(NotificationChannelRecord).where(
+                NotificationChannelRecord.channel.like(f"{shop_id}:%")
+            )
+        ).all()
     }
     for channel in ("email", "sms", "slack", "webhook"):
         if channel in existing_channels:
             continue
         session.add(
             NotificationChannelRecord(
-                channel=channel,
+                channel=_channel_storage_key(shop_id, channel),
                 enabled=channel == "email",
                 target="alerts@example.com" if channel == "email" else "",
                 verified=False,
@@ -140,16 +160,19 @@ def _seed_missing_channels(session) -> None:
         )
 
 
-def list_rules() -> list[AlertRule]:
+def list_rules(shop_id: int) -> list[AlertRule]:
     with SessionLocal() as session:
         records = session.scalars(
-            select(AlertRuleRecord).order_by(AlertRuleRecord.created_at)
+            select(AlertRuleRecord)
+            .where(AlertRuleRecord.shop_id == shop_id)
+            .order_by(AlertRuleRecord.created_at)
         ).all()
         return [_record_to_rule(r) for r in records]
 
 
 def create_rule(
     *,
+    shop_id: int,
     name: str,
     trigger: AlertTrigger,
     severity: AlertSeverity,
@@ -160,6 +183,7 @@ def create_rule(
     with SessionLocal() as session:
         record = AlertRuleRecord(
             id=str(uuid.uuid4()),
+            shop_id=shop_id,
             name=name,
             trigger=str(trigger),
             severity=str(severity),
@@ -173,20 +197,20 @@ def create_rule(
         return _record_to_rule(record)
 
 
-def delete_rule(rule_id: str) -> bool:
+def delete_rule(shop_id: int, rule_id: str) -> bool:
     with SessionLocal() as session:
         record = session.get(AlertRuleRecord, rule_id)
-        if record is None:
+        if record is None or record.shop_id != shop_id:
             return False
         session.delete(record)
         session.commit()
         return True
 
 
-def toggle_rule(rule_id: str, enabled: bool) -> Optional[AlertRule]:
+def toggle_rule(shop_id: int, rule_id: str, enabled: bool) -> Optional[AlertRule]:
     with SessionLocal() as session:
         record = session.get(AlertRuleRecord, rule_id)
-        if record is None:
+        if record is None or record.shop_id != shop_id:
             return None
         record.enabled = enabled
         session.commit()
@@ -194,23 +218,29 @@ def toggle_rule(rule_id: str, enabled: bool) -> Optional[AlertRule]:
         return _record_to_rule(record)
 
 
-def list_channel_configs() -> list[NotificationChannelConfig]:
+def list_channel_configs(shop_id: int) -> list[NotificationChannelConfig]:
     with SessionLocal() as session:
-        records = session.scalars(select(NotificationChannelRecord)).all()
+        records = session.scalars(
+            select(NotificationChannelRecord).where(
+                NotificationChannelRecord.channel.like(f"{shop_id}:%")
+            )
+        ).all()
         return [_record_to_channel(r) for r in records]
 
 
 def update_channel_config(
     *,
+    shop_id: int,
     channel: NotificationChannel,
     enabled: bool,
     target: str,
 ) -> NotificationChannelConfig:
     with SessionLocal() as session:
-        record = session.get(NotificationChannelRecord, channel)
+        key = _channel_storage_key(shop_id, channel)
+        record = session.get(NotificationChannelRecord, key)
         if record is None:
             record = NotificationChannelRecord(
-                channel=str(channel),
+                channel=key,
                 enabled=enabled,
                 target=target,
                 verified=False,
@@ -224,8 +254,8 @@ def update_channel_config(
         return _record_to_channel(record)
 
 
-def list_recent_events(limit: int = 50) -> list[AlertEvent]:
-    return list(_EVENTS[-limit:])
+def list_recent_events(shop_id: int, limit: int = 50) -> list[AlertEvent]:
+    return [event for event_shop_id, event in _EVENTS if event_shop_id == shop_id][-limit:]
 
 
 @dataclass(frozen=True)
@@ -235,19 +265,33 @@ class EvaluationContext:
     supplier_scores: list[SupplierScorecard]
 
 
-def evaluate(context: EvaluationContext, deliver_channels: bool = False) -> list[AlertEvent]:
+def evaluate(
+    shop_id: int,
+    context: EvaluationContext,
+    deliver_channels: bool = False,
+    allowed_channels: set[NotificationChannel] | None = None,
+) -> list[AlertEvent]:
     events: list[AlertEvent] = []
     now = datetime.now(timezone.utc)
 
-    rules = list_rules()
-    channels_by_key = {c.channel: c for c in list_channel_configs()}
+    rules = list_rules(shop_id)
+    channels_by_key = {c.channel: c for c in list_channel_configs(shop_id)}
 
     for rule in rules:
         if not rule.enabled:
             continue
-        events.extend(_evaluate_rule(rule, context, now, deliver_channels, channels_by_key))
+        events.extend(
+            _evaluate_rule(
+                rule,
+                context,
+                now,
+                deliver_channels,
+                channels_by_key,
+                allowed_channels,
+            )
+        )
 
-    _EVENTS.extend(events)
+    _EVENTS.extend((shop_id, event) for event in events)
     return events
 
 
@@ -257,21 +301,22 @@ def _evaluate_rule(
     now: datetime,
     deliver_channels: bool,
     channels_by_key: dict[NotificationChannel, NotificationChannelConfig],
+    allowed_channels: set[NotificationChannel] | None,
 ) -> list[AlertEvent]:
     if rule.trigger == "stockout_risk":
-        return _stockout_events(rule, context, now, deliver_channels, channels_by_key)
+        return _stockout_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels)
     if rule.trigger == "dead_stock":
-        return _dead_stock_events(rule, context, now, deliver_channels, channels_by_key)
+        return _dead_stock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels)
     if rule.trigger == "overstock":
-        return _overstock_events(rule, context, now, deliver_channels, channels_by_key)
+        return _overstock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels)
     if rule.trigger == "supplier_slip":
-        return _supplier_events(rule, context, now, deliver_channels, channels_by_key)
+        return _supplier_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels)
     if rule.trigger == "forecast_miss":
-        return _forecast_events(rule, context, now, deliver_channels, channels_by_key)
+        return _forecast_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels)
     return []
 
 
-def _stockout_events(rule, context, now, deliver_channels, channels_by_key):
+def _stockout_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
         if action.status != "urgent":
@@ -283,11 +328,11 @@ def _stockout_events(rule, context, now, deliver_channels, channels_by_key):
             f"{action.name} will stock out in {days:.1f} days at current velocity. "
             f"Recommended: {action.recommended_action}"
         )
-        events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key))
+        events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key, allowed_channels))
     return events
 
 
-def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key):
+def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
         if action.status != "dead":
@@ -299,11 +344,11 @@ def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key):
             f"{action.name}: ${cash:,.0f} tied up in stale inventory. "
             f"Recommended: {action.recommended_action}"
         )
-        events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key))
+        events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key, allowed_channels))
     return events
 
 
-def _overstock_events(rule, context, now, deliver_channels, channels_by_key):
+def _overstock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
         if action.status != "optimize":
@@ -314,11 +359,11 @@ def _overstock_events(rule, context, now, deliver_channels, channels_by_key):
             f"{action.name} at {action.days_of_inventory:.0f} days of cover — "
             f"${getattr(action, 'cash_tied_up', 0):,.0f} parked inventory."
         )
-        events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key))
+        events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key, allowed_channels))
     return events
 
 
-def _supplier_events(rule, context, now, deliver_channels, channels_by_key):
+def _supplier_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for vendor in context.supplier_scores:
         if vendor.on_time_pct >= rule.threshold:
@@ -327,11 +372,11 @@ def _supplier_events(rule, context, now, deliver_channels, channels_by_key):
             f"Vendor {vendor.vendor} on-time rate dropped to {vendor.on_time_pct:.0f}%. "
             "Consider extending safety stock for this vendor's SKUs."
         )
-        events.append(_fire(rule, None, vendor.vendor, msg, now, deliver_channels, channels_by_key))
+        events.append(_fire(rule, None, vendor.vendor, msg, now, deliver_channels, channels_by_key, allowed_channels))
     return events
 
 
-def _forecast_events(rule, context, now, deliver_channels, channels_by_key):
+def _forecast_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for forecast in context.forecasts:
         if forecast.stockout_probability_30d * 100 < rule.threshold:
@@ -340,16 +385,18 @@ def _forecast_events(rule, context, now, deliver_channels, channels_by_key):
             f"Forecast flags {forecast.sku_id} with {forecast.stockout_probability_30d*100:.0f}% "
             "stockout probability in the next 30 days."
         )
-        events.append(_fire(rule, forecast.sku_id, forecast.sku_id, msg, now, deliver_channels, channels_by_key))
+        events.append(_fire(rule, forecast.sku_id, forecast.sku_id, msg, now, deliver_channels, channels_by_key, allowed_channels))
     return events
 
 
-def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_key):
+def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_key, allowed_channels):
     channels_sent = []
     delivered = not deliver_channels
 
     if deliver_channels:
         for channel in rule.channels:
+            if allowed_channels is not None and channel not in allowed_channels:
+                continue
             config = channels_by_key.get(channel)
             if not config or not config.enabled or not config.target:
                 continue

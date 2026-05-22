@@ -1,14 +1,16 @@
 """Reusable FastAPI dependencies for authentication and DB session."""
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated, Callable, Optional
 
 from fastapi import Cookie, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from app.db.models import User
+from app.db.models import Subscription, User
 from app.db.session import get_db_session
 from app.services.auth import SESSION_COOKIE_NAME, resolve_session
+from app.services.plan_entitlements import FeatureKey, plan_allows_feature
 
 
 def get_current_user(
@@ -74,10 +76,6 @@ def require_active_access(
 
     from datetime import datetime, timedelta, timezone
 
-    from sqlalchemy import select
-
-    from app.db.models import Subscription
-
     # Check trial window. Backfill trial_ends_at for accounts created before
     # the column was added — they get a fresh 14-day window on first access.
     trial_ends = user.trial_ends_at
@@ -97,7 +95,49 @@ def require_active_access(
     if sub is not None and sub.status in ("active", "trialing"):
         return user
 
+    from app.services.billing import reconcile_subscription_from_stripe
+
+    reconciled = reconcile_subscription_from_stripe(db, user=user)
+    if reconciled is not None and reconciled.status in ("active", "trialing"):
+        return user
+
     raise HTTPException(
         status_code=402,
         detail="Your trial has ended. Subscribe to continue using skubase.",
     )
+
+
+def require_plan_feature(feature: FeatureKey) -> Callable[..., User]:
+    """Require active access plus a paid plan that includes a feature.
+
+    Trial users get full product access so they can evaluate higher-tier
+    workflows before choosing a plan.
+    """
+
+    def dependency(
+        db: Annotated[DbSession, Depends(get_db_session)],
+        user: Annotated[User, Depends(require_active_access)],
+    ) -> User:
+        if user.is_admin:
+            return user
+
+        from datetime import datetime, timezone
+
+        trial_ends = user.trial_ends_at
+        if trial_ends is not None:
+            if trial_ends.tzinfo is None:
+                trial_ends = trial_ends.replace(tzinfo=timezone.utc)
+            if trial_ends > datetime.now(timezone.utc):
+                return user
+
+        sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+        if sub is not None and sub.status in ("active", "trialing"):
+            if plan_allows_feature(sub.plan, feature):
+                return user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your current plan does not include this feature. Upgrade to continue.",
+        )
+
+    return dependency

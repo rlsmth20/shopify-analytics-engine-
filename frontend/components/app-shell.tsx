@@ -6,12 +6,14 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SHOPIFY_DOMAIN_STORAGE_KEY } from "@/lib/app-helpers";
+import { planToTier, tierAllows, type PlanTierKey } from "@/lib/plans";
 
 type NavItem = {
   href: string;
   label: string;
   section: "Command" | "Intelligence" | "Operations" | "Settings";
   icon: string;
+  minTier?: PlanTierKey;
 };
 
 const navigationItems: NavItem[] = [
@@ -20,11 +22,11 @@ const navigationItems: NavItem[] = [
   { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "*" },
   { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "o" },
   { href: "/analytics", label: "Analytics", section: "Intelligence", icon: "<>" },
-  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o" },
+  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o", minTier: "growth" },
   { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "o" },
-  { href: "/transfers", label: "Transfers", section: "Operations", icon: "*" },
-  { href: "/bundles", label: "Bundles & Kits", section: "Operations", icon: "<>" },
-  { href: "/liquidation", label: "Liquidation", section: "Operations", icon: "o" },
+  { href: "/transfers", label: "Transfers", section: "Operations", icon: "*", minTier: "growth" },
+  { href: "/bundles", label: "Bundles & Kits", section: "Operations", icon: "<>", minTier: "growth" },
+  { href: "/liquidation", label: "Liquidation", section: "Operations", icon: "o", minTier: "growth" },
   { href: "/store-sync", label: "Store Sync", section: "Settings", icon: ">" },
   { href: "/lead-time-settings", label: "Lead Times", section: "Settings", icon: "*" },
   { href: "/billing", label: "Billing", section: "Settings", icon: "<>" },
@@ -138,10 +140,16 @@ const SECTION_ORDER: NavItem["section"][] = [
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
+type Subscription = {
+  plan: string;
+  status: string;
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [shopifyDomain, setShopifyDomain] = useState("");
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   // hasRealData: true once the shop has any products in the DB. Hides the
   // "Demo data" chip and the yellow demo-mode banner so paid customers
   // don't see "demo" labels on their own data.
@@ -161,6 +169,27 @@ export function AppShell({ children }: { children: ReactNode }) {
       setShopifyDomain(storedDomain);
     }
   }, [pathname]);
+
+  useEffect(() => {
+    if (user.id === 0) {
+      setSubscription(null);
+      return;
+    }
+
+    let cancelled = false;
+    void fetch(`${API_BASE}/billing/me`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: Subscription | null) => {
+        if (!cancelled) setSubscription(data);
+      })
+      .catch(() => {
+        if (!cancelled) setSubscription(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,6 +221,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     items: navigationItems.filter((item) => item.section === section)
   }));
 
+  const paidTier =
+    subscription?.status === "active" || subscription?.status === "trialing"
+      ? planToTier(subscription.plan)
+      : null;
+  const unlockAll = user.id === 0 || Boolean(user.in_trial) || Boolean(user.is_admin);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -210,16 +245,27 @@ export function AppShell({ children }: { children: ReactNode }) {
               {group.items.map((item) => {
                 const isActive =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const isLocked =
+                  Boolean(item.minTier) &&
+                  !unlockAll &&
+                  !tierAllows(paidTier, item.minTier!);
+
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
-                    className={`nav-link${isActive ? " nav-link-active" : ""}`}
+                    href={isLocked ? "/pricing" : item.href}
+                    className={`nav-link${isActive ? " nav-link-active" : ""}${
+                      isLocked ? " nav-link-locked" : ""
+                    }`}
+                    title={isLocked ? `${item.label} is included on Growth and Scale.` : undefined}
                   >
                     <span className="nav-link-icon" aria-hidden>
                       {item.icon}
                     </span>
                     <span className="nav-link-label">{item.label}</span>
+                    {isLocked ? (
+                      <span className="nav-link-gate">Growth</span>
+                    ) : null}
                   </Link>
                 );
               })}

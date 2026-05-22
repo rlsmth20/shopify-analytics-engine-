@@ -49,6 +49,7 @@ def read_dashboard(
 
     return build_dashboard(
         skus,
+        shop_id=user.shop_id,
         daily_history_fn=daily_history,
         recent_revenue_fn=recent_revenue,
         start_weekday=start_weekday_for_shop_history(db, user.shop_id),

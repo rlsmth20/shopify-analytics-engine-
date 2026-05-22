@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
+import { PLAN_LABELS, PRICING_TIERS } from "@/lib/plans";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -15,16 +16,6 @@ type Subscription = {
   cancel_at_period_end: boolean;
   has_payment_method: boolean;
   stripe_configured: boolean;
-};
-
-const PLAN_LABELS: Record<string, string> = {
-  starter_monthly: "Starter ($29/mo)",
-  growth_monthly: "Growth ($99/mo)",
-  scale_monthly: "Scale ($199/mo)",
-  starter_annual: "Starter (annual)",
-  growth_annual: "Growth (annual)",
-  scale_annual: "Scale (annual)",
-  none: "No active plan",
 };
 
 function formatDate(iso: string | null): string {
@@ -203,6 +194,31 @@ export default function BillingPage() {
           </p>
         </SectionCard>
       </div>
+
+      <SectionCard>
+        <div className="section-heading">
+          <div>
+            <p className="section-eyebrow">Plan gates</p>
+            <h2 className="section-title section-title-small">What each tier unlocks</h2>
+          </div>
+        </div>
+        <div className="signal-list">
+          {PRICING_TIERS.map((tier) => (
+            <div key={tier.key} className="signal-item">
+              <div>
+                <p className="signal-title">{tier.name}</p>
+                <p className="signal-copy">{tier.limit}</p>
+                <p className="signal-copy">
+                  {tier.features
+                    .filter((feature) => feature.included)
+                    .map((feature) => feature.label)
+                    .join(" | ")}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
 
       <SectionCard>
         <div className="section-heading">

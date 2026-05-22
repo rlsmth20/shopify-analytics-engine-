@@ -116,6 +116,7 @@ export default function ForecastPage() {
                 }
               />
               <Kpi label="Confidence" value={selected.confidence} />
+              <Kpi label="History" value={`${selected.history_days ?? 0}d`} />
               <Kpi label="Method" value={
                 selected.method === "holt_double_exponential" ? "Holt DES"
                 : selected.method === "moving_average" ? "Moving avg"
@@ -197,6 +198,20 @@ function ExplainCard({ selected }: { selected: ForecastResult }) {
             <div><dt>30d stockout probability</dt><dd>{percent(selected.stockout_probability_30d, 0)}</dd></div>
           </dl>
           <p className="explain-card-explain">{selected.explain}</p>
+          {selected.data_quality_warnings?.length ? (
+            <div className="forecast-warning-list">
+              {selected.data_quality_warnings.map((warning) => (
+                <p key={warning} className="forecast-warning">
+                  {warning}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          {selected.adjusted_stockout_days ? (
+            <p className="explain-card-footnote">
+              Adjusted {selected.adjusted_stockout_days} recent zero-sales days because the SKU appears stockout-limited.
+            </p>
+          ) : null}
           <p className="explain-card-footnote">
             This is the math the rest of the market hides.
           </p>

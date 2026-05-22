@@ -36,6 +36,8 @@ PLAN_BY_PRICE_ID: dict[str, str] = {
     pid: name for name, pid in PRICE_IDS.items() if pid
 }
 
+ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing"}
+
 FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 
 
@@ -67,6 +69,21 @@ def get_or_create_customer(db: DbSession, *, user: User) -> str:
     if stripe is None:
         raise RuntimeError("Stripe is not configured (STRIPE_SECRET_KEY missing).")
 
+    existing_customer_id = _find_stripe_customer_id_by_email(stripe, user.email)
+    if existing_customer_id:
+        if sub is None:
+            sub = Subscription(
+                shop_id=user.shop_id,
+                stripe_customer_id=existing_customer_id,
+                plan="none",
+                status="inactive",
+            )
+            db.add(sub)
+        else:
+            sub.stripe_customer_id = existing_customer_id
+        db.commit()
+        return existing_customer_id
+
     customer = stripe.Customer.create(
         email=user.email,
         metadata={"shop_id": str(user.shop_id), "user_id": str(user.id)},
@@ -84,6 +101,135 @@ def get_or_create_customer(db: DbSession, *, user: User) -> str:
         sub.stripe_customer_id = customer.id
     db.commit()
     return customer.id
+
+
+def _find_stripe_customer_id_by_email(stripe, email: str) -> str | None:
+    try:
+        customers = stripe.Customer.list(email=email, limit=10)
+    except Exception as exc:
+        logger.warning("Stripe customer lookup failed for %s: %s", email, exc)
+        return None
+
+    data = getattr(customers, "data", None)
+    if data is None and isinstance(customers, dict):
+        data = customers.get("data", [])
+    for customer in data or []:
+        customer_id = getattr(customer, "id", None)
+        if customer_id is None and isinstance(customer, dict):
+            customer_id = customer.get("id")
+        if customer_id:
+            return str(customer_id)
+    return None
+
+
+def _get_first_item_price_id(subscription: object) -> str:
+    if isinstance(subscription, dict):
+        items = subscription.get("items", {}).get("data", [])
+        if not items:
+            return ""
+        return str(items[0].get("price", {}).get("id", "") or "")
+
+    items = getattr(getattr(subscription, "items", None), "data", [])
+    if not items:
+        return ""
+    price = getattr(items[0], "price", None)
+    return str(getattr(price, "id", "") or "")
+
+
+def _get_attr(obj: object, key: str, default=None):
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def _mirror_stripe_subscription(
+    db: DbSession,
+    *,
+    user: User,
+    customer_id: str,
+    stripe_subscription: object,
+) -> Subscription:
+    sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+    if sub is None:
+        sub = Subscription(shop_id=user.shop_id)
+        db.add(sub)
+
+    sub.stripe_customer_id = customer_id
+    sub.stripe_subscription_id = str(_get_attr(stripe_subscription, "id", "") or "")
+    sub.status = str(_get_attr(stripe_subscription, "status", "inactive") or "inactive")
+    sub.cancel_at_period_end = bool(
+        _get_attr(stripe_subscription, "cancel_at_period_end", False)
+    )
+
+    period_end = _get_attr(stripe_subscription, "current_period_end")
+    if isinstance(period_end, (int, float)):
+        sub.current_period_end = datetime.fromtimestamp(int(period_end), tz=timezone.utc)
+
+    price_id = _get_first_item_price_id(stripe_subscription)
+    if price_id in PLAN_BY_PRICE_ID:
+        sub.plan = PLAN_BY_PRICE_ID[price_id]
+
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+
+def reconcile_subscription_from_stripe(db: DbSession, *, user: User) -> Subscription | None:
+    """Repair local subscription state from Stripe for the logged-in user.
+
+    This covers missed webhooks, deleted local rows, and the common support case
+    where a customer paid in Stripe but the local access gate still sees an
+    expired trial.
+    """
+    stripe = _stripe()
+    if stripe is None:
+        return None
+
+    local_sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+    customer_ids: list[str] = []
+    if local_sub is not None and local_sub.stripe_customer_id:
+        customer_ids.append(local_sub.stripe_customer_id)
+
+    found_by_email = _find_stripe_customer_id_by_email(stripe, user.email)
+    if found_by_email and found_by_email not in customer_ids:
+        customer_ids.append(found_by_email)
+
+    for customer_id in customer_ids:
+        try:
+            subscriptions = stripe.Subscription.list(
+                customer=customer_id,
+                status="all",
+                limit=10,
+                expand=["data.items.data.price"],
+            )
+        except Exception as exc:
+            logger.warning("Stripe subscription lookup failed for %s: %s", customer_id, exc)
+            continue
+
+        data = getattr(subscriptions, "data", None)
+        if data is None and isinstance(subscriptions, dict):
+            data = subscriptions.get("data", [])
+        candidates = list(data or [])
+        active = [
+            candidate
+            for candidate in candidates
+            if str(_get_attr(candidate, "status", "")) in ACTIVE_SUBSCRIPTION_STATUSES
+        ]
+        if not active:
+            continue
+
+        active.sort(
+            key=lambda candidate: int(_get_attr(candidate, "current_period_end", 0) or 0),
+            reverse=True,
+        )
+        return _mirror_stripe_subscription(
+            db,
+            user=user,
+            customer_id=customer_id,
+            stripe_subscription=active[0],
+        )
+
+    return None
 
 
 def create_checkout_session(
@@ -217,6 +363,11 @@ def verify_webhook_signature(*, payload: bytes, signature_header: str) -> Option
 def current_subscription_summary(db: DbSession, *, user: User) -> dict:
     """Frontend-friendly view of the current user's subscription."""
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+    if sub is None or sub.status not in ACTIVE_SUBSCRIPTION_STATUSES:
+        reconciled = reconcile_subscription_from_stripe(db, user=user)
+        if reconciled is not None:
+            sub = reconciled
+
     if sub is None:
         return {
             "plan": "none",

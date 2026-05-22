@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Inventory, OrderLineItem, Product
 from app.schemas import SkuDetail
+from app.services.transfers import LocationStock
 
 DEFAULT_COST_RATIO = Decimal("0.40")
 
@@ -319,6 +320,69 @@ def load_recent_daily_revenue_for_shop(
         day = (now - timedelta(days=offset)).date().isoformat()
         points.append((offset, rev_by_day.get(day, 0.0)))
     return points
+
+
+def load_location_stocks_for_shop(db: Session, shop_id: int) -> list[LocationStock]:
+    """Build per-location stock snapshots for transfer recommendations.
+
+    Shopify gives inventory by location, while order history is currently shop-wide.
+    Until location-specific demand lands, allocate each SKU's recent velocity across
+    locations in proportion to on-hand stock, with a small floor so low-stock
+    locations can still be identified as transfer candidates.
+    """
+    products = db.scalars(select(Product).where(Product.shop_id == shop_id)).all()
+    if not products:
+        return []
+
+    now = _now_naive_utc()
+    thirty_days_ago = now - timedelta(days=30)
+    sales_rows = db.execute(
+        select(
+            OrderLineItem.product_id,
+            func.coalesce(func.sum(OrderLineItem.quantity), 0).label("sales_30d"),
+        )
+        .where(OrderLineItem.shop_id == shop_id)
+        .where(OrderLineItem.created_at >= thirty_days_ago)
+        .group_by(OrderLineItem.product_id)
+    ).all()
+    sales_by_product = {int(row.product_id): int(row.sales_30d or 0) for row in sales_rows}
+
+    inventory_rows = db.scalars(
+        select(Inventory).where(Inventory.shop_id == shop_id)
+    ).all()
+    by_product: dict[int, list[Inventory]] = {}
+    for row in inventory_rows:
+        by_product.setdefault(row.product_id, []).append(row)
+
+    snapshots: list[LocationStock] = []
+    for product in products:
+        rows = [row for row in by_product.get(product.id, []) if row.quantity > 0]
+        if len(rows) < 2:
+            continue
+
+        total_on_hand = sum(row.quantity for row in rows)
+        total_velocity = sales_by_product.get(product.id, 0) / 30
+        if total_velocity <= 0 or total_on_hand <= 0:
+            continue
+
+        sku_id = _slugified_sku_id_for_product(product)
+        name = product.name + (f" / {product.variant_name}" if product.variant_name else "")
+        location_count = len(rows)
+        for row in rows:
+            inventory_share = row.quantity / total_on_hand
+            equal_share = 1 / location_count
+            allocated_velocity = total_velocity * ((inventory_share + equal_share) / 2)
+            snapshots.append(
+                LocationStock(
+                    sku_id=sku_id,
+                    name=name,
+                    location=row.shopify_location_id,
+                    on_hand=row.quantity,
+                    daily_velocity=max(allocated_velocity, 0.01),
+                )
+            )
+
+    return snapshots
 
 
 def start_weekday_for_shop_history(

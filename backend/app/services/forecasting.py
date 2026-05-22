@@ -42,21 +42,26 @@ class ForecastInputs:
 
 
 def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> ForecastResult:
-    history = _clean_history(inputs.daily_history)
+    raw_history = _clean_history(inputs.daily_history)
+    history, start_weekday, adjusted_days, warnings = _prepare_history_for_forecast(
+        raw_history,
+        on_hand=inputs.on_hand,
+        start_weekday=inputs.start_weekday,
+    )
     if len(history) < MIN_HISTORY_DAYS:
-        return _naive_forecast(inputs, history, horizon_days)
+        return _naive_forecast(inputs, history, horizon_days, adjusted_days, warnings)
 
     weekly_index, seasonality_pattern = _detect_weekly_seasonality(
-        history, inputs.start_weekday
+        history, start_weekday
     )
-    deseasonalized = _deseasonalize(history, weekly_index, inputs.start_weekday)
+    deseasonalized = _deseasonalize(history, weekly_index, start_weekday)
 
     level, trend = _holt_double_smoothing(deseasonalized)
     residuals = _residuals(deseasonalized, level, trend)
     sigma = statistics.pstdev(residuals) if len(residuals) > 2 else max(level * 0.25, 0.5)
 
     # Project horizon days, re-applying seasonality
-    next_weekday = (inputs.start_weekday + len(history)) % 7
+    next_weekday = (start_weekday + len(history)) % 7
     points: list[ForecastPoint] = []
     for i in range(horizon_days):
         weekday = (next_weekday + i) % 7
@@ -123,13 +128,74 @@ def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> Fo
             on_hand=inputs.on_hand,
             stockout_prob=stockout_prob,
             sigma=sigma,
+            warnings=warnings,
         ),
+        history_days=len(history),
+        adjusted_stockout_days=adjusted_days,
+        data_quality_warnings=warnings,
     )
 
 
 def _clean_history(history: list[float]) -> list[float]:
     cleaned = [max(0.0, float(v)) for v in history[-MAX_HISTORY_DAYS:]]
     return cleaned
+
+
+def _prepare_history_for_forecast(
+    history: list[float],
+    *,
+    on_hand: int,
+    start_weekday: int,
+) -> tuple[list[float], int, int, list[str]]:
+    warnings: list[str] = []
+    if not history:
+        return history, start_weekday, 0, ["No sales history is available yet."]
+
+    first_sale_idx = next((i for i, value in enumerate(history) if value > 0), None)
+    if first_sale_idx is None:
+        return history, start_weekday, 0, [
+            "No demand signal yet; all imported sales-history days are zero."
+        ]
+
+    if first_sale_idx > 7:
+        warnings.append(
+            f"Ignored {first_sale_idx} leading zero-sales days before the first observed sale."
+        )
+        history = history[first_sale_idx:]
+        start_weekday = (start_weekday + first_sale_idx) % 7
+
+    non_zero_days = sum(1 for value in history if value > 0)
+    if len(history) < 30:
+        warnings.append("Limited history: fewer than 30 days are available for this SKU.")
+    elif len(history) < 60:
+        warnings.append("Moderate history: forecast confidence will improve after 60+ days.")
+
+    if non_zero_days and non_zero_days / max(len(history), 1) < 0.2:
+        warnings.append("Sparse demand: many days have no sales, so reorder timing is less certain.")
+
+    if len(history) >= 28:
+        recent_14 = sum(history[-14:]) / 14
+        prior = history[:-14]
+        prior_avg = sum(prior) / len(prior) if prior else 0.0
+        if recent_14 >= max(prior_avg * 2.0, prior_avg + 0.5) and recent_14 >= 0.5:
+            warnings.append("New fast-seller signal: recent velocity is materially above prior history.")
+
+    adjusted_days = 0
+    if on_hand <= 0 and len(history) >= 21 and sum(history[-7:]) == 0 and sum(history[-21:-7]) > 0:
+        replacement = _recent_nonzero_average(history[:-7])
+        if replacement > 0:
+            history = [*history[:-7], *([replacement] * 7)]
+            adjusted_days = 7
+            warnings.append(
+                "Stockout-limited demand: last 7 zero-sales days were adjusted because inventory is currently zero."
+            )
+
+    return history, start_weekday, adjusted_days, warnings
+
+
+def _recent_nonzero_average(history: list[float]) -> float:
+    values = [value for value in history[-56:] if value > 0]
+    return sum(values) / len(values) if values else 0.0
 
 
 def _project_future_demand(
@@ -149,7 +215,11 @@ def _project_future_demand(
 
 
 def _naive_forecast(
-    inputs: ForecastInputs, history: list[float], horizon_days: int
+    inputs: ForecastInputs,
+    history: list[float],
+    horizon_days: int,
+    adjusted_days: int,
+    warnings: list[str],
 ) -> ForecastResult:
     """Fallback when we don't have enough history for robust statistics."""
     avg = sum(history) / len(history) if history else 0.0
@@ -187,6 +257,9 @@ def _naive_forecast(
             "Not enough history to detect trend or seasonality — projection is a flat "
             "average of the days we do have."
         ),
+        history_days=len(history),
+        adjusted_stockout_days=adjusted_days,
+        data_quality_warnings=warnings,
     )
 
 
@@ -320,6 +393,7 @@ def _build_explanation(
     on_hand: int,
     stockout_prob: float,
     sigma: float,
+    warnings: list[str],
 ) -> str:
     trend_text = {
         "rising": "Demand is trending up",
@@ -341,4 +415,9 @@ def _build_explanation(
     risk_msg = (
         f"Stockout probability in the next 30 days is {stockout_prob * 100:.0f}%."
     )
-    return " ".join(s for s in [trend_text + " " + season_text, coverage_msg, risk_msg] if s).strip()
+    warning_msg = f"Data note: {warnings[0]}" if warnings else ""
+    return " ".join(
+        s
+        for s in [trend_text + " " + season_text, coverage_msg, risk_msg, warning_msg]
+        if s
+    ).strip()

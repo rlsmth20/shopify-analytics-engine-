@@ -14,13 +14,14 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from app.db.models import Shop, User
+from app.db.models import Shop, Subscription, User
 from app.db.session import get_db_session
 from app.services.auth import (
     get_or_create_user_for_email,
     issue_magic_link_token,
     normalize_email,
 )
+from app.services.billing import current_subscription_summary, reconcile_subscription_from_stripe
 from app.services.transactional_email import send_magic_link_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -123,3 +124,56 @@ def list_users(
         UserSummary(id=u.id, email=u.email, shop_id=u.shop_id, is_admin=u.is_admin)
         for u in users
     ]
+
+
+class ReconcileBillingRequest(BaseModel):
+    email: EmailStr
+
+
+class ReconcileBillingResponse(BaseModel):
+    email: str
+    user_id: int
+    shop_id: int
+    plan: str
+    status: str
+    stripe_customer_id: Optional[str]
+    stripe_subscription_id: Optional[str]
+
+
+@router.post("/billing/reconcile", response_model=ReconcileBillingResponse)
+def reconcile_billing(
+    payload: ReconcileBillingRequest,
+    db: Annotated[DbSession, Depends(get_db_session)],
+    x_admin_token: Annotated[Optional[str], Header(alias="X-Admin-Token")] = None,
+) -> ReconcileBillingResponse:
+    _check_admin_bootstrap(x_admin_token)
+    email = normalize_email(str(payload.email))
+    user = db.scalar(select(User).where(User.email == email))
+    if user is None:
+        raise HTTPException(status_code=404, detail=f"User '{email}' not found.")
+
+    reconcile_subscription_from_stripe(db, user=user)
+    sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+    if sub is None:
+        summary = current_subscription_summary(db, user=user)
+        sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+        if sub is None:
+            return ReconcileBillingResponse(
+                email=user.email,
+                user_id=user.id,
+                shop_id=user.shop_id,
+                plan=str(summary["plan"]),
+                status=str(summary["status"]),
+                stripe_customer_id=None,
+                stripe_subscription_id=None,
+            )
+
+    return ReconcileBillingResponse(
+        email=user.email,
+        user_id=user.id,
+        shop_id=user.shop_id,
+        plan=sub.plan,
+        status=sub.status,
+        stripe_customer_id=sub.stripe_customer_id,
+        stripe_subscription_id=sub.stripe_subscription_id,
+    )

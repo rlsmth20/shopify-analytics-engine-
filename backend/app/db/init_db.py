@@ -42,6 +42,14 @@ def run_safe_migrations() -> None:
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
                     "trial_ends_at TIMESTAMP WITH TIME ZONE"
                 ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "shop_id INTEGER REFERENCES shops(id) ON DELETE CASCADE"
+                ))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_alert_rules_shop_id "
+                    "ON alert_rules (shop_id)"
+                ))
             else:
                 # SQLite: check column existence via PRAGMA before adding.
                 result = conn.execute(text("PRAGMA table_info(users)"))
@@ -50,6 +58,17 @@ def run_safe_migrations() -> None:
                     conn.execute(text(
                         "ALTER TABLE users ADD COLUMN trial_ends_at TIMESTAMP"
                     ))
+                result = conn.execute(text("PRAGMA table_info(alert_rules)"))
+                alert_columns = {row[1] for row in result}
+                if "shop_id" not in alert_columns:
+                    conn.execute(text(
+                        "ALTER TABLE alert_rules ADD COLUMN shop_id INTEGER "
+                        "REFERENCES shops(id) ON DELETE CASCADE"
+                    ))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_alert_rules_shop_id "
+                    "ON alert_rules (shop_id)"
+                ))
             conn.commit()
         except Exception:
             logger.exception("Safe migration failed (non-fatal if column already exists)")

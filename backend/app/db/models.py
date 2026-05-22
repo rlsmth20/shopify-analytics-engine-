@@ -205,6 +205,11 @@ class AlertRuleRecord(Base):
     __tablename__ = "alert_rules"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    shop_id: Mapped[int | None] = mapped_column(
+        ForeignKey("shops.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(String(255))
     trigger: Mapped[str] = mapped_column(String(32), index=True)
     severity: Mapped[str] = mapped_column(String(32))
