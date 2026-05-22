@@ -96,68 +96,6 @@ export function getActionImpactValue(action: InventoryAction): number {
   return action.cash_tied_up;
 }
 
-export function exportActionsCsv(actions: InventoryAction[]): void {
-  const rows = actions.map((action) => ({
-    status: action.status,
-    sku_name: action.name,
-    current_on_hand: String(action.current_on_hand),
-    recommended_action: action.recommended_action,
-    explanation: action.explanation ?? "",
-    priority_score: action.priority_score.toFixed(2),
-    daily_velocity: String(action.daily_velocity),
-    safety_stock_units: String(action.safety_stock_units),
-    target_inventory_units: String(action.target_inventory_units),
-    reorder_point_units: String(action.reorder_point_units),
-    impact_type:
-      action.status === "urgent" ? "estimated_profit_impact" : "cash_tied_up",
-    impact_value: String(getActionImpactValue(action)),
-    lead_time_source: action.lead_time_source,
-    target_coverage_days: String(action.target_coverage_days)
-  }));
-
-  const headers = [
-    "status",
-    "sku_name",
-    "current_on_hand",
-    "recommended_action",
-    "explanation",
-    "priority_score",
-    "daily_velocity",
-    "safety_stock_units",
-    "target_inventory_units",
-    "reorder_point_units",
-    "impact_type",
-    "impact_value",
-    "lead_time_source",
-    "target_coverage_days"
-  ];
-  const csvLines = [
-    headers.join(","),
-    ...rows.map((row) =>
-      headers
-        .map((header) => escapeCsvValue(row[header as keyof typeof row]))
-        .join(",")
-    )
-  ];
-
-  const blob = new Blob([csvLines.join("\r\n")], {
-    type: "text/csv;charset=utf-8;"
-  });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `inventory-actions-${new Date()
-    .toISOString()
-    .slice(0, 10)}.csv`;
-  link.click();
-  window.URL.revokeObjectURL(url);
-}
-
-function escapeCsvValue(value: string): string {
-  const normalizedValue = value.replace(/"/g, '""');
-  return `"${normalizedValue}"`;
-}
-
 export function summarizeDataSource(
   dataSource: "db" | "mock" | null
 ): string | null {

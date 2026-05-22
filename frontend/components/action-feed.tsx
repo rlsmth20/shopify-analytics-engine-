@@ -6,13 +6,13 @@ import { ActionCard } from "@/components/action-card";
 import { EmptyState } from "@/components/empty-state";
 import type { ActionDataSource, InventoryAction } from "@/lib/api";
 import {
-  exportActionsCsv,
   getActionImpactValue,
   statusLabel,
   summarizeDataSource,
   type ActionFilter,
   type ActionSort
 } from "@/lib/app-helpers";
+import { exportActionsReport } from "@/lib/report-export";
 
 export function ActionFeed({
   actions,
@@ -94,9 +94,9 @@ export function ActionFeed({
               type="button"
               className="button button-secondary"
               disabled={visibleActions.length === 0}
-              onClick={() => exportActionsCsv(visibleActions)}
+              onClick={() => exportActionsReport(visibleActions)}
             >
-              Export CSV
+              Export report
             </button>
           </div>
         </div>

@@ -49,7 +49,7 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "AI-powered demand forecasting (Holt + seasonality)", included: true },
       { label: "ABC x XYZ classification", included: true },
       { label: "Supplier lead-time settings", included: true },
-      { label: "Purchase order drafts with CSV export", included: true },
+      { label: "Purchase order drafts with styled report export", included: true },
       { label: "Email + Slack alerts", included: true },
       { label: "Shopify-native ingestion", included: true },
       { label: "Self-serve setup", included: true },

@@ -10,6 +10,7 @@ import {
   updatePurchaseOrderStatus,
   type PurchaseOrderDraft,
 } from "@/lib/api-v2";
+import { exportPurchaseOrderReport } from "@/lib/report-export";
 
 const SERVICE_LEVELS = [0.9, 0.95, 0.975, 0.99];
 type ReceiptDraftLine = { qty: string; cost: string };
@@ -160,9 +161,9 @@ export default function PurchaseOrdersPage() {
                   <button
                     type="button"
                     className="button button-ghost"
-                    onClick={() => exportPurchaseOrderCsv(po)}
+                    onClick={() => exportPurchaseOrderReport(po)}
                   >
-                    Export CSV
+                    Export report
                   </button>
                 </div>
                 {receivingPo === po.po_id ? (
@@ -385,46 +386,4 @@ function sendPurchaseOrderToVendor(po: PurchaseOrderDraft): void {
   );
 
   window.location.href = `mailto:?subject=${subject}&body=${body}`;
-}
-
-function exportPurchaseOrderCsv(po: PurchaseOrderDraft): void {
-  const headers = ["po_id", "vendor", "sku_id", "sku_name", "qty", "unit_cost", "extended_cost"];
-  const rows = po.lines.map((line) => ({
-    po_id: po.po_id,
-    vendor: po.vendor,
-    sku_id: line.sku_id,
-    sku_name: line.name,
-    qty: String(line.qty),
-    unit_cost: line.unit_cost.toFixed(2),
-    extended_cost: line.extended_cost.toFixed(2),
-  }));
-  const csv = [
-    headers.join(","),
-    ...rows.map((row) =>
-      headers.map((header) => escapeCsv(row[header as keyof typeof row])).join(",")
-    ),
-  ].join("\r\n");
-
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${po.po_id.toLowerCase()}-${slugify(po.vendor)}.csv`;
-  link.click();
-  window.URL.revokeObjectURL(url);
-}
-
-function escapeCsv(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-
-  return value;
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
