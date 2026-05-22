@@ -7,6 +7,7 @@ from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import ForecastFeedResponse, ForecastResult
+from app.services.forecast_accuracy import backtest_forecast
 from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.shop_skus import (
     load_daily_history_for_shop_sku,
@@ -38,15 +39,22 @@ def list_forecasts(
     forecasts: list[ForecastResult] = []
     for sku in skus:
         history = histories.get(sku.sku_id, [])
+        inputs = ForecastInputs(
+            sku_id=sku.sku_id,
+            daily_history=history,
+            on_hand=sku.inventory,
+            start_weekday=start_weekday,
+        )
+        forecast = forecast_sku(inputs, horizon_days=horizon_days)
+        backtest = backtest_forecast(inputs)
         forecasts.append(
-            forecast_sku(
-                ForecastInputs(
-                    sku_id=sku.sku_id,
-                    daily_history=history,
-                    on_hand=sku.inventory,
-                    start_weekday=start_weekday,
-                ),
-                horizon_days=horizon_days,
+            forecast.model_copy(
+                update={
+                    "backtest_mae_14d": backtest.mae_14d,
+                    "backtest_mape_14d": backtest.mape_14d,
+                    "forecast_bias_14d": backtest.bias_14d,
+                    "trust_reasons": backtest.trust_reasons,
+                }
             )
         )
     forecasts.sort(key=lambda f: f.stockout_probability_30d, reverse=True)
@@ -65,12 +73,19 @@ def get_forecast(
     if sku is None:
         raise HTTPException(status_code=404, detail=f"SKU '{sku_id}' not found.")
     history = load_daily_history_for_shop_sku(db, user.shop_id, sku_id, 90)
-    return forecast_sku(
-        ForecastInputs(
-            sku_id=sku_id,
-            daily_history=history,
-            on_hand=sku.inventory,
-            start_weekday=start_weekday_for_shop_history(db, user.shop_id, 90),
-        ),
-        horizon_days=horizon_days,
+    inputs = ForecastInputs(
+        sku_id=sku_id,
+        daily_history=history,
+        on_hand=sku.inventory,
+        start_weekday=start_weekday_for_shop_history(db, user.shop_id, 90),
+    )
+    forecast = forecast_sku(inputs, horizon_days=horizon_days)
+    backtest = backtest_forecast(inputs)
+    return forecast.model_copy(
+        update={
+            "backtest_mae_14d": backtest.mae_14d,
+            "backtest_mape_14d": backtest.mape_14d,
+            "forecast_bias_14d": backtest.bias_14d,
+            "trust_reasons": backtest.trust_reasons,
+        }
     )

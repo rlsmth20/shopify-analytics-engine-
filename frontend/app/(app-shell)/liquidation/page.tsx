@@ -72,6 +72,15 @@ export default function LiquidationPage() {
           <p className="kpi-value">{suggestions.length}</p>
         </div>
       </div>
+      <div className="button-row">
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => exportLiquidationCsv(suggestions)}
+        >
+          Export markdown plan CSV
+        </button>
+      </div>
 
       <div className="liquidation-grid">
         {suggestions.map((s) => (
@@ -116,6 +125,56 @@ export default function LiquidationPage() {
       </div>
     </div>
   );
+}
+
+function exportLiquidationCsv(suggestions: LiquidationSuggestion[]): void {
+  const headers = [
+    "sku_id",
+    "name",
+    "tactic",
+    "on_hand",
+    "days_since_last_sale",
+    "capital_tied_up",
+    "suggested_markdown_pct",
+    "suggested_price",
+    "projected_recovered_capital",
+    "margin_impact_note",
+  ];
+  const rows = suggestions.map((item) => ({
+    sku_id: item.sku_id,
+    name: item.name,
+    tactic: TACTIC_LABELS[item.tactic],
+    on_hand: String(item.on_hand),
+    days_since_last_sale: String(item.days_since_last_sale),
+    capital_tied_up: item.capital_tied_up.toFixed(2),
+    suggested_markdown_pct: item.suggested_markdown_pct.toFixed(1),
+    suggested_price: item.suggested_price.toFixed(2),
+    projected_recovered_capital: item.projected_recovered_capital.toFixed(2),
+    margin_impact_note:
+      item.tactic === "donate_write_off"
+        ? "No cash recovery; use only when shelf space or write-off value wins."
+        : item.rationale,
+  }));
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers.map((header) => escapeCsv(row[header as keyof typeof row])).join(",")
+    ),
+  ].join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `skubase-liquidation-plan-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
+function escapeCsv(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }
 
 function Stat({

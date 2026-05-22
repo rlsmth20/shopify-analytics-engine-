@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -159,6 +160,81 @@ class ShopifySyncRun(Base):
     order_line_items_count: Mapped[int] = mapped_column(default=0)
 
     shop: Mapped[Shop] = relationship(back_populates="sync_runs")
+
+
+class PurchaseOrderRecord(Base):
+    __tablename__ = "purchase_orders"
+    __table_args__ = (
+        UniqueConstraint("shop_id", "po_id", name="uq_purchase_orders_shop_po"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    po_id: Mapped[str] = mapped_column(String(64), index=True)
+    vendor: Mapped[str] = mapped_column(String(255), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    expected_arrival_date: Mapped[str] = mapped_column(String(32), default="")
+    rationale: Mapped[str] = mapped_column(String(1000), default="")
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class PurchaseOrderLineRecord(Base):
+    __tablename__ = "purchase_order_lines"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_orders.id", ondelete="CASCADE"),
+        index=True,
+    )
+    sku_id: Mapped[str] = mapped_column(String(128), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    qty: Mapped[int] = mapped_column(Integer)
+    unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    extended_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    received_qty: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class PurchaseOrderReceiptRecord(Base):
+    __tablename__ = "purchase_order_receipts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_orders.id", ondelete="CASCADE"),
+        index=True,
+    )
+    vendor: Mapped[str] = mapped_column(String(255), index=True)
+    sku_id: Mapped[str] = mapped_column(String(128), index=True)
+    ordered_qty: Mapped[int] = mapped_column(Integer)
+    received_qty: Mapped[int] = mapped_column(Integer)
+    ordered_unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    received_unit_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    expected_arrival_date: Mapped[str] = mapped_column(String(32), default="")
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )
 
 
 class VendorLeadTime(Base):

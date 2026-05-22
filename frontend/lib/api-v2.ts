@@ -114,6 +114,10 @@ export type ForecastResult = {
   history_days: number;
   adjusted_stockout_days: number;
   data_quality_warnings: string[];
+  backtest_mae_14d: number | null;
+  backtest_mape_14d: number | null;
+  forecast_bias_14d: "over_forecast" | "under_forecast" | "balanced" | null;
+  trust_reasons: string[];
 };
 
 export type SkuScorecard = {
@@ -266,6 +270,8 @@ export type PurchaseOrderDraft = {
   total_cost: number;
   expected_arrival_date: string;
   rationale: string;
+  sent_at: string | null;
+  received_at: string | null;
 };
 
 export type AlertRule = {
@@ -424,6 +430,34 @@ export const fetchPurchaseOrders = (serviceLevel: number, signal?: AbortSignal) 
   get<{ drafts: PurchaseOrderDraft[]; total_capital_required: number }>(
     `/reorder/purchase-orders?service_level=${serviceLevel}`,
     signal
+  );
+
+export const savePurchaseOrder = (draft: PurchaseOrderDraft, signal?: AbortSignal) =>
+  postJson<{ po: PurchaseOrderDraft }>("/reorder/purchase-orders", { draft }, signal);
+
+export const updatePurchaseOrderStatus = (
+  poId: string,
+  status: PurchaseOrderDraft["status"],
+  signal?: AbortSignal,
+) =>
+  postJson<{ po: PurchaseOrderDraft }>(
+    `/reorder/purchase-orders/${encodeURIComponent(poId)}/status?status=${status}`,
+    {},
+    signal,
+  );
+
+export const receivePurchaseOrder = (
+  poId: string,
+  payload: {
+    lines: { sku_id: string; received_qty: number; received_unit_cost?: number | null }[];
+    received_at?: string | null;
+  },
+  signal?: AbortSignal,
+) =>
+  postJson<{ po: PurchaseOrderDraft }>(
+    `/reorder/purchase-orders/${encodeURIComponent(poId)}/receive`,
+    payload,
+    signal,
   );
 
 export const fetchSuppliers = (signal?: AbortSignal) =>

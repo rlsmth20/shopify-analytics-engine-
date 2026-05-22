@@ -7,6 +7,7 @@ from app.api.deps import require_plan_feature
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import SupplierScoreboardResponse
+from app.services.purchase_order_records import load_supplier_observations
 from app.services.shop_skus import load_skus_for_shop
 from app.services.supplier_scoring import build_supplier_scorecards
 
@@ -22,7 +23,5 @@ def read_supplier_scoreboard(
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
         return SupplierScoreboardResponse(vendors=[])
-    # Until real PO/receipt data exists, supplier observations are empty;
-    # build_supplier_scorecards handles an empty observation list gracefully.
-    scorecards = build_supplier_scorecards([], skus)
+    scorecards = build_supplier_scorecards(load_supplier_observations(db, user.shop_id), skus)
     return SupplierScoreboardResponse(vendors=scorecards)

@@ -70,6 +70,10 @@ class ForecastResult(ApiModel):
         description="Recent zero-sales days adjusted because the SKU appears stockout-limited.",
     )
     data_quality_warnings: list[str] = Field(default_factory=list)
+    backtest_mae_14d: Optional[float] = None
+    backtest_mape_14d: Optional[float] = None
+    forecast_bias_14d: Optional[Literal["over_forecast", "under_forecast", "balanced"]] = None
+    trust_reasons: list[str] = Field(default_factory=list)
 
 
 class ForecastFeedResponse(ApiModel):
@@ -263,11 +267,32 @@ class PurchaseOrderDraft(ApiModel):
     total_cost: float
     expected_arrival_date: str
     rationale: str
+    sent_at: Optional[datetime] = None
+    received_at: Optional[datetime] = None
 
 
 class PurchaseOrderDraftsResponse(ApiModel):
     drafts: list[PurchaseOrderDraft]
     total_capital_required: float
+
+
+class SavePurchaseOrderRequest(ApiModel):
+    draft: PurchaseOrderDraft
+
+
+class ReceivePurchaseOrderLineRequest(ApiModel):
+    sku_id: str
+    received_qty: int = Field(ge=0)
+    received_unit_cost: Optional[float] = Field(default=None, ge=0)
+
+
+class ReceivePurchaseOrderRequest(ApiModel):
+    lines: list[ReceivePurchaseOrderLineRequest]
+    received_at: Optional[datetime] = None
+
+
+class PurchaseOrderStatusResponse(ApiModel):
+    po: PurchaseOrderDraft
 
 
 # ---------------------------------------------------------------------------

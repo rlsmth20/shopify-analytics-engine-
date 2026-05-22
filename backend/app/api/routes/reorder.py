@@ -1,13 +1,25 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DbSession
 
 from app.api.deps import get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
-from app.schemas_v2 import PurchaseOrderDraftsResponse, ReorderFeedResponse
+from app.schemas_v2 import (
+    PurchaseOrderDraftsResponse,
+    PurchaseOrderStatusResponse,
+    ReceivePurchaseOrderRequest,
+    ReorderFeedResponse,
+    SavePurchaseOrderRequest,
+)
 from app.services.purchase_orders import build_purchase_order_drafts
+from app.services.purchase_order_records import (
+    list_saved_purchase_orders,
+    receive_purchase_order,
+    save_purchase_order,
+    update_purchase_order_status,
+)
 from app.services.reorder_optimizer import build_reorder_suggestions, build_vendor_totals
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
@@ -92,7 +104,56 @@ def list_po_drafts(
         service_level=service_level,
     )
     drafts = build_purchase_order_drafts(suggestions)
+    saved = list_saved_purchase_orders(db, user.shop_id)
     return PurchaseOrderDraftsResponse(
-        drafts=drafts,
-        total_capital_required=round(sum(d.total_cost for d in drafts), 2),
+        drafts=[*saved, *drafts],
+        total_capital_required=round(sum(d.total_cost for d in [*saved, *drafts]), 2),
     )
+
+
+@router.post("/purchase-orders", response_model=PurchaseOrderStatusResponse)
+def save_po_draft(
+    payload: SavePurchaseOrderRequest,
+    user: Annotated[User, Depends(require_active_access)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> PurchaseOrderStatusResponse:
+    return PurchaseOrderStatusResponse(
+        po=save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
+    )
+
+
+@router.post("/purchase-orders/{po_id}/status", response_model=PurchaseOrderStatusResponse)
+def update_po_status(
+    po_id: str,
+    status: str,
+    user: Annotated[User, Depends(require_active_access)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> PurchaseOrderStatusResponse:
+    if status not in {"draft", "ready", "sent", "received", "cancelled"}:
+        raise HTTPException(status_code=400, detail="Invalid purchase order status.")
+    po = update_purchase_order_status(db, shop_id=user.shop_id, po_id=po_id, status=status)
+    if po is None:
+        raise HTTPException(status_code=404, detail="Purchase order not found.")
+    return PurchaseOrderStatusResponse(po=po)
+
+
+@router.post("/purchase-orders/{po_id}/receive", response_model=PurchaseOrderStatusResponse)
+def receive_po(
+    po_id: str,
+    payload: ReceivePurchaseOrderRequest,
+    user: Annotated[User, Depends(require_active_access)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> PurchaseOrderStatusResponse:
+    po = receive_purchase_order(
+        db,
+        shop_id=user.shop_id,
+        po_id=po_id,
+        received_lines={
+            line.sku_id: (line.received_qty, line.received_unit_cost)
+            for line in payload.lines
+        },
+        received_at=payload.received_at,
+    )
+    if po is None:
+        raise HTTPException(status_code=404, detail="Purchase order not found.")
+    return PurchaseOrderStatusResponse(po=po)

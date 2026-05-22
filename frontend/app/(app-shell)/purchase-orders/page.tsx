@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import {
   currency,
   fetchPurchaseOrders,
+  receivePurchaseOrder,
+  savePurchaseOrder,
+  updatePurchaseOrderStatus,
   type PurchaseOrderDraft,
 } from "@/lib/api-v2";
 
@@ -17,6 +20,7 @@ export default function PurchaseOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [busyPo, setBusyPo] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,14 +120,34 @@ export default function PurchaseOrdersPage() {
                 <div className="po-card-actions">
                   <button
                     type="button"
-                    className="button-primary"
-                    onClick={() => sendPurchaseOrderToVendor(po)}
+                    className="button button-primary"
+                    onClick={() => void saveDraft(po)}
+                    disabled={busyPo === po.po_id}
+                  >
+                    Save draft
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-primary"
+                    onClick={() => {
+                      sendPurchaseOrderToVendor(po);
+                      void markStatus(po, "sent");
+                    }}
+                    disabled={busyPo === po.po_id}
                   >
                     Send to vendor
                   </button>
                   <button
                     type="button"
-                    className="button-ghost"
+                    className="button button-ghost"
+                    onClick={() => void receiveAll(po)}
+                    disabled={busyPo === po.po_id}
+                  >
+                    Receive all
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-ghost"
                     onClick={() => exportPurchaseOrderCsv(po)}
                   >
                     Export CSV
@@ -136,6 +160,50 @@ export default function PurchaseOrdersPage() {
       </div>
     </div>
   );
+
+  async function refresh() {
+    const r = await fetchPurchaseOrders(serviceLevel);
+    setDrafts(r.drafts);
+    setTotal(r.total_capital_required);
+  }
+
+  async function saveDraft(po: PurchaseOrderDraft) {
+    setBusyPo(po.po_id);
+    try {
+      await savePurchaseOrder(po);
+      await refresh();
+    } finally {
+      setBusyPo(null);
+    }
+  }
+
+  async function markStatus(po: PurchaseOrderDraft, status: PurchaseOrderDraft["status"]) {
+    setBusyPo(po.po_id);
+    try {
+      await savePurchaseOrder(po);
+      await updatePurchaseOrderStatus(po.po_id, status);
+      await refresh();
+    } finally {
+      setBusyPo(null);
+    }
+  }
+
+  async function receiveAll(po: PurchaseOrderDraft) {
+    setBusyPo(po.po_id);
+    try {
+      await savePurchaseOrder(po);
+      await receivePurchaseOrder(po.po_id, {
+        lines: po.lines.map((line) => ({
+          sku_id: line.sku_id,
+          received_qty: line.qty,
+          received_unit_cost: line.unit_cost,
+        })),
+      });
+      await refresh();
+    } finally {
+      setBusyPo(null);
+    }
+  }
 }
 
 function sendPurchaseOrderToVendor(po: PurchaseOrderDraft): void {

@@ -116,6 +116,25 @@ export default function ForecastPage() {
                 }
               />
               <Kpi label="Confidence" value={selected.confidence} />
+              <Kpi
+                label="14d error"
+                value={
+                  selected.backtest_mape_14d == null
+                    ? "n/a"
+                    : percent(selected.backtest_mape_14d, 0)
+                }
+                tone={
+                  selected.backtest_mape_14d != null && selected.backtest_mape_14d <= 0.3
+                    ? "positive"
+                    : selected.backtest_mape_14d != null && selected.backtest_mape_14d > 0.6
+                    ? "negative"
+                    : "neutral"
+                }
+              />
+              <Kpi
+                label="Bias"
+                value={(selected.forecast_bias_14d ?? "pending").replace(/_/g, " ")}
+              />
               <Kpi label="History" value={`${selected.history_days ?? 0}d`} />
               <Kpi label="Method" value={
                 selected.method === "holt_double_exponential" ? "Holt DES"
@@ -203,6 +222,15 @@ function ExplainCard({ selected }: { selected: ForecastResult }) {
               {selected.data_quality_warnings.map((warning) => (
                 <p key={warning} className="forecast-warning">
                   {warning}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          {selected.trust_reasons?.length ? (
+            <div className="forecast-warning-list">
+              {selected.trust_reasons.map((reason) => (
+                <p key={reason} className="forecast-warning">
+                  {reason}
                 </p>
               ))}
             </div>

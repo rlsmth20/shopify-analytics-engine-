@@ -24,6 +24,7 @@ const navigationItems: NavItem[] = [
   { href: "/analytics", label: "Analytics", section: "Intelligence", icon: "<>" },
   { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o", minTier: "growth" },
   { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "o" },
+  { href: "/stocky-migration", label: "Stocky Migration", section: "Operations", icon: ">" },
   { href: "/transfers", label: "Transfers", section: "Operations", icon: "*", minTier: "growth" },
   { href: "/bundles", label: "Bundles & Kits", section: "Operations", icon: "<>", minTier: "growth" },
   { href: "/liquidation", label: "Liquidation", section: "Operations", icon: "o", minTier: "growth" },
@@ -78,6 +79,12 @@ const pageMeta: Record<string, PageMeta> = {
     title: "Purchase order drafts",
     description:
       "Auto-consolidated POs by vendor, ready to review and send."
+  },
+  "/stocky-migration": {
+    eyebrow: "Operations",
+    title: "Stocky migration checklist",
+    description:
+      "A first-run workflow for replacing Stocky with safe sync, lead times, forecasting, and reorder review."
   },
   "/transfers": {
     eyebrow: "Operations",
