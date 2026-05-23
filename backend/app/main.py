@@ -30,6 +30,7 @@ from app.api.routes.suppliers import router as suppliers_router
 from app.api.routes.transfers import router as transfers_router
 from app.api.routes.waitlist import router as waitlist_router
 from app.api.routes.contact import router as contact_router
+from app.services.alert_scheduler import start_alert_scheduler, stop_alert_scheduler
 
 
 @asynccontextmanager
@@ -41,7 +42,11 @@ async def lifespan(app: FastAPI):
         # Log the error but don't crash — the /health endpoint must stay up
         # so Railway's healthcheck passes and deploy logs are visible.
         logger.exception("init_db failed at startup — DB may not be reachable yet.")
-    yield
+    start_alert_scheduler()
+    try:
+        yield
+    finally:
+        await stop_alert_scheduler()
 
 
 def create_app() -> FastAPI:

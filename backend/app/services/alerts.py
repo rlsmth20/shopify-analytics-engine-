@@ -153,8 +153,8 @@ def _seed_missing_channels(session, shop_id: int) -> None:
         session.add(
             NotificationChannelRecord(
                 channel=_channel_storage_key(shop_id, channel),
-                enabled=channel == "email",
-                target="alerts@example.com" if channel == "email" else "",
+                enabled=False,
+                target="",
                 verified=False,
             )
         )
@@ -270,6 +270,7 @@ def evaluate(
     context: EvaluationContext,
     deliver_channels: bool = False,
     allowed_channels: set[NotificationChannel] | None = None,
+    cooldown_seconds: int = 0,
 ) -> list[AlertEvent]:
     events: list[AlertEvent] = []
     now = datetime.now(timezone.utc)
@@ -280,6 +281,12 @@ def evaluate(
     for rule in rules:
         if not rule.enabled:
             continue
+        if deliver_channels and cooldown_seconds > 0 and rule.last_fired_at is not None:
+            last_fired_at = rule.last_fired_at
+            if last_fired_at.tzinfo is None:
+                last_fired_at = last_fired_at.replace(tzinfo=timezone.utc)
+            if (now - last_fired_at).total_seconds() < cooldown_seconds:
+                continue
         events.extend(
             _evaluate_rule(
                 rule,
@@ -400,6 +407,8 @@ def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_ke
             config = channels_by_key.get(channel)
             if not config or not config.enabled or not config.target:
                 continue
+            if _is_placeholder_target(config.target):
+                continue
             record = deliver(
                 channel=channel,
                 target=config.target,
@@ -410,11 +419,12 @@ def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_ke
                 channels_sent.append(channel)
                 delivered = True
 
-    with SessionLocal() as session:
-        rule_record = session.get(AlertRuleRecord, rule.id)
-        if rule_record is not None:
-            rule_record.last_fired_at = now
-            session.commit()
+    if deliver_channels:
+        with SessionLocal() as session:
+            rule_record = session.get(AlertRuleRecord, rule.id)
+            if rule_record is not None:
+                rule_record.last_fired_at = now
+                session.commit()
 
     return AlertEvent(
         id=str(uuid.uuid4()),
@@ -429,3 +439,7 @@ def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_ke
         channels_sent=channels_sent,
         delivered=delivered,
     )
+
+
+def _is_placeholder_target(target: str) -> bool:
+    return target.strip().lower() in {"alerts@example.com", "example@example.com"}

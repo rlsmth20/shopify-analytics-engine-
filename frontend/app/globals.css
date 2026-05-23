@@ -2345,6 +2345,19 @@ code {
   margin-left: auto;
 }
 
+.auto-alert-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(5, 150, 105, 0.2);
+  border-radius: 12px;
+  background: rgba(5, 150, 105, 0.08);
+  color: #047857;
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
 .alerts-rules,
 .rules-list,
 .channels-panel,
@@ -2526,6 +2539,11 @@ code {
 @media (max-width: 760px) {
   .alerts-page .tab-bar-trailing {
     margin-left: 0;
+  }
+
+  .auto-alert-pill {
+    width: 100%;
+    justify-content: center;
   }
 
   .alert-rule-form .form-field:last-child {

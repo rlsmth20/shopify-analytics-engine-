@@ -2,11 +2,10 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from app.api.deps import require_active_access
-from app.db.models import Subscription, User
+from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import (
     AlertEventsResponse,
@@ -19,11 +18,10 @@ from app.schemas_v2 import (
     TestAlertRequest,
     UpdateNotificationChannelRequest,
 )
+from app.services.alert_evaluation import allowed_alert_channels, evaluate_shop_alerts
 from app.services.alerts import (
-    EvaluationContext,
     create_rule,
     delete_rule,
-    evaluate,
     list_channel_configs,
     list_recent_events,
     list_rules,
@@ -31,48 +29,10 @@ from app.services.alerts import (
     toggle_rule,
     update_channel_config,
 )
-from app.services.forecasting import ForecastInputs, forecast_sku
-from app.services.inventory_engine import build_inventory_actions
 from app.services.notifications import deliver
-from app.services.plan_entitlements import ALERT_CHANNEL_MIN_TIER, plan_allows_alert_channel
-from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
-from app.services.shop_skus import (
-    load_daily_history_for_shop_skus,
-    load_skus_for_shop,
-    start_weekday_for_shop_history,
-)
-from app.services.supplier_scoring import build_supplier_scorecards
 
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
-
-
-def _current_plan(db: DbSession, user: User) -> str | None:
-    sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
-    if sub is None or sub.status not in ("active", "trialing"):
-        return None
-    return sub.plan
-
-
-def _allowed_alert_channels(db: DbSession, user: User) -> set[NotificationChannel]:
-    if user.is_admin:
-        return set(ALERT_CHANNEL_MIN_TIER.keys())
-
-    from datetime import datetime, timezone
-
-    trial_ends = user.trial_ends_at
-    if trial_ends is not None:
-        if trial_ends.tzinfo is None:
-            trial_ends = trial_ends.replace(tzinfo=timezone.utc)
-        if trial_ends > datetime.now(timezone.utc):
-            return set(ALERT_CHANNEL_MIN_TIER.keys())
-
-    plan = _current_plan(db, user)
-    return {
-        channel
-        for channel in ALERT_CHANNEL_MIN_TIER
-        if plan_allows_alert_channel(plan, channel)
-    }
 
 
 def _require_alert_channels(
@@ -80,7 +40,7 @@ def _require_alert_channels(
     user: User,
     channels: list[NotificationChannel],
 ) -> None:
-    allowed = _allowed_alert_channels(db, user)
+    allowed = allowed_alert_channels(db, user)
     blocked = [channel for channel in channels if channel not in allowed]
     if blocked:
         raise HTTPException(
@@ -204,45 +164,10 @@ def evaluate_now(
     dry_run: bool = True,
 ) -> AlertEventsResponse:
     """Force an immediate evaluation against the current user's shop data."""
-    seed_default_rules_and_channels(user.shop_id)
-
-    skus = load_skus_for_shop(db, user.shop_id)
-    if not skus:
-        return AlertEventsResponse(events=[])
-
-    settings = load_effective_shop_settings_map(db).get(user.shop_id)
-    if settings is None:
-        settings = build_default_shop_settings()
-
-    actions = build_inventory_actions(skus, lead_time_config=settings.to_lead_time_config())
-    start_weekday = start_weekday_for_shop_history(db, user.shop_id, 90)
-    histories = load_daily_history_for_shop_skus(
+    events = evaluate_shop_alerts(
         db,
-        user.shop_id,
-        [sku.sku_id for sku in skus],
-        90,
-    )
-    forecasts = [
-        forecast_sku(
-            ForecastInputs(
-                sku_id=sku.sku_id,
-                daily_history=histories.get(sku.sku_id, []),
-                on_hand=sku.inventory,
-                start_weekday=start_weekday,
-            )
-        )
-        for sku in skus
-    ]
-    suppliers = build_supplier_scorecards([], skus)
-
-    events = evaluate(
-        user.shop_id,
-        EvaluationContext(
-            actions=actions,
-            forecasts=forecasts,
-            supplier_scores=suppliers,
-        ),
-        deliver_channels=not dry_run,
-        allowed_channels=_allowed_alert_channels(db, user),
+        user,
+        dry_run=dry_run,
+        cooldown_seconds=0,
     )
     return AlertEventsResponse(events=events)

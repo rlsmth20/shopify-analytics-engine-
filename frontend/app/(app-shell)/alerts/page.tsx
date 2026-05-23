@@ -48,7 +48,6 @@ export default function AlertsPage() {
   const [channels, setChannels] = useState<NotificationChannelConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<"rules" | "channels" | "history">("rules");
@@ -92,11 +91,7 @@ export default function AlertsPage() {
   }
 
   async function runEvaluation(dryRun: boolean) {
-    if (dryRun) {
-      setEvaluating(true);
-    } else {
-      setSending(true);
-    }
+    setEvaluating(true);
     setError(null);
     setNotice(null);
     try {
@@ -125,7 +120,6 @@ export default function AlertsPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setEvaluating(false);
-      setSending(false);
     }
   }
 
@@ -145,19 +139,12 @@ export default function AlertsPage() {
         <button
           type="button"
           className="button-ghost tab-bar-trailing"
-          disabled={evaluating || sending}
+          disabled={evaluating}
           onClick={() => void runEvaluation(true)}
         >
           {evaluating ? "Evaluating..." : "Preview evaluation"}
         </button>
-        <button
-          type="button"
-          className="button-primary"
-          disabled={evaluating || sending}
-          onClick={() => void runEvaluation(false)}
-        >
-          {sending ? "Sending..." : "Send matching alerts"}
-        </button>
+        <span className="auto-alert-pill">Auto-send on</span>
       </div>
 
       {loading ? <p className="page-loading">Loading...</p> : null}
@@ -214,7 +201,7 @@ function RulesPanel({
       <form className="alert-rule-form" onSubmit={handleCreate}>
         <h3 className="panel-section-title">Add a rule</h3>
         <p className="panel-section-subtitle">
-          Build a custom rule - mix triggers, channels, and thresholds to fit how your team operates.
+          Enabled rules are checked automatically. Use preview to inspect matches without sending notifications.
         </p>
         <div className="form-grid">
           <label className="form-field">
@@ -384,7 +371,7 @@ function ChannelsPanel({
   return (
     <div className="channels-panel">
       <p className="panel-section-subtitle">
-        Configure how alerts reach you. Email, SMS, Slack, and generic webhooks are all supported out of the box.
+        Configure where automatic alerts are delivered. Only enabled channels with real targets receive notifications.
       </p>
       <div className="channels-grid">
         {channels.map((c) => (
@@ -487,7 +474,7 @@ function EventsPanel({ events }: { events: AlertEvent[] }) {
       <div className="empty-state">
         <p className="empty-state-title">No alerts have fired yet</p>
         <p className="empty-state-copy">
-          Preview an evaluation above to inspect matches, or send matching alerts to deliver notifications.
+          Enabled rules are monitored automatically. Preview an evaluation above to inspect current matches without sending.
         </p>
       </div>
     );
