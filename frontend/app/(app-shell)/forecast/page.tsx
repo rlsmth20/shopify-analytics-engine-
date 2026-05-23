@@ -24,8 +24,9 @@ export default function ForecastPage() {
     setLoading(true);
     fetchForecasts(controller.signal)
       .then((res) => {
-        setForecasts(res.forecasts);
-        setSelectedId(res.forecasts[0]?.sku_id ?? null);
+        const rankedForecasts = rankForecastsByStockoutRisk(res.forecasts);
+        setForecasts(rankedForecasts);
+        setSelectedId(rankedForecasts[0]?.sku_id ?? null);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -167,6 +168,15 @@ export default function ForecastPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function rankForecastsByStockoutRisk(forecasts: ForecastResult[]): ForecastResult[] {
+  return [...forecasts].sort(
+    (left, right) =>
+      right.stockout_probability_30d - left.stockout_probability_30d ||
+      right.projected_30_day_demand - left.projected_30_day_demand ||
+      left.sku_id.localeCompare(right.sku_id)
   );
 }
 
