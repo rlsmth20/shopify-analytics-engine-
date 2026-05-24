@@ -307,6 +307,23 @@ function buildReportHtml<T>({
   tableRows: T[];
   columns: ReportTableColumn<T>[];
 }): string {
+  const kpiCells = kpis.map(renderKpiCell).join("");
+  const chartSections = charts.map(renderChartRows).join("");
+  const headerCells = columns
+    .map((column) => `<th class="${column.align ?? "left"}">${escapeHtml(column.label)}</th>`)
+    .join("");
+  const bodyRows = tableRows
+    .map(
+      (row) =>
+        `<tr>${columns
+          .map((column) => {
+            const tone = column.tone?.(row);
+            return `<td class="${column.align ?? "left"} ${tone ? `cell-${tone}` : ""}">${escapeHtml(column.format(row))}</td>`;
+          })
+          .join("")}</tr>`
+    )
+    .join("");
+
   return `<!doctype html>
 <html>
 <head>
@@ -315,78 +332,75 @@ function buildReportHtml<T>({
   <style>${reportCss()}</style>
 </head>
 <body>
-  <main>
-    <section class="hero">
-      <div>
-        <p class="eyebrow">skubase export</p>
-        <h1>${escapeHtml(title)}</h1>
-        <p>${escapeHtml(subtitle)}</p>
-      </div>
-      <div class="generated">Generated<br><strong>${escapeHtml(generatedAt)}</strong></div>
-    </section>
-    <section class="kpis">${kpis.map(renderKpi).join("")}</section>
-    <section class="charts">${charts.map(renderChart).join("")}</section>
-    <section class="table-card">
-      <h2>${escapeHtml(tableTitle)}</h2>
-      <table>
-        <thead><tr>${columns.map((column) => `<th class="${column.align ?? "left"}">${escapeHtml(column.label)}</th>`).join("")}</tr></thead>
-        <tbody>
-          ${tableRows
-            .map(
-              (row) =>
-                `<tr>${columns
-                  .map((column) => {
-                    const tone = column.tone?.(row);
-                    return `<td class="${column.align ?? "left"} ${tone ? `cell-${tone}` : ""}">${escapeHtml(column.format(row))}</td>`;
-                  })
-                  .join("")}</tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
-    </section>
-  </main>
+  <table class="sheet">
+    <colgroup>
+      <col class="w-label"><col class="w-value"><col class="w-label"><col class="w-value">
+      <col class="w-label"><col class="w-value"><col class="w-label"><col class="w-value">
+    </colgroup>
+    <tr><td class="brand" colspan="6">skubase export</td><td class="generated" colspan="2">Generated<br><strong>${escapeHtml(generatedAt)}</strong></td></tr>
+    <tr><td class="title" colspan="8">${escapeHtml(title)}</td></tr>
+    <tr><td class="subtitle" colspan="8">${escapeHtml(subtitle)}</td></tr>
+    <tr class="spacer"><td colspan="8"></td></tr>
+    <tr>${kpiCells}</tr>
+    <tr class="spacer"><td colspan="8"></td></tr>
+    ${chartSections}
+    <tr class="spacer"><td colspan="8"></td></tr>
+    <tr><td class="section-title" colspan="8">${escapeHtml(tableTitle)}</td></tr>
+    <tr>${headerCells}</tr>
+    ${bodyRows}
+  </table>
 </body>
 </html>`;
 }
 
-function renderKpi(kpi: ReportKpi): string {
-  return `<article class="kpi kpi-${kpi.tone ?? "neutral"}">
-    <p>${escapeHtml(kpi.label)}</p>
-    <strong>${escapeHtml(kpi.value)}</strong>
-    ${kpi.note ? `<span>${escapeHtml(kpi.note)}</span>` : ""}
-  </article>`;
+function renderKpiCell(kpi: ReportKpi): string {
+  return `<td class="kpi kpi-${kpi.tone ?? "neutral"}" colspan="2">
+    <div class="kpi-label">${escapeHtml(kpi.label)}</div>
+    <div class="kpi-value">${escapeHtml(kpi.value)}</div>
+    ${kpi.note ? `<div class="kpi-note">${escapeHtml(kpi.note)}</div>` : ""}
+  </td>`;
 }
 
-function renderChart(chart: { title: string; points: BarPoint[] }): string {
+function renderChartRows(chart: { title: string; points: BarPoint[] }): string {
   const max = Math.max(...chart.points.map((point) => point.value), 1);
-  return `<article class="chart-card">
-    <h2>${escapeHtml(chart.title)}</h2>
-    <div class="bar-list">
-      ${chart.points
-        .map((point) => {
-          const width = Math.max(4, Math.round((point.value / max) * 100));
-          return `<div class="bar-row">
-            <div class="bar-label">${escapeHtml(point.label)}</div>
-            <div class="bar-track"><span class="bar-fill bar-${point.tone ?? "neutral"}" style="width:${width}%"></span></div>
-            <div class="bar-value">${escapeHtml(point.display)}</div>
-          </div>`;
-        })
-        .join("")}
-    </div>
-  </article>`;
+  return `<tr><td class="section-title" colspan="8">${escapeHtml(chart.title)}</td></tr>
+    ${chart.points
+      .map((point) => {
+        const filled = Math.max(1, Math.round((point.value / max) * 4));
+        const empty = 4 - filled;
+        return `<tr>
+          <td class="bar-label" colspan="2">${escapeHtml(point.label)}</td>
+          ${Array.from({ length: filled })
+            .map(() => `<td class="bar-fill bar-${point.tone ?? "neutral"}"></td>`)
+            .join("")}
+          ${Array.from({ length: empty })
+            .map(() => `<td class="bar-empty"></td>`)
+            .join("")}
+          <td class="bar-value" colspan="2">${escapeHtml(point.display)}</td>
+        </tr>`;
+      })
+      .join("")}
+    <tr class="mini-spacer"><td colspan="8"></td></tr>`;
 }
 
 function reportCss(): string {
   return `
-    :root{--ink:#0f172a;--muted:#64748b;--line:#dbe3ef;--bg:#f4f7fb;--card:#fff;--good:#0f766e;--good-bg:#dff7ef;--warn:#b45309;--warn-bg:#fff3cf;--danger:#b91c1c;--danger-bg:#fee2e2;--blue:#1d4ed8;--blue-bg:#dbeafe}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.45} main{max-width:1180px;margin:0 auto;padding:36px 28px 48px}
-    .hero,.kpi,.chart-card,.table-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 40px rgba(15,23,42,.08)}
-    .hero{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding:28px}.eyebrow{margin:0 0 10px;color:var(--blue);font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase} h1{margin:0;font-size:34px;line-height:1.05} .hero p:not(.eyebrow){max-width:760px;color:var(--muted)}.generated{text-align:right;color:var(--muted);white-space:nowrap}.generated strong{color:var(--ink)}
-    .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:18px}.kpi{padding:18px}.kpi p{margin:0;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.kpi strong{display:block;margin-top:10px;font-size:28px}.kpi span{display:block;margin-top:8px;color:var(--muted)}.kpi-good{background:linear-gradient(180deg,#fff,var(--good-bg))}.kpi-warning{background:linear-gradient(180deg,#fff,var(--warn-bg))}.kpi-danger{background:linear-gradient(180deg,#fff,var(--danger-bg))}
-    .charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}.chart-card{padding:22px}.chart-card h2,.table-card h2{margin:0 0 16px;font-size:18px}.bar-list{display:grid;gap:12px}.bar-row{display:grid;grid-template-columns:minmax(160px,1fr) 3fr 90px;gap:12px;align-items:center}.bar-label{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-track{height:14px;border-radius:999px;background:#e8eef7;overflow:hidden}.bar-fill{display:block;height:100%;border-radius:inherit;background:var(--blue)}.bar-good{background:var(--good)}.bar-warning{background:var(--warn)}.bar-danger{background:var(--danger)}.bar-value{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
-    .table-card{margin-top:18px;padding:22px;overflow:auto}table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--line);border-radius:12px}th,td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}th{position:sticky;top:0;background:#eef4ff;color:#334155;font-size:12px;text-transform:uppercase;letter-spacing:.08em}tr:nth-child(even) td{background:#f8fbff}tr:last-child td{border-bottom:0}.right{text-align:right}.center{text-align:center}.cell-good{background:var(--good-bg)!important;color:#065f46;font-weight:800}.cell-warning{background:var(--warn-bg)!important;color:#92400e;font-weight:800}.cell-danger{background:var(--danger-bg)!important;color:#991b1b;font-weight:800}
-    @media print{body{background:#fff}main{padding:0}.hero,.kpi,.chart-card,.table-card{box-shadow:none}.generated{display:none}}
+    body{margin:0;background:#f4f7fb;color:#0f172a;font-family:Segoe UI,Arial,sans-serif;font-size:12px}
+    .sheet{width:1180px;margin:24px;border-collapse:collapse;background:#ffffff}
+    .w-label{width:170px}.w-value{width:125px}
+    td,th{border:1px solid #dbe3ef;padding:10px 12px;vertical-align:middle}
+    .brand{background:#0f172a;color:#ffffff;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+    .generated{background:#0f172a;color:#cbd5e1;text-align:right;font-size:11px}.generated strong{color:#ffffff}
+    .title{background:#0f172a;color:#ffffff;font-size:28px;font-weight:800;line-height:1.15;padding-top:18px;border-top:0}
+    .subtitle{background:#0f172a;color:#cbd5e1;font-size:13px;padding-bottom:18px;border-top:0}
+    .spacer td{height:14px;background:#f4f7fb;border-color:#f4f7fb}.mini-spacer td{height:8px;background:#ffffff;border-left-color:#ffffff;border-right-color:#ffffff}
+    .kpi{background:#ffffff}.kpi-label{color:#64748b;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.kpi-value{margin-top:6px;font-size:22px;font-weight:800}.kpi-note{margin-top:4px;color:#64748b}
+    .kpi-good{background:#dff7ef!important}.kpi-warning{background:#fff3cf!important}.kpi-danger{background:#fee2e2!important}
+    .section-title{background:#eef4ff!important;color:#0f172a;font-size:16px;font-weight:800}
+    .bar-label{font-weight:700}.bar-empty{background:#edf2f7!important}.bar-fill{background:#2563eb!important}.bar-good{background:#0f766e!important}.bar-warning{background:#b45309!important}.bar-danger{background:#b91c1c!important}.bar-value{text-align:right;color:#0f172a;font-weight:800}
+    th{background:#dbeafe;color:#334155;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+    tr:nth-child(even) td{background:#f8fbff}.right{text-align:right}.center{text-align:center}.left{text-align:left}
+    .cell-good{background:#dff7ef!important;color:#065f46;font-weight:800}.cell-warning{background:#fff3cf!important;color:#92400e;font-weight:800}.cell-danger{background:#fee2e2!important;color:#991b1b;font-weight:800}
   `;
 }
 
