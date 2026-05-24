@@ -53,7 +53,8 @@ export default function VsSpreadsheetPage() {
         </p>
         <WaitlistForm source="vs_spreadsheet_hero" ctaLabel="Start free trial" />
         <p className="marketing-hero-trust">
-          14-day free trial · No credit card · <strong>Prices locked at renewal</strong>
+          14-day free trial · No credit card · <strong>Prices locked at renewal</strong> ·{" "}
+          <Link href="/inventory-risk-snapshot">Get a free inventory risk snapshot</Link>
         </p>
       </section>
 
@@ -134,4 +135,3 @@ export default function VsSpreadsheetPage() {
     </div>
   );
 }
-

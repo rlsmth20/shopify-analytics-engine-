@@ -6,6 +6,7 @@ from app.db.base import Base
 from app.db.models import (
     AlertRuleRecord,
     CategoryLeadTime,
+    InventoryRiskSnapshotLead,
     Inventory,
     MagicLinkToken,
     NotificationChannelRecord,
@@ -53,6 +54,37 @@ def run_safe_migrations() -> None:
                     "CREATE INDEX IF NOT EXISTS ix_alert_rules_shop_id "
                     "ON alert_rules (shop_id)"
                 ))
+                conn.execute(text(
+                    "CREATE TABLE IF NOT EXISTS inventory_risk_snapshot_leads ("
+                    "id SERIAL PRIMARY KEY, "
+                    "created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), "
+                    "first_name VARCHAR(120) NOT NULL, "
+                    "email VARCHAR(320) NOT NULL, "
+                    "company_name VARCHAR(255) NOT NULL, "
+                    "store_url VARCHAR(500) NOT NULL, "
+                    "approximate_sku_count VARCHAR(64) NOT NULL, "
+                    "biggest_inventory_issue VARCHAR(64) NOT NULL, "
+                    "source VARCHAR(96) DEFAULT 'inventory_risk_snapshot' NOT NULL, "
+                    "utm_source VARCHAR(255), "
+                    "utm_medium VARCHAR(255), "
+                    "utm_campaign VARCHAR(255), "
+                    "utm_content VARCHAR(255), "
+                    "utm_term VARCHAR(255), "
+                    "status VARCHAR(64) DEFAULT 'New' NOT NULL"
+                    ")"
+                ))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_inventory_risk_snapshot_leads_created_at "
+                    "ON inventory_risk_snapshot_leads (created_at)"
+                ))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_inventory_risk_snapshot_leads_email "
+                    "ON inventory_risk_snapshot_leads (email)"
+                ))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_inventory_risk_snapshot_leads_status "
+                    "ON inventory_risk_snapshot_leads (status)"
+                ))
             else:
                 # SQLite: check column existence via PRAGMA before adding.
                 result = conn.execute(text("PRAGMA table_info(users)"))
@@ -72,6 +104,25 @@ def run_safe_migrations() -> None:
                     "CREATE INDEX IF NOT EXISTS ix_alert_rules_shop_id "
                     "ON alert_rules (shop_id)"
                 ))
+                conn.execute(text(
+                    "CREATE TABLE IF NOT EXISTS inventory_risk_snapshot_leads ("
+                    "id INTEGER PRIMARY KEY, "
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    "first_name VARCHAR(120) NOT NULL, "
+                    "email VARCHAR(320) NOT NULL, "
+                    "company_name VARCHAR(255) NOT NULL, "
+                    "store_url VARCHAR(500) NOT NULL, "
+                    "approximate_sku_count VARCHAR(64) NOT NULL, "
+                    "biggest_inventory_issue VARCHAR(64) NOT NULL, "
+                    "source VARCHAR(96) DEFAULT 'inventory_risk_snapshot' NOT NULL, "
+                    "utm_source VARCHAR(255), "
+                    "utm_medium VARCHAR(255), "
+                    "utm_campaign VARCHAR(255), "
+                    "utm_content VARCHAR(255), "
+                    "utm_term VARCHAR(255), "
+                    "status VARCHAR(64) DEFAULT 'New' NOT NULL"
+                    ")"
+                ))
             conn.commit()
         except Exception:
             logger.exception("Safe migration failed (non-fatal if column already exists)")
@@ -82,6 +133,7 @@ def init_db() -> None:
     _ = (
         AlertRuleRecord,
         CategoryLeadTime,
+        InventoryRiskSnapshotLead,
         Inventory,
         MagicLinkToken,
         NotificationChannelRecord,

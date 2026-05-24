@@ -48,6 +48,11 @@ export default function PricingPage() {
         <p className="marketing-hero-sub">
           We publish our prices on this page because the rest of the market hides them behind a sales call &mdash; and raises them at renewal. We commit in writing that renewals do not raise the rate on your plan.
         </p>
+        <div className="marketing-hero-ctas">
+          <Link href="/inventory-risk-snapshot" className="button button-secondary button-lg">
+            Get a free inventory risk snapshot
+          </Link>
+        </div>
       </section>
 
       <PricingTable />
@@ -99,4 +104,3 @@ export default function PricingPage() {
     </div>
   );
 }
-

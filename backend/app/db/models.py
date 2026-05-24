@@ -348,6 +348,33 @@ class WaitlistSignup(Base):
     )
 
 
+class InventoryRiskSnapshotLead(Base):
+    """Lead submissions for the free inventory risk snapshot outbound offer."""
+
+    __tablename__ = "inventory_risk_snapshot_leads"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        index=True,
+    )
+    first_name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    company_name: Mapped[str] = mapped_column(String(255))
+    store_url: Mapped[str] = mapped_column(String(500), index=True)
+    approximate_sku_count: Mapped[str] = mapped_column(String(64))
+    biggest_inventory_issue: Mapped[str] = mapped_column(String(64))
+    source: Mapped[str] = mapped_column(String(96), default="inventory_risk_snapshot", index=True)
+    utm_source: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    utm_medium: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    utm_campaign: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    utm_content: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    utm_term: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(64), default="New", index=True)
+
+
 class User(Base):
     """Authenticated user of the skubase app.
 

@@ -19,6 +19,7 @@ from app.api.routes.bundles import router as bundles_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.forecast import router as forecast_router
 from app.api.routes.health import router as health_router
+from app.api.routes.inventory_risk_snapshot import router as inventory_risk_snapshot_router
 from app.api.routes.liquidation import router as liquidation_router
 from app.api.routes.reorder import router as reorder_router
 from app.api.routes.shipstation_import import router as shipstation_import_router
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(shipstation_import_router)
     app.include_router(waitlist_router)
     app.include_router(contact_router)
+    app.include_router(inventory_risk_snapshot_router)
     app.include_router(shop_settings_router)
     app.include_router(skus_router)
 

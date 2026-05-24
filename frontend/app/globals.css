@@ -4018,6 +4018,241 @@ code {
   line-height: 1.55;
 }
 
+/* Inventory risk snapshot campaign ---------------------------------------- */
+.snapshot-hero {
+  max-width: 980px;
+}
+
+.snapshot-two-column {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+  gap: 28px;
+  align-items: start;
+  margin: 12px 0 72px;
+}
+
+.snapshot-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.snapshot-mini-card {
+  min-height: 112px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.snapshot-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: #dff7ef;
+  color: #047857;
+  font-weight: 800;
+}
+
+.snapshot-mini-card h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.snapshot-form {
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.snapshot-form-eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.snapshot-form-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1.18;
+}
+
+.snapshot-form-copy {
+  margin: 10px 0 22px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.snapshot-form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.snapshot-field {
+  display: grid;
+  gap: 7px;
+}
+
+.snapshot-field span,
+.snapshot-issue-field legend {
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.snapshot-issue-field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.snapshot-issue-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.snapshot-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fbff;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.snapshot-radio input {
+  accent-color: #0f766e;
+}
+
+.snapshot-form-error {
+  margin: 14px 0;
+  color: var(--critical);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.snapshot-form-footnote {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.snapshot-reassurance {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 8px 0 48px;
+}
+
+.snapshot-reassurance span {
+  padding: 14px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  border-radius: 14px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.snapshot-report-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 40px 0 28px;
+}
+
+.snapshot-report-hero .marketing-hero-title,
+.snapshot-report-hero .marketing-hero-sub {
+  max-width: 780px;
+}
+
+.snapshot-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0 0 28px;
+}
+
+.snapshot-summary-card {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  box-shadow: var(--shadow-sm);
+}
+
+.snapshot-summary-card strong {
+  display: block;
+  color: var(--ink);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.snapshot-summary-card span {
+  display: block;
+  margin-top: 10px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.snapshot-report-section {
+  padding: 28px 0;
+}
+
+.snapshot-report-section h2 {
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: 26px;
+}
+
+.snapshot-report-table th,
+.snapshot-report-table td {
+  white-space: normal;
+}
+
+.snapshot-action-list {
+  margin: 32px 0 72px;
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);
+  box-shadow: var(--shadow-sm);
+}
+
+.snapshot-action-list ol {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 28px;
+  padding-left: 24px;
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+
 /* Pricing page -------------------------------------------------------------*/
 
 .pricing-grid {
@@ -4715,8 +4950,16 @@ code {
   .marketing-migration,
   .positioning-grid,
   .faq-grid,
-  .migration-steps {
+  .migration-steps,
+  .snapshot-two-column,
+  .snapshot-reassurance,
+  .snapshot-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .snapshot-report-hero {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .acquisition-card {
@@ -4737,8 +4980,18 @@ code {
 
 @media (max-width: 640px) {
   .pillar-grid,
-  .beliefs-grid {
+  .beliefs-grid,
+  .snapshot-card-grid,
+  .snapshot-issue-options {
     grid-template-columns: 1fr;
+  }
+
+  .snapshot-form {
+    padding: 22px;
+  }
+
+  .snapshot-action-list {
+    padding: 24px;
   }
 
   .marketing-section-alt {
