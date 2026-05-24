@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { AskSkubaseChat } from "@/components/ask-skubase-chat";
 import { useAuth } from "@/components/auth-guard";
 import { SHOPIFY_DOMAIN_STORAGE_KEY } from "@/lib/app-helpers";
 import { planToTier, tierAllows, type PlanTierKey } from "@/lib/plans";
@@ -381,6 +382,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="page-container">{children}</main>
       </div>
+      <AskSkubaseChat />
     </div>
   );
 }

@@ -11,6 +11,8 @@ LeadTimeSource = Literal["sku_override", "vendor", "category", "global_default"]
 ActionDataSource = Literal["db", "mock"]
 DataQualityConfidence = Literal["high", "medium", "low"]
 ShopifySyncStatus = Literal["running", "succeeded", "failed"]
+AiChatRole = Literal["user", "assistant"]
+AiChatMode = Literal["ai", "local"]
 
 
 class ApiModel(BaseModel):
@@ -164,6 +166,28 @@ class ActionDataHealthSummaryResponse(ApiModel):
     inventory_rows: int
     order_line_items: int
     distinct_skus_with_usable_action_data: int
+
+
+class AiChatMessage(ApiModel):
+    role: AiChatRole
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class AiChatRequest(ApiModel):
+    messages: list[AiChatMessage] = Field(min_length=1, max_length=10)
+
+
+class AiChatRelatedLink(ApiModel):
+    label: str
+    href: str
+
+
+class AiChatResponse(ApiModel):
+    answer: str
+    mode: AiChatMode
+    data_source: ActionDataSource
+    context_summary: str
+    related_links: list[AiChatRelatedLink] = Field(default_factory=list)
 
 
 class SkuDetail(ApiModel):

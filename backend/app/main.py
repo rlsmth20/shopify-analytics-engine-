@@ -10,6 +10,7 @@ from app.db.init_db import init_db
 logger = logging.getLogger(__name__)
 
 from app.api.routes.actions import auth_scoped_router as auth_scoped_actions_router, router as actions_router
+from app.api.routes.ai_chat import router as ai_chat_router
 from app.api.routes.admin import router as admin_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.analytics import router as analytics_router
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(actions_router)
     app.include_router(auth_scoped_actions_router)
+    app.include_router(ai_chat_router)
     app.include_router(shopify_ingestion_router)
     app.include_router(stocky_import_router)
     app.include_router(shipstation_import_router)

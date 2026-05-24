@@ -17,6 +17,7 @@ Current routes:
 - `GET /health`
 - `GET /actions`
 - `GET /actions/debug-summary`
+- `POST /ai/chat`
 - `POST /integrations/shopify/ingest`
 - `GET /integrations/shopify/sync-status`
 - `GET /shop-settings`
@@ -40,6 +41,10 @@ Current routes:
   - applies per-shop lead-time settings
   - makes the DB-vs-mock fallback explicit
   - adds lightweight data-quality warnings to action output
+- `backend/app/services/inventory_copilot.py`
+  - builds the read-only Ask Skubase response from the current shop action queue
+  - calls the OpenAI Responses API when `OPENAI_API_KEY` is set
+  - falls back to deterministic queue-based guidance when AI credentials are absent or unavailable
 - `backend/app/services/inventory_engine.py`
   - resolves lead times, calculates metrics, scores actions, and builds the action feed
 - `backend/app/services/shopify_ingestion.py`
@@ -80,6 +85,8 @@ Current routes:
 - `GET /shop-settings/vendor-lead-times` and `PUT /shop-settings/vendor-lead-times` manage shop-scoped vendor lead-time overrides
 - `GET /shop-settings/category-lead-times` and `PUT /shop-settings/category-lead-times` manage shop-scoped category lead-time overrides
 - `GET /actions` prefers DB-backed SKU rows when a persisted shop catalog exists
+- `POST /ai/chat` is auth-gated, read-only, and grounded in the current shop's ranked inventory actions
+- `POST /ai/chat` uses `OPENAI_MODEL` when set, otherwise `gpt-5-mini`; without `OPENAI_API_KEY`, it returns local queue-based guidance
 - DB-backed lead-time resolution order is:
   - SKU override
   - DB vendor lead time
