@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { DataQualityNote } from "@/components/data-quality-note";
 import { fetchSuppliers, type SupplierScorecard } from "@/lib/api-v2";
 
 export default function SuppliersPage() {
@@ -26,14 +27,26 @@ export default function SuppliersPage() {
 
   if (vendors.length === 0) {
     return (
-      <div className="empty-state">
-        <p className="empty-state-title">Supplier performance needs receipt history</p>
-        <p className="empty-state-copy">
-          Vendor names come from Shopify product data. On-time rate, fill rate, lead variance,
-          and cost stability need purchase order and receiving observations before skubase can
-          score suppliers honestly.
+      <DataQualityNote
+        title="Supplier scorecards need purchase order receipt history"
+        actions={
+          <>
+            <a className="button button-secondary" href="/purchase-orders">
+              Open purchase orders
+            </a>
+            <a className="button button-ghost" href="/lead-time-settings">
+              Set lead times
+            </a>
+          </>
+        }
+      >
+        <p>
+          Vendor names come from Shopify product data, but on-time rate, fill rate,
+          lead-time variance, and cost stability require expected and received dates.
+          Import PO history or keep using the reorder workflow to build supplier
+          performance data.
         </p>
-      </div>
+      </DataQualityNote>
     );
   }
 

@@ -23,6 +23,7 @@ const navigationItems: NavItem[] = [
   { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "*" },
   { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "o" },
   { href: "/analytics", label: "Analytics", section: "Intelligence", icon: "<>" },
+  { href: "/reports", label: "Reports", section: "Intelligence", icon: ">" },
   { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o", minTier: "growth" },
   { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "o" },
   { href: "/stocky-migration", label: "Stocky Migration", section: "Operations", icon: ">" },
@@ -68,6 +69,12 @@ const pageMeta: Record<string, PageMeta> = {
     title: "ABC x XYZ scorecards",
     description:
       "Segment the catalog by revenue contribution and demand variability - meet your A-items first."
+  },
+  "/reports": {
+    eyebrow: "Intelligence",
+    title: "Reports",
+    description:
+      "A lightweight library of the inventory reports and exports already wired into skubase."
   },
   "/suppliers": {
     eyebrow: "Intelligence",

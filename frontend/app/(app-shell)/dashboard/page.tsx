@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/components/auth-guard";
 import {
   AreaLineChart,
   ChartPanel,
@@ -18,6 +19,38 @@ import {
 
 const ONBOARDING_STORAGE_KEY = "skubase_stocky_migration_steps";
 const ONBOARDING_DISMISSED_KEY = "skubase_dashboard_onboarding_dismissed";
+const ACTION_PATH_STEPS = [
+  {
+    step: "1",
+    title: "Review top stockout risk",
+    body: "Start with the SKUs most likely to run short or miss demand.",
+    href: "/actions",
+  },
+  {
+    step: "2",
+    title: "Review reorder recommendations",
+    body: "Turn urgent replenishment signals into vendor-grouped PO drafts.",
+    href: "/purchase-orders",
+  },
+  {
+    step: "3",
+    title: "Review dead-stock recovery",
+    body: "Find stale inventory tying up cash and pick the next clearance move.",
+    href: "/liquidation",
+  },
+  {
+    step: "4",
+    title: "Check supplier and lead-time issues",
+    body: "Confirm the lead times Skubase uses before trusting reorder math.",
+    href: "/lead-time-settings",
+  },
+  {
+    step: "5",
+    title: "Configure an alert",
+    body: "Let rules watch the queue so stockout and dead-stock risk reaches you sooner.",
+    href: "/alerts",
+  },
+] as const;
 const ONBOARDING_STEPS = [
   { id: "connect-shopify", label: "Connect Shopify", href: "/store-sync" },
   { id: "upload-stocky", label: "Import sales history", href: "/import-stocky" },
@@ -27,6 +60,7 @@ const ONBOARDING_STEPS = [
 ] as const;
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,6 +204,34 @@ export default function DashboardPage() {
             />
           </div>
         ))}
+      </section>
+
+      <section className={`section-card action-path-card${user.id === 0 ? " action-path-demo" : ""}`}>
+        <div className="section-heading">
+          <div>
+            <p className="section-eyebrow">{user.id === 0 ? "Demo path" : "Start here"}</p>
+            <h2 className="section-title section-title-small">
+              Start with your highest-impact inventory actions
+            </h2>
+            <p className="muted section-copy">
+              Work these in order to see how Skubase turns inventory data into a focused weekly plan.
+            </p>
+          </div>
+          <a className="button button-secondary" href="/actions">
+            Open action queue
+          </a>
+        </div>
+        <div className="action-path-grid">
+          {ACTION_PATH_STEPS.map((item) => (
+            <a key={item.step} href={item.href} className="action-path-step">
+              <span className="today-step">{item.step}</span>
+              <span>
+                <strong>{item.title}</strong>
+                <small>{item.body}</small>
+              </span>
+            </a>
+          ))}
+        </div>
       </section>
 
       {!onboardingDismissed ? (

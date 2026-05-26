@@ -1014,6 +1014,40 @@ code {
   line-height: 1.65;
 }
 
+.action-rationale {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.action-rationale-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.action-reason {
+  display: grid;
+  gap: 5px;
+}
+
+.action-reason span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.action-reason strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
 .quality-block,
 .quality-inline {
   margin-top: 16px;
@@ -1109,6 +1143,144 @@ code {
 .signal-right {
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.action-path-card {
+  border-color: rgba(23, 92, 211, 0.18);
+}
+
+.action-path-demo {
+  box-shadow:
+    inset 4px 0 0 var(--accent),
+    var(--shadow-sm);
+}
+
+.action-path-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.action-path-step {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-strong);
+}
+
+.action-path-step strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.action-path-step small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.report-card,
+.data-quality-note {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+}
+
+.report-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.report-card h3 {
+  margin-top: 8px;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.report-copy {
+  flex: 1;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.report-status {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.report-status-available {
+  background: rgba(5, 150, 105, 0.12);
+  color: rgb(6, 95, 70);
+}
+
+.report-status-requires-data {
+  background: rgba(180, 83, 9, 0.12);
+  color: rgb(146, 64, 14);
+}
+
+.report-status-demo-sample {
+  background: rgba(23, 92, 211, 0.12);
+  color: var(--accent);
+}
+
+.data-quality-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  border-color: rgba(23, 92, 211, 0.18);
+}
+
+.data-quality-title {
+  color: var(--ink);
+  font-size: 1.18rem;
+  font-weight: 740;
+  letter-spacing: -0.03em;
+}
+
+.data-quality-copy {
+  max-width: 760px;
+  margin-top: 10px;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.data-quality-actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -1335,6 +1507,7 @@ code {
   .content-grid-2-1,
   .content-grid-2-2,
   .login-shell,
+  .action-path-grid,
   .login-value-grid {
     grid-template-columns: 1fr;
   }
@@ -1377,6 +1550,7 @@ code {
   .toolbar-controls,
   .action-group-header,
   .action-card-top,
+  .data-quality-note,
   .toggle-row,
   .settings-scope-row {
     flex-direction: column;
@@ -1407,6 +1581,8 @@ code {
   .toolbar-card,
   .empty-state,
   .action-card,
+  .report-card,
+  .data-quality-note,
   .kpi-card,
   .login-hero-panel,
   .login-card {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { DataQualityNote } from "@/components/data-quality-note";
 import { currency, fetchBundles, type BundleHealth } from "@/lib/api-v2";
 
 export default function BundlesPage() {
@@ -26,13 +27,13 @@ export default function BundlesPage() {
 
   if (bundles.length === 0) {
     return (
-      <div className="empty-state">
-        <p className="empty-state-title">Bundle definitions are not configured yet</p>
-        <p className="empty-state-copy">
-          Add bundle/component mappings before using bundle health. Live Shopify products are not
-          treated as bundles unless those relationships are known.
+      <DataQualityNote title="Bundle health requires bundle-to-component mappings">
+        <p>
+          Live Shopify products are not treated as bundles unless Skubase knows the
+          parent product and component SKU relationships. Bundle mapping is not
+          configured yet, so this page is intentionally empty instead of guessing.
         </p>
-      </div>
+      </DataQualityNote>
     );
   }
 

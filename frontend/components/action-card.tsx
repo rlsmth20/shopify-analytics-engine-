@@ -40,6 +40,68 @@ export function ActionCard({
         </p>
       </div>
 
+      <div className="action-rationale">
+        <p className="quality-label">Why this is ranked here</p>
+        <div className="action-rationale-grid">
+          <Reason label="Priority" value={numberFormatter.format(action.priority_score)} />
+          {action.status === "urgent" ? (
+            <>
+              <Reason
+                label="Days left"
+                value={
+                  isFiniteNumber(action.days_until_stockout)
+                    ? numberFormatter.format(action.days_until_stockout)
+                    : "Not enough sales history"
+                }
+              />
+              <Reason
+                label="Profit at risk"
+                value={currencyFormatter.format(action.estimated_profit_impact)}
+              />
+            </>
+          ) : (
+            <>
+              <Reason
+                label={action.status === "dead" ? "Cash recovery impact" : "Capital impact"}
+                value={currencyFormatter.format(action.cash_tied_up)}
+              />
+              <Reason
+                label="Excess units"
+                value={
+                  isFiniteNumber(action.excess_units)
+                    ? numberFormatter.format(action.excess_units)
+                    : "Unavailable"
+                }
+              />
+            </>
+          )}
+          <Reason
+            label="Inventory cover"
+            value={
+              isFiniteNumber(action.days_of_inventory)
+                ? `${numberFormatter.format(action.days_of_inventory)} days`
+                : "Not enough sales history"
+            }
+          />
+          <Reason
+            label="Lead time"
+            value={
+              isFiniteNumber(action.lead_time_days_used)
+                ? `${action.lead_time_days_used} days - ${leadTimeSourceLabel[action.lead_time_source]}`
+                : "Lead time unavailable"
+            }
+          />
+          <Reason
+            label="Target coverage"
+            value={
+              isFiniteNumber(action.target_coverage_days)
+                ? `${action.target_coverage_days} days`
+                : "Unavailable"
+            }
+          />
+        </div>
+      </div>
+
       {action.data_quality_warnings.length > 0 ? (
         <div className="quality-block">
           <p className="quality-label">
@@ -122,4 +184,17 @@ export function ActionCard({
       </dl>
     </article>
   );
+}
+
+function Reason({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="action-reason">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function isFiniteNumber(value: number): boolean {
+  return Number.isFinite(value);
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { DataQualityNote } from "@/components/data-quality-note";
 import { fetchTransfers, type TransferRecommendation } from "@/lib/api-v2";
 
 export default function TransfersPage() {
@@ -26,13 +27,20 @@ export default function TransfersPage() {
 
   if (transfers.length === 0) {
     return (
-      <div className="empty-state">
-        <p className="empty-state-title">Transfers need multi-location inventory data</p>
-        <p className="empty-state-copy">
-          Shopify location-level inventory is not available in this workspace yet. Once it is connected,
-          skubase can recommend where to move units between locations.
+      <DataQualityNote
+        title="Transfer recommendations require location-level inventory"
+        actions={
+          <a className="button button-secondary" href="/store-sync">
+            Check Shopify sync
+          </a>
+        }
+      >
+        <p>
+          Your current Shopify sync may be using aggregate inventory. Skubase
+          needs location-level on-hand counts before it can recommend moving units
+          between locations with confidence.
         </p>
-      </div>
+      </DataQualityNote>
     );
   }
 

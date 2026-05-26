@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { DataQualityNote } from "@/components/data-quality-note";
 import { useAuth } from "@/components/auth-guard";
 import {
   createAlertRule,
@@ -471,12 +472,13 @@ function ChannelCard({
 function EventsPanel({ events }: { events: AlertEvent[] }) {
   if (events.length === 0) {
     return (
-      <div className="empty-state">
-        <p className="empty-state-title">No alerts have fired yet</p>
-        <p className="empty-state-copy">
-          Enabled rules are monitored automatically. Preview an evaluation above to inspect current matches without sending.
+      <DataQualityNote title="Alert event history appears after rules match store data">
+        <p>
+          Alert rules are configured and checked automatically. Recent events will
+          appear here after evaluations run against connected inventory, forecast,
+          and supplier data. Use preview to inspect current matches without sending.
         </p>
-      </div>
+      </DataQualityNote>
     );
   }
   return (
