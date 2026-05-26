@@ -414,6 +414,38 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
   });
 }
 
+export type CsvColumn<T> = {
+  label: string;
+  value: (row: T) => string | number | null | undefined;
+};
+
+export function exportReportRowsCsv<T>({
+  filename,
+  columns,
+  rows,
+}: {
+  filename: string;
+  columns: CsvColumn<T>[];
+  rows: T[];
+}): void {
+  const csv = [
+    columns.map((column) => escapeCsv(column.label)).join(","),
+    ...rows.map((row) =>
+      columns.map((column) => escapeCsv(column.value(row) ?? "")).join(",")
+    ),
+  ].join("\r\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+}
+
 // ---------------------------------------------------------------------------
 // Workbook builder
 // ---------------------------------------------------------------------------
@@ -847,6 +879,12 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function escapeCsv(value: string | number): string {
+  const text = String(value);
+  if (!/[",\r\n]/.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 // Avoid unused-import warning when only the type side is consumed.
