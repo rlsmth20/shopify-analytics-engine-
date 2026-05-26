@@ -16,12 +16,12 @@ export default function InventoryRiskSnapshotThanksPage() {
         <p className="marketing-eyebrow">Request received</p>
         <h1 className="marketing-hero-title">You&apos;re on the list.</h1>
         <p className="marketing-hero-sub">
-          Skubase will review the submitted store and send a short inventory risk snapshot
-          with practical SKU-level actions.
+          Skubase will confirm fit, then use read-only Shopify access or export data
+          to prepare a short inventory risk snapshot with practical SKU-level actions.
         </p>
         <div className="marketing-hero-ctas">
           <Link href="/dashboard?demo=1" className="button button-primary button-lg">
-            View live demo
+            View demo
           </Link>
           <Link href="/blog/how-to-clear-dead-stock-shopify" className="button button-secondary button-lg">
             Read the dead stock guide

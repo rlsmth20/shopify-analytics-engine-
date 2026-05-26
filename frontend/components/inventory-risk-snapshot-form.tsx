@@ -22,7 +22,6 @@ const SKU_COUNT_OPTIONS = ["50-250", "251-1,000", "1,001-5,000", "5,001+", "Not 
 type FormState = {
   first_name: string;
   email: string;
-  company_name: string;
   store_url: string;
   approximate_sku_count: string;
   biggest_inventory_issue: string;
@@ -31,7 +30,6 @@ type FormState = {
 const INITIAL_STATE: FormState = {
   first_name: "",
   email: "",
-  company_name: "",
   store_url: "",
   approximate_sku_count: "",
   biggest_inventory_issue: "",
@@ -77,7 +75,6 @@ export function InventoryRiskSnapshotForm({
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       return "Enter a valid work email.";
     }
-    if (!form.company_name.trim()) return "Enter your company name.";
     if (!isPlausibleStoreUrl(form.store_url)) return "Enter a valid Shopify store URL.";
     if (!form.approximate_sku_count) return "Choose an approximate SKU count.";
     if (!form.biggest_inventory_issue) return "Choose your biggest inventory issue.";
@@ -100,6 +97,7 @@ export function InventoryRiskSnapshotForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          company_name: deriveCompanyName(form.store_url),
           source: "inventory_risk_snapshot",
           ...utmParams,
         }),
@@ -124,9 +122,10 @@ export function InventoryRiskSnapshotForm({
     <form id="snapshot-form" className={`snapshot-form ${className}`} onSubmit={handleSubmit}>
       <div>
         <p className="snapshot-form-eyebrow">Free diagnostic</p>
-        <h2 className="snapshot-form-title">Get your inventory risk snapshot</h2>
+        <h2 className="snapshot-form-title">Request your free snapshot</h2>
         <p className="snapshot-form-copy">
-          Send the basics. We will review the store and return a short action snapshot.
+          Send the basics. We will confirm fit, then use Shopify access or export data
+          to prepare a short inventory action snapshot.
         </p>
       </div>
 
@@ -149,16 +148,6 @@ export function InventoryRiskSnapshotForm({
             value={form.email}
             onChange={(event) => updateField("email", event.target.value)}
             autoComplete="email"
-            required
-          />
-        </label>
-        <label className="snapshot-field">
-          <span>Company name</span>
-          <input
-            className="input-control"
-            value={form.company_name}
-            onChange={(event) => updateField("company_name", event.target.value)}
-            autoComplete="organization"
             required
           />
         </label>
@@ -208,11 +197,23 @@ export function InventoryRiskSnapshotForm({
 
       {error ? <p className="snapshot-form-error" role="alert">{error}</p> : null}
       <button type="submit" className="button button-primary button-lg" disabled={submitting}>
-        {submitting ? "Submitting..." : "Get my free snapshot"}
+        {submitting ? "Submitting..." : "Request free snapshot"}
       </button>
-      <p className="snapshot-form-footnote">No credit card. No sales deck required.</p>
+      <p className="snapshot-form-footnote">
+        No credit card. Read-only for the scan unless you approve otherwise.
+      </p>
     </form>
   );
+}
+
+function deriveCompanyName(storeUrl: string): string {
+  try {
+    const parsed = new URL(storeUrl.includes("://") ? storeUrl : `https://${storeUrl}`);
+    const host = parsed.hostname.replace(/^www\./, "");
+    return host.split(".")[0] || host;
+  } catch {
+    return storeUrl.trim() || "Shopify store";
+  }
 }
 
 function isPlausibleStoreUrl(value: string): boolean {

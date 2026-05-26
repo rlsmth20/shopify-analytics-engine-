@@ -10,11 +10,11 @@ export const metadata = {
 };
 
 const includes = [
-  "Stockout risk",
-  "Dead inventory / cash tied up",
+  "Stockout risks",
   "Reorder priorities",
-  "Supplier or lead-time risk",
-  "Weekly action list",
+  "Dead-stock cash tied up",
+  "Slow movers",
+  "Suggested next actions",
 ];
 
 const audience = [
@@ -24,10 +24,10 @@ const audience = [
 ];
 
 const reassurance = [
-  "No sales deck required",
-  "No credit card",
-  "Built for Shopify merchants",
-  "Practical SKU-level actions, not a generic dashboard",
+  "No credit card required",
+  "Sample report available immediately",
+  "Actual snapshot uses Shopify access or export data",
+  "Read-only for the scan unless otherwise stated",
 ];
 
 const faqs = [
@@ -65,15 +65,16 @@ export default function InventoryRiskSnapshotPage() {
       <section className="marketing-hero snapshot-hero">
         <p className="marketing-eyebrow">Free Shopify Inventory Risk Snapshot</p>
         <h1 className="marketing-hero-title">
-          Find the SKUs most likely to stock out, sit dead, or tie up cash.
+          Get a free Shopify inventory risk snapshot
         </h1>
         <p className="marketing-hero-sub">
-          Skubase turns Shopify inventory and sales data into a ranked action list: what to
-          reorder, what to clear, and what to fix first.
+          Skubase reviews your Shopify sales and inventory data to identify stockout
+          risks, slow movers, overstock, and reorder priorities.
         </p>
         <InventoryRiskSnapshotCtas />
         <p className="marketing-hero-trust">
-          Built for Shopify merchants with real SKU complexity. No credit card.
+          Built for Shopify merchants with real SKU complexity. The sample report is instant;
+          a real snapshot needs Shopify access or export data.
         </p>
       </section>
 
@@ -84,7 +85,7 @@ export default function InventoryRiskSnapshotPage() {
           <div className="snapshot-card-grid">
             {includes.map((item) => (
               <article key={item} className="snapshot-mini-card">
-                <span className="snapshot-check" aria-hidden>✓</span>
+                <span className="snapshot-check" aria-hidden>+</span>
                 <h3>{item}</h3>
               </article>
             ))}
@@ -114,8 +115,8 @@ export default function InventoryRiskSnapshotPage() {
         <div className="migration-steps">
           {[
             ["1", "Submit your store URL", "Send the store and a little context about your inventory issue."],
-            ["2", "Skubase reviews inventory risk signals", "We look for stockout, dead-stock, reorder, and lead-time risk patterns."],
-            ["3", "You receive a short inventory action snapshot", "You get practical actions to focus on this week."],
+            ["2", "Share read-only access or export data if it is a fit", "A real snapshot needs inventory and sales signals; the public sample is available immediately."],
+            ["3", "You receive a short inventory action snapshot", "You get practical actions to focus on this week without a sales deck."],
           ].map(([number, title, body]) => (
             <article key={number} className="migration-step">
               <span className="migration-step-number">{number}</span>

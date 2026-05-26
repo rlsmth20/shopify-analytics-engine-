@@ -18,14 +18,14 @@ export function InventoryRiskSnapshotCtas() {
   return (
     <div className="marketing-hero-ctas">
       <button type="button" className="button button-primary button-lg" onClick={focusForm}>
-        Get my free snapshot
+        Request free snapshot
       </button>
       <Link
         href="/sample-inventory-risk-snapshot"
         className="button button-secondary button-lg"
         onClick={() => trackEvent("inventory_snapshot_cta_click", { cta: "sample_snapshot" })}
       >
-        See sample snapshot
+        View sample snapshot
       </Link>
     </div>
   );
@@ -38,7 +38,7 @@ export function SampleSnapshotCta({ cta }: { cta: string }) {
       className="button button-primary button-lg"
       onClick={() => trackEvent("sample_snapshot_cta_click", { cta })}
     >
-      Get my free snapshot
+      Request free snapshot
     </Link>
   );
 }
@@ -50,7 +50,7 @@ export function SampleDemoCta({ cta }: { cta: string }) {
       className="button button-secondary button-lg"
       onClick={() => trackEvent("sample_snapshot_cta_click", { cta })}
     >
-      View live demo
+      View demo
     </Link>
   );
 }
