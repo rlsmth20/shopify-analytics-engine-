@@ -76,6 +76,12 @@ export type BarPoint = {
   tone?: Tone;
 };
 
+export type ReportTodo = {
+  label: string;
+  detail?: string;
+  tone?: Tone;
+};
+
 const LIQUIDATION_TACTIC_LABELS: Record<LiquidationSuggestion["tactic"], string> = {
   markdown: "Markdown",
   bundle: "Bundle",
@@ -134,6 +140,11 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
                 : "neutral") as Tone,
           })),
       },
+    ],
+    todos: [
+      { label: "Start with urgent SKUs", detail: "Review every critical stockout action before optimization work.", tone: "danger" },
+      { label: "Turn reorder actions into POs", detail: "Use the purchase order workflow for high-priority replenishment.", tone: "warning" },
+      { label: "Clear dead-stock cash", detail: "Move stale SKUs into liquidation or bundle review.", tone: "good" },
     ],
     tableTitle: "Action Details",
     tableRows: actions,
@@ -252,6 +263,11 @@ export async function exportLiquidationReport(
           })),
       },
     ],
+    todos: [
+      { label: "Tackle largest recovery opportunities", detail: "Start with SKUs tying up the most capital.", tone: "danger" },
+      { label: "Choose the right clearance tactic", detail: "Markdown, bundle, wholesale, or write-off based on margin and age.", tone: "warning" },
+      { label: "Recheck after the promotion window", detail: "Compare recovered capital against the plan before cutting deeper.", tone: "good" },
+    ],
     tableTitle: "Markdown Plan",
     tableRows: suggestions,
     columns: [
@@ -369,6 +385,11 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
           })),
       },
     ],
+    todos: [
+      { label: "Approve the PO", detail: "Confirm quantities, costs, and expected arrival before sending.", tone: "warning" },
+      { label: "Send to vendor", detail: "Use the exported line detail or the app send flow to contact the supplier.", tone: "good" },
+      { label: "Record receipts", detail: "Receiving history powers supplier scorecards and lead-time confidence.", tone: "neutral" },
+    ],
     tableTitle: "PO Lines",
     tableRows: po.lines,
     columns: [
@@ -418,6 +439,7 @@ export async function exportFormattedReport<T>(spec: {
   detailSheetName?: string;
   kpis: ReportKpi[];
   charts: Array<{ title: string; points: BarPoint[] }>;
+  todos?: ReportTodo[];
   tableTitle: string;
   rows: T[];
   columns: ReportTableColumn<T>[];
@@ -430,6 +452,7 @@ export async function exportFormattedReport<T>(spec: {
     detailSheetName: spec.detailSheetName ?? "Detail",
     kpis: spec.kpis,
     charts: spec.charts,
+    todos: spec.todos ?? defaultTodos(spec.title),
     tableTitle: spec.tableTitle,
     tableRows: spec.rows,
     columns: spec.columns,
@@ -479,6 +502,7 @@ type WorkbookSpec<T> = {
   detailSheetName: string;
   kpis: ReportKpi[];
   charts: Array<{ title: string; points: BarPoint[] }>;
+  todos: ReportTodo[];
   tableTitle: string;
   tableRows: T[];
   columns: ReportTableColumn<T>[];
@@ -490,13 +514,16 @@ async function buildWorkbook<T>(spec: WorkbookSpec<T>): Promise<void> {
   wb.creator = "skubase";
   wb.created = new Date();
   wb.modified = new Date();
-  buildSummarySheet(wb, spec);
+  await buildSummarySheet(wb, spec);
   buildDetailSheet(wb, spec);
   const buffer = await wb.xlsx.writeBuffer();
   triggerDownload(buffer as ArrayBuffer, spec.filename);
 }
 
-function buildSummarySheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<T>): void {
+async function buildSummarySheet<T>(
+  wb: import("exceljs").Workbook,
+  spec: WorkbookSpec<T>,
+): Promise<void> {
   const ws = wb.addWorksheet(spec.summarySheetName, {
     views: [{ showGridLines: false, state: "normal" }],
     properties: { defaultRowHeight: 18 },
@@ -585,7 +612,45 @@ function buildSummarySheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec
   ws.getRow(row).height = 14;
   fillCells(ws, row, 1, row, COLS, COLOR_PAGE_BG);
 
-  spec.charts.forEach((chart) => {
+  row += 1;
+  ws.mergeCells(row, 1, row, COLS);
+  const todoTitle = ws.getCell(row, 1);
+  todoTitle.value = "Recommended next actions";
+  todoTitle.font = { name: FONT_DISPLAY, bold: true, size: 14, color: { argb: COLOR_BRAND } };
+  todoTitle.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  fillCells(ws, row, 1, row, COLS, COLOR_SECTION_BG);
+  drawBoxBorder(ws, row, 1, row, COLS, COLOR_BORDER);
+  ws.getRow(row).height = 28;
+
+  spec.todos.slice(0, 6).forEach((todo, idx) => {
+    const r = row + idx + 1;
+    const tone = todo.tone ?? "neutral";
+    ws.getCell(r, 1).value = idx + 1;
+    ws.getCell(r, 1).font = { name: FONT_BASE, bold: true, size: 12, color: { argb: TONE_INK[tone] } };
+    ws.getCell(r, 1).alignment = { vertical: "middle", horizontal: "center" };
+    ws.getCell(r, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: TONE_FILL[tone] } };
+
+    ws.mergeCells(r, 2, r, 5);
+    const label = ws.getCell(r, 2);
+    label.value = todo.label;
+    label.font = { name: FONT_BASE, bold: true, size: 11, color: { argb: COLOR_BRAND } };
+    label.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+    ws.mergeCells(r, 6, r, COLS);
+    const detail = ws.getCell(r, 6);
+    detail.value = todo.detail ?? "";
+    detail.font = { name: FONT_BASE, size: 10, color: { argb: "FF475569" } };
+    detail.alignment = { vertical: "middle", horizontal: "left", wrapText: true, indent: 1 };
+    fillCells(ws, r, 2, r, COLS, idx % 2 === 0 ? COLOR_PANEL_BG : COLOR_ALT_ROW);
+    drawBoxBorder(ws, r, 1, r, COLS, COLOR_BORDER);
+    ws.getRow(r).height = 30;
+  });
+
+  row += Math.max(spec.todos.slice(0, 6).length, 1) + 1;
+  ws.getRow(row).height = 12;
+  fillCells(ws, row, 1, row, COLS, COLOR_PAGE_BG);
+
+  for (const chart of spec.charts) {
     row += 1;
     ws.mergeCells(row, 1, row, COLS);
     const sectionCell = ws.getCell(row, 1);
@@ -596,59 +661,30 @@ function buildSummarySheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec
     drawBoxBorder(ws, row, 1, row, COLS, COLOR_BORDER);
     ws.getRow(row).height = 28;
 
-    const dataStartRow = row + 1;
-    const max = Math.max(...chart.points.map((p) => p.value), 1);
+    const chartStartRow = row + 1;
+    const chartHeightRows = 15;
+    for (let r = chartStartRow; r < chartStartRow + chartHeightRows; r += 1) {
+      ws.getRow(r).height = 18;
+      fillCells(ws, r, 1, r, COLS, COLOR_PANEL_BG);
+    }
+    drawBoxBorder(ws, chartStartRow, 1, chartStartRow + chartHeightRows - 1, COLS, COLOR_BORDER);
 
-    chart.points.forEach((point, idx) => {
-      const r = dataStartRow + idx;
-
-      ws.mergeCells(r, 1, r, 3);
-      const lab = ws.getCell(r, 1);
-      lab.value = point.label;
-      lab.font = { name: FONT_BASE, bold: true, size: 11, color: { argb: COLOR_HEADER_INK } };
-      lab.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
-
-      ws.mergeCells(r, 4, r, 10);
-      const barCell = ws.getCell(r, 4);
-      barCell.value = point.value;
-      barCell.numFmt = Math.abs(point.value) >= 100 ? '"$"#,##0' : "#,##0";
-      barCell.font = { name: FONT_BASE, size: 1, color: { argb: "00FFFFFF" } };
-      barCell.alignment = { vertical: "middle", horizontal: "left" };
-
-      ws.mergeCells(r, 11, r, 12);
-      const disp = ws.getCell(r, 11);
-      disp.value = point.display;
-      const tone: Tone = point.tone ?? "neutral";
-      disp.font = { name: FONT_BASE, bold: true, size: 11, color: { argb: TONE_INK[tone] } };
-      disp.alignment = { vertical: "middle", horizontal: "right", indent: 1 };
-
-      ws.addConditionalFormatting({
-        ref: barCell.address,
-        rules: [
-          {
-            type: "dataBar",
-            cfvo: [
-              { type: "num", value: 0 },
-              { type: "num", value: max },
-            ],
-            color: { argb: TONE_ACCENT[tone] },
-            gradient: true,
-            showValue: false,
-            priority: 1,
-          } as never,
-        ],
+    const chartImage = renderBarChartDataUrl(chart.title, chart.points);
+    if (chartImage) {
+      const imageId = wb.addImage({ base64: chartImage, extension: "png" });
+      ws.addImage(imageId, {
+        tl: { col: 0.25, row: chartStartRow - 0.85 },
+        ext: { width: 900, height: 260 },
       });
+    } else {
+      buildFallbackChartRows(ws, chart, chartStartRow, COLS);
+    }
 
-      ws.getRow(r).height = 22;
-    });
-
-    drawBoxBorder(ws, dataStartRow, 1, dataStartRow + chart.points.length - 1, COLS, COLOR_BORDER);
-
-    row = dataStartRow + chart.points.length;
+    row = chartStartRow + chartHeightRows;
     row += 1;
     ws.getRow(row).height = 10;
     fillCells(ws, row, 1, row, COLS, COLOR_PAGE_BG);
-  });
+  }
 
   row += 1;
   ws.mergeCells(row, 1, row, COLS);
@@ -760,6 +796,141 @@ function buildDetailSheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<
   ws.views = [{ state: "frozen", xSplit: 0, ySplit: headerRow, showGridLines: false }];
 }
 
+function buildFallbackChartRows(
+  ws: import("exceljs").Worksheet,
+  chart: { title: string; points: BarPoint[] },
+  dataStartRow: number,
+  colCount: number,
+): void {
+  const max = Math.max(...chart.points.map((p) => p.value), 1);
+  chart.points.slice(0, 10).forEach((point, idx) => {
+    const r = dataStartRow + idx;
+    ws.mergeCells(r, 1, r, 3);
+    const lab = ws.getCell(r, 1);
+    lab.value = point.label;
+    lab.font = { name: FONT_BASE, bold: true, size: 11, color: { argb: COLOR_HEADER_INK } };
+    lab.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+    ws.mergeCells(r, 4, r, Math.max(4, colCount - 2));
+    const barCell = ws.getCell(r, 4);
+    barCell.value = point.value;
+    barCell.numFmt = Math.abs(point.value) >= 100 ? '"$"#,##0' : "#,##0";
+    barCell.font = { name: FONT_BASE, size: 1, color: { argb: "00FFFFFF" } };
+    const tone: Tone = point.tone ?? "neutral";
+    ws.addConditionalFormatting({
+      ref: barCell.address,
+      rules: [
+        {
+          type: "dataBar",
+          cfvo: [
+            { type: "num", value: 0 },
+            { type: "num", value: max },
+          ],
+          color: { argb: TONE_ACCENT[tone] },
+          gradient: true,
+          showValue: false,
+          priority: 1,
+        } as never,
+      ],
+    });
+
+    ws.mergeCells(r, colCount - 1, r, colCount);
+    const disp = ws.getCell(r, colCount - 1);
+    disp.value = point.display;
+    disp.font = { name: FONT_BASE, bold: true, size: 11, color: { argb: TONE_INK[tone] } };
+    disp.alignment = { vertical: "middle", horizontal: "right", indent: 1 };
+  });
+}
+
+function renderBarChartDataUrl(title: string, points: BarPoint[]): string | null {
+  if (typeof document === "undefined" || points.length === 0) return null;
+  const visible = points.slice(0, 8);
+  const canvas = document.createElement("canvas");
+  const width = 1200;
+  const height = 360;
+  const scale = 2;
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "700 28px Calibri, Arial, sans-serif";
+  ctx.fillText(title, 28, 44);
+
+  const chartTop = 78;
+  const labelWidth = 310;
+  const valueWidth = 160;
+  const barLeft = labelWidth + 42;
+  const barWidth = width - labelWidth - valueWidth - 78;
+  const rowHeight = Math.min(34, Math.floor((height - chartTop - 26) / Math.max(visible.length, 1)));
+  const max = Math.max(...visible.map((point) => Math.abs(point.value)), 1);
+
+  ctx.font = "600 18px Calibri, Arial, sans-serif";
+  visible.forEach((point, idx) => {
+    const y = chartTop + idx * rowHeight;
+    const tone = point.tone ?? "neutral";
+    const label = truncate(point.label, 34);
+    ctx.fillStyle = "#334155";
+    ctx.fillText(label, 28, y + 22);
+
+    ctx.fillStyle = "#eef2f7";
+    roundRect(ctx, barLeft, y + 6, barWidth, 18, 9);
+    ctx.fill();
+
+    ctx.fillStyle = argbToHex(TONE_ACCENT[tone]);
+    roundRect(ctx, barLeft, y + 6, Math.max((Math.abs(point.value) / max) * barWidth, 4), 18, 9);
+    ctx.fill();
+
+    ctx.fillStyle = argbToHex(TONE_INK[tone]);
+    ctx.font = "700 18px Calibri, Arial, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(point.display, width - 28, y + 22);
+    ctx.textAlign = "left";
+    ctx.font = "600 18px Calibri, Arial, sans-serif";
+  });
+
+  ctx.strokeStyle = "#dbe3ef";
+  ctx.lineWidth = 2;
+  roundRect(ctx, 1, 1, width - 2, height - 2, 18);
+  ctx.stroke();
+
+  return canvas.toDataURL("image/png");
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+function truncate(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}...`;
+}
+
+function argbToHex(argb: string): string {
+  return `#${argb.slice(2)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Style helpers
 // ---------------------------------------------------------------------------
@@ -849,6 +1020,36 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function defaultTodos(title: string): ReportTodo[] {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("stockout")) {
+    return [
+      { label: "Review critical stockout risks", detail: "Start with SKUs where days left is inside supplier lead time.", tone: "danger" },
+      { label: "Open the reorder plan", detail: "Convert high-risk SKUs into purchase order decisions.", tone: "warning" },
+      { label: "Validate lead-time assumptions", detail: "Confirm vendor lead times before committing capital.", tone: "neutral" },
+    ];
+  }
+  if (normalized.includes("dead") || normalized.includes("overstock")) {
+    return [
+      { label: "Prioritize largest cash recovery", detail: "Use the table to find the SKUs tying up the most money.", tone: "danger" },
+      { label: "Pick liquidation tactic", detail: "Choose markdown, bundle, wholesale, or write-off per item.", tone: "warning" },
+      { label: "Track recovered capital", detail: "Compare results with the projected recovery after the sale window.", tone: "good" },
+    ];
+  }
+  if (normalized.includes("reorder") || normalized.includes("purchase")) {
+    return [
+      { label: "Approve urgent reorder lines", detail: "Confirm costs and quantities for SKUs inside the reorder window.", tone: "danger" },
+      { label: "Group by supplier", detail: "Send fewer, cleaner purchase orders to vendors.", tone: "warning" },
+      { label: "Record receipts", detail: "Receipt history improves supplier scorecards and lead-time confidence.", tone: "good" },
+    ];
+  }
+  return [
+    { label: "Review the highest-priority rows", detail: "Start with the top of the detail table before lower-impact work.", tone: "danger" },
+    { label: "Assign the next workflow", detail: "Move reorder, liquidation, and supplier issues into the right app workflow.", tone: "warning" },
+    { label: "Export again after changes", detail: "Use a fresh export to confirm the action queue moved.", tone: "good" },
+  ];
 }
 
 function escapeCsv(value: string | number): string {

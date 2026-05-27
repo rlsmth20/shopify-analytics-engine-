@@ -18,13 +18,19 @@ import { fetchInventoryActions, type InventoryAction } from "@/lib/api";
 import { getActionImpactValue, statusLabel } from "@/lib/app-helpers";
 import {
   currency,
+  fetchAuditEvents,
   fetchForecasts,
+  fetchReportSchedules,
   fetchReorderSuggestions,
   fetchScorecards,
+  saveReportSchedule,
+  type AuditLogEvent,
   type ForecastResult,
+  type ReportSchedule,
   type ReorderSuggestion,
   type SkuScorecard,
 } from "@/lib/api-v2";
+import { useAuth } from "@/components/auth-guard";
 import {
   exportFormattedReport,
   type BarPoint,
@@ -135,10 +141,10 @@ const reportCards = [
   {
     title: "Scheduled Weekly Reports",
     category: "Automation",
-    description: "Planned recurring email delivery. Not active yet.",
-    status: "Coming soon",
-    href: "/alerts",
-    cta: "Configure alerts",
+    description: "Save email schedule preferences for recurring inventory report delivery.",
+    status: "Available",
+    href: "/reports",
+    cta: "Configure schedule",
   },
 ] as const;
 
@@ -166,8 +172,11 @@ const reportMeta: Record<ReportKind, { title: string; description: string }> = {
 };
 
 export default function ReportsPage() {
+  const { user } = useAuth();
   const [selectedReport, setSelectedReport] = useState<ReportKind>("actions");
   const [data, setData] = useState<LoadedData | null>(null);
+  const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditLogEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -175,6 +184,11 @@ export default function ReportsPage() {
   const [sortKey, setSortKey] = useState("priority");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [scheduleEmail, setScheduleEmail] = useState(user.email);
+  const [scheduleCadence, setScheduleCadence] = useState<ReportSchedule["cadence"]>("weekly");
+  const [scheduleEnabled, setScheduleEnabled] = useState(true);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -205,7 +219,37 @@ export default function ReportsPage() {
     setSortKey("priority");
     setSortDirection("desc");
     setSelectedRowId(null);
+    const existing = schedules.find((schedule) => schedule.report_type === selectedReport);
+    setScheduleEmail(existing?.recipient_email || user.email);
+    setScheduleCadence(existing?.cadence || "weekly");
+    setScheduleEnabled(existing?.enabled ?? true);
+    setScheduleNotice(null);
   }, [selectedReport]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      fetchReportSchedules(controller.signal),
+      fetchAuditEvents(8, controller.signal),
+    ])
+      .then(([scheduleResponse, auditResponse]) => {
+        setSchedules(scheduleResponse.schedules);
+        setAuditEvents(auditResponse.events);
+        const existing = scheduleResponse.schedules.find(
+          (schedule) => schedule.report_type === selectedReport,
+        );
+        if (existing) {
+          setScheduleEmail(existing.recipient_email);
+          setScheduleCadence(existing.cadence);
+          setScheduleEnabled(existing.enabled);
+        }
+      })
+      .catch(() => {
+        setSchedules([]);
+        setAuditEvents([]);
+      });
+    return () => controller.abort();
+  }, []);
 
   const isDemo = isDemoMode();
   const rowsByReport = useMemo(() => buildReportRows(data), [data]);
@@ -247,10 +291,55 @@ export default function ReportsPage() {
       detailSheetName: detailSheetName(selectedReport),
       kpis: metricsToKpis(metrics),
       charts: buildReportCharts(selectedReport, visibleRows),
+      todos: buildReportTodos(selectedReport, visibleRows),
       tableTitle: reportMeta[selectedReport].title,
       rows: visibleRows,
       columns: buildXlsxColumns(selectedReport),
     });
+  }
+
+  async function saveSchedule() {
+    const email = scheduleEmail.trim();
+    if (!email || !email.includes("@")) {
+      setScheduleNotice("Enter a valid email before saving the schedule.");
+      return;
+    }
+    setScheduleSaving(true);
+    setScheduleNotice(null);
+    try {
+      const saved = await saveReportSchedule({
+        report_type: selectedReport,
+        cadence: scheduleCadence,
+        channel: "email",
+        recipient_email: email,
+        enabled: scheduleEnabled,
+      });
+      setSchedules((current) => [
+        saved,
+        ...current.filter((schedule) => schedule.report_type !== selectedReport),
+      ]);
+      setAuditEvents((current) => [
+        {
+          id: Date.now(),
+          event_type: "report_schedule_saved",
+          entity_type: "report_schedule",
+          entity_id: selectedReport,
+          summary: `${reportMeta[selectedReport].title} schedule saved for ${email}.`,
+          metadata: {
+            report_type: selectedReport,
+            cadence: scheduleCadence,
+            enabled: scheduleEnabled,
+          },
+          created_at: new Date().toISOString(),
+        },
+        ...current,
+      ].slice(0, 8));
+      setScheduleNotice("Report schedule preference saved.");
+    } catch (err) {
+      setScheduleNotice(err instanceof Error ? err.message : "Schedule could not be saved.");
+    } finally {
+      setScheduleSaving(false);
+    }
   }
 
   return (
@@ -296,10 +385,7 @@ export default function ReportsPage() {
                 Preview report
               </button>
             ) : (
-              <a
-                className={`button ${report.status === "Coming soon" ? "button-ghost" : "button-secondary"}`}
-                href={report.href}
-              >
+              <a className="button button-secondary" href={report.href}>
                 {report.cta}
               </a>
             )}
@@ -383,7 +469,148 @@ export default function ReportsPage() {
           </>
         )}
       </section>
+
+      <section className="report-admin-grid">
+        <ReportSchedulePanel
+          selectedReport={selectedReport}
+          email={scheduleEmail}
+          cadence={scheduleCadence}
+          enabled={scheduleEnabled}
+          saving={scheduleSaving}
+          notice={scheduleNotice}
+          onEmailChange={setScheduleEmail}
+          onCadenceChange={setScheduleCadence}
+          onEnabledChange={setScheduleEnabled}
+          onSave={saveSchedule}
+        />
+        <AuditHistoryPanel events={auditEvents} />
+      </section>
     </div>
+  );
+}
+
+function ReportSchedulePanel({
+  selectedReport,
+  email,
+  cadence,
+  enabled,
+  saving,
+  notice,
+  onEmailChange,
+  onCadenceChange,
+  onEnabledChange,
+  onSave,
+}: {
+  selectedReport: ReportKind;
+  email: string;
+  cadence: ReportSchedule["cadence"];
+  enabled: boolean;
+  saving: boolean;
+  notice: string | null;
+  onEmailChange: (value: string) => void;
+  onCadenceChange: (value: ReportSchedule["cadence"]) => void;
+  onEnabledChange: (value: boolean) => void;
+  onSave: () => void;
+}) {
+  return (
+    <section className="section-card report-admin-card">
+      <div className="section-heading">
+        <div>
+          <p className="section-eyebrow">Scheduled reports</p>
+          <h2 className="section-title section-title-small">
+            Email delivery preferences
+          </h2>
+          <p className="section-copy">
+            Save a recurring schedule for the selected report. The preference is
+            recorded now so report delivery can run from the backend scheduler.
+          </p>
+        </div>
+        <ReportStatusBadge tone="positive">Available</ReportStatusBadge>
+      </div>
+      <div className="report-schedule-form">
+        <label className="report-filter-field">
+          <span>Report</span>
+          <input
+            className="input-control"
+            value={reportMeta[selectedReport].title}
+            readOnly
+          />
+        </label>
+        <label className="report-filter-field">
+          <span>Cadence</span>
+          <select
+            value={cadence}
+            onChange={(event) => onCadenceChange(event.target.value as ReportSchedule["cadence"])}
+          >
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </label>
+        <label className="report-filter-field">
+          <span>Recipient</span>
+          <input
+            className="input-control"
+            type="email"
+            value={email}
+            onChange={(event) => onEmailChange(event.target.value)}
+            placeholder="ops@example.com"
+          />
+        </label>
+        <label className="report-toggle-row">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(event) => onEnabledChange(event.target.checked)}
+          />
+          Enabled
+        </label>
+      </div>
+      <div className="button-row">
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => void onSave()}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : "Save schedule"}
+        </button>
+      </div>
+      {notice ? <p className="report-schedule-notice">{notice}</p> : null}
+    </section>
+  );
+}
+
+function AuditHistoryPanel({ events }: { events: AuditLogEvent[] }) {
+  return (
+    <section className="section-card report-admin-card">
+      <div className="section-heading">
+        <div>
+          <p className="section-eyebrow">Decision history</p>
+          <h2 className="section-title section-title-small">Recent audit trail</h2>
+          <p className="section-copy">
+            Saved report schedules, PO approvals, sends, and receipts appear here
+            as workspace history.
+          </p>
+        </div>
+      </div>
+      {events.length === 0 ? (
+        <ReportEmptyState
+          title="No decisions logged yet"
+          description="Save a report schedule or move a purchase order through approval to start the audit trail."
+        />
+      ) : (
+        <div className="audit-timeline">
+          {events.map((event) => (
+            <article key={`${event.id}-${event.created_at}`} className="audit-event">
+              <p className="audit-event-summary">{event.summary}</p>
+              <p className="audit-event-meta">
+                {formatDateTime(event.created_at)} - {event.entity_type}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -453,6 +680,87 @@ function buildInsight(report: ReportKind, rows: ReportRow[]): string {
   }
   const critical = rows.filter((row) => row.riskLevel === "Critical").length;
   return `${rows.length} SKUs need replenishment attention based on stock on hand, velocity, lead time, and target coverage. ${critical} are critical.`;
+}
+
+function buildReportTodos(report: ReportKind, rows: ReportRow[]) {
+  if (report === "stockout") {
+    const critical = rows.filter((row) => row.riskLevel === "Critical").length;
+    return [
+      {
+        label: `Review ${critical} critical stockout ${critical === 1 ? "SKU" : "SKUs"}`,
+        detail: "Start with rows where days left is inside the supplier lead time.",
+        tone: "danger" as const,
+      },
+      {
+        label: "Open reorder plan",
+        detail: "Turn the urgent stockout rows into purchase order decisions.",
+        tone: "warning" as const,
+      },
+      {
+        label: "Confirm lead-time assumptions",
+        detail: "Check vendor/category lead-time settings before committing capital.",
+        tone: "neutral" as const,
+      },
+    ];
+  }
+  if (report === "reorder") {
+    const vendors = new Set(rows.map((row) => row.vendor).filter(Boolean)).size;
+    return [
+      {
+        label: "Approve urgent reorder items",
+        detail: "Confirm quantities, costs, and target coverage for the shortest runway SKUs.",
+        tone: "danger" as const,
+      },
+      {
+        label: `Group orders across ${vendors} ${vendors === 1 ? "vendor" : "vendors"}`,
+        detail: "Use supplier grouping to keep purchase orders clean.",
+        tone: "warning" as const,
+      },
+      {
+        label: "Record receipts",
+        detail: "Receiving history feeds supplier scorecards and lead-time confidence.",
+        tone: "good" as const,
+      },
+    ];
+  }
+  if (report === "dead-stock") {
+    const cash = currency(sum(rows, "cashImpact"));
+    return [
+      {
+        label: `Recover the largest share of ${cash}`,
+        detail: "Start with the rows tying up the most working capital.",
+        tone: "danger" as const,
+      },
+      {
+        label: "Pick liquidation tactic",
+        detail: "Choose markdown, bundle, wholesale, or write-off based on age and cash tied up.",
+        tone: "warning" as const,
+      },
+      {
+        label: "Track recovery after the sale window",
+        detail: "Export again after promotions to confirm the dead-stock list shrank.",
+        tone: "good" as const,
+      },
+    ];
+  }
+  const highPriority = rows.filter((row) => row.priority >= 80).length;
+  return [
+    {
+      label: `Work ${highPriority} highest-priority actions first`,
+      detail: "These rows combine urgency, cash impact, and inventory signals.",
+      tone: "danger" as const,
+    },
+    {
+      label: "Route each action to the right workflow",
+      detail: "Use purchase orders for reorders, liquidation for dead stock, and lead-time settings for supplier issues.",
+      tone: "warning" as const,
+    },
+    {
+      label: "Re-export after decisions",
+      detail: "Use the next report to see whether the queue and cash exposure improved.",
+      tone: "good" as const,
+    },
+  ];
 }
 
 function ReportRowDetails({
@@ -731,13 +1039,6 @@ function buildColumns(report: ReportKind): ReportColumn<ReportRow>[] {
   ];
 }
 
-function buildCsvColumns(report: ReportKind): CsvColumn<ReportRow>[] {
-  return buildColumns(report).map((column) => ({
-    label: column.label,
-    value: (row) => csvValue(column.key, row),
-  }));
-}
-
 function buildMetrics(report: ReportKind, rows: ReportRow[]): ReportMetric[] {
   if (report === "actions") {
     return [
@@ -985,6 +1286,17 @@ function formatMoney(value: number | null): string {
   return currency(value);
 }
 
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown time";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function priorityBucket(priority: number): string {
   if (priority >= 80) return "Critical";
   if (priority >= 60) return "High";
@@ -1044,7 +1356,7 @@ function detailSheetName(report: ReportKind): string {
 function metricsToKpis(metrics: ReportMetric[]): XlsxKpi[] {
   return metrics.map((metric) => ({
     label: metric.label,
-    value: typeof metric.value === "number" ? formatNumber(metric.value) : metric.value,
+    value: typeof metric.value === "number" ? formatNumber(metric.value) : String(metric.value ?? ""),
     tone: metricToneToXlsxTone(metric.tone),
   }));
 }

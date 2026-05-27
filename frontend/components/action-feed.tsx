@@ -96,7 +96,7 @@ export function ActionFeed({
               disabled={visibleActions.length === 0}
               onClick={() => exportActionsReport(visibleActions)}
             >
-              Export report
+              Export styled Excel
             </button>
           </div>
         </div>

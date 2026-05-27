@@ -82,11 +82,15 @@ def update_purchase_order_status(
     shop_id: int,
     po_id: str,
     status: str,
+    user_id: int | None = None,
 ) -> PurchaseOrderDraft | None:
     record = _get_record(db, shop_id, po_id)
     if record is None:
         return None
     record.status = status
+    if status == "approved" and record.approved_at is None:
+        record.approved_at = datetime.now(timezone.utc)
+        record.approved_by_user_id = user_id
     if status == "sent" and record.sent_at is None:
         record.sent_at = datetime.now(timezone.utc)
     db.commit()
@@ -197,6 +201,8 @@ def _record_to_schema(db: DbSession, record: PurchaseOrderRecord) -> PurchaseOrd
         total_cost=float(record.total_cost),
         expected_arrival_date=record.expected_arrival_date,
         rationale=record.rationale,
+        approved_at=record.approved_at,
+        approved_by_user_id=record.approved_by_user_id,
         sent_at=record.sent_at,
         received_at=record.received_at,
     )

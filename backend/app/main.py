@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 from app.api.routes.actions import auth_scoped_router as auth_scoped_actions_router, router as actions_router
 from app.api.routes.ai_chat import router as ai_chat_router
 from app.api.routes.admin import router as admin_router
+from app.api.routes.audit import router as audit_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.auth import router as auth_router
@@ -23,6 +24,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.inventory_risk_snapshot import router as inventory_risk_snapshot_router
 from app.api.routes.liquidation import router as liquidation_router
 from app.api.routes.reorder import router as reorder_router
+from app.api.routes.report_schedules import router as report_schedules_router
 from app.api.routes.shipstation_import import router as shipstation_import_router
 from app.api.routes.shop_settings import router as shop_settings_router
 from app.api.routes.shopify_ingestion import router as shopify_ingestion_router
@@ -106,6 +108,8 @@ def create_app() -> FastAPI:
     app.include_router(transfers_router)
     app.include_router(liquidation_router)
     app.include_router(alerts_router)
+    app.include_router(audit_router)
+    app.include_router(report_schedules_router)
 
     return app
 

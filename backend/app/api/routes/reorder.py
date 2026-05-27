@@ -20,6 +20,7 @@ from app.services.purchase_order_records import (
     save_purchase_order,
     update_purchase_order_status,
 )
+from app.services.audit_log import record_audit_event
 from app.services.reorder_optimizer import build_reorder_suggestions, build_vendor_totals
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
@@ -117,8 +118,19 @@ def save_po_draft(
     user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
+    saved = save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
+    record_audit_event(
+        db,
+        shop_id=user.shop_id,
+        user_id=user.id,
+        event_type="purchase_order_saved",
+        entity_type="purchase_order",
+        entity_id=saved.po_id,
+        summary=f"Purchase order {saved.po_id} saved for {saved.vendor}.",
+        metadata={"vendor": saved.vendor, "total_cost": saved.total_cost, "status": saved.status},
+    )
     return PurchaseOrderStatusResponse(
-        po=save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
+        po=saved
     )
 
 
@@ -129,11 +141,27 @@ def update_po_status(
     user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
-    if status not in {"draft", "ready", "sent", "received", "cancelled"}:
+    if status not in {"draft", "ready", "approved", "sent", "received", "cancelled"}:
         raise HTTPException(status_code=400, detail="Invalid purchase order status.")
-    po = update_purchase_order_status(db, shop_id=user.shop_id, po_id=po_id, status=status)
+    po = update_purchase_order_status(
+        db,
+        shop_id=user.shop_id,
+        po_id=po_id,
+        status=status,
+        user_id=user.id,
+    )
     if po is None:
         raise HTTPException(status_code=404, detail="Purchase order not found.")
+    record_audit_event(
+        db,
+        shop_id=user.shop_id,
+        user_id=user.id,
+        event_type=f"purchase_order_{status}",
+        entity_type="purchase_order",
+        entity_id=po.po_id,
+        summary=f"Purchase order {po.po_id} marked {status}.",
+        metadata={"vendor": po.vendor, "total_cost": po.total_cost, "status": po.status},
+    )
     return PurchaseOrderStatusResponse(po=po)
 
 
@@ -156,4 +184,18 @@ def receive_po(
     )
     if po is None:
         raise HTTPException(status_code=404, detail="Purchase order not found.")
+    record_audit_event(
+        db,
+        shop_id=user.shop_id,
+        user_id=user.id,
+        event_type="purchase_order_received",
+        entity_type="purchase_order",
+        entity_id=po.po_id,
+        summary=f"Receipt recorded for purchase order {po.po_id}.",
+        metadata={
+            "vendor": po.vendor,
+            "received_lines": [line.model_dump() for line in payload.lines],
+            "status": po.status,
+        },
+    )
     return PurchaseOrderStatusResponse(po=po)

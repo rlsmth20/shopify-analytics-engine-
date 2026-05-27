@@ -49,6 +49,8 @@ const DEMO_FIXTURES: Record<string, unknown> = {
   "/bundles": DEMO_BUNDLES,
   "/transfers": DEMO_TRANSFERS,
   "/liquidation": DEMO_LIQUIDATION,
+  "/reports/schedules": { schedules: [] },
+  "/audit/events": { events: [] },
   "/alerts/rules": DEMO_ALERT_RULES,
   "/alerts/events": DEMO_ALERT_EVENTS,
   "/alerts/channels": DEMO_ALERT_CHANNELS,
@@ -265,13 +267,36 @@ export type PurchaseOrderDraft = {
   po_id: string;
   vendor: string;
   created_at: string;
-  status: "draft" | "ready" | "sent" | "received" | "cancelled";
+  status: "draft" | "ready" | "approved" | "sent" | "received" | "cancelled";
   lines: PurchaseOrderLine[];
   total_cost: number;
   expected_arrival_date: string;
   rationale: string;
+  approved_at: string | null;
+  approved_by_user_id: number | null;
   sent_at: string | null;
   received_at: string | null;
+};
+
+export type AuditLogEvent = {
+  id: number;
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type ReportSchedule = {
+  id: number;
+  report_type: "actions" | "stockout" | "dead-stock" | "reorder";
+  cadence: "weekly" | "monthly";
+  channel: "email";
+  recipient_email: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AlertRule = {
@@ -459,6 +484,28 @@ export const receivePurchaseOrder = (
     payload,
     signal,
   );
+
+export const fetchAuditEvents = (limit = 20, signal?: AbortSignal) =>
+  get<{ events: AuditLogEvent[] }>(`/audit/events?limit=${limit}`, signal);
+
+export const fetchReportSchedules = (signal?: AbortSignal) =>
+  get<{ schedules: ReportSchedule[] }>("/reports/schedules", signal);
+
+export const saveReportSchedule = (
+  payload: Omit<ReportSchedule, "id" | "created_at" | "updated_at">,
+  signal?: AbortSignal,
+) => {
+  if (isDemo()) {
+    const now = new Date().toISOString();
+    return Promise.resolve({
+      id: 0,
+      created_at: now,
+      updated_at: now,
+      ...payload,
+    } satisfies ReportSchedule);
+  }
+  return postJson<ReportSchedule>("/reports/schedules", payload, signal);
+};
 
 export const fetchSuppliers = (signal?: AbortSignal) =>
   get<{ vendors: SupplierScorecard[] }>("/suppliers", signal);

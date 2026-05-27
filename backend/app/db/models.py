@@ -176,6 +176,12 @@ class PurchaseOrderRecord(Base):
     total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     expected_arrival_date: Mapped[str] = mapped_column(String(32), default="")
     rationale: Mapped[str] = mapped_column(String(1000), default="")
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -234,6 +240,59 @@ class PurchaseOrderReceiptRecord(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         default=func.now(),
+    )
+
+
+class AuditLogRecord(Base):
+    """Workspace decision history for inventory actions and workflow changes."""
+
+    __tablename__ = "audit_log_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    entity_type: Mapped[str] = mapped_column(String(64), index=True)
+    entity_id: Mapped[str] = mapped_column(String(128), index=True)
+    summary: Mapped[str] = mapped_column(String(1000))
+    event_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        index=True,
+    )
+
+
+class ReportScheduleRecord(Base):
+    """Saved schedule preferences for recurring inventory reports."""
+
+    __tablename__ = "report_schedule_records"
+    __table_args__ = (
+        UniqueConstraint("shop_id", "report_type", name="uq_report_schedules_shop_report"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    report_type: Mapped[str] = mapped_column(String(64), index=True)
+    cadence: Mapped[str] = mapped_column(String(32), default="weekly")
+    channel: Mapped[str] = mapped_column(String(32), default="email")
+    recipient_email: Mapped[str] = mapped_column(String(320), default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+        onupdate=func.now(),
     )
 
 

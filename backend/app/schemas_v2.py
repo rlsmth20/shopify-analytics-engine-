@@ -29,7 +29,7 @@ AlertTrigger = Literal[
     "bundle_break",
     "price_drop",
 ]
-PurchaseOrderStatus = Literal["draft", "ready", "sent", "received", "cancelled"]
+PurchaseOrderStatus = Literal["draft", "ready", "approved", "sent", "received", "cancelled"]
 
 
 class ApiModel(BaseModel):
@@ -267,6 +267,8 @@ class PurchaseOrderDraft(ApiModel):
     total_cost: float
     expected_arrival_date: str
     rationale: str
+    approved_at: Optional[datetime] = None
+    approved_by_user_id: Optional[int] = None
     sent_at: Optional[datetime] = None
     received_at: Optional[datetime] = None
 
@@ -293,6 +295,43 @@ class ReceivePurchaseOrderRequest(ApiModel):
 
 class PurchaseOrderStatusResponse(ApiModel):
     po: PurchaseOrderDraft
+
+
+class AuditLogEvent(ApiModel):
+    id: int
+    event_type: str
+    entity_type: str
+    entity_id: str
+    summary: str
+    metadata: dict
+    created_at: datetime
+
+
+class AuditLogResponse(ApiModel):
+    events: list[AuditLogEvent]
+
+
+class ReportSchedule(ApiModel):
+    id: int
+    report_type: str
+    cadence: Literal["weekly", "monthly"]
+    channel: Literal["email"]
+    recipient_email: str
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReportSchedulesResponse(ApiModel):
+    schedules: list[ReportSchedule]
+
+
+class UpsertReportScheduleRequest(ApiModel):
+    report_type: Literal["actions", "stockout", "dead-stock", "reorder"]
+    cadence: Literal["weekly", "monthly"] = "weekly"
+    channel: Literal["email"] = "email"
+    recipient_email: str = Field(min_length=3, max_length=320)
+    enabled: bool = True
 
 
 # ---------------------------------------------------------------------------

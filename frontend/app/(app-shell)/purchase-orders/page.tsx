@@ -133,6 +133,14 @@ export default function PurchaseOrdersPage() {
                   </button>
                   <button
                     type="button"
+                    className="button button-secondary"
+                    onClick={() => void markStatus(po, "approved")}
+                    disabled={busyPo === po.po_id || po.status === "approved"}
+                  >
+                    Approve PO
+                  </button>
+                  <button
+                    type="button"
                     className="button button-primary"
                     onClick={() => {
                       sendPurchaseOrderToVendor(po);
@@ -163,7 +171,7 @@ export default function PurchaseOrdersPage() {
                     className="button button-ghost"
                     onClick={() => exportPurchaseOrderReport(po)}
                   >
-                    Export report
+                    Export styled Excel
                   </button>
                 </div>
                 {receivingPo === po.po_id ? (

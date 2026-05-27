@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 export type ReportOption = {
   label: string;
@@ -178,6 +178,9 @@ export function ReportTable<T>({
   columns,
   rows,
   rowKey,
+  selectedRowKey,
+  onRowClick,
+  renderRowDetails,
   sortKey,
   sortDirection,
   onSort,
@@ -187,6 +190,9 @@ export function ReportTable<T>({
   columns: ReportColumn<T>[];
   rows: T[];
   rowKey: (row: T) => string;
+  selectedRowKey?: string | null;
+  onRowClick?: (row: T) => void;
+  renderRowDetails?: (row: T) => ReactNode;
   sortKey: string;
   sortDirection: "asc" | "desc";
   onSort: (key: string) => void;
@@ -229,15 +235,29 @@ export function ReportTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={rowKey(row)}>
-              {columns.map((column) => (
-                <td key={column.key} className={`align-${column.align ?? "left"}`}>
-                  {column.render(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const key = rowKey(row);
+            const expanded = selectedRowKey === key;
+            return (
+              <Fragment key={key}>
+                <tr
+                  className={expanded ? "report-row report-row-expanded" : "report-row"}
+                  onClick={() => onRowClick?.(row)}
+                >
+                  {columns.map((column) => (
+                    <td key={column.key} className={`align-${column.align ?? "left"}`}>
+                      {column.render(row)}
+                    </td>
+                  ))}
+                </tr>
+                {expanded && renderRowDetails ? (
+                  <tr className="report-detail-row">
+                    <td colSpan={columns.length}>{renderRowDetails(row)}</td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
