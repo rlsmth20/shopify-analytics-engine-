@@ -25,7 +25,13 @@ import {
   type ReorderSuggestion,
   type SkuScorecard,
 } from "@/lib/api-v2";
-import { exportReportRowsCsv, type CsvColumn } from "@/lib/report-export";
+import {
+  exportFormattedReport,
+  type BarPoint,
+  type ReportKpi as XlsxKpi,
+  type ReportTableColumn as XlsxColumn,
+  type Tone as XlsxTone,
+} from "@/lib/report-export";
 
 type ReportKind = "actions" | "stockout" | "dead-stock" | "reorder";
 type SortDirection = "asc" | "desc";
@@ -168,6 +174,7 @@ export default function ReportsPage() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [sortKey, setSortKey] = useState("priority");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -197,6 +204,7 @@ export default function ReportsPage() {
     setFilters({});
     setSortKey("priority");
     setSortDirection("desc");
+    setSelectedRowId(null);
   }, [selectedReport]);
 
   const isDemo = isDemoMode();
@@ -215,6 +223,11 @@ export default function ReportsPage() {
     () => sortRows(filterRows(rows, selectedReport, search, filters), columns, sortKey, sortDirection),
     [rows, selectedReport, search, filters, columns, sortKey, sortDirection],
   );
+  const insight = useMemo(
+    () => buildInsight(selectedReport, rows),
+    [selectedReport, rows],
+  );
+  const cta = reportCta(selectedReport);
 
   function updateSort(key: string) {
     if (sortKey === key) {
@@ -225,11 +238,18 @@ export default function ReportsPage() {
     setSortDirection(key === "product" ? "asc" : "desc");
   }
 
-  function exportCsv() {
-    exportReportRowsCsv({
-      filename: `skubase-${selectedReport}-report-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: buildCsvColumns(selectedReport),
+  async function exportWorkbook() {
+    await exportFormattedReport({
+      title: reportMeta[selectedReport].title,
+      subtitle: reportMeta[selectedReport].description,
+      filename: `skubase-${selectedReport}-report-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      summarySheetName: "Summary",
+      detailSheetName: detailSheetName(selectedReport),
+      kpis: metricsToKpis(metrics),
+      charts: buildReportCharts(selectedReport, visibleRows),
+      tableTitle: reportMeta[selectedReport].title,
       rows: visibleRows,
+      columns: buildXlsxColumns(selectedReport),
     });
   }
 
@@ -247,7 +267,7 @@ export default function ReportsPage() {
               filtering, then export the filtered rows.
             </p>
           </div>
-          {isDemo ? <ReportStatusBadge tone="demo">Demo data</ReportStatusBadge> : null}
+          {isDemo ? <ReportStatusBadge tone="demo">Sample data</ReportStatusBadge> : null}
         </div>
       </section>
 
@@ -291,16 +311,21 @@ export default function ReportsPage() {
         <ReportToolbar
           title={reportMeta[selectedReport].title}
           description={reportMeta[selectedReport].description}
-          badge={isDemo ? <ReportStatusBadge tone="demo">Demo data</ReportStatusBadge> : undefined}
+          badge={isDemo ? <ReportStatusBadge tone="demo">Sample data</ReportStatusBadge> : undefined}
           actions={
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={exportCsv}
-              disabled={visibleRows.length === 0}
-            >
-              Export filtered CSV
-            </button>
+            <>
+              <a className="button button-secondary" href={cta.href}>
+                {cta.label}
+              </a>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={exportWorkbook}
+                disabled={visibleRows.length === 0}
+              >
+                Export filtered Excel
+              </button>
+            </>
           }
         />
 
@@ -313,6 +338,7 @@ export default function ReportsPage() {
         ) : (
           <>
             <ReportMetricCards metrics={metrics} />
+            <p className="report-insight">{insight}</p>
             <div className="report-control-panel">
               <ReportSearchInput value={search} onChange={setSearch} />
               <ReportFilters
@@ -331,6 +357,14 @@ export default function ReportsPage() {
               columns={columns}
               rows={visibleRows}
               rowKey={(row) => `${selectedReport}-${row.id}`}
+              selectedRowKey={selectedRowId}
+              onRowClick={(row) => {
+                const key = `${selectedReport}-${row.id}`;
+                setSelectedRowId((current) => (current === key ? null : key));
+              }}
+              renderRowDetails={(row) => (
+                <ReportRowDetails report={selectedReport} row={row} />
+              )}
               sortKey={sortKey}
               sortDirection={sortDirection}
               onSort={updateSort}
@@ -394,6 +428,102 @@ function buildReportRows(data: LoadedData | null): Record<ReportKind, ReportRow[
     "dead-stock": deadStockRows,
     reorder: reorderRows,
   };
+}
+
+function reportCta(report: ReportKind): { label: string; href: string } {
+  if (report === "stockout") return { label: "Review reorder plan", href: "/purchase-orders" };
+  if (report === "reorder") return { label: "Open purchase orders", href: "/purchase-orders" };
+  if (report === "dead-stock") return { label: "Open liquidation plan", href: "/liquidation" };
+  return { label: "Open action feed", href: "/actions" };
+}
+
+function buildInsight(report: ReportKind, rows: ReportRow[]): string {
+  if (report === "stockout") {
+    const critical = rows.filter((row) => row.riskLevel === "Critical").length;
+    const high = rows.filter((row) => row.riskLevel === "High").length;
+    return `${critical + high} SKUs may run out before lead time can comfortably recover them. Start with the critical risk items below.`;
+  }
+  if (report === "actions") {
+    const critical = rows.filter((row) => row.priority >= 80).length;
+    return `${critical} high-priority actions are ranked by urgency, cash impact, and available inventory signals.`;
+  }
+  if (report === "dead-stock") {
+    const cash = currency(sum(rows, "cashImpact"));
+    return `${cash} is tied up across slow-moving or excess inventory. Start with the largest recovery opportunities.`;
+  }
+  const critical = rows.filter((row) => row.riskLevel === "Critical").length;
+  return `${rows.length} SKUs need replenishment attention based on stock on hand, velocity, lead time, and target coverage. ${critical} are critical.`;
+}
+
+function ReportRowDetails({
+  report,
+  row,
+}: {
+  report: ReportKind;
+  row: ReportRow;
+}) {
+  const cta = reportCta(report);
+  const fields = [
+    ["Product", row.product],
+    ["SKU", row.sku],
+    ["Vendor", row.vendor],
+    ["Category", row.category],
+    ["Priority / risk / status", `${formatNumber(row.priority)} / ${row.riskLevel} / ${row.status}`],
+    ["Current stock", formatNumber(row.currentStock)],
+    ["Daily velocity", row.dailyVelocity === null ? "Unavailable" : `${formatNumber(row.dailyVelocity)} / day`],
+    ["Days left / inventory", formatNumber(row.daysLeft ?? row.daysInventory)],
+    ["Lead time", row.leadTime === null ? "Unavailable" : `${formatNumber(row.leadTime)} days`],
+    ["Estimated stockout", row.estimatedStockoutDate || "Unavailable"],
+    ["Recommended qty", formatNumber(row.recommendedQty)],
+    ["Estimated cost / cash impact", formatMoney(row.estimatedCost ?? row.cashImpact)],
+  ];
+
+  return (
+    <div className="report-row-details">
+      <div className="report-row-detail-main">
+        <div>
+          <p className="report-detail-eyebrow">Row details</p>
+          <h3>{row.product}</h3>
+          <p className="report-detail-copy">{row.reason || "No additional reason available."}</p>
+        </div>
+        <a className="button button-secondary button-sm" href={cta.href}>
+          {cta.label}
+        </a>
+      </div>
+      <dl className="report-detail-grid">
+        {fields.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="report-why-box">
+        <p className="report-detail-eyebrow">Why this matters</p>
+        <p>{buildWhyThisMatters(report, row)}</p>
+        <strong>{row.recommendedAction || "Review this SKU before acting."}</strong>
+      </div>
+    </div>
+  );
+}
+
+function buildWhyThisMatters(report: ReportKind, row: ReportRow): string {
+  if (report === "stockout" || report === "reorder") {
+    if (row.daysLeft !== null && row.leadTime !== null) {
+      if (row.daysLeft <= row.leadTime) {
+        return `This SKU has ${formatNumber(row.daysLeft)} days left and a ${formatNumber(row.leadTime)}-day lead time, so replenishment may not arrive before stock runs out.`;
+      }
+      return `This SKU has ${formatNumber(row.daysLeft)} days left against a ${formatNumber(row.leadTime)}-day lead time, so it belongs in the reorder review window.`;
+    }
+    return "Skubase has enough replenishment signal to keep this SKU in the report, but days-left context is limited.";
+  }
+  if (report === "dead-stock") {
+    return `${formatMoney(row.cashImpact)} may be tied up in inventory that is slow-moving, stale, or above target coverage.`;
+  }
+  if (row.cashImpact !== null) {
+    return `This action carries an estimated impact of ${formatMoney(row.cashImpact)}, so it is worth reviewing before lower-priority work.`;
+  }
+  return "This SKU is included because its inventory signals make it actionable in the current report.";
 }
 
 function actionToRow(
@@ -622,7 +752,7 @@ function buildMetrics(report: ReportKind, rows: ReportRow[]): ReportMetric[] {
       metric("Critical risk", rows.filter((row) => row.riskLevel === "Critical").length, "danger"),
       metric("High risk", rows.filter((row) => row.riskLevel === "High").length, "warning"),
       metric("Lead-time misses", rows.filter((row) => (row.daysLeft ?? 999) <= (row.leadTime ?? 0)).length, "danger"),
-      metric("SKUs reviewed", rows.length, "neutral"),
+      metric("SKUs Analyzed", rows.length, "neutral"),
     ];
   }
   if (report === "dead-stock") {
@@ -850,6 +980,11 @@ function formatNumber(value: number | null): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value);
 }
 
+function formatMoney(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "Unavailable";
+  return currency(value);
+}
+
 function priorityBucket(priority: number): string {
   if (priority >= 80) return "Critical";
   if (priority >= 60) return "High";
@@ -893,6 +1028,375 @@ function badgeTone(value: string): "neutral" | "positive" | "warning" | "danger"
 
 function statusClass(status: string): string {
   return status.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-$/g, "");
+}
+
+// ---------------------------------------------------------------------------
+// Excel-export helpers — build report-specific KPIs, charts, and column
+// definitions that drive the formatted xlsx output (summary tab + detail tab).
+// ---------------------------------------------------------------------------
+function detailSheetName(report: ReportKind): string {
+  if (report === "actions") return "Actions";
+  if (report === "stockout") return "Stockout";
+  if (report === "dead-stock") return "Dead Stock";
+  return "Reorder";
+}
+
+function metricsToKpis(metrics: ReportMetric[]): XlsxKpi[] {
+  return metrics.map((metric) => ({
+    label: metric.label,
+    value: typeof metric.value === "number" ? formatNumber(metric.value) : metric.value,
+    tone: metricToneToXlsxTone(metric.tone),
+  }));
+}
+
+function metricToneToXlsxTone(tone: ReportMetric["tone"]): XlsxTone {
+  if (tone === "danger") return "danger";
+  if (tone === "warning") return "warning";
+  if (tone === "positive") return "good";
+  return "neutral";
+}
+
+function riskToTone(risk: ReportRow["riskLevel"]): XlsxTone {
+  if (risk === "Critical") return "danger";
+  if (risk === "High") return "warning";
+  if (risk === "Medium") return "warning";
+  return "good";
+}
+
+function buildReportCharts(
+  report: ReportKind,
+  rows: ReportRow[],
+): Array<{ title: string; points: BarPoint[] }> {
+  if (rows.length === 0) return [];
+
+  if (report === "actions") {
+    return [
+      {
+        title: "Priority distribution",
+        points: priorityDistribution(rows),
+      },
+      {
+        title: "Top cash-impact SKUs",
+        points: topByNumber(rows, (row) => row.cashImpact, 8, (n) => currency(n)),
+      },
+    ];
+  }
+  if (report === "stockout") {
+    return [
+      {
+        title: "Risk distribution",
+        points: riskDistribution(rows),
+      },
+      {
+        title: "Shortest runway SKUs",
+        points: bottomByNumber(rows, (row) => row.daysLeft, 8, (n) => `${formatNumber(n)} d`).map(
+          (point, idx) => ({ ...point, tone: idx < 3 ? "danger" : idx < 6 ? "warning" : "neutral" }),
+        ),
+      },
+    ];
+  }
+  if (report === "dead-stock") {
+    return [
+      {
+        title: "Status mix",
+        points: statusDistribution(rows),
+      },
+      {
+        title: "Largest capital stuck",
+        points: topByNumber(rows, (row) => row.cashImpact, 8, (n) => currency(n)).map((point) => ({
+          ...point,
+          tone: "danger",
+        })),
+      },
+    ];
+  }
+  // reorder
+  return [
+    {
+      title: "Vendor exposure",
+      points: vendorExposure(rows),
+    },
+    {
+      title: "Critical reorder SKUs",
+      points: bottomByNumber(rows, (row) => row.daysLeft, 8, (n) => `${formatNumber(n)} d`).map(
+        (point, idx) => ({ ...point, tone: idx < 3 ? "danger" : "warning" }),
+      ),
+    },
+  ];
+}
+
+function priorityDistribution(rows: ReportRow[]): BarPoint[] {
+  const buckets = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+  rows.forEach((row) => {
+    buckets[priorityBucket(row.priority) as keyof typeof buckets] += 1;
+  });
+  return [
+    { label: "Critical", value: buckets.Critical, display: String(buckets.Critical), tone: "danger" },
+    { label: "High", value: buckets.High, display: String(buckets.High), tone: "warning" },
+    { label: "Medium", value: buckets.Medium, display: String(buckets.Medium), tone: "warning" },
+    { label: "Low", value: buckets.Low, display: String(buckets.Low), tone: "good" },
+  ];
+}
+
+function riskDistribution(rows: ReportRow[]): BarPoint[] {
+  const buckets = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+  rows.forEach((row) => {
+    buckets[row.riskLevel] += 1;
+  });
+  return [
+    { label: "Critical", value: buckets.Critical, display: String(buckets.Critical), tone: "danger" },
+    { label: "High", value: buckets.High, display: String(buckets.High), tone: "warning" },
+    { label: "Medium", value: buckets.Medium, display: String(buckets.Medium), tone: "warning" },
+    { label: "Low", value: buckets.Low, display: String(buckets.Low), tone: "good" },
+  ];
+}
+
+function statusDistribution(rows: ReportRow[]): BarPoint[] {
+  const counts = new Map<string, number>();
+  rows.forEach((row) => {
+    counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
+  });
+  return [...counts.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .map(([label, value]) => ({
+      label,
+      value,
+      display: String(value),
+      tone: label === "Dead stock" ? "danger" : label === "Overstock" ? "warning" : "neutral",
+    }));
+}
+
+function vendorExposure(rows: ReportRow[]): BarPoint[] {
+  const totals = new Map<string, number>();
+  rows.forEach((row) => {
+    const cost = row.estimatedCost ?? row.cashImpact ?? 0;
+    totals.set(row.vendor, (totals.get(row.vendor) ?? 0) + cost);
+  });
+  return [...totals.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 8)
+    .map(([label, value]) => ({
+      label,
+      value,
+      display: currency(value),
+      tone: value >= 5000 ? "warning" : "neutral",
+    }));
+}
+
+function topByNumber(
+  rows: ReportRow[],
+  pick: (row: ReportRow) => number | null,
+  limit: number,
+  format: (n: number) => string,
+): BarPoint[] {
+  return [...rows]
+    .filter((row) => pick(row) !== null && Number.isFinite(pick(row) as number))
+    .sort((a, b) => (pick(b) as number) - (pick(a) as number))
+    .slice(0, limit)
+    .map((row) => {
+      const value = pick(row) as number;
+      return {
+        label: row.product,
+        value,
+        display: format(value),
+        tone: "neutral",
+      };
+    });
+}
+
+function bottomByNumber(
+  rows: ReportRow[],
+  pick: (row: ReportRow) => number | null,
+  limit: number,
+  format: (n: number) => string,
+): BarPoint[] {
+  return [...rows]
+    .filter((row) => pick(row) !== null && Number.isFinite(pick(row) as number))
+    .sort((a, b) => (pick(a) as number) - (pick(b) as number))
+    .slice(0, limit)
+    .map((row) => {
+      const value = pick(row) as number;
+      // For "shortest runway" type charts the bar should grow with severity
+      // (smaller days left = bigger bar), so use 1/(value+1) as the bar value
+      // but show the actual days left in the display column.
+      return {
+        label: row.product,
+        value: Math.max(1, 100 - value),
+        display: format(value),
+        tone: "neutral",
+      };
+    });
+}
+
+function buildXlsxColumns(report: ReportKind): XlsxColumn<ReportRow>[] {
+  const product: XlsxColumn<ReportRow> = {
+    key: "product",
+    label: "Product",
+    width: 32,
+    format: (row) => row.product,
+  };
+  const sku: XlsxColumn<ReportRow> = {
+    key: "sku",
+    label: "SKU",
+    width: 18,
+    format: (row) => row.sku,
+  };
+  const vendor: XlsxColumn<ReportRow> = {
+    key: "vendor",
+    label: "Vendor",
+    width: 18,
+    format: (row) => row.vendor,
+  };
+
+  if (report === "actions") {
+    return [
+      {
+        key: "priority",
+        label: "Priority",
+        align: "right",
+        width: 11,
+        format: (row) => formatNumber(row.priority),
+        numericValue: (row) => row.priority,
+        numFmt: "0",
+        tone: (row) => (row.priority >= 80 ? "danger" : row.priority >= 60 ? "warning" : null),
+      },
+      {
+        key: "actionType",
+        label: "Action",
+        width: 12,
+        format: (row) => row.actionType,
+        tone: (row) =>
+          row.actionType === "Urgent"
+            ? "danger"
+            : row.actionType === "Dead"
+              ? "danger"
+              : row.actionType === "Optimize"
+                ? "warning"
+                : null,
+      },
+      product,
+      sku,
+      vendor,
+      numCol("currentStock", "Current stock", 13, (r) => r.currentStock, "#,##0"),
+      numCol("daysLeft", "Days left / DOI", 14, (r) => r.daysLeft, "#,##0"),
+      numCol("leadTime", "Lead time", 11, (r) => r.leadTime, "#,##0"),
+      numCol("recommendedQty", "Rec. qty", 11, (r) => r.recommendedQty, "#,##0"),
+      moneyCol("cashImpact", "Cash impact", 14, (r) => r.cashImpact, (r) =>
+        (r.cashImpact ?? 0) >= 1000 ? "good" : null,
+      ),
+      {
+        key: "reason",
+        label: "Reason",
+        width: 60,
+        format: (row) => row.reason,
+      },
+    ];
+  }
+
+  if (report === "stockout") {
+    return [
+      product,
+      sku,
+      vendor,
+      numCol("currentStock", "Current stock", 13, (r) => r.currentStock, "#,##0"),
+      numCol("salesLast30", "30-day sales", 13, (r) => r.salesLast30, "#,##0"),
+      numCol("dailyVelocity", "Daily velocity", 13, (r) => r.dailyVelocity, "0.0"),
+      numCol("daysLeft", "Days left", 11, (r) => r.daysLeft, "0.0"),
+      numCol("leadTime", "Lead time", 11, (r) => r.leadTime, "#,##0"),
+      { key: "estimatedStockoutDate", label: "Est. stockout", width: 14, format: (r) => r.estimatedStockoutDate },
+      {
+        key: "riskLevel",
+        label: "Risk",
+        width: 11,
+        format: (r) => r.riskLevel,
+        tone: (r) => riskToTone(r.riskLevel),
+      },
+      { key: "recommendedAction", label: "Recommended action", width: 50, format: (r) => r.recommendedAction },
+    ];
+  }
+
+  if (report === "dead-stock") {
+    return [
+      product,
+      sku,
+      vendor,
+      {
+        key: "status",
+        label: "Status",
+        width: 13,
+        format: (r) => r.status,
+        tone: (r) =>
+          r.status === "Dead stock" ? "danger" : r.status === "Overstock" ? "warning" : "warning",
+      },
+      numCol("currentStock", "Current stock", 13, (r) => r.currentStock, "#,##0"),
+      moneyCol("inventoryValue", "Inventory value", 15, (r) => r.inventoryValue, null),
+      numCol("daysSinceLastSale", "Days since sale", 14, (r) => r.daysSinceLastSale, "#,##0"),
+      numCol("salesLast30", "Sales last 30", 13, (r) => r.salesLast30, "#,##0"),
+      numCol("daysInventory", "Days inventory", 14, (r) => r.daysInventory, "0.0"),
+      moneyCol("cashImpact", "Cash tied up", 14, (r) => r.cashImpact, () => "danger"),
+      { key: "recommendedAction", label: "Recommended action", width: 50, format: (r) => r.recommendedAction },
+    ];
+  }
+
+  // reorder
+  return [
+    product,
+    sku,
+    vendor,
+    numCol("currentStock", "Current stock", 13, (r) => r.currentStock, "#,##0"),
+    numCol("dailyVelocity", "Daily velocity", 13, (r) => r.dailyVelocity, "0.0"),
+    numCol("leadTime", "Lead time", 11, (r) => r.leadTime, "#,##0"),
+    numCol("targetCoverage", "Target cov.", 12, (r) => r.targetCoverage, "0.0"),
+    numCol("recommendedQty", "Rec. qty", 11, (r) => r.recommendedQty, "#,##0"),
+    moneyCol("estimatedCost", "Est. cost", 13, (r) => r.estimatedCost, (r) =>
+      (r.estimatedCost ?? 0) >= 5000 ? "warning" : null,
+    ),
+    { key: "orderDeadline", label: "Order deadline", width: 14, format: (r) => r.orderDeadline },
+    { key: "recommendedAction", label: "Status / action", width: 50, format: (r) => r.recommendedAction },
+  ];
+}
+
+function numCol(
+  key: string,
+  label: string,
+  width: number,
+  pick: (r: ReportRow) => number | null,
+  numFmt: string,
+): XlsxColumn<ReportRow> {
+  return {
+    key,
+    label,
+    align: "right",
+    width,
+    format: (r) => formatNumber(pick(r)),
+    numericValue: (r) => {
+      const v = pick(r);
+      return v !== null && Number.isFinite(v) ? v : null;
+    },
+    numFmt,
+  };
+}
+
+function moneyCol(
+  key: string,
+  label: string,
+  width: number,
+  pick: (r: ReportRow) => number | null,
+  tone: ((r: ReportRow) => XlsxTone | null) | null,
+): XlsxColumn<ReportRow> {
+  return {
+    key,
+    label,
+    align: "right",
+    width,
+    format: (r) => (pick(r) === null ? "Unavailable" : currency(pick(r) ?? 0)),
+    numericValue: (r) => {
+      const v = pick(r);
+      return v !== null && Number.isFinite(v) ? v : null;
+    },
+    numFmt: '"$"#,##0',
+    tone: tone ?? undefined,
+  };
 }
 
 function isDemoMode(): boolean {

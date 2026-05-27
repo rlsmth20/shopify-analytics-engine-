@@ -4,14 +4,12 @@ import type { InventoryAction } from "@/lib/api";
 import { currency, type LiquidationSuggestion, type PurchaseOrderDraft } from "@/lib/api-v2";
 import { getActionImpactValue, statusLabel } from "@/lib/app-helpers";
 
-// ExcelJS is loaded dynamically only when an export is triggered, so the
+// ExcelJS is loaded dynamically only when an export is triggered so the
 // ~800kB library is never bundled into the initial page payload.
 type AnyExcel = typeof import("exceljs");
 let excelModulePromise: Promise<AnyExcel> | null = null;
 async function loadExcel(): Promise<AnyExcel> {
-  if (!excelModulePromise) {
-    excelModulePromise = import("exceljs");
-  }
+  if (!excelModulePromise) excelModulePromise = import("exceljs");
   return excelModulePromise;
 }
 
@@ -51,9 +49,9 @@ const TONE_ACCENT: Record<string, string> = {
 const FONT_BASE = "Calibri";
 const FONT_DISPLAY = "Calibri";
 
-type Tone = "neutral" | "good" | "warning" | "danger";
+export type Tone = "neutral" | "good" | "warning" | "danger";
 
-type ReportTableColumn<T> = {
+export type ReportTableColumn<T> = {
   key: string;
   label: string;
   align?: "left" | "right" | "center";
@@ -64,14 +62,14 @@ type ReportTableColumn<T> = {
   numFmt?: string;
 };
 
-type ReportKpi = {
+export type ReportKpi = {
   label: string;
   value: string;
   note?: string;
   tone?: Tone;
 };
 
-type BarPoint = {
+export type BarPoint = {
   label: string;
   value: number;
   display: string;
@@ -86,7 +84,7 @@ const LIQUIDATION_TACTIC_LABELS: Record<LiquidationSuggestion["tactic"], string>
 };
 
 // ---------------------------------------------------------------------------
-// Public exports
+// Public exports — dedicated report exporters
 // ---------------------------------------------------------------------------
 export async function exportActionsReport(actions: InventoryAction[]): Promise<void> {
   const totals = actions.reduce(
@@ -123,7 +121,7 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
       {
         title: "Top impact SKUs",
         points: [...actions]
-          .sort((left, right) => getActionImpactValue(right) - getActionImpactValue(left))
+          .sort((l, r) => getActionImpactValue(r) - getActionImpactValue(l))
           .slice(0, 8)
           .map((action) => ({
             label: action.name,
@@ -214,8 +212,7 @@ export async function exportLiquidationReport(
 
   await buildWorkbook({
     title: "Liquidation Plan",
-    subtitle:
-      "Dead-stock recommendations with recovery estimates, markdown guidance, and tactic mix.",
+    subtitle: "Dead-stock recommendations with recovery estimates, markdown guidance, and tactic mix.",
     filename: `skubase-liquidation-plan-${todayStamp()}.xlsx`,
     summarySheetName: "Summary",
     detailSheetName: "Plan",
@@ -225,10 +222,7 @@ export async function exportLiquidationReport(
       { label: "Projected recovery", value: currency(projectedRecovery), tone: "good" },
       {
         label: "Recovery rate",
-        value:
-          capitalTiedUp > 0
-            ? `${((projectedRecovery / capitalTiedUp) * 100).toFixed(0)}%`
-            : "0%",
+        value: capitalTiedUp > 0 ? `${((projectedRecovery / capitalTiedUp) * 100).toFixed(0)}%` : "0%",
       },
     ],
     charts: [
@@ -248,10 +242,7 @@ export async function exportLiquidationReport(
       {
         title: "Largest recovery opportunities",
         points: [...suggestions]
-          .sort(
-            (left, right) =>
-              right.projected_recovered_capital - left.projected_recovered_capital
-          )
+          .sort((l, r) => r.projected_recovered_capital - l.projected_recovered_capital)
           .slice(0, 8)
           .map((item) => ({
             label: item.name,
@@ -368,7 +359,7 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
       {
         title: "Cost by line",
         points: [...po.lines]
-          .sort((left, right) => right.extended_cost - left.extended_cost)
+          .sort((l, r) => r.extended_cost - l.extended_cost)
           .slice(0, 12)
           .map((line) => ({
             label: line.name,
@@ -414,6 +405,40 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
   });
 }
 
+// ---------------------------------------------------------------------------
+// Generic formatted workbook exporter — drives the /reports page output.
+// Callers supply KPIs, charts, and column structure; the same buildWorkbook
+// used by the dedicated exporters above produces the polished xlsx.
+// ---------------------------------------------------------------------------
+export async function exportFormattedReport<T>(spec: {
+  title: string;
+  subtitle: string;
+  filename: string;
+  summarySheetName?: string;
+  detailSheetName?: string;
+  kpis: ReportKpi[];
+  charts: Array<{ title: string; points: BarPoint[] }>;
+  tableTitle: string;
+  rows: T[];
+  columns: ReportTableColumn<T>[];
+}): Promise<void> {
+  await buildWorkbook({
+    title: spec.title,
+    subtitle: spec.subtitle,
+    filename: spec.filename,
+    summarySheetName: spec.summarySheetName ?? "Summary",
+    detailSheetName: spec.detailSheetName ?? "Detail",
+    kpis: spec.kpis,
+    charts: spec.charts,
+    tableTitle: spec.tableTitle,
+    tableRows: spec.rows,
+    columns: spec.columns,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Legacy CSV exporter — kept for back-compat with any caller still wired up.
+// ---------------------------------------------------------------------------
 export type CsvColumn<T> = {
   label: string;
   value: (row: T) => string | number | null | undefined;
@@ -429,12 +454,9 @@ export function exportReportRowsCsv<T>({
   rows: T[];
 }): void {
   const csv = [
-    columns.map((column) => escapeCsv(column.label)).join(","),
-    ...rows.map((row) =>
-      columns.map((column) => escapeCsv(column.value(row) ?? "")).join(",")
-    ),
+    columns.map((c) => escapeCsv(c.label)).join(","),
+    ...rows.map((row) => columns.map((c) => escapeCsv(c.value(row) ?? "")).join(",")),
   ].join("\r\n");
-
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -464,34 +486,24 @@ type WorkbookSpec<T> = {
 
 async function buildWorkbook<T>(spec: WorkbookSpec<T>): Promise<void> {
   const ExcelJS = await loadExcel();
-
   const wb = new ExcelJS.Workbook();
   wb.creator = "skubase";
   wb.created = new Date();
   wb.modified = new Date();
-
   buildSummarySheet(wb, spec);
   buildDetailSheet(wb, spec);
-
   const buffer = await wb.xlsx.writeBuffer();
   triggerDownload(buffer as ArrayBuffer, spec.filename);
 }
 
-function buildSummarySheet<T>(
-  wb: import("exceljs").Workbook,
-  spec: WorkbookSpec<T>
-): void {
+function buildSummarySheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<T>): void {
   const ws = wb.addWorksheet(spec.summarySheetName, {
     views: [{ showGridLines: false, state: "normal" }],
     properties: { defaultRowHeight: 18 },
   });
-
   const COLS = 12;
-  for (let i = 1; i <= COLS; i += 1) {
-    ws.getColumn(i).width = i === 1 ? 28 : 12;
-  }
+  for (let i = 1; i <= COLS; i += 1) ws.getColumn(i).width = i === 1 ? 28 : 12;
 
-  // ---- Brand bar ----
   let row = 1;
   ws.mergeCells(row, 1, row, COLS - 2);
   const brandCell = ws.getCell(row, 1);
@@ -507,7 +519,6 @@ function buildSummarySheet<T>(
   genCell.alignment = { vertical: "middle", horizontal: "right", indent: 1 };
   ws.getRow(row).height = 22;
 
-  // ---- Title ----
   row += 1;
   ws.mergeCells(row, 1, row, COLS);
   const titleCell = ws.getCell(row, 1);
@@ -526,12 +537,10 @@ function buildSummarySheet<T>(
   fillCells(ws, row, 1, row, COLS, COLOR_BRAND);
   ws.getRow(row).height = 32;
 
-  // Spacer
   row += 1;
   ws.getRow(row).height = 14;
   fillCells(ws, row, 1, row, COLS, COLOR_PAGE_BG);
 
-  // ---- KPI row ----
   row += 1;
   const kpiHeaderRow = row;
   const kpiValueRow = row + 1;
@@ -576,7 +585,6 @@ function buildSummarySheet<T>(
   ws.getRow(row).height = 14;
   fillCells(ws, row, 1, row, COLS, COLOR_PAGE_BG);
 
-  // ---- Chart sections ----
   spec.charts.forEach((chart) => {
     row += 1;
     ws.mergeCells(row, 1, row, COLS);
@@ -604,7 +612,6 @@ function buildSummarySheet<T>(
       const barCell = ws.getCell(r, 4);
       barCell.value = point.value;
       barCell.numFmt = Math.abs(point.value) >= 100 ? '"$"#,##0' : "#,##0";
-      // Hide the cell value text — the bar speaks for itself
       barCell.font = { name: FONT_BASE, size: 1, color: { argb: "00FFFFFF" } };
       barCell.alignment = { vertical: "middle", horizontal: "left" };
 
@@ -635,14 +642,7 @@ function buildSummarySheet<T>(
       ws.getRow(r).height = 22;
     });
 
-    drawBoxBorder(
-      ws,
-      dataStartRow,
-      1,
-      dataStartRow + chart.points.length - 1,
-      COLS,
-      COLOR_BORDER
-    );
+    drawBoxBorder(ws, dataStartRow, 1, dataStartRow + chart.points.length - 1, COLS, COLOR_BORDER);
 
     row = dataStartRow + chart.points.length;
     row += 1;
@@ -650,7 +650,6 @@ function buildSummarySheet<T>(
     fillCells(ws, row, 1, row, COLS, COLOR_PAGE_BG);
   });
 
-  // Pointer to detail sheet
   row += 1;
   ws.mergeCells(row, 1, row, COLS);
   const ptr = ws.getCell(row, 1);
@@ -662,18 +661,13 @@ function buildSummarySheet<T>(
   ws.views = [{ state: "frozen", xSplit: 0, ySplit: 3, showGridLines: false }];
 }
 
-function buildDetailSheet<T>(
-  wb: import("exceljs").Workbook,
-  spec: WorkbookSpec<T>
-): void {
+function buildDetailSheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<T>): void {
   const ws = wb.addWorksheet(spec.detailSheetName, {
     views: [{ showGridLines: false }],
     properties: { defaultRowHeight: 18 },
   });
 
-  spec.columns.forEach((col, idx) => {
-    ws.getColumn(idx + 1).width = col.width ?? 16;
-  });
+  spec.columns.forEach((col, idx) => { ws.getColumn(idx + 1).width = col.width ?? 16; });
   const colCount = spec.columns.length;
 
   ws.mergeCells(1, 1, 1, colCount);
@@ -715,17 +709,12 @@ function buildDetailSheet<T>(
       const tone = col.tone?.(row);
       const baseFill = tone ? TONE_FILL[tone] : isAlt ? COLOR_ALT_ROW : COLOR_PANEL_BG;
       const ink = tone ? TONE_INK[tone] : "FF0F172A";
-      cell.font = {
-        name: FONT_BASE,
-        size: 10,
-        bold: Boolean(tone),
-        color: { argb: ink },
-      };
+      cell.font = { name: FONT_BASE, size: 10, bold: Boolean(tone), color: { argb: ink } };
       cell.alignment = {
         vertical: "middle",
         horizontal: col.align ?? "left",
         indent: 1,
-        wrapText: col.key === "recommendation",
+        wrapText: col.key === "recommendation" || col.key === "recommendedAction" || col.key === "reason",
       };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: baseFill } };
       cell.border = {
@@ -735,14 +724,12 @@ function buildDetailSheet<T>(
         right: { style: "hair", color: { argb: COLOR_BORDER } },
       };
     });
-    if (spec.columns.some((c) => c.key === "recommendation")) {
-      ws.getRow(r).height = 36;
-    } else {
-      ws.getRow(r).height = 22;
-    }
+    const wraps = spec.columns.some(
+      (c) => c.key === "recommendation" || c.key === "recommendedAction" || c.key === "reason",
+    );
+    ws.getRow(r).height = wraps ? 36 : 22;
   });
 
-  // Data bars on the most-impactful numeric column
   const numericCols = spec.columns
     .map((col, idx) => ({ col, idx }))
     .filter(({ col }) => col.numericValue !== undefined);
@@ -770,9 +757,7 @@ function buildDetailSheet<T>(
     from: { row: headerRow, column: 1 },
     to: { row: headerRow, column: colCount },
   };
-  ws.views = [
-    { state: "frozen", xSplit: 0, ySplit: headerRow, showGridLines: false },
-  ];
+  ws.views = [{ state: "frozen", xSplit: 0, ySplit: headerRow, showGridLines: false }];
 }
 
 // ---------------------------------------------------------------------------
@@ -780,29 +765,18 @@ function buildDetailSheet<T>(
 // ---------------------------------------------------------------------------
 function fillCells(
   ws: import("exceljs").Worksheet,
-  r1: number,
-  c1: number,
-  r2: number,
-  c2: number,
-  argb: string
+  r1: number, c1: number, r2: number, c2: number, argb: string,
 ): void {
   for (let r = r1; r <= r2; r += 1) {
     for (let c = c1; c <= c2; c += 1) {
-      ws.getCell(r, c).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb },
-      };
+      ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
     }
   }
 }
 
 function drawCardBorder(
   ws: import("exceljs").Worksheet,
-  r1: number,
-  c1: number,
-  r2: number,
-  c2: number
+  r1: number, c1: number, r2: number, c2: number,
 ): void {
   const color = { argb: COLOR_BORDER };
   for (let c = c1; c <= c2; c += 1) {
@@ -821,11 +795,7 @@ function drawCardBorder(
 
 function drawBoxBorder(
   ws: import("exceljs").Worksheet,
-  r1: number,
-  c1: number,
-  r2: number,
-  c2: number,
-  argb: string
+  r1: number, c1: number, r2: number, c2: number, argb: string,
 ): void {
   const color = { argb };
   for (let c = c1; c <= c2; c += 1) {
@@ -882,11 +852,11 @@ function slugify(value: string): string {
 }
 
 function escapeCsv(value: string | number): string {
-  const text = String(value);
-  if (!/[",\r\n]/.test(text)) return text;
-  return `"${text.replace(/"/g, '""')}"`;
+  const str = String(value);
+  if (/[",\r\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+  return str;
 }
 
-// Avoid unused-import warning when only the type side is consumed.
+// Reference unused constants so tsc doesn't complain
 const _unusedPanelBg = COLOR_PANEL_BG;
 void _unusedPanelBg;
