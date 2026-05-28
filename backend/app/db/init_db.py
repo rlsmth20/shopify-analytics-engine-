@@ -50,6 +50,14 @@ def run_safe_migrations() -> None:
                 ))
                 conn.execute(text(
                     "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS "
+                    "subtotal_cost NUMERIC(12, 2) DEFAULT 0"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS "
+                    "shipping_cost NUMERIC(12, 2) DEFAULT 0"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS "
                     "approved_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"
                 ))
                 conn.execute(text(
@@ -145,6 +153,14 @@ def run_safe_migrations() -> None:
                 if "approved_at" not in purchase_order_columns:
                     conn.execute(text(
                         "ALTER TABLE purchase_orders ADD COLUMN approved_at TIMESTAMP"
+                    ))
+                if "subtotal_cost" not in purchase_order_columns:
+                    conn.execute(text(
+                        "ALTER TABLE purchase_orders ADD COLUMN subtotal_cost NUMERIC(12, 2) DEFAULT 0"
+                    ))
+                if "shipping_cost" not in purchase_order_columns:
+                    conn.execute(text(
+                        "ALTER TABLE purchase_orders ADD COLUMN shipping_cost NUMERIC(12, 2) DEFAULT 0"
                     ))
                 if "approved_by_user_id" not in purchase_order_columns:
                     conn.execute(text(

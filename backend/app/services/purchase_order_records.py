@@ -52,6 +52,8 @@ def save_purchase_order(
 
     record.vendor = draft.vendor
     record.status = draft.status
+    record.subtotal_cost = Decimal(str(draft.subtotal_cost or sum(line.extended_cost for line in draft.lines)))
+    record.shipping_cost = Decimal(str(draft.shipping_cost))
     record.total_cost = Decimal(str(draft.total_cost))
     record.expected_arrival_date = draft.expected_arrival_date
     record.rationale = draft.rationale
@@ -198,6 +200,8 @@ def _record_to_schema(db: DbSession, record: PurchaseOrderRecord) -> PurchaseOrd
             )
             for line in lines
         ],
+        subtotal_cost=float(record.subtotal_cost),
+        shipping_cost=float(record.shipping_cost),
         total_cost=float(record.total_cost),
         expected_arrival_date=record.expected_arrival_date,
         rationale=record.rationale,

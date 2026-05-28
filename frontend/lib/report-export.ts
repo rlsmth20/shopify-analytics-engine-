@@ -368,8 +368,9 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
     kpis: [
       { label: "Vendor", value: po.vendor },
       { label: "Lines", value: String(po.lines.length) },
-      { label: "Total cost", value: currency(po.total_cost), tone: "warning" },
-      { label: "Status", value: po.status },
+      { label: "Subtotal", value: currency(po.subtotal_cost), tone: "neutral" },
+      { label: "Shipping", value: currency(po.shipping_cost), tone: "warning" },
+      { label: "Total landed cost", value: currency(po.total_cost), tone: "warning" },
     ],
     charts: [
       {

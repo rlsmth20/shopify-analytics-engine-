@@ -19,6 +19,109 @@ function daysFromNow(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+type DemoForecastInput = {
+  onHand: number;
+  projected30: number;
+  avgDailyUnits: number;
+  variabilityCv: number;
+};
+
+const DEMO_FORECAST_INPUTS = {
+  "sku_premium-linen-shirt-navy-m": {
+    onHand: 48,
+    projected30: 186,
+    avgDailyUnits: 6.2,
+    variabilityCv: 0.14,
+  },
+  "sku_wool-blend-sweater-grey-l": {
+    onHand: 31,
+    projected30: 142,
+    avgDailyUnits: 3.8,
+    variabilityCv: 0.32,
+  },
+  "sku_silk-scarf-burgundy": {
+    onHand: 18,
+    projected30: 98,
+    avgDailyUnits: 3.3,
+    variabilityCv: 0.38,
+  },
+  "sku_slim-fit-chinos-khaki-32x30": {
+    onHand: 73,
+    projected30: 124,
+    avgDailyUnits: 4.1,
+    variabilityCv: 0.11,
+  },
+  "sku_organic-cotton-hoodie-black-xl": {
+    onHand: 214,
+    projected30: 67,
+    avgDailyUnits: 4.8,
+    variabilityCv: 0.29,
+  },
+  "sku_canvas-tote-bag-natural": {
+    onHand: 188,
+    projected30: 58,
+    avgDailyUnits: 1.9,
+    variabilityCv: 0.09,
+  },
+  "sku_classic-polo-white-s": {
+    onHand: 142,
+    projected30: 45,
+    avgDailyUnits: 1.5,
+    variabilityCv: 0.61,
+  },
+  "sku_denim-jacket-indigo-l": {
+    onHand: 156,
+    projected30: 38,
+    avgDailyUnits: 1.3,
+    variabilityCv: 0.27,
+  },
+} satisfies Record<string, DemoForecastInput>;
+
+function demoStockoutProbability30d(skuId: keyof typeof DEMO_FORECAST_INPUTS): number {
+  const input = DEMO_FORECAST_INPUTS[skuId];
+  const sigma30d = demoStockoutSigma30d(skuId);
+  const z = (input.onHand - input.projected30) / sigma30d;
+  return roundProbability(1 - normalCdf(z));
+}
+
+function demoStockoutRiskPct(skuId: keyof typeof DEMO_FORECAST_INPUTS): number {
+  return Math.round(demoStockoutProbability30d(skuId) * 100);
+}
+
+function demoStockoutSigma30d(skuId: keyof typeof DEMO_FORECAST_INPUTS): number {
+  const input = DEMO_FORECAST_INPUTS[skuId];
+  return Math.max(input.avgDailyUnits * input.variabilityCv * Math.sqrt(30), 0.01);
+}
+
+function demoStockoutRiskMath(skuId: keyof typeof DEMO_FORECAST_INPUTS): string {
+  const input = DEMO_FORECAST_INPUTS[skuId];
+  const sigma30d = demoStockoutSigma30d(skuId);
+  const z = (input.onHand - input.projected30) / sigma30d;
+  return `Stockout risk is ${demoStockoutRiskPct(skuId)}%: 1 - normal_cdf((${input.onHand} on hand - ${input.projected30} projected 30d demand) / ${sigma30d.toFixed(1)} demand volatility) = ${Math.round((1 - normalCdf(z)) * 100)}%.`;
+}
+
+function roundProbability(value: number): number {
+  return Math.max(0, Math.min(1, Math.round(value * 1000) / 1000));
+}
+
+function normalCdf(z: number): number {
+  return 0.5 * (1 + erf(z / Math.SQRT2));
+}
+
+// Abramowitz and Stegun 7.1.26 approximation, used only for deterministic demo math.
+function erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const absX = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * absX);
+  const y =
+    1 -
+    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t +
+      0.254829592) *
+      t *
+      Math.exp(-absX * absX);
+  return sign * y;
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────────
 
 function buildRevenueTrend(): { label: string; value: number }[] {
@@ -173,7 +276,7 @@ export const DEMO_INVENTORY_HEALTH = {
       name: "Premium Linen Shirt - Navy M",
       vendor: "Coastal Apparel Co.",
       value: 5120,
-      note: "74% stockout risk, 186 units forecast.",
+      note: `${demoStockoutRiskPct("sku_premium-linen-shirt-navy-m")}% stockout risk, 186 units forecast.`,
       severity: "warning" as const,
     },
     {
@@ -181,7 +284,7 @@ export const DEMO_INVENTORY_HEALTH = {
       name: "Wool Blend Sweater - Grey L",
       vendor: "NorthThread Supply",
       value: 3960,
-      note: "61% stockout risk, 142 units forecast.",
+      note: `${demoStockoutRiskPct("sku_wool-blend-sweater-grey-l")}% stockout risk, 142 units forecast.`,
       severity: "warning" as const,
     },
     {
@@ -189,7 +292,7 @@ export const DEMO_INVENTORY_HEALTH = {
       name: "Silk Scarf - Burgundy",
       vendor: "Atlas Basics",
       value: 2510,
-      note: "53% stockout risk, 98 units forecast.",
+      note: `${demoStockoutRiskPct("sku_silk-scarf-burgundy")}% stockout risk, 98 units forecast.`,
       severity: "warning" as const,
     },
   ],
@@ -246,7 +349,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 186,
       projected_60_day_demand: 379,
       projected_90_day_demand: 573,
-      stockout_probability_30d: 0.74,
+      stockout_probability_30d: demoStockoutProbability30d("sku_premium-linen-shirt-navy-m"),
       points: buildForecastPoints(6.2),
       explain:
         "Strong upward trend with consistent weekend lift. Current on-hand covers ~8 days at observed velocity. Reorder immediately.",
@@ -262,7 +365,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 142,
       projected_60_day_demand: 291,
       projected_90_day_demand: 445,
-      stockout_probability_30d: 0.61,
+      stockout_probability_30d: demoStockoutProbability30d("sku_wool-blend-sweater-grey-l"),
       points: buildForecastPoints(4.7),
       explain:
         "Seasonal demand spike entering winter months. Weekday-heavy pattern suggests B2B or gifting channel.",
@@ -278,7 +381,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 98,
       projected_60_day_demand: 203,
       projected_90_day_demand: 308,
-      stockout_probability_30d: 0.53,
+      stockout_probability_30d: demoStockoutProbability30d("sku_silk-scarf-burgundy"),
       points: buildForecastPoints(3.3),
       explain:
         "Moderate confidence — fewer than 60 historical data points. Weekend demand is materially higher. Safety stock buffer recommended.",
@@ -294,7 +397,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 124,
       projected_60_day_demand: 248,
       projected_90_day_demand: 372,
-      stockout_probability_30d: 0.38,
+      stockout_probability_30d: demoStockoutProbability30d("sku_slim-fit-chinos-khaki-32x30"),
       points: buildForecastPoints(4.1),
       explain:
         "Very stable demand with no detectable seasonality. Lead time of 21d against 18d of remaining cover puts this in a reorder window.",
@@ -310,7 +413,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 67,
       projected_60_day_demand: 129,
       projected_90_day_demand: 186,
-      stockout_probability_30d: 0.08,
+      stockout_probability_30d: demoStockoutProbability30d("sku_organic-cotton-hoodie-black-xl"),
       points: buildForecastPoints(2.2),
       explain:
         "Demand declining from peak. Ample on-hand stock — hold and let inventory run down before next reorder.",
@@ -326,7 +429,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 58,
       projected_60_day_demand: 116,
       projected_90_day_demand: 174,
-      stockout_probability_30d: 0.05,
+      stockout_probability_30d: demoStockoutProbability30d("sku_canvas-tote-bag-natural"),
       points: buildForecastPoints(1.9),
       explain: "Steady low-velocity item. Current stock covers 60+ days. No action needed.",
     },
@@ -341,7 +444,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 45,
       projected_60_day_demand: 89,
       projected_90_day_demand: 132,
-      stockout_probability_30d: 0.22,
+      stockout_probability_30d: demoStockoutProbability30d("sku_classic-polo-white-s"),
       points: buildForecastPoints(1.5),
       explain:
         "Low confidence due to erratic demand pattern. Possible channel mixing or listing changes. Review sales history before acting on this forecast.",
@@ -357,7 +460,7 @@ export const DEMO_FORECASTS = {
       projected_30_day_demand: 38,
       projected_60_day_demand: 71,
       projected_90_day_demand: 99,
-      stockout_probability_30d: 0.04,
+      stockout_probability_30d: demoStockoutProbability30d("sku_denim-jacket-indigo-l"),
       points: buildForecastPoints(1.3),
       explain: "Post-season slowdown. 90+ days of cover. Consider markdown to free capital.",
     },
@@ -765,7 +868,7 @@ export const DEMO_LIQUIDATION = {
 // ── Purchase Orders ──────────────────────────────────────────────────────────
 
 export const DEMO_PURCHASE_ORDERS = {
-  total_capital_required: 21480,
+  total_capital_required: 21585,
   drafts: [
     {
       po_id: "po_coastal-apr29",
@@ -788,7 +891,9 @@ export const DEMO_PURCHASE_ORDERS = {
           extended_cost: 1520,
         },
       ],
-      total_cost: 4940,
+      subtotal_cost: 4940,
+      shipping_cost: 35,
+      total_cost: 4975,
       expected_arrival_date: daysFromNow(16),
       rationale: "Urgent reorder — both SKUs at critical stockout risk within 14 days.",
     },
@@ -806,7 +911,9 @@ export const DEMO_PURCHASE_ORDERS = {
           extended_cost: 6840,
         },
       ],
-      total_cost: 6840,
+      subtotal_cost: 6840,
+      shipping_cost: 35,
+      total_cost: 6875,
       expected_arrival_date: daysFromNow(20),
       rationale: "Seasonal demand spike anticipated. Order now to cover the winter ramp.",
     },
@@ -824,7 +931,9 @@ export const DEMO_PURCHASE_ORDERS = {
           extended_cost: 3300,
         },
       ],
-      total_cost: 3300,
+      subtotal_cost: 3300,
+      shipping_cost: 35,
+      total_cost: 3335,
       expected_arrival_date: daysFromNow(23),
       rationale:
         "Stock covers ~18 days against a 21-day lead time — entering the reorder window today.",
@@ -850,6 +959,10 @@ export const DEMO_REORDER: {
     expected_stockout_prob: number;
     unit_cost: number;
     extended_cost: number;
+    order_cost: number;
+    landed_extended_cost: number;
+    landed_unit_cost: number;
+    freight_share_pct: number;
     lead_time_days: number;
     rationale: string;
   }>;
@@ -869,9 +982,13 @@ export const DEMO_REORDER: {
       recommended_order_qty: 120,
       economic_order_qty: 140,
       service_level_target: 0.95,
-      expected_stockout_prob: 0.74,
+      expected_stockout_prob: demoStockoutProbability30d("sku_premium-linen-shirt-navy-m"),
       unit_cost: 28.5,
       extended_cost: 3420,
+      order_cost: 35,
+      landed_extended_cost: 3455,
+      landed_unit_cost: 28.79,
+      freight_share_pct: 1.0,
       lead_time_days: 14,
       rationale: "On-hand below reorder point. High stockout probability. Order now.",
     },
@@ -886,9 +1003,13 @@ export const DEMO_REORDER: {
       recommended_order_qty: 200,
       economic_order_qty: 180,
       service_level_target: 0.95,
-      expected_stockout_prob: 0.61,
+      expected_stockout_prob: demoStockoutProbability30d("sku_wool-blend-sweater-grey-l"),
       unit_cost: 34.2,
       extended_cost: 6840,
+      order_cost: 35,
+      landed_extended_cost: 6875,
+      landed_unit_cost: 34.38,
+      freight_share_pct: 0.5,
       lead_time_days: 18,
       rationale: "Seasonal demand rising. Place order before lead time consumes buffer.",
     },
@@ -903,9 +1024,13 @@ export const DEMO_REORDER: {
       recommended_order_qty: 80,
       economic_order_qty: 90,
       service_level_target: 0.95,
-      expected_stockout_prob: 0.53,
+      expected_stockout_prob: demoStockoutProbability30d("sku_silk-scarf-burgundy"),
       unit_cost: 19.0,
       extended_cost: 1520,
+      order_cost: 35,
+      landed_extended_cost: 1555,
+      landed_unit_cost: 19.44,
+      freight_share_pct: 2.3,
       lead_time_days: 14,
       rationale: "Below reorder point. Consolidate into Coastal PO to save freight.",
     },
@@ -920,18 +1045,22 @@ export const DEMO_REORDER: {
       recommended_order_qty: 150,
       economic_order_qty: 160,
       service_level_target: 0.95,
-      expected_stockout_prob: 0.38,
+      expected_stockout_prob: demoStockoutProbability30d("sku_slim-fit-chinos-khaki-32x30"),
       unit_cost: 22.0,
       extended_cost: 3300,
+      order_cost: 35,
+      landed_extended_cost: 3335,
+      landed_unit_cost: 22.23,
+      freight_share_pct: 1.0,
       lead_time_days: 21,
       rationale: "Within reorder window given 21-day lead time. Place now.",
     },
   ],
-  total_extended_cost: 15080,
+  total_extended_cost: 15205,
   vendor_totals: {
-    "Coastal Apparel Co.": 4940,
-    "NorthThread Supply": 6840,
-    "Pacific Goods Ltd.": 3300,
+    "Coastal Apparel Co.": 5000,
+    "NorthThread Supply": 6875,
+    "Pacific Goods Ltd.": 3335,
   },
 };
 
@@ -996,7 +1125,7 @@ export const DEMO_ALERT_EVENTS = {
       trigger: "stockout_risk" as const,
       sku_id: "sku_premium-linen-shirt-navy-m",
       sku_name: "Premium Linen Shirt - Navy M",
-      message: "Stockout probability reached 74% — reorder immediately.",
+      message: `Stockout probability reached ${demoStockoutRiskPct("sku_premium-linen-shirt-navy-m")}% - reorder immediately.`,
       fired_at: daysAgo(1),
       channels_sent: ["email" as const, "slack" as const],
       delivered: true,
@@ -1009,7 +1138,7 @@ export const DEMO_ALERT_EVENTS = {
       trigger: "stockout_risk" as const,
       sku_id: "sku_wool-blend-sweater-grey-l",
       sku_name: "Wool Blend Sweater - Grey L",
-      message: "Stockout probability reached 61% during seasonal demand spike.",
+      message: `Stockout probability reached ${demoStockoutRiskPct("sku_wool-blend-sweater-grey-l")}% during seasonal demand spike.`,
       fired_at: daysAgo(2),
       channels_sent: ["email" as const, "slack" as const],
       delivered: true,
@@ -1022,7 +1151,7 @@ export const DEMO_ALERT_EVENTS = {
       trigger: "stockout_risk" as const,
       sku_id: "sku_silk-scarf-burgundy",
       sku_name: "Silk Scarf - Burgundy",
-      message: "Stockout probability at 53% — within the next replenishment window.",
+      message: `Stockout probability at ${demoStockoutRiskPct("sku_silk-scarf-burgundy")}% - within the next replenishment window.`,
       fired_at: daysAgo(3),
       channels_sent: ["email" as const],
       delivered: true,
@@ -1063,7 +1192,7 @@ export const DEMO_ACTION_FEED = {
       name: "Premium Linen Shirt - Navy M",
       status: "urgent" as const,
       recommended_action: "Place reorder with Coastal Apparel Co. — 120 units at $28.50.",
-      explanation: "On-hand covers only 8 days. Lead time is 14 days. Stockout risk is 74%.",
+      explanation: `On-hand covers only 8 days. Lead time is 14 days. ${demoStockoutRiskMath("sku_premium-linen-shirt-navy-m")}`,
       current_on_hand: 48,
       daily_velocity: 6,
       safety_stock_units: 25,

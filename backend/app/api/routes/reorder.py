@@ -37,6 +37,7 @@ def list_reorder_suggestions(
     user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
+    shipping_cost: float = Query(35.0, ge=0.0, le=10000.0),
 ) -> ReorderFeedResponse:
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
@@ -65,12 +66,13 @@ def list_reorder_suggestions(
         daily_history,
         lead_time_config=settings.to_lead_time_config(),
         service_level=service_level,
+        order_cost=shipping_cost,
     )
     totals = build_vendor_totals(suggestions)
     return ReorderFeedResponse(
         service_level=service_level,
         suggestions=suggestions,
-        total_extended_cost=round(sum(s.extended_cost for s in suggestions), 2),
+        total_extended_cost=round(sum(s.landed_extended_cost for s in suggestions), 2),
         vendor_totals=totals,
     )
 
@@ -80,6 +82,7 @@ def list_po_drafts(
     user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
+    shipping_cost: float = Query(35.0, ge=0.0, le=10000.0),
 ) -> PurchaseOrderDraftsResponse:
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
@@ -103,8 +106,9 @@ def list_po_drafts(
         daily_history,
         lead_time_config=settings.to_lead_time_config(),
         service_level=service_level,
+        order_cost=shipping_cost,
     )
-    drafts = build_purchase_order_drafts(suggestions)
+    drafts = build_purchase_order_drafts(suggestions, shipping_cost_per_po=shipping_cost)
     saved = list_saved_purchase_orders(db, user.shop_id)
     return PurchaseOrderDraftsResponse(
         drafts=[*saved, *drafts],

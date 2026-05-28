@@ -169,6 +169,10 @@ class ReorderSuggestion(ApiModel):
     expected_stockout_prob: float
     unit_cost: float
     extended_cost: float
+    order_cost: float = 0.0
+    landed_extended_cost: float = 0.0
+    landed_unit_cost: float = 0.0
+    freight_share_pct: float = 0.0
     lead_time_days: int
     rationale: str
 
@@ -264,6 +268,8 @@ class PurchaseOrderDraft(ApiModel):
     created_at: datetime
     status: PurchaseOrderStatus
     lines: list[PurchaseOrderLine]
+    subtotal_cost: float = 0.0
+    shipping_cost: float = 0.0
     total_cost: float
     expected_arrival_date: str
     rationale: str

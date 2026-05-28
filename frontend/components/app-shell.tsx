@@ -153,6 +153,18 @@ const SECTION_ORDER: NavItem["section"][] = [
   "Settings"
 ];
 
+const WIDE_APP_ROUTES = new Set([
+  "/actions",
+  "/analytics",
+  "/reports",
+  "/purchase-orders",
+  "/forecast",
+  "/suppliers",
+  "/liquidation",
+  "/bundles",
+  "/transfers",
+]);
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 type Subscription = {
@@ -230,6 +242,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const meta = pageMeta[pathname] ?? pageMeta["/dashboard"];
+  const isWideAppRoute = WIDE_APP_ROUTES.has(pathname);
+  const appContainerClassName = `page-container${isWideAppRoute ? " page-container-wide" : ""}`;
+  const headerClassName = `top-header${isWideAppRoute ? " top-header-wide" : ""}`;
 
   const groupedNav = SECTION_ORDER.map((section) => ({
     section,
@@ -352,7 +367,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           </div>
         ) : null}
-        <header className="top-header">
+        <header className={headerClassName}>
           <div>
             <p className="header-eyebrow">{meta.eyebrow}</p>
             <h1 className="header-title">{meta.title}</h1>
@@ -387,7 +402,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="page-container">{children}</main>
+        <main className={appContainerClassName}>{children}</main>
       </div>
       <AskSkubaseChat />
     </div>

@@ -33,9 +33,10 @@ SERVICE_LEVEL_Z = {
     0.999: 3.09,
 }
 
-DEFAULT_ORDER_COST = 35.0  # fixed cost per purchase order, USD
+DEFAULT_ORDER_COST = 35.0  # estimated fixed shipping/freight cost per purchase order, USD
 DEFAULT_HOLDING_RATE = 0.25  # annual holding cost as a fraction of unit cost
 DEFAULT_REVIEW_PERIOD_DAYS = 7
+MAX_FREIGHT_SHARE_FOR_TOP_UP = 0.12
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ def build_reorder_suggestions(
     history_for_sku: callable,
     lead_time_config: LeadTimeConfig = MOCK_LEAD_TIME_CONFIG,
     service_level: float = 0.95,
+    order_cost: float = DEFAULT_ORDER_COST,
 ) -> list[ReorderSuggestion]:
     suggestions: list[ReorderSuggestion] = []
     for sku in skus:
@@ -64,11 +66,12 @@ def build_reorder_suggestions(
             daily_history=history,
             lead_time_days=lead_time,
             service_level=service_level,
+            order_cost=max(order_cost, 0.0),
         )
         suggestion = _build_suggestion(inputs)
         if suggestion.recommended_order_qty > 0:
             suggestions.append(suggestion)
-    suggestions.sort(key=lambda s: s.extended_cost, reverse=True)
+    suggestions.sort(key=lambda s: s.landed_extended_cost, reverse=True)
     return suggestions
 
 
@@ -92,10 +95,23 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
         eoq = int(math.ceil(math.sqrt((2 * annual_demand * inputs.order_cost) / holding_cost)))
 
     reorder_qty = max(0, int(math.ceil(order_up_to - sku.inventory)))
+    below_reorder_point = sku.inventory <= reorder_point
 
-    # Align reorder qty with EOQ when EOQ is larger (avoid ordering less than economically optimal)
-    if eoq > 0 and reorder_qty > 0:
+    # Align urgent reorders with EOQ when EOQ is larger. Do not let EOQ force
+    # marginal top-up orders that create overstock just to amortize freight.
+    if eoq > 0 and reorder_qty > 0 and below_reorder_point:
         reorder_qty = max(reorder_qty, eoq)
+
+    item_cost = reorder_qty * sku.cost
+    freight_share = inputs.order_cost / max(item_cost + inputs.order_cost, 0.01)
+    if (
+        reorder_qty > 0
+        and not below_reorder_point
+        and freight_share > MAX_FREIGHT_SHARE_FOR_TOP_UP
+    ):
+        reorder_qty = 0
+        item_cost = 0
+        freight_share = 0
 
     stockout_prob = _stockout_probability(
         on_hand=sku.inventory,
@@ -117,15 +133,24 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
         service_level_target=inputs.service_level,
         expected_stockout_prob=round(stockout_prob, 3),
         unit_cost=round(sku.cost, 2),
-        extended_cost=round(reorder_qty * sku.cost, 2),
+        extended_cost=round(item_cost, 2),
+        order_cost=round(inputs.order_cost if reorder_qty > 0 else 0.0, 2),
+        landed_extended_cost=round(item_cost + (inputs.order_cost if reorder_qty > 0 else 0.0), 2),
+        landed_unit_cost=round((item_cost + inputs.order_cost) / reorder_qty, 2)
+        if reorder_qty > 0
+        else 0.0,
+        freight_share_pct=round(freight_share * 100, 1),
         lead_time_days=inputs.lead_time_days,
-        rationale=_rationale(
+        rationale=_shipping_rationale(
             sku=sku,
             reorder_qty=reorder_qty,
             eoq=eoq,
             service_level=inputs.service_level,
             lead_time_days=inputs.lead_time_days,
             mean_daily=mean_daily,
+            order_cost=inputs.order_cost,
+            freight_share=freight_share,
+            below_reorder_point=below_reorder_point,
         ),
     )
 
@@ -154,6 +179,43 @@ def _stockout_probability(
     z = (on_hand - mean_lt) / sigma_lt
     # 1 - CDF(z) = probability demand exceeds on_hand during lead time
     return max(0.0, min(1.0, 1 - 0.5 * (1 + math.erf(z / math.sqrt(2)))))
+
+
+def _shipping_rationale(
+    *,
+    sku: SkuDetail,
+    reorder_qty: int,
+    eoq: int,
+    service_level: float,
+    lead_time_days: int,
+    mean_daily: float,
+    order_cost: float,
+    freight_share: float,
+    below_reorder_point: bool,
+) -> str:
+    if reorder_qty <= 0:
+        return (
+            "No reorder needed - inventory is above reorder point and estimated "
+            "shipping cost makes this a marginal top-up."
+        )
+
+    coverage_after = (sku.inventory + reorder_qty) / max(mean_daily, 0.01)
+    parts = [
+        f"Order {reorder_qty} units to hit the {int(service_level * 100)}% service level target.",
+        f"Restocks you to ~{coverage_after:.0f} days of cover (lead time {lead_time_days} days).",
+    ]
+    if eoq > 0 and reorder_qty >= eoq:
+        parts.append(f"Matches or exceeds EOQ ({eoq}) so PO economics are sound.")
+    elif eoq > 0:
+        parts.append(f"Note: EOQ is {eoq}, consider upsizing this PO for better economics.")
+    if order_cost > 0:
+        parts.append(
+            f"Includes estimated ${order_cost:.0f} PO shipping/freight "
+            f"({freight_share * 100:.0f}% of landed PO cost)."
+        )
+    if not below_reorder_point:
+        parts.append("This is a top-up only; avoid if cash or storage is tight.")
+    return " ".join(parts)
 
 
 def _rationale(
@@ -185,5 +247,5 @@ def build_vendor_totals(
 ) -> dict[str, float]:
     totals: dict[str, float] = {}
     for s in suggestions:
-        totals[s.vendor] = round(totals.get(s.vendor, 0.0) + s.extended_cost, 2)
+        totals[s.vendor] = round(totals.get(s.vendor, 0.0) + s.landed_extended_cost, 2)
     return totals

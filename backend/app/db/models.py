@@ -173,6 +173,8 @@ class PurchaseOrderRecord(Base):
     po_id: Mapped[str] = mapped_column(String(64), index=True)
     vendor: Mapped[str] = mapped_column(String(255), index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    subtotal_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    shipping_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     expected_arrival_date: Mapped[str] = mapped_column(String(32), default="")
     rationale: Mapped[str] = mapped_column(String(1000), default="")

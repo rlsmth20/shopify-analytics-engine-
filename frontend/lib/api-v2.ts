@@ -194,6 +194,10 @@ export type ReorderSuggestion = {
   expected_stockout_prob: number;
   unit_cost: number;
   extended_cost: number;
+  order_cost: number;
+  landed_extended_cost: number;
+  landed_unit_cost: number;
+  freight_share_pct: number;
   lead_time_days: number;
   rationale: string;
 };
@@ -269,6 +273,8 @@ export type PurchaseOrderDraft = {
   created_at: string;
   status: "draft" | "ready" | "approved" | "sent" | "received" | "cancelled";
   lines: PurchaseOrderLine[];
+  subtotal_cost: number;
+  shipping_cost: number;
   total_cost: number;
   expected_arrival_date: string;
   rationale: string;
@@ -448,14 +454,33 @@ export const fetchInventoryHealth = (signal?: AbortSignal) =>
 
 export const fetchReorderSuggestions = (
   serviceLevel: number,
-  signal?: AbortSignal
-) => get<ReorderFeed>(`/reorder?service_level=${serviceLevel}`, signal);
-
-export const fetchPurchaseOrders = (serviceLevel: number, signal?: AbortSignal) =>
-  get<{ drafts: PurchaseOrderDraft[]; total_capital_required: number }>(
-    `/reorder/purchase-orders?service_level=${serviceLevel}`,
+  shippingCostOrSignal: number | AbortSignal = 35,
+  maybeSignal?: AbortSignal
+) => {
+  const shippingCost =
+    typeof shippingCostOrSignal === "number" ? shippingCostOrSignal : 35;
+  const signal =
+    typeof shippingCostOrSignal === "number" ? maybeSignal : shippingCostOrSignal;
+  return get<ReorderFeed>(
+    `/reorder?service_level=${serviceLevel}&shipping_cost=${shippingCost}`,
     signal
   );
+};
+
+export const fetchPurchaseOrders = (
+  serviceLevel: number,
+  shippingCostOrSignal: number | AbortSignal = 35,
+  maybeSignal?: AbortSignal
+) => {
+  const shippingCost =
+    typeof shippingCostOrSignal === "number" ? shippingCostOrSignal : 35;
+  const signal =
+    typeof shippingCostOrSignal === "number" ? maybeSignal : shippingCostOrSignal;
+  return get<{ drafts: PurchaseOrderDraft[]; total_capital_required: number }>(
+    `/reorder/purchase-orders?service_level=${serviceLevel}&shipping_cost=${shippingCost}`,
+    signal
+  );
+};
 
 export const savePurchaseOrder = (draft: PurchaseOrderDraft, signal?: AbortSignal) =>
   postJson<{ po: PurchaseOrderDraft }>("/reorder/purchase-orders", { draft }, signal);

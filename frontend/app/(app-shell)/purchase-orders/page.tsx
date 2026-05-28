@@ -20,6 +20,7 @@ export default function PurchaseOrdersPage() {
   const [drafts, setDrafts] = useState<PurchaseOrderDraft[]>([]);
   const [total, setTotal] = useState(0);
   const [serviceLevel, setServiceLevel] = useState(0.95);
+  const [shippingCost, setShippingCost] = useState(35);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    fetchPurchaseOrders(serviceLevel, controller.signal)
+    fetchPurchaseOrders(serviceLevel, shippingCost, controller.signal)
       .then((r) => {
         setDrafts(r.drafts);
         setTotal(r.total_capital_required);
@@ -38,7 +39,7 @@ export default function PurchaseOrdersPage() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [serviceLevel]);
+  }, [serviceLevel, shippingCost]);
 
   if (error) return <p className="page-error-copy">{error}</p>;
 
@@ -63,9 +64,29 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
         <div className="po-total">
-          <p className="muted small">Total capital required</p>
+          <p className="muted small">Total capital required, incl. shipping</p>
           <p className="po-total-value">{currency(total)}</p>
         </div>
+      </div>
+      <div className="po-shipping-control">
+        <label className="field-label">
+          <span>Estimated shipping / freight per PO</span>
+          <input
+            className="input-control"
+            type="number"
+            min="0"
+            step="5"
+            value={shippingCost}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              setShippingCost(Number.isFinite(next) ? Math.max(next, 0) : 0);
+            }}
+          />
+        </label>
+        <p className="muted small">
+          Used in reorder economics so Skubase avoids freight-heavy top-up orders
+          that could create overstock.
+        </p>
       </div>
 
       {loading ? <p className="page-loading">Generating POs…</p> : null}
@@ -96,6 +117,9 @@ export default function PurchaseOrdersPage() {
               </div>
               <div className="po-card-cost">
                 <p className="po-card-total">{currency(po.total_cost)}</p>
+                <p className="po-card-meta">
+                  {currency(po.subtotal_cost)} items + {currency(po.shipping_cost)} shipping
+                </p>
                 <span className={`po-status po-status-${po.status}`}>{po.status}</span>
               </div>
             </div>
@@ -122,6 +146,11 @@ export default function PurchaseOrdersPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="po-cost-breakdown">
+                  <span>Subtotal {currency(po.subtotal_cost)}</span>
+                  <span>Shipping {currency(po.shipping_cost)}</span>
+                  <strong>Total {currency(po.total_cost)}</strong>
+                </div>
                 <div className="po-card-actions">
                   <button
                     type="button"
@@ -264,7 +293,7 @@ export default function PurchaseOrdersPage() {
   );
 
   async function refresh() {
-    const r = await fetchPurchaseOrders(serviceLevel);
+    const r = await fetchPurchaseOrders(serviceLevel, shippingCost);
     setDrafts(r.drafts);
     setTotal(r.total_capital_required);
   }
@@ -379,6 +408,8 @@ function sendPurchaseOrderToVendor(po: PurchaseOrderDraft): void {
       `Purchase order ${po.po_id}`,
       `Vendor: ${po.vendor}`,
       `Expected arrival: ${po.expected_arrival_date}`,
+      `Subtotal: ${currency(po.subtotal_cost)}`,
+      `Shipping/freight: ${currency(po.shipping_cost)}`,
       `Total: ${currency(po.total_cost)}`,
       "",
       "Lines:",

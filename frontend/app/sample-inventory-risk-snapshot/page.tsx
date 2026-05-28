@@ -49,10 +49,10 @@ const urgentActions = [
 ];
 
 const stockoutRows = [
-  ["SKU-LINEN-NAVY-M", "Premium Linen Shirt - Navy M", "48", "186", "8", "74%", "Reorder 120 units"],
-  ["SKU-SCARF-BURG", "Silk Scarf - Burgundy", "18", "98", "5", "53%", "Add to next supplier PO"],
-  ["SKU-SWEATER-GRY-L", "Wool Blend Sweater - Grey L", "31", "142", "8", "61%", "Order before lead time expires"],
-  ["SKU-CHINO-KHAKI-32", "Slim Fit Chinos - Khaki 32x30", "73", "124", "18", "38%", "Place reorder this week"],
+  ["SKU-LINEN-NAVY-M", "Premium Linen Shirt - Navy M", "48", "186", "8", `${sampleStockoutRiskPercent(48, 186, 6.2, 0.14)}%`, "Reorder 120 units"],
+  ["SKU-SCARF-BURG", "Silk Scarf - Burgundy", "18", "98", "5", `${sampleStockoutRiskPercent(18, 98, 3.3, 0.38)}%`, "Add to next supplier PO"],
+  ["SKU-SWEATER-GRY-L", "Wool Blend Sweater - Grey L", "31", "142", "8", `${sampleStockoutRiskPercent(31, 142, 3.8, 0.32)}%`, "Order before lead time expires"],
+  ["SKU-CHINO-KHAKI-32", "Slim Fit Chinos - Khaki 32x30", "73", "124", "18", `${sampleStockoutRiskPercent(73, 124, 4.1, 0.11)}%`, "Place reorder this week"],
 ];
 
 const deadStockRows = [
@@ -64,7 +64,7 @@ const deadStockRows = [
 
 const reorderRows = [
   ["1", "SKU-LINEN-NAVY-M", "Premium Linen Shirt - Navy M", "Below reorder point; lead time exceeds cover", "120"],
-  ["2", "SKU-SWEATER-GRY-L", "Wool Blend Sweater - Grey L", "Seasonal demand rising; 61% stockout risk", "200"],
+  ["2", "SKU-SWEATER-GRY-L", "Wool Blend Sweater - Grey L", `Seasonal demand rising; ${sampleStockoutRiskPercent(31, 142, 3.8, 0.32)}% stockout risk`, "200"],
   ["3", "SKU-SCARF-BURG", "Silk Scarf - Burgundy", "Only 5 days of cover", "80"],
   ["4", "SKU-CHINO-KHAKI-32", "Slim Fit Chinos - Khaki 32x30", "Lead time buffer is thin", "150"],
 ];
@@ -76,6 +76,34 @@ const nextSteps = [
   "Check bundle component stock before promoting hoodie bundles.",
   "Turn on stockout and dead-stock alerts so the team sees new risks early.",
 ];
+
+function sampleStockoutRiskPercent(
+  onHand: number,
+  projected30: number,
+  avgDailyUnits: number,
+  variabilityCv: number,
+): number {
+  const sigma30d = Math.max(avgDailyUnits * variabilityCv * Math.sqrt(30), 0.01);
+  const z = (onHand - projected30) / sigma30d;
+  return Math.round((1 - normalCdf(z)) * 100);
+}
+
+function normalCdf(z: number): number {
+  return 0.5 * (1 + erf(z / Math.SQRT2));
+}
+
+function erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const absX = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * absX);
+  const y =
+    1 -
+    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t +
+      0.254829592) *
+      t *
+      Math.exp(-absX * absX);
+  return sign * y;
+}
 
 export default function SampleInventoryRiskSnapshotPage() {
   return (

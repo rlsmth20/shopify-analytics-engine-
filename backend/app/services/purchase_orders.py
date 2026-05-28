@@ -17,8 +17,10 @@ from app.schemas_v2 import (
 def build_purchase_order_drafts(
     suggestions: list[ReorderSuggestion],
     vendor_lead_times: dict[str, int] | None = None,
+    shipping_cost_per_po: float = 35.0,
 ) -> list[PurchaseOrderDraft]:
     vendor_lead_times = vendor_lead_times or {}
+    shipping_cost_per_po = max(shipping_cost_per_po, 0.0)
     by_vendor: dict[str, list[ReorderSuggestion]] = {}
     for s in suggestions:
         if s.recommended_order_qty <= 0:
@@ -38,7 +40,9 @@ def build_purchase_order_drafts(
             )
             for item in items
         ]
-        total = round(sum(line.extended_cost for line in lines), 2)
+        subtotal = round(sum(line.extended_cost for line in lines), 2)
+        shipping_cost = round(shipping_cost_per_po if subtotal > 0 else 0.0, 2)
+        total = round(subtotal + shipping_cost, 2)
         lead_time = vendor_lead_times.get(vendor) or max(
             (item.lead_time_days for item in items), default=14
         )
@@ -51,12 +55,15 @@ def build_purchase_order_drafts(
                 created_at=now,
                 status="draft",
                 lines=lines,
+                subtotal_cost=subtotal,
+                shipping_cost=shipping_cost,
                 total_cost=total,
                 expected_arrival_date=expected_arrival,
                 rationale=(
                     f"Consolidated {len(lines)} SKU"
                     f"{'s' if len(lines) != 1 else ''} from {vendor}. "
-                    f"Expected arrival ~{expected_arrival} at current lead time."
+                    f"Expected arrival ~{expected_arrival} at current lead time. "
+                    f"Includes estimated ${shipping_cost:.0f} shipping/freight."
                 ),
             )
         )

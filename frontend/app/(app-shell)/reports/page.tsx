@@ -962,7 +962,7 @@ function reorderToRow(
     daysInventory: daysLeft,
     leadTime: suggestion.lead_time_days,
     recommendedQty: suggestion.recommended_order_qty,
-    cashImpact: suggestion.extended_cost,
+    cashImpact: suggestion.landed_extended_cost || suggestion.extended_cost,
     reason: suggestion.rationale,
     recommendedAction: suggestion.rationale,
     riskLevel,
@@ -973,7 +973,7 @@ function reorderToRow(
     daysSinceLastSale: null,
     status: "Reorder",
     targetCoverage: dailyVelocity ? suggestion.order_up_to / dailyVelocity : null,
-    estimatedCost: suggestion.extended_cost,
+    estimatedCost: suggestion.landed_extended_cost || suggestion.extended_cost,
     orderDeadline: daysLeft === null ? "Unavailable" : dateFromNow(Math.max(daysLeft - suggestion.lead_time_days, 0)),
   };
 }
