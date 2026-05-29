@@ -31,13 +31,20 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
+    setError(null);
     fetchPurchaseOrders(serviceLevel, shippingCost, controller.signal)
       .then((r) => {
+        if (controller.signal.aborted) return;
         setDrafts(r.drafts);
         setTotal(r.total_capital_required);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (controller.signal.aborted || isAbortError(e)) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
   }, [serviceLevel, shippingCost]);
 
@@ -399,6 +406,15 @@ export default function PurchaseOrdersPage() {
       setBusyPo(null);
     }
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof DOMException && error.name === "AbortError"
+  ) || (
+    error instanceof Error &&
+    (error.name === "AbortError" || error.message.toLowerCase().includes("aborted"))
+  );
 }
 
 function sendPurchaseOrderToVendor(po: PurchaseOrderDraft): void {
