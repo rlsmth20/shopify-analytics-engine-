@@ -27,6 +27,8 @@ export default function PurchaseOrdersPage() {
   const [busyPo, setBusyPo] = useState<string | null>(null);
   const [receivingPo, setReceivingPo] = useState<string | null>(null);
   const [receiptDrafts, setReceiptDrafts] = useState<ReceiptDrafts>({});
+  const [operationNotice, setOperationNotice] = useState<string | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -37,6 +39,7 @@ export default function PurchaseOrdersPage() {
         if (controller.signal.aborted) return;
         setDrafts(r.drafts);
         setTotal(r.total_capital_required);
+        setOperationError(null);
       })
       .catch((e) => {
         if (controller.signal.aborted || isAbortError(e)) return;
@@ -96,6 +99,12 @@ export default function PurchaseOrdersPage() {
         </p>
       </div>
 
+      {operationNotice || operationError ? (
+        <div className={`po-feedback${operationError ? " po-feedback-error" : ""}`} role="status">
+          {operationError ?? operationNotice}
+        </div>
+      ) : null}
+
       {loading ? <p className="page-loading">Generating POs…</p> : null}
 
       {drafts.length === 0 && !loading ? (
@@ -127,7 +136,9 @@ export default function PurchaseOrdersPage() {
                 <p className="po-card-meta">
                   {currency(po.subtotal_cost)} items + {currency(po.shipping_cost)} shipping
                 </p>
-                <span className={`po-status po-status-${po.status}`}>{po.status}</span>
+                <span className={`po-status po-status-${po.status}`}>
+                  {formatPoStatus(po.status)}
+                </span>
               </div>
             </div>
             {expanded === po.po_id ? (
@@ -138,6 +149,7 @@ export default function PurchaseOrdersPage() {
                     <tr>
                       <th>SKU</th>
                       <th>Qty</th>
+                      <th>Received</th>
                       <th>Unit cost</th>
                       <th>Extended</th>
                     </tr>
@@ -147,6 +159,9 @@ export default function PurchaseOrdersPage() {
                       <tr key={line.sku_id}>
                         <td>{line.name}</td>
                         <td>{line.qty}</td>
+                        <td>
+                          {line.received_qty ?? 0} / {line.qty}
+                        </td>
                         <td>{currency(line.unit_cost)}</td>
                         <td>{currency(line.extended_cost)}</td>
                       </tr>
@@ -165,7 +180,7 @@ export default function PurchaseOrdersPage() {
                     onClick={() => void saveDraft(po)}
                     disabled={busyPo === po.po_id}
                   >
-                    Save draft
+                    {busyPo === po.po_id ? "Saving..." : "Save draft"}
                   </button>
                   <button
                     type="button"
@@ -173,7 +188,7 @@ export default function PurchaseOrdersPage() {
                     onClick={() => void markStatus(po, "approved")}
                     disabled={busyPo === po.po_id || po.status === "approved"}
                   >
-                    Approve PO
+                    {busyPo === po.po_id ? "Approving..." : "Approve PO"}
                   </button>
                   <button
                     type="button"
@@ -184,7 +199,7 @@ export default function PurchaseOrdersPage() {
                     }}
                     disabled={busyPo === po.po_id}
                   >
-                    Send to vendor
+                    {busyPo === po.po_id ? "Sending..." : "Send to vendor"}
                   </button>
                   <button
                     type="button"
@@ -200,7 +215,7 @@ export default function PurchaseOrdersPage() {
                     onClick={() => void receiveAll(po)}
                     disabled={busyPo === po.po_id}
                   >
-                    Receive all
+                    {busyPo === po.po_id ? "Receiving..." : "Receive all"}
                   </button>
                   <button
                     type="button"
@@ -223,7 +238,8 @@ export default function PurchaseOrdersPage() {
                         <tr>
                           <th>SKU</th>
                           <th>Ordered</th>
-                          <th>Received qty</th>
+                          <th>Already received</th>
+                          <th>Qty to receive</th>
                           <th>Unit cost</th>
                         </tr>
                       </thead>
@@ -237,12 +253,13 @@ export default function PurchaseOrdersPage() {
                             <tr key={line.sku_id}>
                               <td>{line.name}</td>
                               <td>{line.qty}</td>
+                              <td>{line.received_qty ?? 0}</td>
                               <td>
                                 <input
                                   className="input-control"
                                   type="number"
                                   min="0"
-                                  max={line.qty}
+                                  max={Math.max(line.qty - (line.received_qty ?? 0), 0)}
                                   step="1"
                                   value={draftLine.qty}
                                   onChange={(event) =>
@@ -278,7 +295,7 @@ export default function PurchaseOrdersPage() {
                         onClick={() => void recordPartialReceipt(po)}
                         disabled={busyPo === po.po_id}
                       >
-                        Record receipt
+                        {busyPo === po.po_id ? "Recording..." : "Record receipt"}
                       </button>
                       <button
                         type="button"
@@ -307,9 +324,15 @@ export default function PurchaseOrdersPage() {
 
   async function saveDraft(po: PurchaseOrderDraft) {
     setBusyPo(po.po_id);
+    setOperationError(null);
+    setOperationNotice(null);
     try {
-      await savePurchaseOrder(po);
-      await refresh();
+      const response = await savePurchaseOrder(po);
+      upsertDraft(response.po ?? po);
+      setOperationNotice(`Saved draft ${po.po_id}.`);
+      if (!isDemoMode()) await refresh();
+    } catch (error) {
+      setOperationError(errorMessage(error, "Could not save purchase order draft."));
     } finally {
       setBusyPo(null);
     }
@@ -317,10 +340,16 @@ export default function PurchaseOrdersPage() {
 
   async function markStatus(po: PurchaseOrderDraft, status: PurchaseOrderDraft["status"]) {
     setBusyPo(po.po_id);
+    setOperationError(null);
+    setOperationNotice(null);
     try {
       await savePurchaseOrder(po);
-      await updatePurchaseOrderStatus(po.po_id, status);
-      await refresh();
+      const response = await updatePurchaseOrderStatus(po.po_id, status);
+      upsertDraft(response.po ?? { ...po, status });
+      setOperationNotice(`Purchase order ${po.po_id} marked ${formatPoStatus(status).toLowerCase()}.`);
+      if (!isDemoMode()) await refresh();
+    } catch (error) {
+      setOperationError(errorMessage(error, `Could not mark purchase order ${formatPoStatus(status).toLowerCase()}.`));
     } finally {
       setBusyPo(null);
     }
@@ -335,7 +364,7 @@ export default function PurchaseOrdersPage() {
         [po.po_id]: Object.fromEntries(
           po.lines.map((line) => [
             line.sku_id,
-            { qty: String(line.qty), cost: line.unit_cost.toFixed(2) },
+            { qty: String(Math.max(line.qty - (line.received_qty ?? 0), 0)), cost: line.unit_cost.toFixed(2) },
           ])
         ),
       };
@@ -367,9 +396,12 @@ export default function PurchaseOrdersPage() {
         const receiptLine = draft?.[line.sku_id];
         const receivedQty = Number(receiptLine?.qty ?? 0);
         const receivedUnitCost = Number(receiptLine?.cost ?? line.unit_cost);
+        const remainingQty = Math.max(line.qty - (line.received_qty ?? 0), 0);
         return {
           sku_id: line.sku_id,
-          received_qty: Number.isFinite(receivedQty) ? receivedQty : 0,
+          received_qty: Number.isFinite(receivedQty)
+            ? Math.min(Math.max(Math.round(receivedQty), 0), remainingQty)
+            : 0,
           received_unit_cost: Number.isFinite(receivedUnitCost)
             ? receivedUnitCost
             : line.unit_cost,
@@ -377,14 +409,25 @@ export default function PurchaseOrdersPage() {
       })
       .filter((line) => line.received_qty > 0);
 
-    if (lines.length === 0) return;
+    if (lines.length === 0) {
+      setOperationNotice(null);
+      setOperationError("Enter at least one quantity to receive.");
+      return;
+    }
 
     setBusyPo(po.po_id);
+    setOperationError(null);
+    setOperationNotice(null);
     try {
       await savePurchaseOrder(po);
-      await receivePurchaseOrder(po.po_id, { lines });
+      const response = await receivePurchaseOrder(po.po_id, { lines });
+      const fallbackPo = applyReceiptToPo(po, lines);
+      upsertDraft(response.po ?? fallbackPo);
       setReceivingPo(null);
-      await refresh();
+      setOperationNotice(`Recorded ${sumReceiptQty(lines)} received unit${sumReceiptQty(lines) === 1 ? "" : "s"} for ${po.po_id}.`);
+      if (!isDemoMode()) await refresh();
+    } catch (error) {
+      setOperationError(errorMessage(error, "Could not record purchase order receipt."));
     } finally {
       setBusyPo(null);
     }
@@ -392,20 +435,84 @@ export default function PurchaseOrdersPage() {
 
   async function receiveAll(po: PurchaseOrderDraft) {
     setBusyPo(po.po_id);
+    setOperationError(null);
+    setOperationNotice(null);
     try {
       await savePurchaseOrder(po);
-      await receivePurchaseOrder(po.po_id, {
-        lines: po.lines.map((line) => ({
-          sku_id: line.sku_id,
-          received_qty: line.qty,
-          received_unit_cost: line.unit_cost,
-        })),
-      });
-      await refresh();
+      const lines = po.lines.map((line) => ({
+        sku_id: line.sku_id,
+        received_qty: Math.max(line.qty - (line.received_qty ?? 0), 0),
+        received_unit_cost: line.unit_cost,
+      })).filter((line) => line.received_qty > 0);
+      if (lines.length === 0) {
+        setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
+        return;
+      }
+      const response = await receivePurchaseOrder(po.po_id, { lines });
+      upsertDraft(response.po ?? applyReceiptToPo(po, lines));
+      setOperationNotice(`Received all remaining units for ${po.po_id}.`);
+      if (!isDemoMode()) await refresh();
+    } catch (error) {
+      setOperationError(errorMessage(error, "Could not receive purchase order."));
     } finally {
       setBusyPo(null);
     }
   }
+
+  function upsertDraft(nextPo: PurchaseOrderDraft) {
+    setDrafts((current) =>
+      current.map((draft) => (draft.po_id === nextPo.po_id ? nextPo : draft))
+    );
+  }
+}
+
+type ReceiptLinePayload = {
+  sku_id: string;
+  received_qty: number;
+  received_unit_cost?: number | null;
+};
+
+function applyReceiptToPo(po: PurchaseOrderDraft, receiptLines: ReceiptLinePayload[]): PurchaseOrderDraft {
+  const receivedBySku = new Map(receiptLines.map((line) => [line.sku_id, line.received_qty]));
+  const lines = po.lines.map((line) => {
+    const receiptQty = receivedBySku.get(line.sku_id) ?? 0;
+    return {
+      ...line,
+      received_qty: Math.min(line.qty, (line.received_qty ?? 0) + receiptQty),
+    };
+  });
+  const fullyReceived = lines.every((line) => line.received_qty >= line.qty);
+  const anyReceived = lines.some((line) => line.received_qty > 0);
+  return {
+    ...po,
+    lines,
+    status: fullyReceived ? "received" : anyReceived ? "partially_received" : po.status,
+    received_at: anyReceived ? new Date().toISOString() : po.received_at,
+  };
+}
+
+function sumReceiptQty(lines: ReceiptLinePayload[]): number {
+  return lines.reduce((sum, line) => sum + line.received_qty, 0);
+}
+
+function isDemoMode(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      sessionStorage.getItem("skubase_demo") === "1" ||
+      new URLSearchParams(window.location.search).get("demo") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function formatPoStatus(status: PurchaseOrderDraft["status"]): string {
+  return status.replace(/_/g, " ");
 }
 
 function isAbortError(error: unknown): boolean {

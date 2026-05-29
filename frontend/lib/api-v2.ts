@@ -265,13 +265,14 @@ export type PurchaseOrderLine = {
   qty: number;
   unit_cost: number;
   extended_cost: number;
+  received_qty: number;
 };
 
 export type PurchaseOrderDraft = {
   po_id: string;
   vendor: string;
   created_at: string;
-  status: "draft" | "ready" | "approved" | "sent" | "received" | "cancelled";
+  status: "draft" | "ready" | "approved" | "sent" | "partially_received" | "received" | "cancelled";
   lines: PurchaseOrderLine[];
   subtotal_cost: number;
   shipping_cost: number;

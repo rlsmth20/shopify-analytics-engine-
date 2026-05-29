@@ -110,6 +110,12 @@ def list_po_drafts(
     )
     drafts = build_purchase_order_drafts(suggestions, shipping_cost_per_po=shipping_cost)
     saved = list_saved_purchase_orders(db, user.shop_id)
+    saved_open_vendors = {
+        po.vendor
+        for po in saved
+        if po.status not in {"received", "cancelled"}
+    }
+    drafts = [draft for draft in drafts if draft.vendor not in saved_open_vendors]
     return PurchaseOrderDraftsResponse(
         drafts=[*saved, *drafts],
         total_capital_required=round(sum(d.total_cost for d in [*saved, *drafts]), 2),
@@ -145,7 +151,7 @@ def update_po_status(
     user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
-    if status not in {"draft", "ready", "approved", "sent", "received", "cancelled"}:
+    if status not in {"draft", "ready", "approved", "sent", "partially_received", "received", "cancelled"}:
         raise HTTPException(status_code=400, detail="Invalid purchase order status.")
     po = update_purchase_order_status(
         db,

@@ -29,7 +29,7 @@ AlertTrigger = Literal[
     "bundle_break",
     "price_drop",
 ]
-PurchaseOrderStatus = Literal["draft", "ready", "approved", "sent", "received", "cancelled"]
+PurchaseOrderStatus = Literal["draft", "ready", "approved", "sent", "partially_received", "received", "cancelled"]
 
 
 class ApiModel(BaseModel):
@@ -260,6 +260,7 @@ class PurchaseOrderLine(ApiModel):
     qty: int
     unit_cost: float
     extended_cost: float
+    received_qty: int = 0
 
 
 class PurchaseOrderDraft(ApiModel):

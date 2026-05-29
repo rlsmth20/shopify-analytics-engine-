@@ -36,6 +36,7 @@ def save_purchase_order(
         .where(PurchaseOrderRecord.shop_id == shop_id)
         .where(PurchaseOrderRecord.po_id == draft.po_id)
     )
+    old_received_by_sku: dict[str, int] = {}
     if record is None:
         record = PurchaseOrderRecord(shop_id=shop_id, po_id=draft.po_id)
         db.add(record)
@@ -47,6 +48,7 @@ def save_purchase_order(
             )
         ).all()
         for line in old_lines:
+            old_received_by_sku[line.sku_id] = line.received_qty
             db.delete(line)
         db.flush()
 
@@ -70,7 +72,7 @@ def save_purchase_order(
                 qty=line.qty,
                 unit_cost=Decimal(str(line.unit_cost)),
                 extended_cost=Decimal(str(line.extended_cost)),
-                received_qty=0,
+                received_qty=max(getattr(line, "received_qty", 0), old_received_by_sku.get(line.sku_id, 0)),
             )
         )
     db.commit()
@@ -119,7 +121,7 @@ def receive_purchase_order(
         if line.sku_id not in received_lines:
             continue
         qty, received_unit_cost = received_lines[line.sku_id]
-        line.received_qty = max(line.received_qty, qty)
+        line.received_qty = min(line.qty, line.received_qty + qty)
         unit_cost = float(line.unit_cost)
         db.add(
             PurchaseOrderReceiptRecord(
@@ -136,7 +138,7 @@ def receive_purchase_order(
             )
         )
     record.received_at = received_at
-    record.status = "received" if all(line.received_qty >= line.qty for line in lines) else "sent"
+    record.status = "received" if all(line.received_qty >= line.qty for line in lines) else "partially_received"
     db.commit()
     db.refresh(record)
     return _record_to_schema(db, record)
@@ -197,6 +199,7 @@ def _record_to_schema(db: DbSession, record: PurchaseOrderRecord) -> PurchaseOrd
                 qty=line.qty,
                 unit_cost=float(line.unit_cost),
                 extended_cost=float(line.extended_cost),
+                received_qty=line.received_qty,
             )
             for line in lines
         ],
