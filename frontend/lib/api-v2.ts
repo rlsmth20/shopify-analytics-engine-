@@ -370,13 +370,16 @@ export type DashboardResponse = {
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (isDemo()) return getDemoFixture<T>(path);
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-    credentials: "include",
-    signal,
-  });
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetchWithNetworkContext(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      credentials: "include",
+      signal,
+    },
+    path
+  );
   if (response.status === 402 || response.status === 403) {
     // Trial expired or no active subscription — send to pricing.
     if (typeof window !== "undefined") {
@@ -400,17 +403,22 @@ async function postJson<T>(
   signal?: AbortSignal
 ): Promise<T> {
   if (isDemo()) return getDemoFixture<T>(path);
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetchWithNetworkContext(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      credentials: "include",
+      signal,
     },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-    credentials: "include",
-    signal,
-  });
+    path
+  );
   if (response.status === 402 || response.status === 403) {
     if (typeof window !== "undefined") {
       window.location.href = "/pricing?trial_expired=1";
@@ -425,6 +433,29 @@ async function postJson<T>(
     );
   }
   return (await response.json()) as T;
+}
+
+async function fetchWithNetworkContext(
+  url: string,
+  init: RequestInit,
+  path: string
+): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    if (
+      error instanceof DOMException && error.name === "AbortError" ||
+      error instanceof Error && error.name === "AbortError"
+    ) {
+      throw error;
+    }
+    const origin = typeof window !== "undefined" ? window.location.origin : "unknown origin";
+    throw new Error(
+      `Could not reach the Skubase API for ${path}. Browser origin: ${origin}. API URL: ${url}. ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

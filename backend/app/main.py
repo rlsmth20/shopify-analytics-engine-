@@ -64,11 +64,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    default_origins = [
+        "http://localhost:3000",
+        "https://skubase.io",
+        "https://www.skubase.io",
+    ]
     allowed_origins = [
         origin.strip()
-        for origin in os.getenv("FRONTEND_ORIGIN", "http://localhost:3000").split(",")
+        for origin in os.getenv("FRONTEND_ORIGIN", ",".join(default_origins)).split(",")
         if origin.strip()
     ]
+    for origin in default_origins:
+        if origin not in allowed_origins:
+            allowed_origins.append(origin)
 
     app.add_middleware(
         CORSMiddleware,
