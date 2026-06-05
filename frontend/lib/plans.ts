@@ -58,8 +58,8 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "Bundle Opportunities and transfer planning", included: false },
       { label: "Admin roles and audit history", included: false },
     ],
-    monthly: { plan: "starter_monthly", price: "$49" },
-    annual: { plan: "starter_annual", price: "$41.65", yearTotal: "$500" },
+    monthly: { plan: "starter_monthly", price: "$29" },
+    annual: { plan: "starter_annual", price: "$24.65", yearTotal: "$296" },
   },
   {
     key: "growth",
@@ -106,7 +106,7 @@ export const PRICING_TIERS: PricingTier[] = [
 ];
 
 export const PLAN_LABELS: Record<string, string> = {
-  starter_monthly: "Starter ($49/mo)",
+  starter_monthly: "Starter ($29/mo)",
   growth_monthly: "Growth ($99/mo)",
   scale_monthly: "Scale ($199/mo)",
   starter_annual: "Starter (annual)",

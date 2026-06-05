@@ -23,7 +23,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("FRONTEND_ORIGIN", "https://s
 SHOPIFY_BILLING_TEST = os.getenv("SHOPIFY_BILLING_TEST", "false").lower() in {"1", "true", "yes"}
 
 SHOPIFY_PLAN_AMOUNTS: dict[str, Decimal] = {
-    "starter_monthly": Decimal("49.00"),
+    "starter_monthly": Decimal("29.00"),
     "growth_monthly": Decimal("99.00"),
     "scale_monthly": Decimal("199.00"),
 }

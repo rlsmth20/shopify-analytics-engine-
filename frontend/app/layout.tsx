@@ -67,9 +67,9 @@ const SOFTWARE_APP_LD = {
   url: SITE_URL,
   description: "Forecast 90 days, rank every SKU, score every supplier, and recover cash from dead stock.",
   offers: [
-    { "@type": "Offer", name: "Starter", price: "49", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
-    { "@type": "Offer", name: "Growth", price: "149", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
-    { "@type": "Offer", name: "Scale", price: "349", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
+    { "@type": "Offer", name: "Starter", price: "29", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
+    { "@type": "Offer", name: "Growth", price: "99", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
+    { "@type": "Offer", name: "Scale", price: "199", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
   ],
   publisher: { "@type": "Organization", name: "skubase", url: SITE_URL },
 };
