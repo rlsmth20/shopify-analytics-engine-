@@ -14,6 +14,7 @@ import {
 import { exportPurchaseOrderReport } from "@/lib/report-export";
 
 const SERVICE_LEVELS = [0.9, 0.95, 0.975, 0.99];
+const DEMO_PO_STORAGE_KEY = "skubase_demo_saved_purchase_orders";
 type ReceiptDraftLine = { qty: string; cost: string };
 type ReceiptDrafts = Record<string, Record<string, ReceiptDraftLine>>;
 type EditablePoLine = {
@@ -57,8 +58,11 @@ export default function PurchaseOrdersPage() {
     fetchPurchaseOrders(serviceLevel, shippingCost, controller.signal)
       .then((r) => {
         if (controller.signal.aborted) return;
-        setDrafts(r.drafts);
-        setTotal(r.total_capital_required);
+        const nextDrafts = isDemoMode()
+          ? mergeDemoSavedPurchaseOrders(r.drafts)
+          : r.drafts;
+        setDrafts(nextDrafts);
+        setTotal(sumPoTotals(nextDrafts));
         setOperationError(null);
       })
       .catch((e) => {
@@ -71,6 +75,8 @@ export default function PurchaseOrdersPage() {
     return () => controller.abort();
   }, [serviceLevel, shippingCost]);
 
+  const savedDrafts = drafts.filter(isSavedPurchaseOrder);
+  const visibleSavedDrafts = filterPurchaseOrders(savedDrafts, search, quickView);
   const visibleDrafts = filterPurchaseOrders(drafts, search, quickView);
   const supplyPlan = buildSupplyPlan(visibleDrafts);
 
@@ -173,6 +179,93 @@ export default function PurchaseOrdersPage() {
 
       {loading ? <p className="page-loading">Generating POs…</p> : null}
 
+      <section className="po-saved-ledger">
+        <div className="section-heading">
+          <div>
+            <p className="section-eyebrow">Saved PO ledger</p>
+            <h2>Drafts and receipts you can come back to</h2>
+            <p className="muted small">
+              Saved purchase orders persist receipt history so partial shipments,
+              remaining units, and supplier lead-time observations are not lost.
+            </p>
+          </div>
+        </div>
+        {visibleSavedDrafts.length > 0 ? (
+          <div className="po-ledger-table-wrap">
+            <table className="po-ledger-table">
+              <thead>
+                <tr>
+                  <th>PO</th>
+                  <th>Supplier</th>
+                  <th>Status</th>
+                  <th>Received</th>
+                  <th>Remaining</th>
+                  <th>Expected</th>
+                  <th>Total</th>
+                  <th>Next step</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleSavedDrafts.map((po) => {
+                  const received = receivedUnits(po);
+                  const ordered = orderedUnits(po);
+                  const remaining = Math.max(ordered - received, 0);
+                  return (
+                    <tr key={`saved-${po.po_id}`}>
+                      <td>
+                        <strong>{po.po_id}</strong>
+                        <span>{po.lines.length} line{po.lines.length === 1 ? "" : "s"}</span>
+                      </td>
+                      <td>{po.vendor}</td>
+                      <td>
+                        <span className={`po-status po-status-${po.status}`}>
+                          {formatPoStatus(po.status)}
+                        </span>
+                      </td>
+                      <td>{received} / {ordered}</td>
+                      <td>{remaining}</td>
+                      <td>{po.expected_arrival_date}</td>
+                      <td>{currency(po.total_cost)}</td>
+                      <td>
+                        <div className="po-ledger-actions">
+                          <button
+                            type="button"
+                            className="button button-ghost button-sm"
+                            onClick={() => setExpanded(po.po_id)}
+                          >
+                            Open
+                          </button>
+                          {remaining > 0 ? (
+                            <button
+                              type="button"
+                              className="button button-secondary button-sm"
+                              onClick={() => {
+                                setExpanded(po.po_id);
+                                startPartialReceipt(po);
+                              }}
+                            >
+                              Receive rest
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state empty-state-compact">
+            <p className="empty-state-title">No saved PO drafts yet</p>
+            <p className="empty-state-copy">
+              Save a draft below to create a persistent PO record. Once saved,
+              receipts will stay attached when you leave and come back.
+            </p>
+          </div>
+        )}
+      </section>
+
       {visibleDrafts.length === 0 && !loading ? (
         <div className="empty-state">
           <p className="empty-state-title">{drafts.length === 0 ? "All caught up" : "No PO drafts match"}</p>
@@ -206,6 +299,9 @@ export default function PurchaseOrdersPage() {
                 </p>
                 <span className={`po-status po-status-${po.status}`}>
                   {formatPoStatus(po.status)}
+                </span>
+                <span className={`po-source po-source-${po.source ?? "recommended"}`}>
+                  {isSavedPurchaseOrder(po) ? "Saved record" : "Recommendation"}
                 </span>
               </div>
             </div>
@@ -414,8 +510,11 @@ export default function PurchaseOrdersPage() {
 
   async function refresh() {
     const r = await fetchPurchaseOrders(serviceLevel, shippingCost);
-    setDrafts(r.drafts);
-    setTotal(r.total_capital_required);
+    const nextDrafts = isDemoMode()
+      ? mergeDemoSavedPurchaseOrders(r.drafts)
+      : r.drafts;
+    setDrafts(nextDrafts);
+    setTotal(sumPoTotals(nextDrafts));
   }
 
   async function saveDraft(po: PurchaseOrderDraft): Promise<boolean> {
@@ -424,7 +523,9 @@ export default function PurchaseOrdersPage() {
     setOperationNotice(null);
     try {
       const response = await savePurchaseOrder(po);
-      upsertDraft(response.po ?? po);
+      const savedPo = markSaved(response.po ?? po);
+      persistDemoPurchaseOrder(savedPo);
+      upsertDraft(savedPo);
       setOperationNotice(`Saved draft ${po.po_id}.`);
       if (!isDemoMode()) await refresh();
       return true;
@@ -457,7 +558,9 @@ export default function PurchaseOrdersPage() {
     try {
       await savePurchaseOrder(po);
       const response = await updatePurchaseOrderStatus(po.po_id, status);
-      upsertDraft(response.po ?? { ...po, status });
+      const nextPo = markSaved(response.po ?? { ...po, status });
+      persistDemoPurchaseOrder(nextPo);
+      upsertDraft(nextPo);
       setOperationNotice(
         status === "sent"
           ? `Email draft opened for ${po.po_id}.`
@@ -665,7 +768,9 @@ export default function PurchaseOrdersPage() {
       await savePurchaseOrder(po);
       const response = await receivePurchaseOrder(po.po_id, { lines });
       const fallbackPo = applyReceiptToPo(po, lines);
-      upsertDraft(response.po ?? fallbackPo);
+      const nextPo = markSaved(response.po ?? fallbackPo);
+      persistDemoPurchaseOrder(nextPo);
+      upsertDraft(nextPo);
       setReceivingPo(null);
       setOperationNotice(`Recorded ${sumReceiptQty(lines)} received unit${sumReceiptQty(lines) === 1 ? "" : "s"} for ${po.po_id}.`);
       if (!isDemoMode()) await refresh();
@@ -692,7 +797,9 @@ export default function PurchaseOrdersPage() {
         return;
       }
       const response = await receivePurchaseOrder(po.po_id, { lines });
-      upsertDraft(response.po ?? applyReceiptToPo(po, lines));
+      const nextPo = markSaved(response.po ?? applyReceiptToPo(po, lines));
+      persistDemoPurchaseOrder(nextPo);
+      upsertDraft(nextPo);
       setOperationNotice(`Received all remaining units for ${po.po_id}.`);
       if (!isDemoMode()) await refresh();
     } catch (error) {
@@ -712,6 +819,68 @@ export default function PurchaseOrdersPage() {
       return nextDrafts;
     });
   }
+}
+
+function isSavedPurchaseOrder(po: PurchaseOrderDraft): boolean {
+  return po.source === "saved" || po.status !== "draft" || receivedUnits(po) > 0;
+}
+
+function markSaved(po: PurchaseOrderDraft): PurchaseOrderDraft {
+  return {
+    ...po,
+    source: "saved",
+  };
+}
+
+function orderedUnits(po: PurchaseOrderDraft): number {
+  return po.lines.reduce((sum, line) => sum + line.qty, 0);
+}
+
+function receivedUnits(po: PurchaseOrderDraft): number {
+  return po.lines.reduce((sum, line) => sum + (line.received_qty ?? 0), 0);
+}
+
+function mergeDemoSavedPurchaseOrders(drafts: PurchaseOrderDraft[]): PurchaseOrderDraft[] {
+  const saved = loadDemoSavedPurchaseOrders();
+  if (saved.length === 0) return drafts;
+  const savedById = new Map(saved.map((po) => [po.po_id, po]));
+  const merged = drafts.map((po) => savedById.get(po.po_id) ?? po);
+  const generatedIds = new Set(merged.map((po) => po.po_id));
+  const savedOnly = saved.filter((po) => !generatedIds.has(po.po_id));
+  return [...savedOnly, ...merged];
+}
+
+function loadDemoSavedPurchaseOrders(): PurchaseOrderDraft[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(DEMO_PO_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isPurchaseOrderLike).map(markSaved);
+  } catch {
+    return [];
+  }
+}
+
+function persistDemoPurchaseOrder(po: PurchaseOrderDraft): void {
+  if (!isDemoMode() || typeof window === "undefined") return;
+  const saved = loadDemoSavedPurchaseOrders();
+  const nextPo = markSaved(po);
+  const next = saved.some((draft) => draft.po_id === nextPo.po_id)
+    ? saved.map((draft) => (draft.po_id === nextPo.po_id ? nextPo : draft))
+    : [nextPo, ...saved];
+  window.localStorage.setItem(DEMO_PO_STORAGE_KEY, JSON.stringify(next));
+}
+
+function isPurchaseOrderLike(value: unknown): value is PurchaseOrderDraft {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<PurchaseOrderDraft>;
+  return (
+    typeof candidate.po_id === "string" &&
+    typeof candidate.vendor === "string" &&
+    Array.isArray(candidate.lines)
+  );
 }
 
 function PurchaseOrderEditForm({

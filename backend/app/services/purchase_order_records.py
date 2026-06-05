@@ -192,6 +192,7 @@ def _record_to_schema(db: DbSession, record: PurchaseOrderRecord) -> PurchaseOrd
         vendor=record.vendor,
         created_at=record.created_at,
         status=record.status,
+        source="saved",
         lines=[
             PurchaseOrderLine(
                 sku_id=line.sku_id,

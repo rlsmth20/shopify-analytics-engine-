@@ -295,6 +295,7 @@ class PurchaseOrderDraft(ApiModel):
     vendor: str
     created_at: datetime
     status: PurchaseOrderStatus
+    source: Literal["recommended", "saved"] = "recommended"
     lines: list[PurchaseOrderLine]
     subtotal_cost: float = 0.0
     shipping_cost: float = 0.0

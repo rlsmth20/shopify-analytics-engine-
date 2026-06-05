@@ -32,6 +32,10 @@ export type ProjectedStockHealthProps = {
   daysSinceLastSale?: number | null;
   compact?: boolean;
   hideMetricGrid?: boolean;
+  hideIdentity?: boolean;
+  hideActionText?: boolean;
+  showAdvancedDetails?: boolean;
+  context?: "action" | "report" | "forecast" | "po";
 };
 
 export function ProjectedStockHealth({
@@ -56,6 +60,10 @@ export function ProjectedStockHealth({
   daysSinceLastSale,
   compact = false,
   hideMetricGrid = false,
+  hideIdentity = false,
+  hideActionText = false,
+  showAdvancedDetails = true,
+  context,
 }: ProjectedStockHealthProps) {
   const coverDays = firstFinite(daysLeft, daysOfInventory);
   const health = normalizeStatus(
@@ -82,12 +90,16 @@ export function ProjectedStockHealth({
   const targetPct = markerPercent(targetCoverageDays, targetCoverageDays, coverDays);
 
   return (
-    <section className={`stock-health stock-health-${toneForStatus(health)}${compact ? " stock-health-compact" : ""}`}>
+    <section
+      className={`stock-health stock-health-${toneForStatus(health)}${compact ? " stock-health-compact" : ""}${context ? ` stock-health-context-${context}` : ""}`}
+    >
       <div className="stock-health-head">
-        <div>
-          {productName ? <p className="stock-health-product">{productName}</p> : null}
-          {sku ? <p className="stock-health-sku">{sku}</p> : null}
-        </div>
+        {hideIdentity ? <span className="stock-health-context-label">Stock health</span> : (
+          <div>
+            {productName ? <p className="stock-health-product">{productName}</p> : null}
+            {sku ? <p className="stock-health-sku">{sku}</p> : null}
+          </div>
+        )}
         <span className={`stock-health-badge stock-health-badge-${toneForStatus(health)}`}>
           {health}
         </span>
@@ -106,7 +118,7 @@ export function ProjectedStockHealth({
 
       <p className="stock-health-explanation">{explanation}</p>
 
-      {hideMetricGrid ? null : (
+      {hideMetricGrid || !showAdvancedDetails ? null : (
         <details className="stock-health-details">
           <summary>Details</summary>
           <dl>
@@ -122,7 +134,7 @@ export function ProjectedStockHealth({
             <Detail label="Cash impact" value={formatMoney(cashImpact)} />
             <Detail label="Confidence" value={safeText(confidence)} />
           </dl>
-          {recommendedAction ? <p className="stock-health-action">{recommendedAction}</p> : null}
+          {recommendedAction && !hideActionText ? <p className="stock-health-action">{recommendedAction}</p> : null}
           {dataQualityNote ? <p className="stock-health-note">{dataQualityNote}</p> : null}
         </details>
       )}

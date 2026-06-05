@@ -59,6 +59,8 @@ type ReportRow = {
   cashImpact: number | null;
   reason: string;
   recommendedAction: string;
+  rawReason?: string | null;
+  calculationDetails?: string | null;
   riskLevel: "Critical" | "High" | "Medium" | "Low";
   salesLast30: number | null;
   dailyVelocity: number | null;
@@ -788,23 +790,28 @@ function ReportRowDetails({
   row: ReportRow;
 }) {
   const cta = reportCta(report);
-  const fields = [
-    ["Product", row.product],
-    ["SKU", row.sku],
-    ["Supplier", row.vendor],
-    ["Category", row.category],
-    ["Priority / risk / status", `${formatNumber(row.priority)} / ${row.riskLevel} / ${row.status}`],
-    ["Current stock", formatNumber(row.currentStock)],
-    ["Daily velocity", row.dailyVelocity === null ? "Unavailable" : `${formatNumber(row.dailyVelocity)} / day`],
-    ["Days left / inventory", formatNumber(row.daysLeft ?? row.daysInventory)],
-    ["Lead time", row.leadTime === null ? "Unavailable" : `${formatNumber(row.leadTime)} days`],
-    ["Estimated stockout", row.estimatedStockoutDate || "Unavailable"],
-    ["Recommended qty", formatNumber(row.recommendedQty)],
-    ["Estimated cost / cash impact", formatMoney(row.estimatedCost ?? row.cashImpact)],
-  ];
+  const keyMetrics = buildReportKeyMetrics(report, row);
+  const advancedDetails = buildReportAdvancedDetails(report, row);
+  const summaryReason = row.reason || buildWhyThisMatters(report, row);
+  const statusText = report === "actions" ? row.actionType : report === "stockout" ? row.riskLevel : row.status;
 
   return (
     <div className="report-row-details">
+      <div className="report-row-detail-main">
+        <div>
+          <p className="report-detail-eyebrow">Summary</p>
+          <h3>{row.product}</h3>
+          <p className="report-detail-meta">
+            {row.sku}
+            {row.vendor ? ` · Supplier: ${row.vendor}` : ""}
+            {statusText ? ` · ${statusText}` : ""}
+          </p>
+          <p className="report-detail-copy">{summaryReason}</p>
+        </div>
+        <a className="button button-secondary button-sm" href={cta.href}>
+          {cta.label}
+        </a>
+      </div>
       <ProjectedStockHealth
         productName={row.product}
         sku={row.sku}
@@ -823,21 +830,14 @@ function ReportRowDetails({
         inventoryValue={row.inventoryValue}
         cashImpact={row.cashImpact}
         daysSinceLastSale={row.daysSinceLastSale}
-        dataQualityNote={row.reason}
-        compact={report === "actions"}
+        compact
+        hideMetricGrid
+        hideIdentity
+        hideActionText
+        context="report"
       />
-      <div className="report-row-detail-main">
-        <div>
-          <p className="report-detail-eyebrow">Row details</p>
-          <h3>{row.product}</h3>
-          <p className="report-detail-copy">{row.reason || "No additional reason available."}</p>
-        </div>
-        <a className="button button-secondary button-sm" href={cta.href}>
-          {cta.label}
-        </a>
-      </div>
       <dl className="report-detail-grid">
-        {fields.map(([label, value]) => (
+        {keyMetrics.map(([label, value]) => (
           <div key={label}>
             <dt>{label}</dt>
             <dd>{value}</dd>
@@ -849,8 +849,144 @@ function ReportRowDetails({
         <p>{buildWhyThisMatters(report, row)}</p>
         <strong>{row.recommendedAction || "Review this SKU before acting."}</strong>
       </div>
+      {advancedDetails.length > 0 ? (
+        <details className="report-advanced-details">
+          <summary>Advanced details</summary>
+          <dl className="report-detail-grid">
+            {advancedDetails.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      ) : null}
     </div>
   );
+}
+
+function buildReportKeyMetrics(report: ReportKind, row: ReportRow): Array<[string, string]> {
+  if (report === "stockout") {
+    return compactMetricPairs([
+      ["Current stock", formatNumber(row.currentStock)],
+      ["Days left", formatDaysValue(row.daysLeft)],
+      ["Lead time", formatDaysValue(row.leadTime)],
+      ["Estimated stockout", row.estimatedStockoutDate || "Unavailable"],
+      row.recommendedQty !== null
+        ? ["Recommended qty", formatNumber(row.recommendedQty)]
+        : ["Recommended action", row.recommendedAction || "Review"],
+    ]);
+  }
+  if (report === "reorder") {
+    return compactMetricPairs([
+      ["Current stock", formatNumber(row.currentStock)],
+      ["Lead time", formatDaysValue(row.leadTime)],
+      ["Recommended qty", formatNumber(row.recommendedQty)],
+      ["Estimated cost", formatMoney(row.estimatedCost)],
+      ["Order deadline", row.orderDeadline || "Unavailable"],
+    ]);
+  }
+  if (report === "dead-stock") {
+    return compactMetricPairs([
+      ["Current stock", formatNumber(row.currentStock)],
+      row.daysSinceLastSale !== null
+        ? ["Days since sale", formatDaysValue(row.daysSinceLastSale)]
+        : ["Days of cover", formatDaysValue(row.daysInventory)],
+      ["Cash tied up", formatMoney(row.cashImpact ?? row.inventoryValue)],
+      ["Sales last 30", formatNumber(row.salesLast30)],
+      ["Recommended action", row.recommendedAction || "Review"],
+    ]);
+  }
+  return compactMetricPairs([
+    ["Current stock", formatNumber(row.currentStock)],
+    ["Days left", formatDaysValue(row.daysLeft)],
+    ["Lead time", formatDaysValue(row.leadTime)],
+    ["Recommended qty", formatNumber(row.recommendedQty)],
+    ["Cash impact", formatMoney(row.cashImpact)],
+  ]);
+}
+
+function buildReportAdvancedDetails(report: ReportKind, row: ReportRow): Array<[string, string]> {
+  const details: Array<[string, string]> = [
+    ["Category", safeDetailText(row.category)],
+    ["Daily velocity", row.dailyVelocity === null ? "Unavailable" : `${formatNumber(row.dailyVelocity)} / day`],
+    ["Sales last 30", formatNumber(row.salesLast30)],
+    ["Target coverage", formatDaysValue(row.targetCoverage)],
+  ];
+
+  if (report !== "stockout") {
+    details.push(["Estimated stockout", row.estimatedStockoutDate || "Unavailable"]);
+  }
+  if (report !== "dead-stock") {
+    details.push(["Inventory value", formatMoney(row.inventoryValue)]);
+  }
+  if (row.daysInventory !== null && report !== "actions") {
+    details.push(["Days of cover", formatDaysValue(row.daysInventory)]);
+  }
+  if (row.calculationDetails) {
+    details.push(["Calculation details", row.calculationDetails]);
+  } else if (row.rawReason && row.rawReason !== row.reason) {
+    details.push(["Raw reason", row.rawReason]);
+  }
+
+  return details.filter(([, value]) => value !== "Unavailable" && value !== "");
+}
+
+function compactMetricPairs(pairs: Array<[string, string]>): Array<[string, string]> {
+  return pairs.filter(([, value]) => value !== "Unavailable" && value !== "");
+}
+
+function buildPlainReportReason({
+  rawReason,
+  currentStock,
+  daysLeft,
+  leadTime,
+  status,
+  cashImpact,
+}: {
+  rawReason?: string | null;
+  currentStock?: number | null;
+  daysLeft?: number | null;
+  leadTime?: number | null;
+  status?: string | null;
+  cashImpact?: number | null;
+}): string {
+  if (!rawReason) return "Review this SKU before acting.";
+  if (!containsTechnicalFormula(rawReason)) return rawReason;
+  if (isFiniteNumber(daysLeft) && isFiniteNumber(leadTime)) {
+    if (daysLeft <= leadTime) {
+      return `Current stock covers ${formatNumber(daysLeft)} days, but supplier lead time is ${formatNumber(leadTime)} days. This SKU may run out before replenishment arrives.`;
+    }
+    return `Current stock covers ${formatNumber(daysLeft)} days against a ${formatNumber(leadTime)}-day lead time. Keep this SKU in reorder review.`;
+  }
+  if (status === "Dead stock" || status === "Overstock" || status === "Slow mover") {
+    return `This SKU may have excess inventory${isFiniteNumber(cashImpact) ? ` with ${formatMoney(cashImpact)} tied up` : ""}. Review it before buying more.`;
+  }
+  if (isFiniteNumber(currentStock)) {
+    return `Current stock is ${formatNumber(currentStock)} units. Review the inventory action and supporting metrics before acting.`;
+  }
+  return "Skubase found an actionable inventory signal, but the calculation details are available only in Advanced details.";
+}
+
+function containsTechnicalFormula(value?: string | null): boolean {
+  if (!value) return false;
+  return /normal_cdf|demand volatility|projected 30d|1\s*-\s*normal|z[-\s]?score|formula|cdf\(/i.test(value);
+}
+
+function formatDaysValue(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "Unavailable" : `${formatNumber(value)} days`;
+}
+
+function safeDetailText(value?: string | null): string {
+  if (!value || value === "Invalid Date" || value === "NaN" || value === "null" || value === "undefined") {
+    return "Unavailable";
+  }
+  return value;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function buildWhyThisMatters(report: ReportKind, row: ReportRow): string {
@@ -892,6 +1028,15 @@ function actionToRow(
           ? "Overstock"
           : "Slow mover"
         : "Reorder";
+  const rawReason = action.explanation ?? action.recommended_action;
+  const reason = buildPlainReportReason({
+    rawReason,
+    currentStock: action.current_on_hand,
+    daysLeft,
+    leadTime: action.lead_time_days_used,
+    status,
+    cashImpact: getActionImpactValue(action),
+  });
 
   return {
     id: action.sku_id,
@@ -907,8 +1052,10 @@ function actionToRow(
     leadTime: action.lead_time_days_used,
     recommendedQty,
     cashImpact: getActionImpactValue(action),
-    reason: action.explanation ?? action.recommended_action,
+    reason,
     recommendedAction: action.recommended_action,
+    rawReason,
+    calculationDetails: containsTechnicalFormula(rawReason) ? rawReason : null,
     riskLevel,
     salesLast30: dailyVelocity === null ? null : Math.round(dailyVelocity * 30),
     dailyVelocity,
@@ -942,6 +1089,14 @@ function forecastToRow(
         ? currentStock / dailyVelocity
         : null;
   const riskLevel = calculateRiskLevel(daysLeft, leadTime);
+  const reason = buildPlainReportReason({
+    rawReason: forecast.explain,
+    currentStock,
+    daysLeft,
+    leadTime,
+    status: riskLevel === "Low" ? "Review" : "Reorder",
+    cashImpact: action ? getActionImpactValue(action) : null,
+  });
 
   return {
     id: forecast.sku_id,
@@ -960,8 +1115,10 @@ function forecastToRow(
         ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
         : null,
     cashImpact: action ? getActionImpactValue(action) : null,
-    reason: forecast.explain,
+    reason,
     recommendedAction: action?.recommended_action ?? buildStockoutRecommendation(riskLevel),
+    rawReason: forecast.explain,
+    calculationDetails: containsTechnicalFormula(forecast.explain) ? forecast.explain : null,
     riskLevel,
     salesLast30: forecast.projected_30_day_demand,
     dailyVelocity,
@@ -986,6 +1143,14 @@ function reorderToRow(
     score?.avg_daily_units ?? (forecast ? forecast.projected_30_day_demand / 30 : null);
   const daysLeft = dailyVelocity ? suggestion.current_on_hand / dailyVelocity : null;
   const riskLevel = calculateRiskLevel(daysLeft, suggestion.lead_time_days);
+  const reason = buildPlainReportReason({
+    rawReason: suggestion.rationale,
+    currentStock: suggestion.current_on_hand,
+    daysLeft,
+    leadTime: suggestion.lead_time_days,
+    status: "Reorder",
+    cashImpact: suggestion.landed_extended_cost || suggestion.extended_cost,
+  });
 
   return {
     id: suggestion.sku_id,
@@ -1001,8 +1166,10 @@ function reorderToRow(
     leadTime: suggestion.lead_time_days,
     recommendedQty: suggestion.recommended_order_qty,
     cashImpact: suggestion.landed_extended_cost || suggestion.extended_cost,
-    reason: suggestion.rationale,
+    reason,
     recommendedAction: suggestion.rationale,
+    rawReason: suggestion.rationale,
+    calculationDetails: containsTechnicalFormula(suggestion.rationale) ? suggestion.rationale : null,
     riskLevel,
     salesLast30: dailyVelocity === null ? null : Math.round(dailyVelocity * 30),
     dailyVelocity,
@@ -1029,7 +1196,7 @@ function buildColumns(report: ReportKind): ReportColumn<ReportRow>[] {
       badgeColumn("actionType", "Action", (row) => row.actionType),
       ...baseProduct,
       numberColumn("currentStock", "Current stock", (row) => row.currentStock),
-      numberColumn("daysLeft", "Days left / DOI", (row) => row.daysLeft),
+      numberColumn("daysLeft", "Days left", (row) => row.daysLeft),
       numberColumn("leadTime", "Lead time", (row) => row.leadTime),
       numberColumn("recommendedQty", "Recommended qty", (row) => row.recommendedQty),
       currencyColumn("cashImpact", "Cash impact", (row) => row.cashImpact),
@@ -1058,7 +1225,7 @@ function buildColumns(report: ReportKind): ReportColumn<ReportRow>[] {
       currencyColumn("inventoryValue", "Inventory value", (row) => row.inventoryValue),
       numberColumn("daysSinceLastSale", "Days since sale", (row) => row.daysSinceLastSale),
       numberColumn("salesLast30", "Sales last 30", (row) => row.salesLast30),
-      numberColumn("daysInventory", "Days inventory", (row) => row.daysInventory),
+      numberColumn("daysInventory", "Days of cover", (row) => row.daysInventory),
       currencyColumn("cashImpact", "Cash tied up", (row) => row.cashImpact),
       textColumn("recommendedAction", "Recommended action", (row) => row.recommendedAction),
     ];
@@ -1628,7 +1795,7 @@ function buildXlsxColumns(report: ReportKind): XlsxColumn<ReportRow>[] {
       sku,
       vendor,
       numCol("currentStock", "Current stock", 13, (r) => r.currentStock, "#,##0"),
-      numCol("daysLeft", "Days left / DOI", 14, (r) => r.daysLeft, "#,##0"),
+      numCol("daysLeft", "Days left", 14, (r) => r.daysLeft, "#,##0"),
       numCol("leadTime", "Lead time", 11, (r) => r.leadTime, "#,##0"),
       numCol("recommendedQty", "Rec. qty", 11, (r) => r.recommendedQty, "#,##0"),
       moneyCol("cashImpact", "Cash impact", 14, (r) => r.cashImpact, (r) =>
@@ -1682,7 +1849,7 @@ function buildXlsxColumns(report: ReportKind): XlsxColumn<ReportRow>[] {
       moneyCol("inventoryValue", "Inventory value", 15, (r) => r.inventoryValue, null),
       numCol("daysSinceLastSale", "Days since sale", 14, (r) => r.daysSinceLastSale, "#,##0"),
       numCol("salesLast30", "Sales last 30", 13, (r) => r.salesLast30, "#,##0"),
-      numCol("daysInventory", "Days inventory", 14, (r) => r.daysInventory, "0.0"),
+      numCol("daysInventory", "Days of cover", 14, (r) => r.daysInventory, "0.0"),
       moneyCol("cashImpact", "Cash tied up", 14, (r) => r.cashImpact, () => "danger"),
       { key: "recommendedAction", label: "Recommended action", width: 50, format: (r) => r.recommendedAction },
     ];

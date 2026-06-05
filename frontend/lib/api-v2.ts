@@ -301,6 +301,7 @@ export type PurchaseOrderDraft = {
   vendor: string;
   created_at: string;
   status: "draft" | "ready" | "approved" | "sent" | "partially_received" | "received" | "cancelled";
+  source?: "recommended" | "saved";
   lines: PurchaseOrderLine[];
   subtotal_cost: number;
   shipping_cost: number;

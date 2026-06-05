@@ -1577,6 +1577,13 @@ code {
   line-height: 1.55;
 }
 
+.report-detail-meta {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
 .report-detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1623,6 +1630,22 @@ code {
   display: block;
   margin-top: 10px;
   color: var(--ink);
+}
+
+.report-advanced-details {
+  border-top: 1px dashed rgba(15, 23, 42, 0.12);
+  padding-top: 12px;
+}
+
+.report-advanced-details summary {
+  color: var(--accent-blue);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.report-advanced-details[open] summary {
+  margin-bottom: 12px;
 }
 
 .report-sort {
@@ -4154,6 +4177,89 @@ code {
   color: #991b1b;
 }
 
+.po-source {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.po-source-saved {
+  background: var(--accent-blue-soft);
+  color: var(--accent-blue);
+}
+
+.po-source-recommended {
+  background: var(--neutral-soft);
+  color: var(--muted-strong);
+}
+
+.po-saved-ledger {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.po-ledger-table-wrap {
+  overflow-x: auto;
+}
+
+.po-ledger-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.po-ledger-table th,
+.po-ledger-table td {
+  padding: 11px 12px;
+  text-align: left;
+  border-top: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.po-ledger-table thead th {
+  border-top: 0;
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.po-ledger-table td {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.po-ledger-table td span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.po-ledger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.empty-state-compact {
+  padding: 16px;
+}
+
 .po-card-body {
   padding: 18px 22px 22px;
   border-top: 1px solid var(--line);
@@ -4446,6 +4552,14 @@ code {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 650;
+}
+
+.stock-health-context-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .stock-health-badge {
