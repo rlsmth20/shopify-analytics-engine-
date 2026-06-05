@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { SectionCard } from "@/components/section-card";
+import { authenticatedFetch, getEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -38,7 +39,7 @@ export default function StoreSyncPage() {
 
   async function loadConnection() {
     try {
-      const res = await fetch(`${API_BASE}/integrations/shopify/connection`, {
+      const res = await authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, {
         credentials: "include",
       });
       if (!res.ok) return;
@@ -61,10 +62,12 @@ export default function StoreSyncPage() {
     }
     setInstallLoading(true);
     try {
-      const res = await fetch(
-        `${API_BASE}/integrations/shopify/install?shop=${encodeURIComponent(shopInput.trim())}`,
-        { credentials: "include" }
-      );
+      const embedded = getEmbeddedShopifyContext();
+      const params = new URLSearchParams({ shop: shopInput.trim() });
+      if (embedded?.host) params.set("host", embedded.host);
+      const res = await authenticatedFetch(`${API_BASE}/integrations/shopify/install?${params}`, {
+        credentials: "include",
+      });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
         setInstallError(body?.detail || `Install failed (${res.status}).`);
@@ -83,7 +86,7 @@ export default function StoreSyncPage() {
     setSyncResult(null);
     setSyncing(true);
     try {
-      const res = await fetch(`${API_BASE}/integrations/shopify/sync`, {
+      const res = await authenticatedFetch(`${API_BASE}/integrations/shopify/sync`, {
         method: "POST",
         credentials: "include",
       });
@@ -143,8 +146,11 @@ export default function StoreSyncPage() {
                 onClick={async () => {
                   const domain = connection?.shopify_domain || "";
                   if (!domain) return;
-                  const res = await fetch(
-                    `${API_BASE}/integrations/shopify/install?shop=${encodeURIComponent(domain)}`,
+                  const embedded = getEmbeddedShopifyContext();
+                  const params = new URLSearchParams({ shop: domain });
+                  if (embedded?.host) params.set("host", embedded.host);
+                  const res = await authenticatedFetch(
+                    `${API_BASE}/integrations/shopify/install?${params}`,
                     { credentials: "include" }
                   );
                   const body = await res.json().catch(() => null);

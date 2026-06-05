@@ -23,6 +23,7 @@ import {
   type NotificationChannelConfig,
 } from "@/lib/api-v2";
 import { planToTier, tierAllows, type PlanTierKey } from "@/lib/plans";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -77,7 +78,7 @@ export default function AlertsPage() {
   useEffect(() => {
     if (user.id === 0) return;
 
-    void fetch(`${API_BASE}/billing/me`, { credentials: "include" })
+    void authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { plan?: string } | null) => setPlan(data?.plan ?? null))
       .catch(() => setPlan(null));

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -32,7 +33,7 @@ export default function FeedbackPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/contact/submit`, {
+      const res = await authenticatedFetch(`${API_BASE}/contact/submit`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

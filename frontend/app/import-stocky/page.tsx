@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { authenticatedFetch } from "@/lib/shopify-embedded";
+
 type ImportResult = {
   shop_id: number;
   shopify_domain: string;
@@ -33,7 +35,7 @@ export default function ImportStockyPage() {
     try {
       const fd = new FormData();
       fd.append("csv_file", file);
-      const res = await fetch(`${API_BASE}/integrations/stocky/import`, {
+      const res = await authenticatedFetch(`${API_BASE}/integrations/stocky/import`, {
         method: "POST",
         body: fd,
         credentials: "include",

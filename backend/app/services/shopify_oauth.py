@@ -15,6 +15,7 @@ import hmac as hmac_module
 import logging
 import os
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlencode
@@ -34,6 +35,13 @@ SCOPES = "read_products,read_inventory,read_orders,read_locations"
 
 FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 BACKEND_URL = os.getenv("BACKEND_PUBLIC_URL", "").rstrip("/")
+
+
+@dataclass(frozen=True)
+class OAuthStateResolution:
+    user_id: int | None
+    shop_domain: str
+    host: str | None = None
 
 
 def is_configured() -> bool:
@@ -75,7 +83,13 @@ def build_install_url(*, shop_domain: str, state: str) -> str:
     return f"https://{shop_domain}/admin/oauth/authorize?{urlencode(params)}"
 
 
-def issue_oauth_state(db: DbSession, *, user: User, shop_domain: str) -> str:
+def issue_oauth_state(
+    db: DbSession,
+    *,
+    user: User | None,
+    shop_domain: str,
+    host: str | None = None,
+) -> str:
     """Mint a one-time state token, stash it in the user's session pretext.
 
     Implementation note: we reuse the MagicLinkToken table for short-lived
@@ -86,8 +100,12 @@ def issue_oauth_state(db: DbSession, *, user: User, shop_domain: str) -> str:
     from app.services.auth import _sha256
 
     raw = secrets.token_urlsafe(24)
+    user_part = str(user.id) if user is not None else "embedded"
+    state_parts = ["shopify_oauth", user_part, shop_domain]
+    if host:
+        state_parts.append(host)
     record = MagicLinkToken(
-        email=f"shopify_oauth:{user.id}:{shop_domain}",
+        email=":".join(state_parts),
         token_hash=_sha256(raw),
         expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10),
         used=False,
@@ -97,8 +115,8 @@ def issue_oauth_state(db: DbSession, *, user: User, shop_domain: str) -> str:
     return raw
 
 
-def consume_oauth_state(db: DbSession, *, raw_state: str) -> Optional[tuple[int, str]]:
-    """Returns (user_id, shop_domain) if the state is valid, else None."""
+def consume_oauth_state(db: DbSession, *, raw_state: str) -> Optional[OAuthStateResolution]:
+    """Returns OAuth state details if the state is valid, else None."""
     from app.db.models import MagicLinkToken
     from app.services.auth import _sha256, _as_naive_utc, _now
 
@@ -112,17 +130,21 @@ def consume_oauth_state(db: DbSession, *, raw_state: str) -> Optional[tuple[int,
         return None
     if not record.email.startswith("shopify_oauth:"):
         return None
-    parts = record.email.split(":", 2)
-    if len(parts) != 3:
+    parts = record.email.split(":")
+    if len(parts) < 3:
         return None
-    try:
-        user_id = int(parts[1])
-    except ValueError:
-        return None
+    if parts[1] == "embedded":
+        user_id = None
+    else:
+        try:
+            user_id = int(parts[1])
+        except ValueError:
+            return None
     shop_domain = parts[2]
+    host = parts[3] if len(parts) > 3 and parts[3] else None
     record.used = True
     db.commit()
-    return user_id, shop_domain
+    return OAuthStateResolution(user_id=user_id, shop_domain=shop_domain, host=host)
 
 
 def verify_callback_hmac(query_params: dict[str, str]) -> bool:
@@ -209,3 +231,46 @@ def persist_connection(
     db.commit()
     db.refresh(existing)
     return existing
+
+
+def get_or_create_embedded_user_for_shop(db: DbSession, *, shop_domain: str) -> User:
+    """Provision a Skubase user/workspace for Shopify-originated installs."""
+    from app.services.auth import TRIAL_TTL, _now
+
+    shop = db.scalar(select(Shop).where(Shop.shopify_domain == shop_domain))
+    if shop is None:
+        shop = Shop(shopify_domain=shop_domain)
+        db.add(shop)
+        db.flush()
+
+    email = f"shopify-owner@{shop_domain}"
+    user = db.scalar(select(User).where(User.email == email))
+    if user is None:
+        user = User(
+            email=email,
+            shop_id=shop.id,
+            is_admin=False,
+            trial_ends_at=_now() + TRIAL_TTL,
+            last_login_at=_now(),
+        )
+        db.add(user)
+    else:
+        user.last_login_at = _now()
+        if user.trial_ends_at is None:
+            user.trial_ends_at = _now() + TRIAL_TTL
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def embedded_admin_redirect_url(*, shop_domain: str, host: str | None = None) -> str:
+    """Return a post-OAuth URL that keeps Shopify-originated installs embedded."""
+    app_handle = os.getenv("SHOPIFY_APP_HANDLE", "").strip()
+    if app_handle:
+        store_handle = shop_domain.removesuffix(".myshopify.com")
+        return f"https://admin.shopify.com/store/{store_handle}/apps/{app_handle}"
+
+    params = {"shop": shop_domain, "embedded": "1", "connected": "1"}
+    if host:
+        params["host"] = host
+    return f"{FRONTEND_URL}/dashboard?{urlencode(params)}"

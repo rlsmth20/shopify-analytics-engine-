@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { PLAN_LABELS, PRICING_TIERS } from "@/lib/plans";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -47,7 +48,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API_BASE}/billing/me`, { credentials: "include" })
+    authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => setSub(data as Subscription))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -57,7 +58,7 @@ export default function BillingPage() {
   async function openPortal() {
     setPortalLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/billing/portal`, {
+      const res = await authenticatedFetch(`${API_BASE}/billing/portal`, {
         method: "POST",
         credentials: "include",
       });

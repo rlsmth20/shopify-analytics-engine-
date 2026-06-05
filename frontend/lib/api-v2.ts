@@ -16,6 +16,7 @@ import {
   DEMO_SUPPLIERS,
   DEMO_TRANSFERS,
 } from "@/lib/demo-data";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -470,7 +471,7 @@ async function fetchWithNetworkContext(
   path: string
 ): Promise<Response> {
   try {
-    return await fetch(url, init);
+    return await authenticatedFetch(url, init);
   } catch (error) {
     if (
       error instanceof DOMException && error.name === "AbortError" ||
@@ -650,7 +651,7 @@ export const deleteAlertRule = async (
   ruleId: string,
   signal?: AbortSignal
 ): Promise<boolean> => {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/alerts/rules/${encodeURIComponent(ruleId)}`,
     { method: "DELETE", cache: "no-store", credentials: "include", signal }
   );
@@ -662,7 +663,7 @@ export const toggleAlertRule = async (
   enabled: boolean,
   signal?: AbortSignal
 ): Promise<AlertRule> => {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/alerts/rules/${encodeURIComponent(
       ruleId
     )}/toggle?enabled=${enabled ? "true" : "false"}`,

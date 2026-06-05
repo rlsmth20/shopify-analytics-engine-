@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { authenticatedFetch } from "@/lib/shopify-embedded";
+
 type Velocity = {
   sku: string;
   units_30d: number;
@@ -43,7 +45,7 @@ export default function ImportShipStationPage() {
     try {
       const fd = new FormData();
       fd.append("csv_file", file);
-      const res = await fetch(`${API_BASE}/integrations/shipstation/import`, {
+      const res = await authenticatedFetch(`${API_BASE}/integrations/shipstation/import`, {
         method: "POST",
         body: fd,
         credentials: "include",

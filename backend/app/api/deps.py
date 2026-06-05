@@ -12,6 +12,10 @@ from app.db.models import Subscription, User
 from app.db.session import get_db_session
 from app.services.auth import SESSION_COOKIE_NAME, resolve_session
 from app.services.plan_entitlements import FeatureKey, plan_allows_feature
+from app.services.shopify_session_tokens import (
+    ShopifySessionTokenError,
+    resolve_user_from_shopify_session_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +31,31 @@ def get_current_user(
         @router.get("/some-private")
         def handler(user: User = Depends(get_current_user)): ...
     """
+    bearer = _bearer_token(request)
+    if bearer:
+        try:
+            user = resolve_user_from_shopify_session_token(db, bearer)
+        except ShopifySessionTokenError as exc:
+            logger.info(
+                "auth_me_failed reason=invalid_shopify_session_token origin=%s error=%s",
+                request.headers.get("origin"),
+                exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Shopify session token.",
+            ) from exc
+        if user is not None:
+            return user
+        logger.info(
+            "auth_me_failed reason=shopify_session_not_installed origin=%s",
+            request.headers.get("origin"),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Shopify app is not installed for this shop.",
+        )
+
     if not session_token:
         logger.info(
             "auth_me_failed reason=missing_cookie origin=%s",
@@ -50,13 +79,28 @@ def get_current_user(
 
 
 def get_optional_user(
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
     session_token: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> Optional[User]:
     """Same as get_current_user but returns None instead of 401."""
+    bearer = _bearer_token(request)
+    if bearer:
+        try:
+            return resolve_user_from_shopify_session_token(db, bearer)
+        except ShopifySessionTokenError:
+            return None
     if not session_token:
         return None
     return resolve_session(db, raw_token=session_token)
+
+
+def _bearer_token(request: Request) -> str | None:
+    authorization = request.headers.get("authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return token.strip()
 
 
 def require_admin(

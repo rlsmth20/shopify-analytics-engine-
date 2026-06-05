@@ -8,6 +8,7 @@ import { AskSkubaseChat } from "@/components/ask-skubase-chat";
 import { useAuth } from "@/components/auth-guard";
 import { SHOPIFY_DOMAIN_STORAGE_KEY } from "@/lib/app-helpers";
 import { planToTier, tierAllows, type PlanTierKey } from "@/lib/plans";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 type NavItem = {
   href: string;
@@ -204,7 +205,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    void fetch(`${API_BASE}/billing/me`, { credentials: "include" })
+    void authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: Subscription | null) => {
         if (!cancelled) setSubscription(data);
@@ -220,7 +221,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    void fetch(`${API_BASE}/skus/summary`, { credentials: "include" })
+    void authenticatedFetch(`${API_BASE}/skus/summary`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { product_count: 0 }))
       .then((summary: unknown) => {
         if (cancelled) return;

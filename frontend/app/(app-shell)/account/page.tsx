@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { PLAN_LABELS } from "@/lib/plans";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -30,11 +31,11 @@ export default function AccountPage() {
   const [conn, setConn] = useState<Connection | null>(null);
 
   useEffect(() => {
-    void fetch(`${API_BASE}/billing/me`, { credentials: "include" })
+    void authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => setSub(d as Subscription))
       .catch(() => setSub(null));
-    void fetch(`${API_BASE}/integrations/shopify/connection`, { credentials: "include" })
+    void authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => setConn(d as Connection))
       .catch(() => setConn(null));

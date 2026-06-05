@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { PlanKey } from "@/lib/plans";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -21,7 +22,7 @@ export function PricingButton({
     setLoading(true);
     try {
       // Check if user is already authenticated.
-      const meRes = await fetch(`${API_BASE}/auth/me`, { credentials: "include" }).catch(() => null);
+      const meRes = await authenticatedFetch(`${API_BASE}/auth/me`, { credentials: "include" }).catch(() => null);
       if (!meRes || !meRes.ok) {
         // Not signed in — send to login. After magic-link sign-in the user
         // lands on /dashboard; they can return to /pricing and subscribe.
@@ -30,7 +31,7 @@ export function PricingButton({
       }
 
       // Authenticated — start a Checkout session and redirect.
-      const res = await fetch(`${API_BASE}/billing/checkout`, {
+      const res = await authenticatedFetch(`${API_BASE}/billing/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

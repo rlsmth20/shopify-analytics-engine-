@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -86,7 +87,7 @@ export function AskSkubaseChat() {
 
     setIsSending(true);
     try {
-      const response = await fetch(`${API_BASE}/ai/chat`, {
+      const response = await authenticatedFetch(`${API_BASE}/ai/chat`, {
         method: "POST",
         headers: {
           Accept: "application/json",

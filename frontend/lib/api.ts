@@ -1,3 +1,5 @@
+import { authenticatedFetch } from "@/lib/shopify-embedded";
+
 export type ActionableStatus = "urgent" | "optimize" | "dead";
 export type UrgencyLevel = "critical" | "high" | "medium";
 export type ActionDataSource = "db" | "mock";
@@ -194,7 +196,7 @@ export async function fetchInventoryActions(
 }
 
 function fetchActionFeed(path: string, signal?: AbortSignal): Promise<Response> {
-  return fetch(`${API_BASE_URL}${path}`, {
+  return authenticatedFetch(`${API_BASE_URL}${path}`, {
     method: "GET",
     headers: {
       Accept: "application/json"
@@ -209,7 +211,7 @@ export async function triggerShopifyIngestion(
   payload: ShopifyIngestionRequest,
   signal?: AbortSignal
 ): Promise<ShopifyIngestionResponse> {
-  const response = await fetch(`${API_BASE_URL}/integrations/shopify/ingest`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/integrations/shopify/ingest`, {
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -217,6 +219,7 @@ export async function triggerShopifyIngestion(
     },
     body: JSON.stringify(payload),
     cache: "no-store",
+    credentials: "include",
     signal
   });
 
@@ -238,7 +241,7 @@ export async function fetchShopSettings(
   // Backend now derives the shop from the authenticated user's session.
   // The shopifyDomain argument is kept for backwards compatibility with
   // existing callers but is ignored.
-  const response = await fetch(`${API_BASE_URL}/shop-settings`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/shop-settings`, {
     method: "GET",
     headers: {
       Accept: "application/json"
@@ -264,7 +267,7 @@ export async function fetchLatestShopifySyncStatus(
   signal?: AbortSignal
 ): Promise<LatestShopifySyncStatusResponse> {
   const query = new URLSearchParams({ shopify_domain: shopifyDomain }).toString();
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/integrations/shopify/sync-status?${query}`,
     {
       method: "GET",
@@ -272,6 +275,7 @@ export async function fetchLatestShopifySyncStatus(
         Accept: "application/json"
       },
       cache: "no-store",
+      credentials: "include",
       signal
     }
   );
@@ -291,7 +295,7 @@ export async function saveShopSettings(
   payload: UpdateShopSettingsRequest,
   signal?: AbortSignal
 ): Promise<ShopSettingsResponse> {
-  const response = await fetch(`${API_BASE_URL}/shop-settings`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/shop-settings`, {
     method: "PUT",
     headers: {
       Accept: "application/json",
@@ -318,7 +322,7 @@ export async function fetchVendorLeadTimes(
   _shopifyDomain: string,
   signal?: AbortSignal
 ): Promise<VendorLeadTimeSettingsResponse> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/shop-settings/vendor-lead-times`,
     {
       method: "GET",
@@ -346,7 +350,7 @@ export async function saveVendorLeadTimes(
   payload: UpdateVendorLeadTimesRequest,
   signal?: AbortSignal
 ): Promise<VendorLeadTimeSettingsResponse> {
-  const response = await fetch(`${API_BASE_URL}/shop-settings/vendor-lead-times`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/shop-settings/vendor-lead-times`, {
     method: "PUT",
     headers: {
       Accept: "application/json",
@@ -373,7 +377,7 @@ export async function fetchCategoryLeadTimes(
   _shopifyDomain: string,
   signal?: AbortSignal
 ): Promise<CategoryLeadTimeSettingsResponse> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/shop-settings/category-lead-times`,
     {
       method: "GET",
@@ -401,7 +405,7 @@ export async function saveCategoryLeadTimes(
   payload: UpdateCategoryLeadTimesRequest,
   signal?: AbortSignal
 ): Promise<CategoryLeadTimeSettingsResponse> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${API_BASE_URL}/shop-settings/category-lead-times`,
     {
       method: "PUT",

@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
+import {
+  authenticatedFetch,
+  getEmbeddedShopifyContext,
+  redirectToShopifyInstall,
+} from "@/lib/shopify-embedded";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export type AuthUser = {
@@ -14,7 +20,6 @@ export type AuthUser = {
   in_trial: boolean;
 };
 
-/** Synthetic read-only user injected when ?demo=1 is in the URL. */
 const DEMO_USER: AuthUser = {
   id: 0,
   email: "demo@skubase.io",
@@ -24,24 +29,25 @@ const DEMO_USER: AuthUser = {
   in_trial: true,
 };
 
-/**
- * Returns true if the current browser session is in demo mode.
- * Entering via ?demo=1 sets a sessionStorage flag so subsequent in-app
- * navigation (which drops query params) stays in demo mode.
- */
 function detectDemo(): boolean {
   if (typeof window === "undefined") return false;
   const param = new URLSearchParams(window.location.search).get("demo") === "1";
   if (param) {
-    try { sessionStorage.setItem("skubase_demo", "1"); } catch { /* ignore */ }
+    try {
+      sessionStorage.setItem("skubase_demo", "1");
+    } catch {
+      // ignore
+    }
     return true;
   }
-  try { return sessionStorage.getItem("skubase_demo") === "1"; } catch { return false; }
+  try {
+    return sessionStorage.getItem("skubase_demo") === "1";
+  } catch {
+    return false;
+  }
 }
 
 type AuthContextValue = {
-  // Non-null inside the provider — AuthGuard only renders children when the
-  // user is loaded. Consumers can safely access user.email without a guard.
   user: AuthUser;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -63,10 +69,11 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
+  const [isEmbedded, setIsEmbedded] = useState(false);
 
   async function refresh() {
     try {
-      const res = await fetch(`${API_BASE}/auth/me`, {
+      const res = await authenticatedFetch(`${API_BASE}/auth/me`, {
         credentials: "include",
       });
       if (!res.ok) {
@@ -84,15 +91,18 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   async function logout() {
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
+      await authenticatedFetch(`${API_BASE}/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
     } catch {
       // best-effort; clear locally regardless
     }
-    // Clear demo session too.
-    try { sessionStorage.removeItem("skubase_demo"); } catch { /* ignore */ }
+    try {
+      sessionStorage.removeItem("skubase_demo");
+    } catch {
+      // ignore
+    }
     setUser(null);
     setIsDemo(false);
     router.replace("/");
@@ -100,16 +110,18 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const demo = detectDemo();
+    const embedded = getEmbeddedShopifyContext() !== null;
+    setIsEmbedded(embedded);
 
-    // Always verify the session first. If the user is authenticated, their real
-    // account takes precedence over demo mode — a logged-in merchant who clicks
-    // a demo link should see their own data, not the synthetic user.
-    fetch(`${API_BASE}/auth/me`, { credentials: "include" })
+    authenticatedFetch(`${API_BASE}/auth/me`, { credentials: "include" })
       .then(async (res) => {
         if (res.ok) {
           const data = (await res.json()) as AuthUser;
           setUser(data);
           setIsDemo(false);
+        } else if (embedded) {
+          setUser(null);
+          redirectToShopifyInstall();
         } else if (demo) {
           setUser(DEMO_USER);
           setIsDemo(true);
@@ -118,7 +130,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => {
-        if (demo) {
+        if (embedded) {
+          setUser(null);
+          redirectToShopifyInstall();
+        } else if (demo) {
           setUser(DEMO_USER);
           setIsDemo(true);
         } else {
@@ -130,22 +145,23 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!loading && user === null && !isDemo) {
+    if (!loading && user === null && !isDemo && !isEmbedded) {
       router.replace("/login");
     }
-  }, [loading, user, router, isDemo]);
+  }, [loading, user, router, isDemo, isEmbedded]);
 
   if (loading) {
     return (
       <div className="auth-loading">
         <div className="auth-loading-spinner" aria-hidden />
-        <p className="auth-loading-text">Loading skubase…</p>
+        <p className="auth-loading-text">
+          {isEmbedded ? "Opening skubase inside Shopify..." : "Loading skubase..."}
+        </p>
       </div>
     );
   }
 
   if (user === null) {
-    // Redirect is in flight via useEffect above; render nothing.
     return null;
   }
 
