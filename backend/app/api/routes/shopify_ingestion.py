@@ -25,7 +25,7 @@ from app.services.shopify_oauth import (
 router = APIRouter(prefix="/integrations/shopify", tags=["shopify"])
 
 
-@router.get("/install")
+@router.get("/install", response_model=None)
 def install(
     db: Annotated[DbSession, Depends(get_db_session)],
     user: Annotated[Optional[User], Depends(get_optional_user)],
