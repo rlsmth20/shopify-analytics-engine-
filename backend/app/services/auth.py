@@ -16,7 +16,7 @@ import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
@@ -32,6 +32,7 @@ SESSION_TTL = timedelta(days=30)
 TRIAL_TTL = timedelta(days=14)
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "production").lower() != "development"
+COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN") or os.getenv("COOKIE_DOMAIN") or None
 
 
 def _sha256(value: str) -> str:
@@ -61,6 +62,9 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
+MagicLinkStatus = Literal["valid", "invalid_token", "used_token", "expired_token"]
+
+
 # ---------- Magic-link tokens ----------
 
 def issue_magic_link_token(db: DbSession, *, email: str) -> str:
@@ -81,20 +85,31 @@ def issue_magic_link_token(db: DbSession, *, email: str) -> str:
     return raw_token
 
 
-def consume_magic_link_token(db: DbSession, *, raw_token: str) -> Optional[str]:
-    """Validate a magic-link token. Returns the email if valid, None otherwise.
-
-    Marks the token as used; subsequent calls with the same token return None.
-    """
+def get_magic_link_token_status(
+    db: DbSession, *, raw_token: str
+) -> tuple[MagicLinkStatus, Optional[MagicLinkToken]]:
     token_hash = _sha256(raw_token)
     record = db.scalar(
         select(MagicLinkToken).where(MagicLinkToken.token_hash == token_hash)
     )
     if record is None:
-        return None
+        return "invalid_token", None
     if record.used:
-        return None
+        return "used_token", record
     if _as_naive_utc(record.expires_at) < _now():
+        return "expired_token", record
+    return "valid", record
+
+
+def mark_magic_link_token_used(db: DbSession, record: MagicLinkToken) -> None:
+    record.used = True
+    db.commit()
+
+
+def consume_magic_link_token(db: DbSession, *, raw_token: str) -> Optional[str]:
+    """Validate and consume a magic-link token. Returns the email if valid."""
+    status, record = get_magic_link_token_status(db, raw_token=raw_token)
+    if status != "valid" or record is None:
         return None
     record.used = True
     db.commit()
@@ -198,11 +213,25 @@ def get_or_create_user_for_email(
 
 def cookie_kwargs(*, max_age_seconds: int) -> dict:
     """FastAPI/Starlette set_cookie kwargs that work cross-origin in prod."""
-    return {
+    kwargs = {
         "key": SESSION_COOKIE_NAME,
         "max_age": max_age_seconds,
         "httponly": True,
         "secure": IS_PRODUCTION,
         "samesite": "none" if IS_PRODUCTION else "lax",
         "path": "/",
+    }
+    if COOKIE_DOMAIN:
+        kwargs["domain"] = COOKIE_DOMAIN
+    return kwargs
+
+
+def cookie_settings_summary() -> dict[str, object]:
+    kwargs = cookie_kwargs(max_age_seconds=int(SESSION_TTL.total_seconds()))
+    return {
+        "secure": kwargs.get("secure"),
+        "samesite": kwargs.get("samesite"),
+        "domain": kwargs.get("domain") or "host-only",
+        "path": kwargs.get("path"),
+        "max_age": kwargs.get("max_age"),
     }

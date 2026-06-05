@@ -2,7 +2,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.init_db import init_db
@@ -77,6 +77,19 @@ def create_app() -> FastAPI:
     for origin in default_origins:
         if origin not in allowed_origins:
             allowed_origins.append(origin)
+
+    @app.middleware("http")
+    async def log_auth_cors_context(request: Request, call_next):
+        if request.url.path.startswith("/auth"):
+            origin = request.headers.get("origin")
+            logger.info(
+                "auth_request path=%s method=%s origin=%s cors_allowed=%s",
+                request.url.path,
+                request.method,
+                origin,
+                origin in allowed_origins if origin else None,
+            )
+        return await call_next(request)
 
     app.add_middleware(
         CORSMiddleware,

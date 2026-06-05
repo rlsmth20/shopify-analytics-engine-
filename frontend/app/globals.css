@@ -6741,6 +6741,11 @@ code {
   cursor: pointer;
 }
 
+.auth-action-stack {
+  display: grid;
+  gap: 10px;
+}
+
 .auth-success {
   text-align: left;
 }

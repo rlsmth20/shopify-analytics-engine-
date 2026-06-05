@@ -1,9 +1,10 @@
 """Reusable FastAPI dependencies for authentication and DB session."""
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Callable, Optional
 
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
@@ -12,8 +13,11 @@ from app.db.session import get_db_session
 from app.services.auth import SESSION_COOKIE_NAME, resolve_session
 from app.services.plan_entitlements import FeatureKey, plan_allows_feature
 
+logger = logging.getLogger(__name__)
+
 
 def get_current_user(
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
     session_token: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> User:
@@ -24,12 +28,20 @@ def get_current_user(
         def handler(user: User = Depends(get_current_user)): ...
     """
     if not session_token:
+        logger.info(
+            "auth_me_failed reason=missing_cookie origin=%s",
+            request.headers.get("origin"),
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated.",
         )
     user = resolve_session(db, raw_token=session_token)
     if user is None:
+        logger.info(
+            "auth_me_failed reason=invalid_session origin=%s",
+            request.headers.get("origin"),
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session expired or invalid.",

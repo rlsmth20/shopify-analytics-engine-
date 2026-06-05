@@ -16,7 +16,16 @@ logger = logging.getLogger(__name__)
 # Defaults are safe to ship. Override via env vars on Railway.
 DEFAULT_FROM = os.getenv("WAITLIST_FROM_EMAIL", "skubase <hello@skubase.io>")
 DEFAULT_REPLY_TO = os.getenv("WAITLIST_REPLY_TO", "hello@skubase.io")
+MAGIC_LINK_FROM = os.getenv("MAGIC_LINK_FROM_EMAIL", DEFAULT_FROM)
+MAGIC_LINK_REPLY_TO = os.getenv("MAGIC_LINK_REPLY_TO", DEFAULT_REPLY_TO)
 DEFAULT_PRODUCT_URL = os.getenv("PRODUCT_URL", "https://skubase.io")
+
+
+def _mask_email(email: str) -> str:
+    local, _, domain = email.partition("@")
+    if not domain:
+        return "***"
+    return f"{local[:2]}***@{domain}"
 
 
 def _client():
@@ -144,12 +153,12 @@ def _magic_link_html(email: str, link: str) -> str:
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
         <tr><td>
           <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase</p>
-          <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0f172a;">Sign in to skubase</h1>
+          <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0f172a;">Your Skubase sign-in link</h1>
           <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">
-            Click the button below to sign in. The link is valid for 15 minutes and can only be used once.
+            Use the secure link below to sign in to Skubase. This link expires soon and can only be used once.
           </p>
           <p style="margin:0 0 24px;">
-            <a href="{link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;">Sign in to skubase &rarr;</a>
+            <a href="{link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;">Sign in to Skubase</a>
           </p>
           <p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.6;">
             Or paste this URL into your browser:
@@ -158,7 +167,7 @@ def _magic_link_html(email: str, link: str) -> str:
             <a href="{link}" style="color:#334155;">{link}</a>
           </p>
           <p style="margin:24px 0 0;color:#64748b;font-size:13px;line-height:1.6;">
-            If you did not request this email, you can ignore it &mdash; nothing happens until the link is clicked.
+            If you did not request this email, you can ignore it.
           </p>
         </td></tr>
       </table>
@@ -172,11 +181,10 @@ def _magic_link_html(email: str, link: str) -> str:
 
 def _magic_link_text(email: str, link: str) -> str:
     return (
-        "Sign in to skubase\n\n"
-        f"Click this link to sign in: {link}\n\n"
-        "The link is valid for 15 minutes and can only be used once.\n\n"
-        "If you did not request this email, you can ignore it — nothing "
-        "happens until the link is clicked.\n\n"
+        "Your Skubase sign-in link\n\n"
+        "Use the secure link below to sign in to Skubase. This link expires soon and can only be used once.\n\n"
+        f"Sign in to Skubase: {link}\n\n"
+        "If you did not request this email, you can ignore it.\n\n"
         f"Sent to {email}\n"
     )
 
@@ -285,10 +293,10 @@ def send_magic_link_email(email: str, link: str) -> bool:
         return False
     try:
         params = {
-            "from": DEFAULT_FROM,
+            "from": MAGIC_LINK_FROM,
             "to": [email],
-            "reply_to": DEFAULT_REPLY_TO,
-            "subject": "Sign in to skubase",
+            "reply_to": MAGIC_LINK_REPLY_TO,
+            "subject": "Your Skubase sign-in link",
             "html": _magic_link_html(email, link),
             "text": _magic_link_text(email, link),
             "tags": [
@@ -296,8 +304,14 @@ def send_magic_link_email(email: str, link: str) -> bool:
             ],
         }
         result = client.Emails.send(params)
-        logger.info("magic-link email sent: id=%s to=%s", result.get("id"), email)
+        logger.info(
+            "magic-link email sent: id=%s to=%s from=%s reply_to=%s",
+            result.get("id"),
+            _mask_email(email),
+            MAGIC_LINK_FROM,
+            MAGIC_LINK_REPLY_TO,
+        )
         return True
     except Exception as exc:
-        logger.exception("failed to send magic-link to %s: %s", email, exc)
+        logger.exception("failed to send magic-link to %s: %s", _mask_email(email), exc)
         return False

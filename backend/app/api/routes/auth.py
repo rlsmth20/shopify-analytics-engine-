@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from datetime import datetime, timezone
 from typing import Annotated, Optional
 
@@ -15,21 +16,41 @@ from app.db.session import get_db_session
 from app.services.auth import (
     SESSION_COOKIE_NAME,
     SESSION_TTL,
+    cookie_settings_summary,
     cookie_kwargs,
     create_session,
-    consume_magic_link_token,
     get_or_create_user_for_email,
+    get_magic_link_token_status,
     issue_magic_link_token,
+    mark_magic_link_token_used,
     revoke_session,
 )
 from app.services.transactional_email import send_magic_link_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 # Canonical frontend URL used for outbound links (magic-link emails, redirects).
 # FRONTEND_ORIGIN may be comma-separated for CORS — use the first entry as the
 # canonical link target.
-FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
+FRONTEND_URL = (
+    os.getenv("FRONTEND_URL")
+    or os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0]
+).strip().rstrip("/")
+
+
+def _mask_email(email: str) -> str:
+    local, _, domain = email.partition("@")
+    if not domain:
+        return "***"
+    return f"{local[:2]}***@{domain}"
+
+
+def _auth_error(code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={"code": code, "message": message},
+    )
 
 
 class MagicLinkRequest(BaseModel):
@@ -77,6 +98,12 @@ def request_magic_link(
 ) -> MagicLinkResponse:
     raw_token = issue_magic_link_token(db, email=payload.email)
     callback_url = f"{FRONTEND_URL}/auth/callback?token={raw_token}"
+    logger.info(
+        "magic_link_requested email=%s domain=%s frontend_url=%s",
+        _mask_email(str(payload.email).lower().strip()),
+        str(payload.email).split("@")[-1],
+        FRONTEND_URL,
+    )
     background_tasks.add_task(
         send_magic_link_email,
         email=str(payload.email).lower().strip(),
@@ -93,24 +120,41 @@ class VerifyRequest(BaseModel):
 @router.post("/magic-link/verify", response_model=MeResponse)
 def verify_magic_link(
     payload: VerifyRequest,
+    request: Request,
     response: Response,
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> MeResponse:
-    email = consume_magic_link_token(db, raw_token=payload.token)
-    if email is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This sign-in link is invalid or expired. Request a new one.",
+    logger.info("magic_link_verify_started origin=%s", request.headers.get("origin"))
+    token_status, token_record = get_magic_link_token_status(db, raw_token=payload.token)
+    if token_status != "valid" or token_record is None:
+        logger.info("magic_link_verify_rejected status=%s", token_status)
+        messages = {
+            "invalid_token": "This sign-in link is invalid. Please request a fresh sign-in link.",
+            "used_token": "This sign-in link has already been used. Please request a fresh sign-in link.",
+            "expired_token": "This sign-in link is expired. Please request a fresh sign-in link.",
+        }
+        raise _auth_error(
+            token_status,
+            messages.get(token_status, "This sign-in link is invalid or expired. Request a new one."),
         )
+    email = token_record.email
     user = get_or_create_user_for_email(
         db,
         email=email,
         shopify_domain=payload.shopify_domain,
     )
     raw_session = create_session(db, user_id=user.id)
+    cookie_summary = cookie_settings_summary()
     response.set_cookie(
         value=raw_session,
         **cookie_kwargs(max_age_seconds=int(SESSION_TTL.total_seconds())),
+    )
+    mark_magic_link_token_used(db, token_record)
+    logger.info(
+        "magic_link_verify_success email=%s user_id=%s cookie=%s",
+        _mask_email(email),
+        user.id,
+        cookie_summary,
     )
     return _build_me_response(user)
 
@@ -133,6 +177,7 @@ def logout(
 
 @router.get("/me", response_model=MeResponse)
 def me(
+    request: Request,
     response: Response,
     user: Annotated[User, Depends(get_current_user)],
     session_token: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
@@ -142,4 +187,10 @@ def me(
             value=session_token,
             **cookie_kwargs(max_age_seconds=int(SESSION_TTL.total_seconds())),
         )
+    logger.info(
+        "auth_me_success user_id=%s origin=%s cookie_present=%s",
+        user.id,
+        request.headers.get("origin"),
+        bool(session_token),
+    )
     return _build_me_response(user)
