@@ -28,7 +28,7 @@ import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
 export default function LeadTimeSettingsPage() {
   return (
     <GatedFeature
-      capability="inventoryRules"
+      capability="inventory_rules_advanced"
       title="Customize inventory rules"
       description="Upgrade to Growth to customize lead times, safety buffer, target coverage, and reorder assumptions."
     >

@@ -5,22 +5,11 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
-import { PLAN_LABELS, PRICING_TIERS, type PlanKey } from "@/lib/plans";
+import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
+import { PRICING_TIERS } from "@/lib/plans";
 import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-
-type Subscription = {
-  plan: string;
-  status: string;
-  current_period_end: string | null;
-  cancel_at_period_end: boolean;
-  has_payment_method: boolean;
-  stripe_configured: boolean;
-  billing_provider?: "stripe" | "shopify";
-  shopify_installed?: boolean;
-  shopify_billing_test?: boolean;
-};
 
 function formatDate(iso: string | null): string {
   if (!iso) return "-";
@@ -49,10 +38,9 @@ function openTopLevel(url: string) {
 
 export default function BillingPage() {
   const { user } = useAuth();
-  const [sub, setSub] = useState<Subscription | null>(null);
+  const [sub, setSub] = useState<Entitlements | null>(null);
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [approvingPlan, setApprovingPlan] = useState<PlanKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shopifyPlanNotice, setShopifyPlanNotice] = useState<string | null>(null);
   const [portalFallbackUrl, setPortalFallbackUrl] = useState<string | null>(null);
@@ -68,14 +56,7 @@ export default function BillingPage() {
   useEffect(() => {
     setEmbeddedBilling(isEmbeddedShopifyContext());
     setLoading(true);
-    authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
-      .then(async (r) => {
-        const data = await r.json().catch(() => null);
-        if (!r.ok) {
-          throw new Error(data?.detail || `Billing failed with status ${r.status}.`);
-        }
-        return data as Subscription;
-      })
+    fetchEntitlements()
       .then((data) => setSub(data))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
@@ -119,36 +100,15 @@ export default function BillingPage() {
     }
   }
 
-  async function approveShopifyPlan(plan: PlanKey) {
-    setApprovingPlan(plan);
-    setError(null);
+  function manageShopifyPlan() {
     setShopifyPlanNotice(null);
-    try {
-      const res = await authenticatedFetch(`${API_BASE}/billing/shopify/subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ plan }),
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        const detail = String(body?.detail || "");
-        if (
-          detail.toLowerCase().includes("managed pricing") ||
-          detail.toLowerCase().includes("billing api")
-        ) {
-          setShopifyPlanNotice(
-            "Plan changes are managed through Shopify for this app. Open your Shopify app subscription settings or select a plan from the Shopify App Store listing."
-          );
-          return;
-        }
-        setError(body?.detail || `Could not start Shopify approval (${res.status}).`);
-        return;
-      }
-      if (body?.url) openTopLevel(body.url);
-    } finally {
-      setApprovingPlan(null);
+    if (sub?.shopify_manage_url) {
+      openTopLevel(sub.shopify_manage_url);
+      return;
     }
+    setShopifyPlanNotice(
+      "Plan changes are managed through Shopify. Open your Shopify Admin app subscription settings or select a plan from the Shopify App Store listing."
+    );
   }
 
   if (loading) {
@@ -164,8 +124,8 @@ export default function BillingPage() {
   }
   if (!sub) return null;
 
-  const isActive = sub.status === "active" || sub.status === "trialing";
-  const isShopifyBilling = sub.billing_provider === "shopify" || sub.shopify_installed;
+  const isActive = sub.subscription_status === "active" || sub.subscription_status === "trialing";
+  const isShopifyBilling = sub.is_shopify_installed;
   const showTrialCard = !isShopifyBilling && user.in_trial && !isActive && trialDaysLeft !== null;
 
   return (
@@ -204,12 +164,12 @@ export default function BillingPage() {
               </p>
               <h2 className="section-title">
                 {isActive
-                  ? (PLAN_LABELS[sub.plan] ?? sub.plan)
+                  ? sub.plan_name
                   : isShopifyBilling
                   ? "Choose a Shopify plan"
                   : user.in_trial
                   ? "Free Trial"
-                  : (PLAN_LABELS[sub.plan] ?? sub.plan)}
+                  : sub.plan_name}
               </h2>
             </div>
             <span
@@ -217,7 +177,7 @@ export default function BillingPage() {
                 isActive ? "status-succeeded" : user.in_trial && !isShopifyBilling ? "status-succeeded" : "status-failed"
               }`}
             >
-              {isActive ? sub.status : user.in_trial && !isShopifyBilling ? "trial" : sub.status}
+              {isActive ? sub.subscription_status : user.in_trial && !isShopifyBilling ? "trial" : sub.subscription_status}
             </span>
           </div>
 
@@ -226,7 +186,7 @@ export default function BillingPage() {
               {isShopifyBilling
                 ? isActive
                   ? `Your Shopify app subscription is active. Next billing date: ${formatDate(sub.current_period_end)}.`
-                  : "Billing is managed through Shopify. Choose a plan below and approve the charge in Shopify Admin."
+                  : "Billing is managed through Shopify. Choose or change your plan from Shopify Admin."
                 : isActive
                 ? `Your subscription is active. Next billing date: ${formatDate(sub.current_period_end)}.`
                 : user.in_trial
@@ -235,16 +195,6 @@ export default function BillingPage() {
                   : `Trial ends ${formatDate(user.trial_ends_at)}. No credit card required to keep exploring until then.`
                 : "You don't have an active subscription. Pick a plan to get started."}
             </p>
-            {sub.cancel_at_period_end && !isShopifyBilling ? (
-              <p className="section-copy" style={{ marginTop: "8px", color: "#b91c1c" }}>
-                Set to cancel at period end - your access continues until {formatDate(sub.current_period_end)}.
-              </p>
-            ) : null}
-            {sub.shopify_billing_test ? (
-              <p className="section-copy" style={{ marginTop: "8px" }}>
-                Shopify billing is in test mode for development stores.
-              </p>
-            ) : null}
           </div>
 
           <div className="button-row">
@@ -305,7 +255,7 @@ export default function BillingPage() {
           <div className="section-heading">
             <div>
               <p className="section-eyebrow">Plans</p>
-              <h2 className="section-title section-title-small">Approve through Shopify</h2>
+              <h2 className="section-title section-title-small">Manage through Shopify</h2>
             </div>
           </div>
           <p className="section-copy">
@@ -314,8 +264,7 @@ export default function BillingPage() {
           </p>
           <div className="pricing-grid" style={{ marginTop: "24px" }}>
             {PRICING_TIERS.map((tier) => {
-              const plan = tier.monthly.plan;
-              const current = sub.plan === plan && isActive;
+              const current = sub.plan_id === tier.key && isActive;
               return (
                 <article key={tier.key} className={`pricing-card ${tier.featured ? "pricing-card-featured" : ""}`}>
                   <h3 className="pricing-card-title">{tier.name}</h3>
@@ -326,14 +275,12 @@ export default function BillingPage() {
                   <button
                     type="button"
                     className={`button ${current ? "button-ghost" : "button-primary"} button-full`}
-                    disabled={current || approvingPlan === plan}
-                    onClick={() => void approveShopifyPlan(plan)}
+                    disabled={current}
+                    onClick={manageShopifyPlan}
                   >
                     {current
                       ? "Current plan"
-                      : approvingPlan === plan
-                      ? "Opening Shopify..."
-                      : `Approve ${tier.name}`}
+                      : `Manage ${tier.name} in Shopify`}
                   </button>
                 </article>
               );

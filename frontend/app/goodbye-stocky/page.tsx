@@ -17,7 +17,7 @@ const compareRows = [
   { capability: "Dead-stock plans", stocky: "Aged-stock flag.", skubase: "Markdown / bundle / wholesale / write-off plans." },
   { capability: "Reorder math", stocky: "Manual reorder point.", skubase: "Service-level-segmented safety stock + ROP + EOQ." },
   { capability: "Alerts", stocky: "Basic.", skubase: "Rule engine for email, SMS, Slack, webhooks." },
-  { capability: "Pricing", stocky: "POS Pro $89/mo.", skubase: "Published from $29/mo. No POS Pro requirement." },
+  { capability: "Pricing", stocky: "POS Pro $89/mo.", skubase: "Published from $49/mo. No POS Pro requirement." },
   { capability: "Future", stocky: "Ending August 31, 2026.", skubase: "Independent, founder-led, public changelog." }
 ];
 

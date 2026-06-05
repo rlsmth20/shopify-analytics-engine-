@@ -110,7 +110,7 @@ export default function LoginPage() {
                 <li>✓ Connects to Shopify in one click</li>
                 <li>✓ Shows your reorder queue, forecast, and dead stock on day one</li>
               </ul>
-              <p className="auth-fine">Plans from $29/mo after trial - Cancel any time</p>
+              <p className="auth-fine">Plans from $49/mo after trial - Cancel any time</p>
             </div>
 
             <p className="auth-fine">

@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AskSkubaseChat } from "@/components/ask-skubase-chat";
 import { useAuth } from "@/components/auth-guard";
 import { SHOPIFY_DOMAIN_STORAGE_KEY } from "@/lib/app-helpers";
+import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import {
   planDisplayName,
   planToTier,
@@ -173,19 +174,12 @@ const WIDE_APP_ROUTES = new Set([
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-type Subscription = {
-  plan: string;
-  status: string;
-  billing_provider?: "stripe" | "shopify";
-  shopify_installed?: boolean;
-};
-
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [shopifyDomain, setShopifyDomain] = useState<string | null>(null);
   const [storeLoaded, setStoreLoaded] = useState(false);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscription, setSubscription] = useState<Entitlements | null>(null);
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [subscriptionStatusFailed, setSubscriptionStatusFailed] = useState(false);
   // hasRealData: true once the shop has any products in the DB. Hides the
@@ -219,9 +213,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    void authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: Subscription | null) => {
+    void fetchEntitlements()
+      .then((data) => {
         if (!cancelled) setSubscription(data);
       })
       .catch(() => {
@@ -273,12 +266,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }));
 
   const paidTier =
-    subscription?.status === "active" || subscription?.status === "trialing"
-      ? planToTier(subscription.plan)
+    subscription?.subscription_status === "active" || subscription?.subscription_status === "trialing"
+      ? planToTier(subscription.plan_id)
       : null;
   const hasActiveSubscription = subscriptionLoaded && paidTier !== null;
-  const isShopifyInstalled =
-    subscription?.billing_provider === "shopify" || Boolean(subscription?.shopify_installed);
+  const isShopifyInstalled = Boolean(subscription?.is_shopify_installed);
   const directTrialAccess =
     Boolean(user.in_trial) && !isShopifyInstalled && !isEmbeddedShopifyContext();
   const unlockAll = user.id === 0 || directTrialAccess || Boolean(user.is_admin) || !subscriptionLoaded;
@@ -368,7 +360,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        {user.id !== 0 && subscriptionLoaded && !subscriptionStatusFailed && !hasActiveSubscription && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
+        {user.id !== 0 && !isShopifyInstalled && subscriptionLoaded && !subscriptionStatusFailed && !hasActiveSubscription && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
           <div className={`demo-banner ${trialDaysLeft <= 2 ? "demo-banner-preview" : ""}`} role="status">
             <span className="demo-banner-mark" aria-hidden>*</span>
             <span>

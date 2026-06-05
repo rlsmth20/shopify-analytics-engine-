@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { PlanKey } from "@/lib/plans";
+import { fetchEntitlements } from "@/lib/entitlements";
 import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -37,16 +38,22 @@ export function PricingButton({
         return;
       }
 
-      const billingRes = await authenticatedFetch(`${API_BASE}/billing/me`, {
-        credentials: "include",
-      }).catch(() => null);
-      const billing = billingRes?.ok ? await billingRes.json().catch(() => null) : null;
-      const endpoint =
-        billing?.billing_provider === "shopify" || billing?.shopify_installed
-          ? "/billing/shopify/subscribe"
-          : "/billing/checkout";
+      const entitlements = await fetchEntitlements().catch(() => null);
+      if (entitlements?.is_shopify_installed) {
+        if (popup && !popup.closed) popup.close();
+        if (entitlements.shopify_manage_url) {
+          if (embedded) {
+            window.open(entitlements.shopify_manage_url, "_blank", "noopener,noreferrer");
+          } else {
+            window.location.href = entitlements.shopify_manage_url;
+          }
+          return;
+        }
+        window.location.href = "/billing";
+        return;
+      }
 
-      const res = await authenticatedFetch(`${API_BASE}${endpoint}`, {
+      const res = await authenticatedFetch(`${API_BASE}/billing/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

@@ -19,6 +19,11 @@ from app.services.shopify_billing import (
     current_shopify_subscription_summary,
     has_active_shopify_connection,
 )
+from app.services.plan_entitlements import (
+    capabilities_for_plan,
+    get_plan_display_name,
+    normalize_plan_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -419,4 +424,46 @@ def current_subscription_summary(db: DbSession, *, user: User) -> dict:
         "stripe_configured": is_configured(),
         "billing_provider": "stripe",
         "shopify_installed": False,
+    }
+
+
+def current_entitlements_summary(db: DbSession, *, user: User) -> dict:
+    """Canonical billing + entitlement view for frontend feature gates.
+
+    Shopify-installed merchants are governed by Shopify Managed Pricing status.
+    Direct web users may still use Stripe and direct trial access.
+    """
+    raw = current_subscription_summary(db, user=user)
+    is_shopify_installed = bool(raw.get("shopify_installed"))
+    status = str(raw.get("status") or "inactive")
+    raw_plan = str(raw.get("plan") or "none")
+
+    if is_shopify_installed:
+        plan_id = normalize_plan_name(raw_plan) if status in ACTIVE_SUBSCRIPTION_STATUSES else "none"
+        billing_provider = "shopify_managed_pricing"
+    else:
+        plan_id = normalize_plan_name(raw_plan) if status in ACTIVE_SUBSCRIPTION_STATUSES else "none"
+        billing_provider = "stripe" if raw.get("billing_provider") == "stripe" else "none"
+        trial_ends = user.trial_ends_at
+        if plan_id == "none" and trial_ends is not None:
+            if trial_ends.tzinfo is None:
+                trial_ends = trial_ends.replace(tzinfo=timezone.utc)
+            if trial_ends > datetime.now(timezone.utc):
+                plan_id = "trial"
+                status = "trialing"
+
+    return {
+        "billing_provider": billing_provider,
+        "is_shopify_installed": is_shopify_installed,
+        "plan_id": plan_id,
+        "plan_name": get_plan_display_name(plan_id),
+        "raw_plan": raw_plan,
+        "subscription_status": status,
+        "trial_ends_at": user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+        "current_period_end": raw.get("current_period_end"),
+        "billing_status_loaded": True,
+        "capabilities": capabilities_for_plan(plan_id),
+        "shopify_domain": raw.get("shopify_domain"),
+        "shopify_manage_url": raw.get("shopify_manage_url"),
+        "stripe_configured": raw.get("stripe_configured", False),
     }

@@ -37,7 +37,7 @@ type EditablePoDrafts = Record<string, EditablePoDraft>;
 export default function PurchaseOrdersPage() {
   return (
     <GatedFeature
-      capability="purchaseOrders"
+      capability="reorder_pos"
       title="Turn recommendations into purchase orders"
       description="Upgrade to Growth to create saved PO drafts, track partial receipts, and build supplier lead-time history."
     >

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_current_user, require_active_access
+from app.api.deps import require_plan_feature
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import (
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/reorder", tags=["reorder"])
 
 @router.get("", response_model=ReorderFeedResponse)
 def list_reorder_suggestions(
-    user: Annotated[User, Depends(require_active_access)],
+    user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
     shipping_cost: float = Query(35.0, ge=0.0, le=10000.0),
@@ -79,7 +79,7 @@ def list_reorder_suggestions(
 
 @router.get("/purchase-orders", response_model=PurchaseOrderDraftsResponse)
 def list_po_drafts(
-    user: Annotated[User, Depends(require_active_access)],
+    user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
     service_level: float = Query(0.95, ge=0.80, le=0.999),
     shipping_cost: float = Query(35.0, ge=0.0, le=10000.0),
@@ -125,7 +125,7 @@ def list_po_drafts(
 @router.post("/purchase-orders", response_model=PurchaseOrderStatusResponse)
 def save_po_draft(
     payload: SavePurchaseOrderRequest,
-    user: Annotated[User, Depends(require_active_access)],
+    user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
     saved = save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
@@ -148,7 +148,7 @@ def save_po_draft(
 def update_po_status(
     po_id: str,
     status: str,
-    user: Annotated[User, Depends(require_active_access)],
+    user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
     if status not in {"draft", "ready", "approved", "sent", "partially_received", "received", "cancelled"}:
@@ -179,7 +179,7 @@ def update_po_status(
 def receive_po(
     po_id: str,
     payload: ReceivePurchaseOrderRequest,
-    user: Annotated[User, Depends(require_active_access)],
+    user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
     po = receive_purchase_order(

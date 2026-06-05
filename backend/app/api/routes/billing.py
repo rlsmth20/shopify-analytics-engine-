@@ -12,13 +12,13 @@ from app.services.billing import (
     PRICE_IDS,
     create_checkout_session,
     create_portal_session,
+    current_entitlements_summary,
     current_subscription_summary,
     handle_webhook_event,
     is_configured,
     verify_webhook_signature,
 )
 from app.services.shopify_billing import (
-    create_shopify_subscription,
     has_active_shopify_connection,
 )
 
@@ -97,6 +97,14 @@ def my_subscription(
     return current_subscription_summary(db, user=user)
 
 
+@router.get("/entitlements")
+def my_entitlements(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> dict:
+    return current_entitlements_summary(db, user=user)
+
+
 @router.post("/shopify/subscribe", response_model=CheckoutResponse)
 def start_shopify_subscription(
     payload: CheckoutRequest,
@@ -108,11 +116,10 @@ def start_shopify_subscription(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No active Shopify install for this workspace.",
         )
-    try:
-        url = create_shopify_subscription(db, user=user, plan=payload.plan)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return CheckoutResponse(url=url)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Plan changes are managed through Shopify Managed Pricing for this app.",
+    )
 
 
 # Stripe webhook — separate prefix so signature verification is clean.

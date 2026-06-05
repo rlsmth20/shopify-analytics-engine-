@@ -188,13 +188,29 @@ def require_plan_feature(feature: FeatureKey) -> Callable[..., User]:
             return user
 
         from datetime import datetime, timezone
+        from app.services.shopify_billing import (
+            current_shopify_subscription_summary,
+            has_active_shopify_connection,
+        )
 
-        trial_ends = user.trial_ends_at
-        if trial_ends is not None:
-            if trial_ends.tzinfo is None:
-                trial_ends = trial_ends.replace(tzinfo=timezone.utc)
-            if trial_ends > datetime.now(timezone.utc):
-                return user
+        is_shopify_installed = has_active_shopify_connection(db, shop_id=user.shop_id)
+        if not is_shopify_installed:
+            trial_ends = user.trial_ends_at
+            if trial_ends is not None:
+                if trial_ends.tzinfo is None:
+                    trial_ends = trial_ends.replace(tzinfo=timezone.utc)
+                if trial_ends > datetime.now(timezone.utc):
+                    return user
+
+        if is_shopify_installed:
+            shopify_sub = current_shopify_subscription_summary(db, user=user)
+            if shopify_sub.get("status") in ("active", "trialing"):
+                if plan_allows_feature(str(shopify_sub.get("plan") or "none"), feature):
+                    return user
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your current Shopify plan does not include this feature. Upgrade to continue.",
+            )
 
         sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
         if sub is not None and sub.status in ("active", "trialing"):

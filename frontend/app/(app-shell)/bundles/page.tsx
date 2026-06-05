@@ -31,7 +31,7 @@ type SortDirection = "asc" | "desc";
 export default function BundlesPage() {
   return (
     <GatedFeature
-      capability="bundleOpportunities"
+      capability="bundle_opportunities"
       title="Find products customers buy together"
       description="Upgrade to Growth to use order history for bundle, kit, cross-sell, and promo opportunities."
     >

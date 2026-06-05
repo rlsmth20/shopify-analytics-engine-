@@ -1,20 +1,36 @@
 export type BillingCycle = "monthly" | "annual";
 export type PlanTierKey = "starter" | "growth" | "scale";
+export type PlanId = "none" | "trial" | PlanTierKey;
 export type CapabilityKey =
-  | "today"
-  | "actionQueue"
-  | "basicAlerts"
-  | "basicReports"
-  | "inventoryHealth"
-  | "deadStock"
+  | "billing"
+  | "account"
+  | "store_sync"
+  | "contact_feedback"
+  | "stocky_migration"
+  | "limited_today"
+  | "today_basic"
+  | "action_queue_basic"
+  | "action_queue_full"
+  | "alerts_basic"
+  | "alerts_advanced"
   | "forecast"
-  | "purchaseOrders"
-  | "advancedReports"
-  | "bundleOpportunities"
-  | "projectedStockHealth"
-  | "inventoryRules"
-  | "supplierScorecards"
-  | "transfers";
+  | "projected_stock_health"
+  | "inventory_health_basic"
+  | "inventory_health_full"
+  | "reports_basic"
+  | "reports_export"
+  | "reorder_pos"
+  | "bundle_opportunities"
+  | "dead_stock_basic"
+  | "dead_stock_full"
+  | "suppliers_basic"
+  | "supplier_scorecards"
+  | "transfers"
+  | "inventory_rules_basic"
+  | "inventory_rules_advanced"
+  | "scheduled_reports"
+  | "team_controls"
+  | "priority_support";
 export type PlanKey =
   | "starter_monthly"
   | "growth_monthly"
@@ -52,49 +68,123 @@ export const TIER_ORDER: Record<PlanTierKey, number> = {
   scale: 2,
 };
 
+export const PLAN_ORDER: Record<PlanId, number> = {
+  none: -1,
+  trial: 99,
+  starter: 0,
+  growth: 1,
+  scale: 2,
+};
+
 export type PlanCapability = {
-  requiredPlan: PlanTierKey;
+  requiredPlan: PlanId;
   title: string;
   description: string;
   cta: string;
 };
 
 export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
-  today: {
+  billing: {
+    requiredPlan: "none",
+    title: "Billing",
+    description: "View plan status and manage app billing.",
+    cta: "View billing",
+  },
+  account: {
+    requiredPlan: "none",
+    title: "Account",
+    description: "Manage account and workspace details.",
+    cta: "View account",
+  },
+  store_sync: {
+    requiredPlan: "none",
+    title: "Store Sync",
+    description: "Connect Shopify and review sync status.",
+    cta: "Open Store Sync",
+  },
+  contact_feedback: {
+    requiredPlan: "none",
+    title: "Contact & Feedback",
+    description: "Contact support or share product feedback.",
+    cta: "Contact support",
+  },
+  stocky_migration: {
+    requiredPlan: "none",
+    title: "Stocky Migration",
+    description: "Use the migration checklist to move from Stocky.",
+    cta: "Open checklist",
+  },
+  limited_today: {
+    requiredPlan: "none",
+    title: "Today",
+    description: "See a limited starting view before choosing a plan.",
+    cta: "View Today",
+  },
+  today_basic: {
     requiredPlan: "starter",
     title: "Today",
     description: "Review the most important inventory signals for your Shopify store.",
     cta: "Choose Starter",
   },
-  actionQueue: {
+  action_queue_basic: {
     requiredPlan: "starter",
-    title: "Action Queue",
-    description: "Work through ranked stockout, reorder, and dead-stock recommendations.",
+    title: "Basic Action Queue",
+    description: "Work through basic stockout, reorder, and dead-stock recommendations.",
     cta: "Choose Starter",
   },
-  basicAlerts: {
+  action_queue_full: {
+    requiredPlan: "growth",
+    title: "Full Action Queue",
+    description: "Work through the full ranked queue with richer action context.",
+    cta: "Upgrade to Growth",
+  },
+  alerts_basic: {
     requiredPlan: "starter",
-    title: "Alerts & Rules",
+    title: "Basic Alerts & Rules",
     description: "Monitor stockout risk, dead stock, overstock, forecast risk, and reorder needs.",
     cta: "Choose Starter",
   },
-  basicReports: {
-    requiredPlan: "starter",
-    title: "Reports & Exports",
-    description: "Review and export core inventory reports from connected Shopify data.",
-    cta: "Choose Starter",
+  alerts_advanced: {
+    requiredPlan: "growth",
+    title: "Advanced Alerts & Rules",
+    description: "Use configurable rules and alert channels for more targeted inventory monitoring.",
+    cta: "Upgrade to Growth",
   },
-  inventoryHealth: {
+  inventory_health_basic: {
     requiredPlan: "starter",
     title: "Inventory Health",
     description: "Understand stockout risk, slow movers, cash tied up, and SKU health.",
     cta: "Choose Starter",
   },
-  deadStock: {
+  inventory_health_full: {
+    requiredPlan: "growth",
+    title: "Full Inventory Health",
+    description: "Review deeper SKU health and planning context.",
+    cta: "Upgrade to Growth",
+  },
+  reports_basic: {
+    requiredPlan: "starter",
+    title: "Reports",
+    description: "Review core inventory report previews from connected Shopify data.",
+    cta: "Choose Starter",
+  },
+  reports_export: {
+    requiredPlan: "growth",
+    title: "Reports & Exports",
+    description: "Filter, review, and export deeper reorder, stockout, and dead-stock reports.",
+    cta: "Upgrade to Growth",
+  },
+  dead_stock_basic: {
     requiredPlan: "starter",
     title: "Dead Stock",
     description: "Find slow-moving inventory and prioritize recovery opportunities.",
     cta: "Choose Starter",
+  },
+  dead_stock_full: {
+    requiredPlan: "growth",
+    title: "Dead Stock Recovery",
+    description: "Use full recovery planning and exports for slow-moving inventory.",
+    cta: "Upgrade to Growth",
   },
   forecast: {
     requiredPlan: "growth",
@@ -102,37 +192,43 @@ export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
     description: "Forecast future demand, calculate reorder needs, and see when inventory needs attention.",
     cta: "Upgrade to Growth",
   },
-  purchaseOrders: {
+  reorder_pos: {
     requiredPlan: "growth",
     title: "Reorder / POs",
     description: "Turn reorder recommendations into saved PO drafts and receipt history.",
     cta: "Upgrade to Growth",
   },
-  advancedReports: {
-    requiredPlan: "growth",
-    title: "Advanced Reports & Exports",
-    description: "Filter, review, and export deeper reorder, stockout, and dead-stock reports.",
-    cta: "Upgrade to Growth",
-  },
-  bundleOpportunities: {
+  bundle_opportunities: {
     requiredPlan: "growth",
     title: "Bundle Opportunities",
     description: "Use order history to find products customers already buy together.",
     cta: "Upgrade to Growth",
   },
-  projectedStockHealth: {
+  projected_stock_health: {
     requiredPlan: "growth",
     title: "Projected Stock Health",
     description: "Compare stock cover, lead time, and target coverage for each SKU.",
     cta: "Upgrade to Growth",
   },
-  inventoryRules: {
+  suppliers_basic: {
+    requiredPlan: "growth",
+    title: "Supplier Insights",
+    description: "Review supplier and lead-time insights when data is available.",
+    cta: "Upgrade to Growth",
+  },
+  inventory_rules_basic: {
+    requiredPlan: "starter",
+    title: "Inventory Rules",
+    description: "Edit default lead time and target coverage assumptions.",
+    cta: "Choose Starter",
+  },
+  inventory_rules_advanced: {
     requiredPlan: "growth",
     title: "Inventory Rules",
     description: "Customize lead times, safety buffer, target coverage, and reorder assumptions.",
     cta: "Upgrade to Growth",
   },
-  supplierScorecards: {
+  supplier_scorecards: {
     requiredPlan: "scale",
     title: "Supplier Scorecards",
     description: "Measure supplier performance when PO receipt history is available.",
@@ -142,6 +238,24 @@ export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
     requiredPlan: "scale",
     title: "Transfer Planning",
     description: "Balance inventory across locations when location-level Shopify inventory is available.",
+    cta: "Upgrade to Scale",
+  },
+  scheduled_reports: {
+    requiredPlan: "scale",
+    title: "Scheduled Reports",
+    description: "Save report schedule preferences as delivery automation expands.",
+    cta: "Upgrade to Scale",
+  },
+  team_controls: {
+    requiredPlan: "scale",
+    title: "Team Controls",
+    description: "Use advanced workspace controls as team administration expands.",
+    cta: "Upgrade to Scale",
+  },
+  priority_support: {
+    requiredPlan: "scale",
+    title: "Priority Support",
+    description: "Get same-business-day support for higher-volume operations.",
     cta: "Upgrade to Scale",
   },
 };
@@ -167,8 +281,8 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "Bundle Opportunities and transfer planning", included: false },
       { label: "Admin roles and audit history", included: false },
     ],
-    monthly: { plan: "starter_monthly", price: "$29" },
-    annual: { plan: "starter_annual", price: "$24.65", yearTotal: "$296" },
+    monthly: { plan: "starter_monthly", price: "$49" },
+    annual: { plan: "starter_annual", price: "$41.65", yearTotal: "$500" },
   },
   {
     key: "growth",
@@ -215,7 +329,7 @@ export const PRICING_TIERS: PricingTier[] = [
 ];
 
 export const PLAN_LABELS: Record<string, string> = {
-  starter_monthly: "Starter ($29/mo)",
+  starter_monthly: "Starter ($49/mo)",
   growth_monthly: "Growth ($99/mo)",
   scale_monthly: "Scale ($199/mo)",
   starter_annual: "Starter (annual)",
@@ -225,11 +339,25 @@ export const PLAN_LABELS: Record<string, string> = {
 };
 
 export function planToTier(plan: string | null | undefined): PlanTierKey | null {
-  if (!plan || plan === "none") return null;
-  if (plan.startsWith("starter_")) return "starter";
-  if (plan.startsWith("growth_")) return "growth";
-  if (plan.startsWith("scale_")) return "scale";
+  const normalized = normalizePlanName(plan);
+  if (normalized === "starter" || normalized === "growth" || normalized === "scale") {
+    return normalized;
+  }
   return null;
+}
+
+export function normalizePlanName(plan: string | null | undefined): PlanId {
+  if (!plan || plan === "none") return "none";
+  const normalized = String(plan)
+    .trim()
+    .toLowerCase()
+    .replace("skubase", "")
+    .replace(/[\s-]+/g, "_");
+  if (normalized === "trial" || normalized === "trialing") return "trial";
+  if (normalized.includes("starter")) return "starter";
+  if (normalized.includes("growth")) return "growth";
+  if (normalized.includes("scale")) return "scale";
+  return "none";
 }
 
 export function tierAllows(
@@ -240,19 +368,27 @@ export function tierAllows(
   return TIER_ORDER[tier] >= TIER_ORDER[minimum];
 }
 
-export function requiresPlan(capability: CapabilityKey): PlanTierKey {
+export function requiresPlan(capability: CapabilityKey): PlanId {
   return PLAN_CAPABILITIES[capability].requiredPlan;
 }
 
 export function hasCapability(
-  tier: PlanTierKey | null,
+  tier: PlanId | null,
   capability: CapabilityKey,
 ): boolean {
-  return tierAllows(tier, requiresPlan(capability));
+  if (!tier) return false;
+  return PLAN_ORDER[tier] >= PLAN_ORDER[requiresPlan(capability)];
 }
 
-export function planDisplayName(tier: PlanTierKey): string {
+export function planDisplayName(tier: PlanId): string {
+  if (tier === "none") return "No active plan";
+  if (tier === "trial") return "Trial";
   if (tier === "starter") return "Starter";
   if (tier === "growth") return "Growth";
   return "Scale";
+}
+
+export function getUpgradeLabel(requiredPlan: PlanId): string {
+  if (requiredPlan === "none" || requiredPlan === "trial") return "View billing";
+  return `Upgrade to ${planDisplayName(requiredPlan)}`;
 }

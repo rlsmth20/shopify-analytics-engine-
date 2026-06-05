@@ -71,7 +71,7 @@ export default function InventoryPlannerAlternativePage() {
         <p>
           skubase ships the same forecasting math (Holt double-exponential smoothing with weekly seasonality)
           plus three things Inventory Planner never got to: supplier scorecards, dead-stock action plans, and
-          a ranked daily action queue. Pricing is published - $29, $99, $199/mo - with a written commitment
+          a ranked daily action queue. Pricing is published - $49, $99, $199/mo - with a written commitment
           that your plan price doesn&apos;t increase at renewal. No POS Pro requirement, no minimum contract.
         </p>
         <p>

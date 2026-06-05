@@ -4,23 +4,13 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { useAuth } from "@/components/auth-guard";
+import { entitlementHas, fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import {
   PLAN_CAPABILITIES,
-  hasCapability,
+  getUpgradeLabel,
   planDisplayName,
-  planToTier,
   type CapabilityKey,
 } from "@/lib/plans";
-import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-
-type BillingSummary = {
-  plan: string;
-  status: string;
-  billing_provider?: "stripe" | "shopify";
-  shopify_installed?: boolean;
-};
 
 export function GatedFeature({
   capability,
@@ -34,7 +24,7 @@ export function GatedFeature({
   children: ReactNode;
 }) {
   const { user } = useAuth();
-  const [billing, setBilling] = useState<BillingSummary | null>(null);
+  const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -44,20 +34,18 @@ export function GatedFeature({
     setFailed(false);
 
     if (user.id === 0 || user.is_admin) {
-      setBilling({ plan: "scale_monthly", status: "active" });
+      setEntitlements(null);
       setLoading(false);
       return;
     }
 
-    void authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: BillingSummary | null) => {
-        if (cancelled) return;
-        setBilling(data);
+    void fetchEntitlements()
+      .then((data) => {
+        if (!cancelled) setEntitlements(data);
       })
       .catch(() => {
         if (cancelled) return;
-        setBilling(null);
+        setEntitlements(null);
         setFailed(true);
       })
       .finally(() => {
@@ -73,22 +61,15 @@ export function GatedFeature({
     return <div className="page-loading">Loading plan access...</div>;
   }
 
-  const active =
-    user.id === 0 ||
-    user.is_admin ||
-    billing?.status === "active" ||
-    billing?.status === "trialing";
-  const isShopifyInstalled = billing?.billing_provider === "shopify" || billing?.shopify_installed;
-  const directTrialAccess =
-    Boolean(user.in_trial) && !isShopifyInstalled && !isEmbeddedShopifyContext();
-  const tier = directTrialAccess ? "scale" : active ? planToTier(billing?.plan) : null;
-
-  if ((active || directTrialAccess) && hasCapability(tier, capability)) {
+  if (user.id === 0 || user.is_admin || entitlementHas(entitlements, capability)) {
     return <>{children}</>;
   }
 
   const config = PLAN_CAPABILITIES[capability];
   const requiredPlan = planDisplayName(config.requiredPlan);
+  const upgradeLabel = getUpgradeLabel(config.requiredPlan);
+  const isShopifyInstalled = Boolean(entitlements?.is_shopify_installed);
+
   return (
     <section className="section-card gated-feature-card">
       <div className="gated-feature-content">
@@ -96,14 +77,12 @@ export function GatedFeature({
         <h2 className="section-title section-title-small">
           {title ?? `Unlock ${config.title.toLowerCase()}`}
         </h2>
-        <p className="section-copy">
-          {description ?? config.description}
-        </p>
+        <p className="section-copy">{description ?? config.description}</p>
         <div className="gated-feature-panel">
-          <strong>{config.cta}</strong>
+          <strong>{upgradeLabel}</strong>
           <span>
             {isShopifyInstalled
-              ? `This feature is included on ${requiredPlan}. Plan approval is handled securely through Shopify.`
+              ? `This feature is included on ${requiredPlan}. Manage your app plan through Shopify.`
               : `This feature is included on ${requiredPlan}. Upgrade from Billing to unlock it.`}
           </span>
         </div>
@@ -115,7 +94,7 @@ export function GatedFeature({
         ) : null}
         <div className="button-row">
           <Link href="/billing" className="button button-primary">
-            {config.cta}
+            {upgradeLabel}
           </Link>
           <Link href="/sample-inventory-risk-snapshot" className="button button-ghost">
             View sample report

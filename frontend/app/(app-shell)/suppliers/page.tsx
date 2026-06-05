@@ -9,7 +9,7 @@ import { fetchSuppliers, type SupplierScorecard } from "@/lib/api-v2";
 export default function SuppliersPage() {
   return (
     <GatedFeature
-      capability="supplierScorecards"
+      capability="supplier_scorecards"
       title="Measure supplier performance"
       description="Upgrade to Scale to unlock supplier scorecards when PO receipt history is available."
     >

@@ -43,7 +43,7 @@ export default function StockyAlternativesPost() {
 
         <h3 className="blog-article-h3">skubase</h3>
         <p>
-          We built skubase partly because we couldn&apos;t find a Stocky replacement that did the math right. Holt double-exponential smoothing with weekly seasonality, stockout probability per SKU, supplier scorecards (on-time, fill rate), markdown/bundle/wholesale/write-off plans for dead stock. Pricing published, three tiers from $29/mo, with a written price-lock clause in TOS. <Link href="/goodbye-stocky">Migration page</Link>.
+          We built skubase partly because we couldn&apos;t find a Stocky replacement that did the math right. Holt double-exponential smoothing with weekly seasonality, stockout probability per SKU, supplier scorecards (on-time, fill rate), markdown/bundle/wholesale/write-off plans for dead stock. Pricing published, three tiers from $49/mo, with a written price-lock clause in TOS. <Link href="/goodbye-stocky">Migration page</Link>.
         </p>
 
         <h3 className="blog-article-h3">Inventory Planner (Sage)</h3>

@@ -32,6 +32,7 @@ import {
   type SkuScorecard,
 } from "@/lib/api-v2";
 import { useAuth } from "@/components/auth-guard";
+import { entitlementHas, fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import {
   exportFormattedReport,
   type BarPoint,
@@ -208,6 +209,8 @@ export default function ReportsPage() {
   const [scheduleEnabled, setScheduleEnabled] = useState(true);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
+  const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
+  const [entitlementsLoaded, setEntitlementsLoaded] = useState(user.id === 0 || user.is_admin);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -231,6 +234,29 @@ export default function ReportsPage() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (user.id === 0 || user.is_admin) {
+      setEntitlements(null);
+      setEntitlementsLoaded(true);
+      return;
+    }
+    setEntitlementsLoaded(false);
+    void fetchEntitlements()
+      .then((data) => {
+        if (!cancelled) setEntitlements(data);
+      })
+      .catch(() => {
+        if (!cancelled) setEntitlements(null);
+      })
+      .finally(() => {
+        if (!cancelled) setEntitlementsLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id, user.is_admin]);
 
   useEffect(() => {
     setSearch("");
@@ -291,6 +317,10 @@ export default function ReportsPage() {
     [selectedReport, rows],
   );
   const cta = reportCta(selectedReport);
+  const canExport =
+    user.id === 0 ||
+    user.is_admin ||
+    entitlementHas(entitlements, "reports_export");
 
   function updateSort(key: string) {
     if (sortKey === key) {
@@ -422,14 +452,24 @@ export default function ReportsPage() {
               <a className="button button-secondary" href={cta.href}>
                 {cta.label}
               </a>
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={exportWorkbook}
-                disabled={visibleRows.length === 0}
-              >
-                Export filtered Excel
-              </button>
+              {canExport ? (
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={exportWorkbook}
+                  disabled={visibleRows.length === 0}
+                >
+                  Export filtered Excel
+                </button>
+              ) : (
+                <a
+                  className={`button button-primary${!entitlementsLoaded ? " button-disabled" : ""}`}
+                  href={entitlementsLoaded ? "/billing" : undefined}
+                  aria-disabled={!entitlementsLoaded}
+                >
+                  {entitlementsLoaded ? "Upgrade to Growth to export" : "Loading plan access..."}
+                </a>
+              )}
             </>
           }
         />

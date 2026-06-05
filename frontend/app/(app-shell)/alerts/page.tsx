@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
 import { useAuth } from "@/components/auth-guard";
+import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import {
   createAlertRule,
   deleteAlertRule,
@@ -22,10 +23,7 @@ import {
   type NotificationChannel,
   type NotificationChannelConfig,
 } from "@/lib/api-v2";
-import { planToTier, tierAllows, type PlanTierKey } from "@/lib/plans";
-import { authenticatedFetch } from "@/lib/shopify-embedded";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+import { hasCapability, type PlanTierKey } from "@/lib/plans";
 
 const TRIGGER_OPTIONS: { value: AlertTrigger; label: string; help: string }[] = [
   { value: "stockout_risk", label: "Stockout risk", help: "Fires when a SKU has fewer days of cover than the threshold" },
@@ -64,12 +62,11 @@ export default function AlertsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<"rules" | "channels" | "history">("rules");
-  const [plan, setPlan] = useState<string | null>(null);
+  const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
 
-  const paidTier = planToTier(plan) ?? "starter";
-  const unlockAll = user.id === 0 || user.in_trial || user.is_admin;
+  const unlockAll = user.id === 0 || user.is_admin;
   const isChannelAllowed = (channel: NotificationChannel) =>
-    unlockAll || tierAllows(paidTier, CHANNEL_MIN_TIER[channel]);
+    unlockAll || hasCapability(entitlements?.plan_id ?? "none", CHANNEL_MIN_TIER[channel] === "growth" ? "alerts_advanced" : "alerts_basic");
 
   useEffect(() => {
     refresh();
@@ -78,10 +75,9 @@ export default function AlertsPage() {
   useEffect(() => {
     if (user.id === 0) return;
 
-    void authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { plan?: string } | null) => setPlan(data?.plan ?? null))
-      .catch(() => setPlan(null));
+    void fetchEntitlements()
+      .then((data) => setEntitlements(data))
+      .catch(() => setEntitlements(null));
   }, [user.id]);
 
   async function refresh() {

@@ -23,7 +23,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("FRONTEND_ORIGIN", "https://s
 SHOPIFY_BILLING_TEST = os.getenv("SHOPIFY_BILLING_TEST", "false").lower() in {"1", "true", "yes"}
 
 SHOPIFY_PLAN_AMOUNTS: dict[str, Decimal] = {
-    "starter_monthly": Decimal("29.00"),
+    "starter_monthly": Decimal("49.00"),
     "growth_monthly": Decimal("99.00"),
     "scale_monthly": Decimal("199.00"),
 }
@@ -58,6 +58,8 @@ def current_shopify_subscription_summary(db: DbSession, *, user: User) -> dict:
     return {
         "billing_provider": "shopify",
         "shopify_installed": True,
+        "shopify_domain": conn.shopify_domain,
+        "shopify_manage_url": _shopify_manage_url(conn.shopify_domain),
         "plan": local.plan if local else "none",
         "status": local.status if local else "inactive",
         "current_period_end": local.current_period_end.isoformat() if local and local.current_period_end else None,
@@ -196,6 +198,11 @@ def _normalize_shopify_status(status: str) -> str:
 def _return_url(shopify_domain: str) -> str:
     params = urlencode({"shop": shopify_domain, "billing": "approved"})
     return f"{FRONTEND_URL}/billing?{params}"
+
+
+def _shopify_manage_url(shopify_domain: str) -> str:
+    handle = shopify_domain.split(".")[0]
+    return f"https://admin.shopify.com/store/{handle}/settings/billing/subscriptions"
 
 
 def _gql(conn: ShopifyConnection, query: str, variables: dict[str, Any]) -> dict:

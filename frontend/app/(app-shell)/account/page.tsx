@@ -5,21 +5,10 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
-import { PLAN_LABELS } from "@/lib/plans";
+import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-
-type Subscription = {
-  plan: string;
-  status: string;
-  current_period_end: string | null;
-  cancel_at_period_end: boolean;
-  has_payment_method: boolean;
-  stripe_configured: boolean;
-  billing_provider?: "stripe" | "shopify";
-  shopify_installed?: boolean;
-};
 
 type Connection = {
   connected: boolean;
@@ -29,13 +18,12 @@ type Connection = {
 
 export default function AccountPage() {
   const { user, logout } = useAuth();
-  const [sub, setSub] = useState<Subscription | null>(null);
+  const [sub, setSub] = useState<Entitlements | null>(null);
   const [conn, setConn] = useState<Connection | null>(null);
 
   useEffect(() => {
-    void authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => setSub(d as Subscription))
+    void fetchEntitlements()
+      .then((d) => setSub(d))
       .catch(() => setSub(null));
     void authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, { credentials: "include" })
       .then((r) => r.json())
@@ -90,7 +78,8 @@ export default function AccountPage() {
       <div className="content-grid content-grid-2-1">
         <SectionCard>
           {(() => {
-            const isActive = sub?.status === "active" || sub?.status === "trialing";
+            const isActive = sub?.subscription_status === "active" || sub?.subscription_status === "trialing";
+            const isShopifyBilling = Boolean(sub?.is_shopify_installed);
             const trialDaysLeft: number | null = (() => {
               if (!user.trial_ends_at) return null;
               const ms = new Date(user.trial_ends_at).getTime() - Date.now();
@@ -98,17 +87,16 @@ export default function AccountPage() {
               return d > 0 ? d : 0;
             })();
             const planLabel = isActive
-              ? (PLAN_LABELS[sub!.plan] ?? sub!.plan)
-              : user.in_trial
+              ? sub!.plan_name
+              : user.in_trial && !isShopifyBilling
               ? trialDaysLeft === null || trialDaysLeft > 0
                 ? trialDaysLeft !== null ? `Free Trial - ${trialDaysLeft}d left` : "Free Trial"
                 : "Trial ended"
-              : (PLAN_LABELS[sub?.plan ?? "none"] ?? sub?.plan ?? "No active plan");
-            const badgeClass = isActive || (user.in_trial && (trialDaysLeft ?? 0) > 0)
+              : (sub?.plan_name ?? "No active plan");
+            const badgeClass = isActive || (!isShopifyBilling && user.in_trial && (trialDaysLeft ?? 0) > 0)
               ? "status-succeeded"
               : "status-failed";
-            const badgeLabel = isActive ? sub!.status : user.in_trial ? "trial" : "inactive";
-            const isShopifyBilling = sub?.billing_provider === "shopify" || sub?.shopify_installed;
+            const badgeLabel = isActive ? sub!.subscription_status : user.in_trial && !isShopifyBilling ? "trial" : "inactive";
             return (
               <>
                 <div className="section-heading">
@@ -123,7 +111,7 @@ export default function AccountPage() {
                     ? isShopifyBilling
                       ? "Plan details and app subscription charges are managed through Shopify."
                       : "Plan details, invoice history, and payment method are managed in the Stripe Customer Portal."
-                    : user.in_trial
+                    : user.in_trial && !isShopifyBilling
                     ? "You're on a free trial. Subscribe on the billing page before your trial ends."
                     : "No active subscription. Pick a plan to keep your access."}
                 </p>
