@@ -17,6 +17,10 @@ from app.services.billing import (
     is_configured,
     verify_webhook_signature,
 )
+from app.services.shopify_billing import (
+    create_shopify_subscription,
+    has_active_shopify_connection,
+)
 
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -36,6 +40,11 @@ def start_checkout(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> CheckoutResponse:
+    if has_active_shopify_connection(db, shop_id=user.shop_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopify-installed merchants must use Shopify billing.",
+        )
     if not is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -63,6 +72,11 @@ def open_portal(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PortalResponse:
+    if has_active_shopify_connection(db, shop_id=user.shop_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Billing for this store is managed through Shopify.",
+        )
     if not is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -81,6 +95,24 @@ def my_subscription(
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> dict:
     return current_subscription_summary(db, user=user)
+
+
+@router.post("/shopify/subscribe", response_model=CheckoutResponse)
+def start_shopify_subscription(
+    payload: CheckoutRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> CheckoutResponse:
+    if not has_active_shopify_connection(db, shop_id=user.shop_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active Shopify install for this workspace.",
+        )
+    try:
+        url = create_shopify_subscription(db, user=user, plan=payload.plan)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return CheckoutResponse(url=url)
 
 
 # Stripe webhook — separate prefix so signature verification is clean.

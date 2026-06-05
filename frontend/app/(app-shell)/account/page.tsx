@@ -17,6 +17,8 @@ type Subscription = {
   cancel_at_period_end: boolean;
   has_payment_method: boolean;
   stripe_configured: boolean;
+  billing_provider?: "stripe" | "shopify";
+  shopify_installed?: boolean;
 };
 
 type Connection = {
@@ -106,6 +108,7 @@ export default function AccountPage() {
               ? "status-succeeded"
               : "status-failed";
             const badgeLabel = isActive ? sub!.status : user.in_trial ? "trial" : "inactive";
+            const isShopifyBilling = sub?.billing_provider === "shopify" || sub?.shopify_installed;
             return (
               <>
                 <div className="section-heading">
@@ -117,7 +120,9 @@ export default function AccountPage() {
                 </div>
                 <p className="section-copy">
                   {isActive
-                    ? "Plan details, invoice history, and payment method are managed in the Stripe Customer Portal."
+                    ? isShopifyBilling
+                      ? "Plan details and app subscription charges are managed through Shopify."
+                      : "Plan details, invoice history, and payment method are managed in the Stripe Customer Portal."
                     : user.in_trial
                     ? "You're on a free trial. Subscribe on the billing page before your trial ends."
                     : "No active subscription. Pick a plan to keep your access."}

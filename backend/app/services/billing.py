@@ -15,6 +15,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from app.db.models import Shop, Subscription, User
+from app.services.shopify_billing import (
+    current_shopify_subscription_summary,
+    has_active_shopify_connection,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -380,6 +384,9 @@ def verify_webhook_signature(*, payload: bytes, signature_header: str) -> Option
 
 def current_subscription_summary(db: DbSession, *, user: User) -> dict:
     """Frontend-friendly view of the current user's subscription."""
+    if has_active_shopify_connection(db, shop_id=user.shop_id):
+        return current_shopify_subscription_summary(db, user=user)
+
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
     should_reconcile = (
         sub is None
@@ -400,6 +407,8 @@ def current_subscription_summary(db: DbSession, *, user: User) -> dict:
             "cancel_at_period_end": False,
             "has_payment_method": False,
             "stripe_configured": is_configured(),
+            "billing_provider": "stripe",
+            "shopify_installed": False,
         }
     return {
         "plan": sub.plan,
@@ -408,4 +417,6 @@ def current_subscription_summary(db: DbSession, *, user: User) -> dict:
         "cancel_at_period_end": sub.cancel_at_period_end,
         "has_payment_method": bool(sub.stripe_customer_id),
         "stripe_configured": is_configured(),
+        "billing_provider": "stripe",
+        "shopify_installed": False,
     }

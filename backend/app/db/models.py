@@ -522,11 +522,11 @@ class Session(Base):
 
 
 class Subscription(Base):
-    """Stripe subscription state mirrored locally per shop.
+    """Subscription state mirrored locally per shop.
 
-    The single source of truth is Stripe; we store enough fields to render
-    `/billing` pages and gate paid features without round-tripping to Stripe
-    on every request. The webhook handler keeps this row in sync.
+    Direct web accounts use Stripe as source of truth. Shopify-installed
+    merchants use Shopify app subscriptions as source of truth; those rows use
+    the existing fields so access gates and billing pages have one local shape.
     """
 
     __tablename__ = "subscriptions"

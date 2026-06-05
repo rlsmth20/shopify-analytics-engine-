@@ -180,6 +180,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [storeLoaded, setStoreLoaded] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
+  const [subscriptionStatusFailed, setSubscriptionStatusFailed] = useState(false);
   // hasRealData: true once the shop has any products in the DB. Hides the
   // "Sample data" chip and the yellow demo-mode banner so paid customers
   // don't see "demo" labels on their own data.
@@ -201,6 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setSubscriptionLoaded(false);
+    setSubscriptionStatusFailed(false);
     if (user.id === 0) {
       setSubscription(null);
       setSubscriptionLoaded(true);
@@ -214,7 +216,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (!cancelled) setSubscription(data);
       })
       .catch(() => {
-        if (!cancelled) setSubscription(null);
+        if (!cancelled) {
+          setSubscription(null);
+          setSubscriptionStatusFailed(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setSubscriptionLoaded(true);
@@ -350,7 +355,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        {user.id !== 0 && subscriptionLoaded && !hasActiveSubscription && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
+        {user.id !== 0 && subscriptionLoaded && !subscriptionStatusFailed && !hasActiveSubscription && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
           <div className={`demo-banner ${trialDaysLeft <= 2 ? "demo-banner-preview" : ""}`} role="status">
             <span className="demo-banner-mark" aria-hidden>*</span>
             <span>

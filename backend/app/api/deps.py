@@ -146,6 +146,16 @@ def require_active_access(
     if trial_ends > datetime.now(timezone.utc):
         return user  # still in trial
 
+    from app.services.shopify_billing import (
+        current_shopify_subscription_summary,
+        has_active_shopify_connection,
+    )
+
+    if has_active_shopify_connection(db, shop_id=user.shop_id):
+        shopify_sub = current_shopify_subscription_summary(db, user=user)
+        if shopify_sub.get("status") in ("active", "trialing"):
+            return user
+
     # Check paid subscription. Accept both active and trialing Stripe states.
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
     if sub is not None and sub.status in ("active", "trialing"):

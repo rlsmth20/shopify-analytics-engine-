@@ -24,7 +24,7 @@ export function PricingButton({
     const popup = embedded ? window.open("about:blank", "_blank") : null;
     if (popup) {
       popup.opener = null;
-      popup.document.title = "Opening Stripe checkout...";
+      popup.document.title = "Opening billing approval...";
     }
 
     try {
@@ -37,7 +37,16 @@ export function PricingButton({
         return;
       }
 
-      const res = await authenticatedFetch(`${API_BASE}/billing/checkout`, {
+      const billingRes = await authenticatedFetch(`${API_BASE}/billing/me`, {
+        credentials: "include",
+      }).catch(() => null);
+      const billing = billingRes?.ok ? await billingRes.json().catch(() => null) : null;
+      const endpoint =
+        billing?.billing_provider === "shopify" || billing?.shopify_installed
+          ? "/billing/shopify/subscribe"
+          : "/billing/checkout";
+
+      const res = await authenticatedFetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -50,7 +59,7 @@ export function PricingButton({
           window.location.href = "/#waitlist";
           return;
         }
-        alert(body?.detail || `Could not start checkout (${res.status}).`);
+        alert(body?.detail || `Could not start billing approval (${res.status}).`);
         return;
       }
       if (body?.url) {
