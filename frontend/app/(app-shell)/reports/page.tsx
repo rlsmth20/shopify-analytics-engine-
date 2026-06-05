@@ -14,6 +14,7 @@ import {
   type ReportFilterConfig,
   type ReportMetric,
 } from "@/components/reports/report-components";
+import { ProjectedStockHealth } from "@/components/projected-stock-health";
 import { fetchInventoryActions, type InventoryAction } from "@/lib/api";
 import { getActionImpactValue, statusLabel } from "@/lib/app-helpers";
 import {
@@ -121,6 +122,14 @@ const reportCards = [
     status: "Available",
     href: "/analytics",
     cta: "Open analytics",
+  },
+  {
+    title: "Transfer Plan Report",
+    category: "Operations",
+    description: "Recommended inventory moves between locations when location-level stock is available.",
+    status: "Available in demo",
+    href: "/transfers",
+    cta: "Open transfers",
   },
   {
     title: "Supplier Scorecard",
@@ -788,6 +797,26 @@ function ReportRowDetails({
 
   return (
     <div className="report-row-details">
+      <ProjectedStockHealth
+        productName={row.product}
+        sku={row.sku}
+        currentStock={row.currentStock}
+        dailyVelocity={row.dailyVelocity}
+        daysLeft={row.daysLeft}
+        daysOfInventory={row.daysInventory}
+        leadTimeDays={row.leadTime}
+        targetCoverageDays={row.targetCoverage}
+        stockoutDate={row.estimatedStockoutDate}
+        recommendedQty={row.recommendedQty}
+        recommendedAction={row.recommendedAction}
+        riskLevel={row.riskLevel}
+        status={row.status}
+        inventoryValue={row.inventoryValue}
+        cashImpact={row.cashImpact}
+        daysSinceLastSale={row.daysSinceLastSale}
+        dataQualityNote={row.reason}
+        compact={report === "actions"}
+      />
       <div className="report-row-detail-main">
         <div>
           <p className="report-detail-eyebrow">Row details</p>

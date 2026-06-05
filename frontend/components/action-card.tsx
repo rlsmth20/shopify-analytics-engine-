@@ -1,4 +1,5 @@
 import type { InventoryAction } from "@/lib/api";
+import { ProjectedStockHealth } from "@/components/projected-stock-health";
 import {
   confidenceLabel,
   currencyFormatter,
@@ -101,6 +102,36 @@ export function ActionCard({
           />
         </div>
       </div>
+
+      <ProjectedStockHealth
+        productName={action.name}
+        sku={action.sku_id}
+        currentStock={action.current_on_hand}
+        dailyVelocity={action.daily_velocity}
+        daysLeft={action.status === "urgent" ? action.days_until_stockout : action.days_of_inventory}
+        daysOfInventory={action.days_of_inventory}
+        leadTimeDays={action.lead_time_days_used}
+        targetCoverageDays={action.target_coverage_days}
+        recommendedQty={
+          action.status === "urgent"
+            ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
+            : null
+        }
+        recommendedAction={action.recommended_action}
+        status={
+          action.status === "urgent"
+            ? "Stockout risk"
+            : action.status === "dead"
+              ? "Dead stock"
+              : action.days_of_inventory > action.target_coverage_days * 3
+                ? "Overstock"
+                : "Watch"
+        }
+        cashImpact={action.status === "urgent" ? action.estimated_profit_impact : action.cash_tied_up}
+        confidence={confidenceLabel[action.data_quality_confidence]}
+        dataQualityNote={action.data_quality_warnings[0]}
+        compact
+      />
 
       {action.data_quality_warnings.length > 0 ? (
         <div className="quality-block">

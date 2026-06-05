@@ -239,6 +239,12 @@ export type TransferRecommendation = {
   from_location: string;
   to_location: string;
   qty: number;
+  source_stock?: number;
+  destination_stock?: number;
+  destination_days_left?: number;
+  lead_time_days?: number;
+  priority?: "Critical" | "High" | "Medium" | "Low";
+  status?: "Recommended" | "Reviewed" | "Exported";
   from_days_of_cover_before: number;
   to_days_of_cover_before: number;
   from_days_of_cover_after: number;
