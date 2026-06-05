@@ -18,18 +18,18 @@ type NavItem = {
 };
 
 const navigationItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", section: "Command", icon: ">" },
+  { href: "/dashboard", label: "Today", section: "Command", icon: ">" },
   { href: "/actions", label: "Action Queue", section: "Command", icon: "o" },
   { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "*" },
   { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "o" },
-  { href: "/analytics", label: "Analytics", section: "Intelligence", icon: "<>" },
-  { href: "/reports", label: "Reports", section: "Intelligence", icon: ">" },
+  { href: "/analytics", label: "Inventory Health", section: "Intelligence", icon: "<>" },
+  { href: "/reports", label: "Reports & Exports", section: "Intelligence", icon: ">" },
   { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o", minTier: "growth" },
-  { href: "/purchase-orders", label: "Purchase Orders", section: "Operations", icon: "o" },
+  { href: "/purchase-orders", label: "Reorder / POs", section: "Operations", icon: "o" },
   { href: "/stocky-migration", label: "Stocky Migration", section: "Operations", icon: ">" },
   { href: "/transfers", label: "Transfers", section: "Operations", icon: "*", minTier: "growth" },
-  { href: "/bundles", label: "Bundles & Kits", section: "Operations", icon: "<>", minTier: "growth" },
-  { href: "/liquidation", label: "Liquidation", section: "Operations", icon: "o", minTier: "growth" },
+  { href: "/bundles", label: "Bundle Opportunities", section: "Operations", icon: "<>", minTier: "growth" },
+  { href: "/liquidation", label: "Dead Stock", section: "Operations", icon: "o", minTier: "growth" },
   { href: "/store-sync", label: "Store Sync", section: "Settings", icon: ">" },
   { href: "/lead-time-settings", label: "Lead Times", section: "Settings", icon: "*" },
   { href: "/billing", label: "Billing", section: "Settings", icon: "<>" },
@@ -50,7 +50,7 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Command",
     title: "Action queue",
     description:
-      "Ranked inventory actions - urgent, optimize, dead - ready to triage."
+      "Ranked Action Queue - urgent, optimize, dead - ready to triage."
   },
   "/alerts": {
     eyebrow: "Command",
@@ -66,27 +66,27 @@ const pageMeta: Record<string, PageMeta> = {
   },
   "/analytics": {
     eyebrow: "Intelligence",
-    title: "ABC x XYZ scorecards",
+    title: "Inventory health",
     description:
       "Segment the catalog by revenue contribution and demand variability - meet your A-items first."
   },
   "/reports": {
     eyebrow: "Intelligence",
-    title: "Reports",
+    title: "Reports & exports",
     description:
       "A lightweight library of the inventory reports and exports already wired into skubase."
   },
   "/suppliers": {
     eyebrow: "Intelligence",
-    title: "Vendors you can measure.",
+    title: "Suppliers you can measure.",
     description:
       "On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering."
   },
   "/purchase-orders": {
     eyebrow: "Operations",
-    title: "Purchase order drafts",
+    title: "Reorder plan and PO drafts",
     description:
-      "Auto-consolidated POs by vendor, ready to review and send."
+      "Supplier-grouped PO drafts, ready to review and email manually."
   },
   "/stocky-migration": {
     eyebrow: "Operations",
@@ -102,13 +102,13 @@ const pageMeta: Record<string, PageMeta> = {
   },
   "/bundles": {
     eyebrow: "Operations",
-    title: "Bundles that don't lose components.",
+    title: "Bundle opportunities",
     description:
-      "Kits decompose at reorder time so a PO never leaves a component short."
+      "Find products customers buy together; component tracking requires mappings."
   },
   "/liquidation": {
     eyebrow: "Operations",
-    title: "Cash recovery on stale inventory.",
+    title: "Dead stock recovery.",
     description:
       "Every dead-stock SKU comes with a plan - markdown, bundle, wholesale, or write-off - and a dollar-impact estimate."
   },
@@ -122,7 +122,7 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Settings",
     title: "Lead time configuration",
     description:
-      "Global defaults, safety buffer, and vendor/category overrides."
+      "Global defaults, safety buffer, and supplier/category overrides."
   },
   "/billing": {
     eyebrow: "Settings",
@@ -178,7 +178,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [shopifyDomain, setShopifyDomain] = useState("");
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   // hasRealData: true once the shop has any products in the DB. Hides the
-  // "Demo data" chip and the yellow demo-mode banner so paid customers
+  // "Sample data" chip and the yellow demo-mode banner so paid customers
   // don't see "demo" labels on their own data.
   const [hasRealData, setHasRealData] = useState<boolean | null>(null);
 
@@ -379,7 +379,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {shopifyDomain ? shopifyDomain : "No store selected"}
             </span>
             {hasRealData === false ? (
-              <span className="header-chip">Demo data</span>
+              <span className="header-chip">Sample data</span>
             ) : null}
             {user.id !== 0 ? (
               <span className="header-chip header-chip-user" title={user.email}>

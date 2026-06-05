@@ -13,7 +13,7 @@ export const metadata = {
 const beliefs = [
   { title: "Inventory is a decision problem, not a reporting problem.", body: "Most inventory tools are dashboards — they tell you what happened and leave you to act. skubase ranks the decisions: what to reorder, what is overstocked, what is dead, what to do first." },
   { title: "Math should be visible.", body: "Every recommended quantity explains itself. Trailing demand, seasonality factor, service level, stockout probability — all on the card, all clickable." },
-  { title: "Suppliers are measurable.", body: "23 of 25 tools we studied treat vendors as contact records. We treat them as performers. On-time delivery, fill rate, lead-time stability, tiering. Facts, not feelings." },
+{ title: "Suppliers are measurable.", body: "23 of 25 tools we studied treat suppliers as contact records. We treat them as performers. On-time delivery, fill rate, lead-time stability, tiering. Facts, not feelings." },
   { title: "Dead stock is a cash recovery problem.", body: "24 of 25 tools flag aged inventory and stop. We propose the specific plan — markdown, bundle, wholesale, or write-off — with the dollar impact attached." },
   { title: "Pricing should be published and locked.", body: "7 of 25 tools are quote-only. 6 of 25 have public complaints about renewal-time price hikes. We publish our prices and commit in writing not to raise them." }
 ];
@@ -112,4 +112,3 @@ export default function AboutPage() {
     </div>
   );
 }
-

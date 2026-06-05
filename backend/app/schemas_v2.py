@@ -229,6 +229,33 @@ class BundleHealthResponse(ApiModel):
     bundles: list[BundleHealth]
 
 
+class BundleOpportunity(ApiModel):
+    id: str
+    product_a_id: int
+    product_a_name: str
+    product_a_sku: str | None = None
+    product_a_category: str | None = None
+    product_b_id: int
+    product_b_name: str
+    product_b_sku: str | None = None
+    product_b_category: str | None = None
+    co_purchase_count: int
+    support: float
+    confidence_a_to_b: float
+    confidence_b_to_a: float
+    lift: float | None = None
+    combined_revenue: float
+    average_order_value_impact: float | None = None
+    opportunity_type: str
+    suggested_action: str
+    explanation: str
+
+
+class BundleOpportunitiesResponse(BundleHealthResponse):
+    opportunities: list[BundleOpportunity]
+    orders_analyzed: int
+
+
 # ---------------------------------------------------------------------------
 # Multi-location transfers
 # ---------------------------------------------------------------------------

@@ -37,6 +37,8 @@ export default function PurchaseOrdersPage() {
   const [total, setTotal] = useState(0);
   const [serviceLevel, setServiceLevel] = useState(0.95);
   const [shippingCost, setShippingCost] = useState(35);
+  const [search, setSearch] = useState("");
+  const [quickView, setQuickView] = useState<"all" | "week" | "at-risk" | "high-value">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -68,6 +70,9 @@ export default function PurchaseOrdersPage() {
       });
     return () => controller.abort();
   }, [serviceLevel, shippingCost]);
+
+  const visibleDrafts = filterPurchaseOrders(drafts, search, quickView);
+  const supplyPlan = buildSupplyPlan(visibleDrafts);
 
   if (error) return <p className="page-error-copy">{error}</p>;
 
@@ -117,6 +122,49 @@ export default function PurchaseOrdersPage() {
         </p>
       </div>
 
+      <section className="planning-preview-grid">
+        <PlanningCard
+          title="Supply Plan"
+          label="Next 90 days"
+          value={currency(supplyPlan.next90Value)}
+          note={`${supplyPlan.next90Units} recommended units across ${visibleDrafts.length} PO draft${visibleDrafts.length === 1 ? "" : "s"}`}
+        />
+        <PlanningCard
+          title="Replenishment Plan"
+          label="Next 12 months"
+          value={currency(supplyPlan.next12MonthValue)}
+          note="Projected from current reorder draft value; refine after more demand history."
+        />
+      </section>
+
+      <section className="po-filter-panel">
+        <label className="forecast-search">
+          <span>Search</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search product, SKU, or supplier"
+          />
+        </label>
+        <div className="quick-filter-row">
+          {[
+            ["all", "All"],
+            ["week", "Running out this week"],
+            ["at-risk", "At risk"],
+            ["high-value", "High value"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`quick-filter-chip${quickView === key ? " quick-filter-chip-active" : ""}`}
+              onClick={() => setQuickView(key as typeof quickView)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
       {operationNotice || operationError ? (
         <div className={`po-feedback${operationError ? " po-feedback-error" : ""}`} role="status">
           {operationError ?? operationNotice}
@@ -125,17 +173,19 @@ export default function PurchaseOrdersPage() {
 
       {loading ? <p className="page-loading">Generating POs…</p> : null}
 
-      {drafts.length === 0 && !loading ? (
+      {visibleDrafts.length === 0 && !loading ? (
         <div className="empty-state">
-          <p className="empty-state-title">All caught up</p>
+          <p className="empty-state-title">{drafts.length === 0 ? "All caught up" : "No PO drafts match"}</p>
           <p className="empty-state-copy">
-            No vendor currently needs a purchase order at this service level.
+            {drafts.length === 0
+              ? "No supplier currently needs a purchase order at this service level."
+              : "Clear search or quick filters to see more draft purchase orders."}
           </p>
         </div>
       ) : null}
 
       <div className="po-list">
-        {drafts.map((po) => (
+        {visibleDrafts.map((po) => (
           <div key={po.po_id} className="po-card">
             <div
               className="po-card-head"
@@ -244,7 +294,7 @@ export default function PurchaseOrdersPage() {
                     }}
                     disabled={busyPo === po.po_id || editingPo === po.po_id}
                   >
-                    {busyPo === po.po_id ? "Sending..." : "Send to vendor"}
+                    {busyPo === po.po_id ? "Opening vendor email draft..." : "Open vendor email draft"}
                   </button>
                   <button
                     type="button"
@@ -408,7 +458,11 @@ export default function PurchaseOrdersPage() {
       await savePurchaseOrder(po);
       const response = await updatePurchaseOrderStatus(po.po_id, status);
       upsertDraft(response.po ?? { ...po, status });
-      setOperationNotice(`Purchase order ${po.po_id} marked ${formatPoStatus(status).toLowerCase()}.`);
+      setOperationNotice(
+        status === "sent"
+          ? `Email draft opened for ${po.po_id}.`
+          : `Purchase order ${po.po_id} marked ${formatPoStatus(status).toLowerCase()}.`
+      );
       if (!isDemoMode()) await refresh();
     } catch (error) {
       setOperationError(errorMessage(error, `Could not mark purchase order ${formatPoStatus(status).toLowerCase()}.`));
@@ -526,7 +580,7 @@ export default function PurchaseOrdersPage() {
     const shipping = parseMoney(draft.shipping_cost);
 
     if (!vendor) {
-      setOperationError("Vendor is required before saving the purchase order.");
+      setOperationError("Supplier is required before saving the purchase order.");
       return null;
     }
     if (!expectedArrivalDate) {
@@ -693,7 +747,7 @@ function PurchaseOrderEditForm({
       </div>
       <div className="po-edit-grid">
         <label className="field-label">
-          <span>Vendor</span>
+          <span>Supplier</span>
           <input
             className="input-control"
             value={draft.vendor}
@@ -827,6 +881,79 @@ function PurchaseOrderEditForm({
       </div>
     </div>
   );
+}
+
+function PlanningCard({
+  title,
+  label,
+  value,
+  note,
+}: {
+  title: string;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <article className="planning-card">
+      <span>{title}</span>
+      <p>{label}</p>
+      <strong>{value}</strong>
+      <small>{note}</small>
+    </article>
+  );
+}
+
+function filterPurchaseOrders(
+  drafts: PurchaseOrderDraft[],
+  search: string,
+  quickView: "all" | "week" | "at-risk" | "high-value",
+): PurchaseOrderDraft[] {
+  const needle = search.trim().toLowerCase();
+  return drafts.filter((po) => {
+    if (
+      needle &&
+      ![
+        po.vendor,
+        po.po_id,
+        po.rationale,
+        ...po.lines.flatMap((line) => [line.name, line.sku_id]),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle)
+    ) {
+      return false;
+    }
+    const rationale = po.rationale.toLowerCase();
+    if (quickView === "week") {
+      return rationale.includes("critical") || rationale.includes("urgent") || rationale.includes("stockout");
+    }
+    if (quickView === "at-risk") {
+      return po.lines.length > 0;
+    }
+    if (quickView === "high-value") {
+      return po.total_cost >= 3000;
+    }
+    return true;
+  });
+}
+
+function buildSupplyPlan(drafts: PurchaseOrderDraft[]): {
+  next90Units: number;
+  next90Value: number;
+  next12MonthValue: number;
+} {
+  const next90Units = drafts.reduce(
+    (sum, po) => sum + po.lines.reduce((lineSum, line) => lineSum + line.qty, 0),
+    0,
+  );
+  const next90Value = drafts.reduce((sum, po) => sum + po.total_cost, 0);
+  return {
+    next90Units,
+    next90Value: roundCurrency(next90Value),
+    next12MonthValue: roundCurrency(next90Value * 4),
+  };
 }
 
 function toEditablePoDraft(po: PurchaseOrderDraft): EditablePoDraft {
@@ -977,7 +1104,7 @@ function sendPurchaseOrderToVendor(po: PurchaseOrderDraft): void {
   const body = encodeURIComponent(
     [
       `Purchase order ${po.po_id}`,
-      `Vendor: ${po.vendor}`,
+      `Supplier: ${po.vendor}`,
       `Expected arrival: ${po.expected_arrival_date}`,
       `Subtotal: ${currency(po.subtotal_cost)}`,
       `Shipping/freight: ${currency(po.shipping_cost)}`,

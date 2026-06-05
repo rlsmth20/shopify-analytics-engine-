@@ -1,0 +1,43 @@
+SKU,Product,Variant,Vendor,Type,Cost,Price,Inventory,Lead Time Days
+SUPP-WPC-VAN-2LB,Whey Protein Concentrate,Vanilla 2lb,NutriSource Labs,Supplements,18.50,49.99,6,21
+SUPP-WPC-CHO-2LB,Whey Protein Concentrate,Chocolate 2lb,NutriSource Labs,Supplements,18.50,49.99,4,21
+SUPP-WPC-STR-2LB,Whey Protein Concentrate,Strawberry 2lb,NutriSource Labs,Supplements,18.50,49.99,14,21
+SUPP-WPC-VAN-5LB,Whey Protein Concentrate,Vanilla 5lb,NutriSource Labs,Supplements,38.00,89.99,2,21
+SUPP-WPC-CHO-5LB,Whey Protein Concentrate,Chocolate 5lb,NutriSource Labs,Supplements,38.00,89.99,1,21
+SUPP-CREAT-MON-300G,Creatine Monohydrate,Unflavored 300g,NutriSource Labs,Supplements,8.20,29.99,22,21
+SUPP-CREAT-MON-500G,Creatine Monohydrate,Unflavored 500g,NutriSource Labs,Supplements,12.00,44.99,18,21
+SUPP-PRE-STRM-30SRV,Pre-Workout Storm,Watermelon 30srv,AlphaFormula,Supplements,14.75,54.99,3,28
+SUPP-PRE-STRM-60SRV,Pre-Workout Storm,Watermelon 60srv,AlphaFormula,Supplements,26.00,94.99,0,28
+SUPP-BCAA-TRP-30SRV,BCAA Tropical Blend,Tropical 30srv,NutriSource Labs,Supplements,9.50,34.99,31,14
+SUPP-OMEGA3-120CT,Omega-3 Fish Oil,120 Capsules,OmegaPure Co,Supplements,7.80,24.99,45,30
+SUPP-VIT-D3-K2-90CT,Vitamin D3+K2,90 Capsules,OmegaPure Co,Supplements,6.20,19.99,52,30
+SUPP-MGSLY-120CT,Magnesium Glycinate,120 Capsules,OmegaPure Co,Supplements,8.40,27.99,28,30
+SUPP-ASHW-60CT,Ashwagandha KSM-66,60 Capsules,BotanicaRx,Supplements,9.10,32.99,7,35
+SUPP-COLLAG-UNFLV-300G,Collagen Peptides,Unflavored 300g,BotanicaRx,Supplements,14.00,39.99,11,35
+SUPP-COLLAG-VANIL-300G,Collagen Peptides,Vanilla 300g,BotanicaRx,Supplements,14.00,39.99,5,35
+EQUIP-BAND-LT,Resistance Band Set,Light (10-30lb),GearForce,Equipment,6.50,24.99,88,45
+EQUIP-BAND-MED,Resistance Band Set,Medium (30-60lb),GearForce,Equipment,6.50,24.99,74,45
+EQUIP-BAND-HVY,Resistance Band Set,Heavy (60-100lb),GearForce,Equipment,6.50,24.99,62,45
+EQUIP-FOAM-STD,Foam Roller,Standard 36in,GearForce,Equipment,9.80,34.99,19,45
+EQUIP-FOAM-PRO,Foam Roller,Vibrating Pro,GearForce,Equipment,28.00,79.99,8,45
+EQUIP-PULL-DOOR,Doorframe Pull-Up Bar,Standard,IronEdge,Equipment,14.20,44.99,13,60
+EQUIP-DIPS-PRTBL,Portable Dip Station,Black,IronEdge,Equipment,42.00,119.99,4,60
+EQUIP-KB-16KG,Kettlebell,16kg / 35lb,IronEdge,Equipment,28.50,74.99,6,60
+EQUIP-KB-24KG,Kettlebell,24kg / 53lb,IronEdge,Equipment,38.00,94.99,3,60
+EQUIP-STRAP-LIFT,Lifting Straps,Pair,GearForce,Equipment,3.20,14.99,41,45
+EQUIP-BELT-MED,Weightlifting Belt,Medium,GearForce,Equipment,18.00,59.99,12,45
+EQUIP-BELT-LRG,Weightlifting Belt,Large,GearForce,Equipment,18.00,59.99,7,45
+APPAR-TEE-M-BLK,Performance Tee,Men's Medium Black,ActiveThread,Apparel,9.50,34.99,16,42
+APPAR-TEE-L-BLK,Performance Tee,Men's Large Black,ActiveThread,Apparel,9.50,34.99,22,42
+APPAR-TEE-XL-BLK,Performance Tee,Men's XL Black,ActiveThread,Apparel,9.50,34.99,9,42
+APPAR-TEE-M-GRY,Performance Tee,Men's Medium Grey,ActiveThread,Apparel,9.50,34.99,5,42
+APPAR-LEG-S-BLK,Compression Leggings,Women's Small Black,ActiveThread,Apparel,14.00,54.99,3,42
+APPAR-LEG-M-BLK,Compression Leggings,Women's Medium Black,ActiveThread,Apparel,14.00,54.99,8,42
+APPAR-LEG-L-BLK,Compression Leggings,Women's Large Black,ActiveThread,Apparel,14.00,54.99,6,42
+APPAR-SHRT-M-BLK,Training Shorts,Men's Medium Black,ActiveThread,Apparel,10.00,39.99,11,42
+APPAR-SHRT-L-BLK,Training Shorts,Men's Large Black,ActiveThread,Apparel,10.00,39.99,14,42
+MISC-SHAKER-BLK,Shaker Bottle,Black 28oz,GearForce,Accessories,3.80,14.99,34,30
+MISC-SHAKER-CLR,Shaker Bottle,Clear 28oz,GearForce,Accessories,3.80,14.99,21,30
+MISC-JOURNAL-TRNG,Training Journal,Spiral-bound 90 days,PaperGains,Accessories,4.50,17.99,156,60
+MISC-CHALK-BLCK,Gymnastic Chalk Block,2oz Block,GearForce,Accessories,1.20,7.99,89,45
+MISC-TAPE-ATH,Athletic Tape,1.5in x 10yd,GearForce,Accessories,1.50,8.99,67,45

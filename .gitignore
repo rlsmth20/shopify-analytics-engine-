@@ -1,3 +1,14 @@
+# Seed / dev scripts with embedded credentials — never commit
+seed_shopify_orders.py
+seed_summary.json
+
+# local assistant/tool artifacts
+.claude/
+*.bak
+*_tmp.tsx
+run-*.bat
+marketing/leads/
+
 __pycache__/
 **/__pycache__/
 backend/__pycache__/

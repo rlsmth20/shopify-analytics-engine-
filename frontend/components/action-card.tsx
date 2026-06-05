@@ -14,6 +14,28 @@ export function ActionCard({
 }: {
   action: InventoryAction;
 }) {
+  const daysLeft = firstFinite(
+    action.status === "urgent" ? action.days_until_stockout : null,
+    action.days_of_inventory
+  );
+  const recommendedQty =
+    action.status === "urgent" && isFiniteNumber(action.target_inventory_units) && isFiniteNumber(action.current_on_hand)
+      ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
+      : null;
+  const cashAtRisk = action.status === "urgent" ? action.estimated_profit_impact : action.cash_tied_up;
+  const calculationDetails = technicalExplanation(action.explanation) ? action.explanation : null;
+  const explanation = plainEnglishExplanation(action, daysLeft);
+  const stockHealthStatus =
+    action.status === "urgent"
+      ? "Stockout risk"
+      : action.status === "dead"
+        ? "Dead stock"
+        : isFiniteNumber(action.days_of_inventory) &&
+            isFiniteNumber(action.target_coverage_days) &&
+            action.days_of_inventory > action.target_coverage_days * 3
+          ? "Overstock"
+          : "Watch";
+
   return (
     <article className={`action-card action-card-${action.status}`}>
       <div className="action-card-top">
@@ -36,9 +58,7 @@ export function ActionCard({
         <p className="action-sku">{action.sku_id}</p>
         <h3 className="action-name">{action.name}</h3>
         <p className="action-recommendation">{action.recommended_action}</p>
-        <p className="action-explanation">
-          {action.explanation ?? "Decision rationale is loading."}
-        </p>
+        <p className="action-explanation">{explanation}</p>
       </div>
 
       <div className="action-rationale">
@@ -49,57 +69,36 @@ export function ActionCard({
             <>
               <Reason
                 label="Days left"
-                value={
-                  isFiniteNumber(action.days_until_stockout)
-                    ? numberFormatter.format(action.days_until_stockout)
-                    : "Not enough sales history"
-                }
+                value={formatDaysLeft(daysLeft)}
               />
               <Reason
-                label="Profit at risk"
-                value={currencyFormatter.format(action.estimated_profit_impact)}
+                label="Cash at risk"
+                value={formatMoney(cashAtRisk)}
               />
             </>
           ) : (
             <>
               <Reason
-                label={action.status === "dead" ? "Cash recovery impact" : "Capital impact"}
-                value={currencyFormatter.format(action.cash_tied_up)}
+                label="Days left"
+                value={formatDaysLeft(daysLeft)}
               />
               <Reason
-                label="Excess units"
-                value={
-                  isFiniteNumber(action.excess_units)
-                    ? numberFormatter.format(action.excess_units)
-                    : "Unavailable"
-                }
+                label="Cash at risk"
+                value={formatMoney(cashAtRisk)}
               />
             </>
           )}
           <Reason
-            label="Inventory cover"
-            value={
-              isFiniteNumber(action.days_of_inventory)
-                ? `${numberFormatter.format(action.days_of_inventory)} days`
-                : "Not enough sales history"
-            }
-          />
-          <Reason
             label="Lead time"
-            value={
-              isFiniteNumber(action.lead_time_days_used)
-                ? `${action.lead_time_days_used} days - ${leadTimeSourceLabel[action.lead_time_source]}`
-                : "Lead time unavailable"
-            }
+            value={formatDays(action.lead_time_days_used, "Lead time unavailable")}
           />
           <Reason
             label="Target coverage"
-            value={
-              isFiniteNumber(action.target_coverage_days)
-                ? `${action.target_coverage_days} days`
-                : "Unavailable"
-            }
+            value={formatDays(action.target_coverage_days, "Unavailable")}
           />
+          {recommendedQty !== null ? (
+            <Reason label="Recommended qty" value={numberFormatter.format(recommendedQty)} />
+          ) : null}
         </div>
       </div>
 
@@ -108,111 +107,62 @@ export function ActionCard({
         sku={action.sku_id}
         currentStock={action.current_on_hand}
         dailyVelocity={action.daily_velocity}
-        daysLeft={action.status === "urgent" ? action.days_until_stockout : action.days_of_inventory}
+        salesLast30Days={isFiniteNumber(action.daily_velocity) ? Math.round(action.daily_velocity * 30) : null}
+        daysLeft={daysLeft}
         daysOfInventory={action.days_of_inventory}
         leadTimeDays={action.lead_time_days_used}
         targetCoverageDays={action.target_coverage_days}
-        recommendedQty={
-          action.status === "urgent"
-            ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
-            : null
-        }
+        recommendedQty={recommendedQty}
         recommendedAction={action.recommended_action}
-        status={
-          action.status === "urgent"
-            ? "Stockout risk"
-            : action.status === "dead"
-              ? "Dead stock"
-              : action.days_of_inventory > action.target_coverage_days * 3
-                ? "Overstock"
-                : "Watch"
-        }
-        cashImpact={action.status === "urgent" ? action.estimated_profit_impact : action.cash_tied_up}
+        status={stockHealthStatus}
+        cashImpact={cashAtRisk}
         confidence={confidenceLabel[action.data_quality_confidence]}
         dataQualityNote={action.data_quality_warnings[0]}
         compact
+        hideMetricGrid
       />
 
-      {action.data_quality_warnings.length > 0 ? (
-        <div className="quality-block">
-          <p className="quality-label">
-            Data confidence {confidenceLabel[action.data_quality_confidence]}
-          </p>
-          <ul className="warning-list">
-            {action.data_quality_warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <div className="quality-inline">
-          <span className="quality-label">
-            Data confidence {confidenceLabel[action.data_quality_confidence]}
-          </span>
-        </div>
-      )}
-
-      <dl className="action-metadata">
-        <div>
-          <dt>On hand</dt>
-          <dd>{numberFormatter.format(action.current_on_hand)}</dd>
-        </div>
-        <div>
-          <dt>Days of inventory</dt>
-          <dd>{numberFormatter.format(action.days_of_inventory)}</dd>
-        </div>
-        <div>
-          <dt>Daily velocity</dt>
-          <dd>{numberFormatter.format(action.daily_velocity)} / day</dd>
-        </div>
-        <div>
-          <dt>Lead time used</dt>
-          <dd>{action.lead_time_days_used} days</dd>
-        </div>
-        <div>
-          <dt>Lead time source</dt>
-          <dd>{leadTimeSourceLabel[action.lead_time_source]}</dd>
-        </div>
-        <div>
-          <dt>Target coverage</dt>
-          <dd>{action.target_coverage_days} days</dd>
-        </div>
-        <div>
-          <dt>Target units</dt>
-          <dd>{numberFormatter.format(action.target_inventory_units)}</dd>
-        </div>
-        <div>
-          <dt>Safety stock</dt>
-          <dd>{numberFormatter.format(action.safety_stock_units)}</dd>
-        </div>
-        {action.status === "urgent" ? (
-          <>
-            <div>
-              <dt>Reorder point</dt>
-              <dd>{numberFormatter.format(action.reorder_point_units)}</dd>
-            </div>
-            <div>
-              <dt>Days until stockout</dt>
-              <dd>{numberFormatter.format(action.days_until_stockout)}</dd>
-            </div>
-            <div>
-              <dt>Profit at risk</dt>
-              <dd>{currencyFormatter.format(action.estimated_profit_impact)}</dd>
-            </div>
-          </>
+      <details className="action-advanced-details">
+        <summary>Advanced details</summary>
+        {action.data_quality_warnings.length > 0 ? (
+          <div className="quality-block">
+            <p className="quality-label">
+              Data confidence {confidenceLabel[action.data_quality_confidence]}
+            </p>
+            <ul className="warning-list">
+              {action.data_quality_warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </div>
         ) : (
-          <>
-            <div>
-              <dt>Excess units</dt>
-              <dd>{numberFormatter.format(action.excess_units)}</dd>
-            </div>
-            <div>
-              <dt>Cash tied up</dt>
-              <dd>{currencyFormatter.format(action.cash_tied_up)}</dd>
-            </div>
-          </>
+          <div className="quality-inline">
+            <span className="quality-label">
+              Data confidence {confidenceLabel[action.data_quality_confidence]}
+            </span>
+          </div>
         )}
-      </dl>
+
+        <dl className="action-metadata">
+          <Meta label="Current stock" value={formatNumber(action.current_on_hand)} />
+          <Meta label="Daily velocity" value={formatVelocity(action.daily_velocity)} />
+          <Meta label="Reorder point" value={formatNumber(action.reorder_point_units)} />
+          <Meta label="Safety stock" value={formatNumber(action.safety_stock_units)} />
+          <Meta label="Target units" value={formatNumber(action.target_inventory_units)} />
+          <Meta label="Lead time source" value={leadTimeSourceLabel[action.lead_time_source]} />
+          {action.status === "urgent" ? (
+            <Meta label="Exact stockout probability" value={riskTextFromExplanation(action.explanation)} />
+          ) : (
+            <Meta label="Excess units" value={formatNumber(action.excess_units)} />
+          )}
+          {calculationDetails ? (
+            <div className="action-metadata-wide">
+              <dt>Calculation details</dt>
+              <dd>{calculationDetails}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </details>
     </article>
   );
 }
@@ -226,6 +176,68 @@ function Reason({ label, value }: { label: string; value: string }) {
   );
 }
 
-function isFiniteNumber(value: number): boolean {
-  return Number.isFinite(value);
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function plainEnglishExplanation(action: InventoryAction, daysLeft: number | null): string {
+  if (!technicalExplanation(action.explanation) && action.explanation) {
+    return action.explanation;
+  }
+  if (action.status === "urgent" && isFiniteNumber(daysLeft) && isFiniteNumber(action.lead_time_days_used)) {
+    if (daysLeft <= action.lead_time_days_used) {
+      return `Current stock covers ${numberFormatter.format(daysLeft)} days, but lead time is ${numberFormatter.format(action.lead_time_days_used)} days. This SKU may run out before replenishment arrives.`;
+    }
+    return `Current stock covers ${numberFormatter.format(daysLeft)} days against a ${numberFormatter.format(action.lead_time_days_used)}-day lead time. Keep this SKU in reorder review.`;
+  }
+  if (action.status === "dead" && isFiniteNumber(action.cash_tied_up)) {
+    return `${formatMoney(action.cash_tied_up)} is tied up in inventory that should be reviewed for recovery.`;
+  }
+  if (action.status === "optimize" && isFiniteNumber(action.days_of_inventory) && isFiniteNumber(action.target_coverage_days)) {
+    return `Current stock covers ${numberFormatter.format(action.days_of_inventory)} days against a ${numberFormatter.format(action.target_coverage_days)}-day target. Review before placing another order.`;
+  }
+  return "Skubase ranked this item because its inventory signals need review.";
+}
+
+function technicalExplanation(value?: string | null): boolean {
+  if (!value) return false;
+  return /normal_cdf|normalcdf|erf\(|z-score|demand volatility|projected 30d|1\s*-\s*normal/i.test(value);
+}
+
+function riskTextFromExplanation(value?: string | null): string {
+  const match = value?.match(/Stockout risk is\s+(\d+(?:\.\d+)?)%/i);
+  return match ? `${match[1]}%` : "Unavailable";
+}
+
+function firstFinite(...values: Array<number | null | undefined>): number | null {
+  return values.find((value): value is number => isFiniteNumber(value)) ?? null;
+}
+
+function formatDays(value: number | null | undefined, fallback: string): string {
+  return isFiniteNumber(value) ? `${numberFormatter.format(value)} days` : fallback;
+}
+
+function formatDaysLeft(value: number | null): string {
+  return isFiniteNumber(value) ? `${numberFormatter.format(value)} days` : "Not enough sales history";
+}
+
+function formatMoney(value: number | null | undefined): string {
+  return isFiniteNumber(value) ? currencyFormatter.format(value) : "Unavailable";
+}
+
+function formatNumber(value: number | null | undefined): string {
+  return isFiniteNumber(value) ? numberFormatter.format(value) : "Unavailable";
+}
+
+function formatVelocity(value: number | null | undefined): string {
+  return isFiniteNumber(value) ? `${numberFormatter.format(value)} / day` : "Not enough sales history";
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }

@@ -185,7 +185,7 @@ export async function fetchInventoryActions(
   if (!response.ok) {
     throw new ApiError(
       (await readApiError(response)) ??
-        `Action feed request failed with status ${response.status}.`,
+        `Action Queue request failed with status ${response.status}.`,
       response.status
     );
   }

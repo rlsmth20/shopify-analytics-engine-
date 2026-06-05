@@ -18,6 +18,8 @@ export default function ForecastPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [quickView, setQuickView] = useState<"all" | "week" | "at-risk" | "high-confidence">("all");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -37,6 +39,10 @@ export default function ForecastPage() {
   const selected = useMemo(
     () => forecasts.find((f) => f.sku_id === selectedId) ?? null,
     [forecasts, selectedId]
+  );
+  const visibleForecasts = useMemo(
+    () => filterForecasts(forecasts, quickView, search),
+    [forecasts, quickView, search],
   );
 
   if (loading && forecasts.length === 0) {
@@ -60,8 +66,33 @@ export default function ForecastPage() {
       <aside className="forecast-list">
         <h3 className="panel-section-title">SKUs</h3>
         <p className="panel-section-subtitle">Ranked by stockout probability</p>
+        <label className="forecast-search">
+          <span>Search</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search SKU"
+          />
+        </label>
+        <div className="quick-filter-row quick-filter-row-compact">
+          {[
+            ["all", "All"],
+            ["week", "Running out this week"],
+            ["at-risk", "At risk"],
+            ["high-confidence", "High confidence"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`quick-filter-chip${quickView === key ? " quick-filter-chip-active" : ""}`}
+              onClick={() => setQuickView(key as typeof quickView)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <ul className="sku-list">
-          {forecasts.map((f) => (
+          {visibleForecasts.map((f) => (
             <li
               key={f.sku_id}
               className={`sku-list-row${
@@ -96,6 +127,9 @@ export default function ForecastPage() {
             </li>
           ))}
         </ul>
+        {visibleForecasts.length === 0 ? (
+          <p className="muted small">No SKUs match this quick view.</p>
+        ) : null}
       </aside>
 
       <section className="forecast-detail">
@@ -144,6 +178,21 @@ export default function ForecastPage() {
               } />
             </div>
 
+            <section className="planning-preview-grid">
+              <PlanningCard
+                title="Demand Plan"
+                label="Next 90 days"
+                value={`${selected.projected_90_day_demand.toFixed(0)} units`}
+                note={`30d ${selected.projected_30_day_demand.toFixed(0)} / 60d ${selected.projected_60_day_demand.toFixed(0)} / 90d ${selected.projected_90_day_demand.toFixed(0)}`}
+              />
+              <PlanningCard
+                title="Replenishment Signal"
+                label="Stockout probability"
+                value={percent(selected.stockout_probability_30d, 0)}
+                note="Use purchase orders for quantity and vendor grouping."
+              />
+            </section>
+
             <ChartPanel
               title={`Forecast · ${selected.sku_id.replace(/^sku_/, "")}`}
               subtitle={selected.explain}
@@ -171,6 +220,21 @@ export default function ForecastPage() {
   );
 }
 
+function filterForecasts(
+  forecasts: ForecastResult[],
+  quickView: "all" | "week" | "at-risk" | "high-confidence",
+  search: string,
+): ForecastResult[] {
+  const needle = search.trim().toLowerCase();
+  return forecasts.filter((forecast) => {
+    if (needle && !forecast.sku_id.toLowerCase().includes(needle)) return false;
+    if (quickView === "week") return forecast.stockout_probability_30d >= 0.5;
+    if (quickView === "at-risk") return forecast.stockout_probability_30d >= 0.2;
+    if (quickView === "high-confidence") return forecast.confidence === "high";
+    return true;
+  });
+}
+
 function rankForecastsByStockoutRisk(forecasts: ForecastResult[]): ForecastResult[] {
   return [...forecasts].sort(
     (left, right) =>
@@ -194,6 +258,27 @@ function Kpi({
       <p className="kpi-label">{label}</p>
       <p className="kpi-value">{value}</p>
     </div>
+  );
+}
+
+function PlanningCard({
+  title,
+  label,
+  value,
+  note,
+}: {
+  title: string;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <article className="planning-card">
+      <span>{title}</span>
+      <p>{label}</p>
+      <strong>{value}</strong>
+      <small>{note}</small>
+    </article>
   );
 }
 

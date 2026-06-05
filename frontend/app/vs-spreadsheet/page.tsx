@@ -19,7 +19,7 @@ const reasons = [
   { title: "A 6-month rule of thumb is a tax on your working capital.", body: "Holding 6 months of cover for an A-item with steady demand is statistically wasteful — that''s a 95th-percentile-plus stockout rule applied to SKUs that only need 30–60 days. The cash gap is real, and it compounds across every reorder cycle." },
   { title: "Trailing averages miss seasonality and trend.", body: "A 6-month moving average is half-blind on every Q4 ramp. skubase fits a Holt double-exponential model with a weekly seasonality factor, so a back-to-school SKU isn''t reordered like a steady-state one." },
   { title: "All SKUs are not equal.", body: "Your A-items deserve a 99% service level; your C-items don''t. skubase segments by ABC × XYZ and sets safety stock per class — the math the spreadsheet can''t do without becoming a part-time job." },
-  { title: "Your suppliers are unmeasured.", body: "If your spreadsheet doesn''t track which vendors miss promised lead times, you''re carrying their failures as your stockouts. skubase scores every vendor on on-time, fill rate, and lead-time stability." },
+  { title: "Your suppliers are unmeasured.", body: "If your spreadsheet doesn''t track which suppliers miss promised lead times, you''re carrying their failures as your stockouts. skubase scores every supplier on on-time, fill rate, and lead-time stability." },
   { title: "Dead stock is a cash recovery problem your sheet ignores.", body: "The Sheet shows you what you have. It does not propose a markdown plan, a bundle, a wholesale list, or a write-off. skubase does — with the dollar impact attached." }
 ];
 

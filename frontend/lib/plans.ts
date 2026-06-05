@@ -45,7 +45,7 @@ export const PRICING_TIERS: PricingTier[] = [
     limit: "Up to 500 active SKUs - 1 location - 3 seats",
     featured: false,
     features: [
-      { label: "Ranked action feed (urgent / optimize / dead)", included: true },
+      { label: "Ranked Action Queue (urgent / optimize / dead)", included: true },
       { label: "AI-powered demand forecasting (Holt + seasonality)", included: true },
       { label: "ABC x XYZ classification", included: true },
       { label: "Supplier lead-time settings", included: true },
@@ -54,7 +54,7 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "Shopify-native ingestion", included: true },
       { label: "Self-serve setup", included: true },
       { label: "Supplier scorecards + tiering", included: false },
-      { label: "Bundles, transfers, and liquidation plans", included: false },
+      { label: "Bundle opportunities, transfers, and dead-stock plans", included: false },
       { label: "SMS + webhook alerts", included: false },
       { label: "Admin roles and audit history", included: false },
     ],

@@ -237,20 +237,23 @@ export default function LeadTimeSettingsPage() {
               </label>
             </div>
 
-            <label className="toggle-row">
-              <div>
-                <span className="toggle-title">Allow mock fallback</span>
-                <p className="toggle-copy">
-                  If disabled, `/actions` returns an error when the DB does not
-                  have usable live data.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={allowMockFallback}
-                onChange={(event) => setAllowMockFallback(event.target.checked)}
-              />
-            </label>
+            <details className="advanced-settings">
+              <summary>Advanced settings</summary>
+              <label className="toggle-row">
+                <div>
+                  <span className="toggle-title">Allow sample fallback</span>
+                  <p className="toggle-copy">
+                    If disabled, the Action Queue returns an error when the DB does
+                    not have usable live data.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={allowMockFallback}
+                  onChange={(event) => setAllowMockFallback(event.target.checked)}
+                />
+              </label>
+            </details>
           </SectionCard>
 
           <SectionCard>
@@ -266,8 +269,8 @@ export default function LeadTimeSettingsPage() {
                 <p>Uses the SKU-specific lead time when it exists.</p>
               </div>
               <div className="step-item">
-                <strong>2. Vendor override</strong>
-                <p>Uses the shop-scoped vendor lead time table.</p>
+                <strong>2. Supplier override</strong>
+                <p>Uses the shop-scoped supplier lead time table.</p>
               </div>
               <div className="step-item">
                 <strong>3. Category override</strong>
@@ -285,12 +288,12 @@ export default function LeadTimeSettingsPage() {
           <SectionCard>
             <div className="section-heading">
               <div>
-                <p className="section-eyebrow">Vendor Overrides</p>
-                <h2 className="section-title section-title-small">Vendor lead times</h2>
+                <p className="section-eyebrow">Supplier Overrides</p>
+                <h2 className="section-title section-title-small">Supplier lead times</h2>
               </div>
             </div>
             <label className="field-label">
-              <span>One vendor per line</span>
+              <span>One supplier per line</span>
               <textarea
                 className="input-control textarea-control"
                 value={vendorLeadTimesText}
@@ -298,7 +301,7 @@ export default function LeadTimeSettingsPage() {
                 placeholder={"Northstar Apparel | 16\nSummit Sportswear | 19"}
               />
             </label>
-            <p className="section-copy">Format: vendor name | lead time days</p>
+            <p className="section-copy">Format: supplier name | lead time days</p>
           </SectionCard>
 
           <SectionCard>

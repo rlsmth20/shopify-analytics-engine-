@@ -32,7 +32,7 @@ export function useActionFeed() {
       if (error instanceof ApiError && error.status === 401) {
         setErrorStatus(error.status);
         setErrorMessage(
-          "The action feed rejected the request. Your dashboard session is still active, so refresh the page or try again in a moment."
+          "The Action Queue rejected the request. Your session is still active, so refresh the page or try again in a moment."
         );
         return;
       }

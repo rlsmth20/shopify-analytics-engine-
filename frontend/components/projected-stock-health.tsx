@@ -15,6 +15,7 @@ export type ProjectedStockHealthProps = {
   sku?: string;
   currentStock?: number | null;
   dailyVelocity?: number | null;
+  salesLast30Days?: number | null;
   daysLeft?: number | null;
   daysOfInventory?: number | null;
   leadTimeDays?: number | null;
@@ -30,6 +31,7 @@ export type ProjectedStockHealthProps = {
   dataQualityNote?: string | null;
   daysSinceLastSale?: number | null;
   compact?: boolean;
+  hideMetricGrid?: boolean;
 };
 
 export function ProjectedStockHealth({
@@ -37,6 +39,7 @@ export function ProjectedStockHealth({
   sku,
   currentStock,
   dailyVelocity,
+  salesLast30Days,
   daysLeft,
   daysOfInventory,
   leadTimeDays,
@@ -52,6 +55,7 @@ export function ProjectedStockHealth({
   dataQualityNote,
   daysSinceLastSale,
   compact = false,
+  hideMetricGrid = false,
 }: ProjectedStockHealthProps) {
   const coverDays = firstFinite(daysLeft, daysOfInventory);
   const health = normalizeStatus(
@@ -102,23 +106,26 @@ export function ProjectedStockHealth({
 
       <p className="stock-health-explanation">{explanation}</p>
 
-      <details className="stock-health-details">
-        <summary>Details</summary>
-        <dl>
-          <Detail label="Current stock" value={formatNumber(currentStock)} />
-          <Detail label="Daily velocity" value={formatVelocity(dailyVelocity)} />
-          <Detail label="Days left / cover" value={formatDays(coverDays)} />
-          <Detail label="Lead time" value={formatDays(leadTimeDays)} />
-          <Detail label="Target coverage" value={formatDays(targetCoverageDays)} />
-          <Detail label="Recommended qty" value={formatNumber(recommendedQty)} />
-          <Detail label="Estimated stockout" value={safeText(stockoutDate)} />
-          <Detail label="Inventory value" value={formatMoney(inventoryValue)} />
-          <Detail label="Cash impact" value={formatMoney(cashImpact)} />
-          <Detail label="Confidence" value={safeText(confidence)} />
-        </dl>
-        {recommendedAction ? <p className="stock-health-action">{recommendedAction}</p> : null}
-        {dataQualityNote ? <p className="stock-health-note">{dataQualityNote}</p> : null}
-      </details>
+      {hideMetricGrid ? null : (
+        <details className="stock-health-details">
+          <summary>Details</summary>
+          <dl>
+            <Detail label="Current stock" value={formatNumber(currentStock)} />
+            <Detail label="Daily velocity" value={formatVelocity(dailyVelocity)} />
+            <Detail label="Sales last 30 days" value={formatNumber(salesLast30Days)} />
+            <Detail label="Days left / cover" value={formatDays(coverDays)} />
+            <Detail label="Lead time" value={formatDays(leadTimeDays)} />
+            <Detail label="Target coverage" value={formatDays(targetCoverageDays)} />
+            <Detail label="Recommended qty" value={formatNumber(recommendedQty)} />
+            <Detail label="Estimated stockout" value={safeText(stockoutDate)} />
+            <Detail label="Inventory value" value={formatMoney(inventoryValue)} />
+            <Detail label="Cash impact" value={formatMoney(cashImpact)} />
+            <Detail label="Confidence" value={safeText(confidence)} />
+          </dl>
+          {recommendedAction ? <p className="stock-health-action">{recommendedAction}</p> : null}
+          {dataQualityNote ? <p className="stock-health-note">{dataQualityNote}</p> : null}
+        </details>
+      )}
     </section>
   );
 }
@@ -197,9 +204,9 @@ function buildExplanation({
   }
   if (health === "Overstock") {
     if (isFiniteNumber(coverDays) && isFiniteNumber(targetCoverageDays)) {
-      return `This SKU has ${formatNumber(coverDays)} days of cover, above the ${formatNumber(targetCoverageDays)}-day target. Review for overstock.`;
+      return `This SKU has ${formatNumber(coverDays)} days left, above the ${formatNumber(targetCoverageDays)}-day target. Review for overstock.`;
     }
-    return "Inventory cover appears above target, so review this SKU before buying more.";
+    return "Current stock appears above target, so review this SKU before buying more.";
   }
   if ((health === "Stockout risk" || health === "At risk" || health === "Watch") && isFiniteNumber(coverDays) && isFiniteNumber(leadTimeDays)) {
     if (coverDays <= leadTimeDays) {

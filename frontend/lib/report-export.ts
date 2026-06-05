@@ -366,7 +366,7 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
     summarySheetName: "Summary",
     detailSheetName: "Lines",
     kpis: [
-      { label: "Vendor", value: po.vendor },
+      { label: "Supplier", value: po.vendor },
       { label: "Lines", value: String(po.lines.length) },
       { label: "Subtotal", value: currency(po.subtotal_cost), tone: "neutral" },
       { label: "Shipping", value: currency(po.shipping_cost), tone: "warning" },
@@ -388,7 +388,7 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
     ],
     todos: [
       { label: "Approve the PO", detail: "Confirm quantities, costs, and expected arrival before sending.", tone: "warning" },
-      { label: "Send to vendor", detail: "Use the exported line detail or the app send flow to contact the supplier.", tone: "good" },
+      { label: "Open vendor email draft", detail: "Use the exported line detail or the PO page email draft to contact the supplier.", tone: "good" },
       { label: "Record receipts", detail: "Receiving history powers supplier scorecards and lead-time confidence.", tone: "neutral" },
     ],
     tableTitle: "PO Lines",
@@ -1029,7 +1029,7 @@ function defaultTodos(title: string): ReportTodo[] {
     return [
       { label: "Review critical stockout risks", detail: "Start with SKUs where days left is inside supplier lead time.", tone: "danger" },
       { label: "Open the reorder plan", detail: "Convert high-risk SKUs into purchase order decisions.", tone: "warning" },
-      { label: "Validate lead-time assumptions", detail: "Confirm vendor lead times before committing capital.", tone: "neutral" },
+      { label: "Validate lead-time assumptions", detail: "Confirm supplier lead times before committing capital.", tone: "neutral" },
     ];
   }
   if (normalized.includes("dead") || normalized.includes("overstock")) {
@@ -1042,7 +1042,7 @@ function defaultTodos(title: string): ReportTodo[] {
   if (normalized.includes("reorder") || normalized.includes("purchase")) {
     return [
       { label: "Approve urgent reorder lines", detail: "Confirm costs and quantities for SKUs inside the reorder window.", tone: "danger" },
-      { label: "Group by supplier", detail: "Send fewer, cleaner purchase orders to vendors.", tone: "warning" },
+      { label: "Group by supplier", detail: "Prepare fewer, cleaner purchase orders for suppliers.", tone: "warning" },
       { label: "Record receipts", detail: "Receipt history improves supplier scorecards and lead-time confidence.", tone: "good" },
     ];
   }

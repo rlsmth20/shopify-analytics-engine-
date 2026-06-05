@@ -53,8 +53,8 @@ export function ActionFeed({
       <div className="toolbar-card">
         <div className="toolbar-left">
           <div>
-            <p className="section-eyebrow">Work Queue</p>
-            <h2 className="section-title section-title-small">Prioritized inventory actions</h2>
+            <p className="section-eyebrow">Action Queue</p>
+            <h2 className="section-title section-title-small">Prioritized Action Queue</h2>
           </div>
           {dataSource ? (
             <span className="source-badge">{summarizeDataSource(dataSource)}</span>
@@ -104,8 +104,8 @@ export function ActionFeed({
 
       {isLoading ? (
         <EmptyState
-          title="Loading action feed"
-          description="Pulling prioritized inventory actions from the backend."
+          title="Loading Action Queue"
+          description="Pulling prioritized Action Queue items from the backend."
         />
       ) : null}
 

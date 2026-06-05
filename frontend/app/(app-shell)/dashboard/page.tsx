@@ -29,7 +29,7 @@ const ACTION_PATH_STEPS = [
   {
     step: "2",
     title: "Review reorder recommendations",
-    body: "Turn urgent replenishment signals into vendor-grouped PO drafts.",
+    body: "Turn urgent replenishment signals into supplier-grouped PO drafts.",
     href: "/purchase-orders",
   },
   {
@@ -156,7 +156,7 @@ export default function DashboardPage() {
               <span className="dashboard-empty-step-num">4</span>
               <div>
                 <p className="dashboard-empty-step-title">Set lead times</p>
-                <p className="dashboard-empty-step-body">Global default + vendor overrides — drives every reorder calculation.</p>
+                <p className="dashboard-empty-step-body">Global default + supplier overrides - drives every reorder calculation.</p>
               </div>
               <span aria-hidden>→</span>
             </a>
@@ -211,7 +211,7 @@ export default function DashboardPage() {
           <div>
             <p className="section-eyebrow">{user.id === 0 ? "Demo path" : "Start here"}</p>
             <h2 className="section-title section-title-small">
-              Start with your highest-impact inventory actions
+              Start with your highest-impact Action Queue items
             </h2>
             <p className="muted section-copy">
               Work these in order to see how Skubase turns inventory data into a focused weekly plan.
@@ -340,8 +340,8 @@ export default function DashboardPage() {
 
         <ChartPanel
           className="col-8"
-          title="Cash parked by vendor"
-          subtitle="Overstock + dead stock at cost, top 6 vendors"
+          title="Cash parked by supplier"
+          subtitle="Overstock + dead stock at cost, top 6 suppliers"
           accent="warning"
         >
           <HorizontalBarChart
@@ -383,7 +383,7 @@ export default function DashboardPage() {
             <TodayRow
               step="1"
               title="Reorder urgent SKUs"
-              body="Push the prioritized action queue into purchase orders — they're grouped by vendor on the PO page."
+              body="Push the prioritized Action Queue into purchase orders - they're grouped by supplier on the PO page."
               href="/purchase-orders"
             />
             <TodayRow

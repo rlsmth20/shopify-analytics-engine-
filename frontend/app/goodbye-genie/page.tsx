@@ -14,7 +14,7 @@ export const metadata = {
 const reasons = [
   { title: "Shopify-native simplicity, kept.", body: "Genie's appeal was that it felt like a Shopify app, not an ERP bolt-on. skubase is built the same way." },
   { title: "The math, added.", body: "Genie merchants told reviewers the forecasting felt basic. skubase ships Holt double-exponential smoothing with weekly seasonality." },
-  { title: "Suppliers, measured.", body: "Genie treated vendors as contacts. skubase scores them: on-time delivery, fill rate, lead-time stability, tiering." },
+  { title: "Suppliers, measured.", body: "Genie treated suppliers as contacts. skubase scores them: on-time delivery, fill rate, lead-time stability, tiering." },
   { title: "Dead stock, acted on.", body: "Genie surfaced aged stock. skubase proposes a plan: markdown, bundle, wholesale, or write-off." }
 ];
 

@@ -233,6 +233,28 @@ export type BundleHealth = {
   recommended_action: string;
 };
 
+export type BundleOpportunity = {
+  id: string;
+  product_a_id: number;
+  product_a_name: string;
+  product_a_sku: string | null;
+  product_a_category: string | null;
+  product_b_id: number;
+  product_b_name: string;
+  product_b_sku: string | null;
+  product_b_category: string | null;
+  co_purchase_count: number;
+  support: number;
+  confidence_a_to_b: number;
+  confidence_b_to_a: number;
+  lift: number | null;
+  combined_revenue: number;
+  average_order_value_impact: number | null;
+  opportunity_type: "Bundle" | "Cross-sell" | "Promo test" | "Watch" | string;
+  suggested_action: "Create bundle" | "Add cross-sell" | "Test promo" | "Watch" | string;
+  explanation: string;
+};
+
 export type TransferRecommendation = {
   sku_id: string;
   name: string;
@@ -574,7 +596,7 @@ export const fetchSuppliers = (signal?: AbortSignal) =>
   get<{ vendors: SupplierScorecard[] }>("/suppliers", signal);
 
 export const fetchBundles = (signal?: AbortSignal) =>
-  get<{ bundles: BundleHealth[] }>("/bundles", signal);
+  get<{ bundles: BundleHealth[]; opportunities?: BundleOpportunity[]; orders_analyzed?: number }>("/bundles", signal);
 
 export const fetchTransfers = (signal?: AbortSignal) =>
   get<{ transfers: TransferRecommendation[] }>("/transfers", signal);

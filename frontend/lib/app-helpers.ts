@@ -69,7 +69,7 @@ export function buildActionErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "The action feed could not be loaded.";
+  return "The Action Queue could not be loaded.";
 }
 
 export function buildSyncRunSummary(syncRun: ShopifySyncRun): string {

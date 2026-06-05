@@ -101,7 +101,7 @@ const reportCards = [
     key: "reorder" as const,
     title: "Reorder Plan Report",
     category: "Replenishment",
-    description: "Recommended reorder quantities, estimated cost, and vendor exposure.",
+    description: "Recommended reorder quantities, estimated cost, and supplier exposure.",
     status: "Available",
     href: "/purchase-orders",
     cta: "Open PO drafts",
@@ -127,9 +127,17 @@ const reportCards = [
     title: "Transfer Plan Report",
     category: "Operations",
     description: "Recommended inventory moves between locations when location-level stock is available.",
-    status: "Available in demo",
+    status: "Sample data",
     href: "/transfers",
     cta: "Open transfers",
+  },
+  {
+    title: "Bundle Opportunity Report",
+    category: "Revenue",
+    description: "Products frequently bought together, ranked by co-purchase strength and revenue opportunity.",
+    status: "Available",
+    href: "/bundles",
+    cta: "Open bundles",
   },
   {
     title: "Supplier Scorecard",
@@ -143,15 +151,15 @@ const reportCards = [
     title: "Sample Inventory Risk Snapshot",
     category: "Outbound sample",
     description: "Demo-only sample deliverable for cold-email prospects.",
-    status: "Demo/sample",
+    status: "Sample report",
     href: "/sample-inventory-risk-snapshot",
     cta: "View sample",
   },
   {
-    title: "Scheduled Weekly Reports",
+    title: "Schedule Preferences",
     category: "Automation",
-    description: "Save email schedule preferences for recurring inventory report delivery.",
-    status: "Available",
+    description: "Save report delivery preferences; automated email delivery is planned.",
+    status: "Delivery planned",
     href: "/reports",
     cta: "Configure schedule",
   },
@@ -161,7 +169,7 @@ const reportMeta: Record<ReportKind, { title: string; description: string }> = {
   actions: {
     title: "Inventory Action Report",
     description:
-      "A working table of the current action queue, enriched with vendor and category when scorecard data is available.",
+      "A working table of the current Action Queue, enriched with supplier and category when scorecard data is available.",
   },
   stockout: {
     title: "Stockout Risk Report",
@@ -176,7 +184,7 @@ const reportMeta: Record<ReportKind, { title: string; description: string }> = {
   reorder: {
     title: "Reorder Plan Report",
     description:
-      "Suggested replenishment quantities with vendor, lead-time, and estimated cost context.",
+      "Suggested replenishment quantities with supplier, lead-time, and estimated cost context.",
   },
 };
 
@@ -469,7 +477,7 @@ export default function ReportsPage() {
                   title={data ? "No rows match the current filters" : "Requires connected store data"}
                   description={
                     data
-                      ? "Try clearing filters or searching a different SKU, product, vendor, or category."
+                      ? "Try clearing filters or searching a different SKU, product, supplier, or category."
                       : "Connect Shopify or enter demo mode to populate report previews."
                   }
                 />
@@ -525,16 +533,16 @@ function ReportSchedulePanel({
     <section className="section-card report-admin-card">
       <div className="section-heading">
         <div>
-          <p className="section-eyebrow">Scheduled reports</p>
+          <p className="section-eyebrow">Schedule preferences</p>
           <h2 className="section-title section-title-small">
-            Email delivery preferences
+            Report delivery preferences
           </h2>
           <p className="section-copy">
-            Save a recurring schedule for the selected report. The preference is
-            recorded now so report delivery can run from the backend scheduler.
+            Save the selected report cadence and recipient. Automated email
+            delivery is planned; exports are available now.
           </p>
         </div>
-        <ReportStatusBadge tone="positive">Available</ReportStatusBadge>
+        <ReportStatusBadge tone="warning">Delivery planned</ReportStatusBadge>
       </div>
       <div className="report-schedule-form">
         <label className="report-filter-field">
@@ -595,17 +603,17 @@ function AuditHistoryPanel({ events }: { events: AuditLogEvent[] }) {
       <div className="section-heading">
         <div>
           <p className="section-eyebrow">Decision history</p>
-          <h2 className="section-title section-title-small">Recent audit trail</h2>
+          <h2 className="section-title section-title-small">Recent workspace history</h2>
           <p className="section-copy">
-            Saved report schedules, PO approvals, sends, and receipts appear here
-            as workspace history.
+            Saved report preferences and PO status changes appear here when they
+            are recorded by the workspace.
           </p>
         </div>
       </div>
       {events.length === 0 ? (
         <ReportEmptyState
           title="No decisions logged yet"
-          description="Save a report schedule or move a purchase order through approval to start the audit trail."
+          description="Save report preferences or update a purchase order status to start workspace history."
         />
       ) : (
         <div className="audit-timeline">
@@ -670,7 +678,7 @@ function reportCta(report: ReportKind): { label: string; href: string } {
   if (report === "stockout") return { label: "Review reorder plan", href: "/purchase-orders" };
   if (report === "reorder") return { label: "Open purchase orders", href: "/purchase-orders" };
   if (report === "dead-stock") return { label: "Open liquidation plan", href: "/liquidation" };
-  return { label: "Open action feed", href: "/actions" };
+  return { label: "Open Action Queue", href: "/actions" };
 }
 
 function buildInsight(report: ReportKind, rows: ReportRow[]): string {
@@ -707,7 +715,7 @@ function buildReportTodos(report: ReportKind, rows: ReportRow[]) {
       },
       {
         label: "Confirm lead-time assumptions",
-        detail: "Check vendor/category lead-time settings before committing capital.",
+        detail: "Check supplier/category lead-time settings before committing capital.",
         tone: "neutral" as const,
       },
     ];
@@ -721,7 +729,7 @@ function buildReportTodos(report: ReportKind, rows: ReportRow[]) {
         tone: "danger" as const,
       },
       {
-        label: `Group orders across ${vendors} ${vendors === 1 ? "vendor" : "vendors"}`,
+        label: `Group orders across ${vendors} ${vendors === 1 ? "supplier" : "suppliers"}`,
         detail: "Use supplier grouping to keep purchase orders clean.",
         tone: "warning" as const,
       },
@@ -783,7 +791,7 @@ function ReportRowDetails({
   const fields = [
     ["Product", row.product],
     ["SKU", row.sku],
-    ["Vendor", row.vendor],
+    ["Supplier", row.vendor],
     ["Category", row.category],
     ["Priority / risk / status", `${formatNumber(row.priority)} / ${row.riskLevel} / ${row.status}`],
     ["Current stock", formatNumber(row.currentStock)],
@@ -802,6 +810,7 @@ function ReportRowDetails({
         sku={row.sku}
         currentStock={row.currentStock}
         dailyVelocity={row.dailyVelocity}
+        salesLast30Days={row.salesLast30}
         daysLeft={row.daysLeft}
         daysOfInventory={row.daysInventory}
         leadTimeDays={row.leadTime}
@@ -1011,7 +1020,7 @@ function buildColumns(report: ReportKind): ReportColumn<ReportRow>[] {
   const baseProduct: ReportColumn<ReportRow>[] = [
     textColumn("product", "Product", (row) => row.product),
     textColumn("sku", "SKU", (row) => row.sku),
-    textColumn("vendor", "Vendor", (row) => row.vendor),
+    textColumn("vendor", "Supplier", (row) => row.vendor),
   ];
 
   if (report === "actions") {
@@ -1097,12 +1106,12 @@ function buildMetrics(report: ReportKind, rows: ReportRow[]): ReportMetric[] {
     metric("SKUs to reorder", rows.length, "warning"),
     metric("Estimated reorder value", currency(sum(rows, "estimatedCost")), "warning"),
     metric("Critical reorder items", rows.filter((row) => row.riskLevel === "Critical").length, "danger"),
-    metric("Vendors involved", new Set(rows.map((row) => row.vendor)).size, "neutral"),
+    metric("Suppliers involved", new Set(rows.map((row) => row.vendor)).size, "neutral"),
   ];
 }
 
 function buildFilterConfig(report: ReportKind, rows: ReportRow[]): ReportFilterConfig[] {
-  const vendor = selectFilter("vendor", "Vendor", uniqueValues(rows, "vendor"));
+  const vendor = selectFilter("vendor", "Supplier", uniqueValues(rows, "vendor"));
   const category = selectFilter("category", "Category", uniqueValues(rows, "category"));
 
   if (report === "actions") {
@@ -1454,7 +1463,7 @@ function buildReportCharts(
   // reorder
   return [
     {
-      title: "Vendor exposure",
+      title: "Supplier exposure",
       points: vendorExposure(rows),
     },
     {
@@ -1584,7 +1593,7 @@ function buildXlsxColumns(report: ReportKind): XlsxColumn<ReportRow>[] {
   };
   const vendor: XlsxColumn<ReportRow> = {
     key: "vendor",
-    label: "Vendor",
+    label: "Supplier",
     width: 18,
     format: (row) => row.vendor,
   };

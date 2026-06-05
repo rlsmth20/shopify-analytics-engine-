@@ -99,13 +99,33 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    if (detectDemo()) {
-      setIsDemo(true);
-      setUser(DEMO_USER);
-      setLoading(false);
-      return;
-    }
-    refresh();
+    const demo = detectDemo();
+
+    // Always verify the session first. If the user is authenticated, their real
+    // account takes precedence over demo mode — a logged-in merchant who clicks
+    // a demo link should see their own data, not the synthetic user.
+    fetch(`${API_BASE}/auth/me`, { credentials: "include" })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = (await res.json()) as AuthUser;
+          setUser(data);
+          setIsDemo(false);
+        } else if (demo) {
+          setUser(DEMO_USER);
+          setIsDemo(true);
+        } else {
+          setUser(null);
+        }
+      })
+      .catch(() => {
+        if (demo) {
+          setUser(DEMO_USER);
+          setIsDemo(true);
+        } else {
+          setUser(null);
+        }
+      })
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

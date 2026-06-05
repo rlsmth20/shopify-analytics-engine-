@@ -255,7 +255,7 @@ export function DonutChart({
               style={{ background: DONUT_PALETTE[i % DONUT_PALETTE.length] }}
             />
             <span className="donut-legend-label">{p.label}</span>
-            <span className="donut-legend-value">— {p.value.toLocaleString()}</span>
+            <span className="donut-legend-value">{p.value.toLocaleString()}</span>
           </div>
         ))}
       </div>
