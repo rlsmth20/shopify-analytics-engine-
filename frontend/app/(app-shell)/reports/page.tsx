@@ -210,7 +210,7 @@ export default function ReportsPage() {
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
-  const [entitlementsLoaded, setEntitlementsLoaded] = useState(user.id === 0 || user.is_admin);
+  const [entitlementsLoaded, setEntitlementsLoaded] = useState(user.id === 0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -237,7 +237,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (user.id === 0 || user.is_admin) {
+    if (user.id === 0) {
       setEntitlements(null);
       setEntitlementsLoaded(true);
       return;
@@ -256,7 +256,7 @@ export default function ReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [user.id, user.is_admin]);
+  }, [user.id]);
 
   useEffect(() => {
     setSearch("");
@@ -319,7 +319,6 @@ export default function ReportsPage() {
   const cta = reportCta(selectedReport);
   const canExport =
     user.id === 0 ||
-    user.is_admin ||
     entitlementHas(entitlements, "reports_export");
 
   function updateSort(key: string) {

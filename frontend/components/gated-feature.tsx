@@ -33,7 +33,7 @@ export function GatedFeature({
     setLoading(true);
     setFailed(false);
 
-    if (user.id === 0 || user.is_admin) {
+    if (user.id === 0) {
       setEntitlements(null);
       setLoading(false);
       return;
@@ -55,13 +55,13 @@ export function GatedFeature({
     return () => {
       cancelled = true;
     };
-  }, [user.id, user.is_admin]);
+  }, [user.id]);
 
   if (loading) {
     return <div className="page-loading">Loading plan access...</div>;
   }
 
-  if (user.id === 0 || user.is_admin || entitlementHas(entitlements, capability)) {
+  if (user.id === 0 || entitlementHas(entitlements, capability)) {
     return <>{children}</>;
   }
 

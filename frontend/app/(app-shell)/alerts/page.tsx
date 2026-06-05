@@ -65,7 +65,7 @@ export default function AlertsPage() {
   const [tab, setTab] = useState<"rules" | "channels" | "history">("rules");
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
 
-  const unlockAll = user.id === 0 || user.is_admin;
+  const unlockAll = user.id === 0;
   const isChannelAllowed = (channel: NotificationChannel) =>
     unlockAll || hasCapability(entitlements?.plan_id ?? "none", CHANNEL_MIN_TIER[channel] === "growth" ? "alerts_advanced" : "alerts_basic");
 

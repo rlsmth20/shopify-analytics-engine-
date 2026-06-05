@@ -273,7 +273,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isShopifyInstalled = Boolean(subscription?.is_shopify_installed);
   const directTrialAccess =
     Boolean(user.in_trial) && !isShopifyInstalled && !isEmbeddedShopifyContext();
-  const unlockAll = user.id === 0 || directTrialAccess || Boolean(user.is_admin) || !subscriptionLoaded;
+  const unlockAll = user.id === 0 || directTrialAccess || !subscriptionLoaded;
   const planChipLabel =
     user.id === 0
       ? "Sample workspace"

@@ -184,9 +184,6 @@ def require_plan_feature(feature: FeatureKey) -> Callable[..., User]:
         db: Annotated[DbSession, Depends(get_db_session)],
         user: Annotated[User, Depends(require_active_access)],
     ) -> User:
-        if user.is_admin:
-            return user
-
         from datetime import datetime, timezone
         from app.services.shopify_billing import (
             current_shopify_subscription_summary,

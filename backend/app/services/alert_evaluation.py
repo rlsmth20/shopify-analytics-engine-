@@ -22,6 +22,17 @@ from app.services.supplier_scoring import build_supplier_scorecards
 
 
 def current_plan(db: DbSession, user: User) -> str | None:
+    from app.services.shopify_billing import (
+        current_shopify_subscription_summary,
+        has_active_shopify_connection,
+    )
+
+    if has_active_shopify_connection(db, shop_id=user.shop_id):
+        shopify_sub = current_shopify_subscription_summary(db, user=user)
+        if shopify_sub.get("status") in ("active", "trialing"):
+            return str(shopify_sub.get("plan") or "none")
+        return None
+
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
     if sub is None or sub.status not in ("active", "trialing"):
         return None
@@ -44,9 +55,6 @@ def user_has_active_access(db: DbSession, user: User) -> bool:
 
 
 def allowed_alert_channels(db: DbSession, user: User) -> set[NotificationChannel]:
-    if user.is_admin:
-        return set(ALERT_CHANNEL_MIN_TIER.keys())
-
     trial_ends = user.trial_ends_at
     if trial_ends is not None:
         if trial_ends.tzinfo is None:
