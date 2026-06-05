@@ -7,8 +7,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AskSkubaseChat } from "@/components/ask-skubase-chat";
 import { useAuth } from "@/components/auth-guard";
 import { SHOPIFY_DOMAIN_STORAGE_KEY } from "@/lib/app-helpers";
-import { planToTier, tierAllows, type PlanTierKey } from "@/lib/plans";
-import { authenticatedFetch } from "@/lib/shopify-embedded";
+import {
+  planDisplayName,
+  planToTier,
+  tierAllows,
+  type PlanTierKey,
+} from "@/lib/plans";
+import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
 type NavItem = {
   href: string;
@@ -22,17 +27,17 @@ const navigationItems: NavItem[] = [
   { href: "/dashboard", label: "Today", section: "Command", icon: ">" },
   { href: "/actions", label: "Action Queue", section: "Command", icon: "o" },
   { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "*" },
-  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "o" },
+  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "o", minTier: "growth" },
   { href: "/analytics", label: "Inventory Health", section: "Intelligence", icon: "<>" },
   { href: "/reports", label: "Reports & Exports", section: "Intelligence", icon: ">" },
-  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o", minTier: "growth" },
-  { href: "/purchase-orders", label: "Reorder / POs", section: "Operations", icon: "o" },
+  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o", minTier: "scale" },
+  { href: "/purchase-orders", label: "Reorder / POs", section: "Operations", icon: "o", minTier: "growth" },
   { href: "/stocky-migration", label: "Stocky Migration", section: "Operations", icon: ">" },
-  { href: "/transfers", label: "Transfers", section: "Operations", icon: "*", minTier: "growth" },
+  { href: "/transfers", label: "Transfers", section: "Operations", icon: "*", minTier: "scale" },
   { href: "/bundles", label: "Bundle Opportunities", section: "Operations", icon: "<>", minTier: "growth" },
-  { href: "/liquidation", label: "Dead Stock", section: "Operations", icon: "o", minTier: "growth" },
+  { href: "/liquidation", label: "Dead Stock", section: "Operations", icon: "o" },
   { href: "/store-sync", label: "Store Sync", section: "Settings", icon: ">" },
-  { href: "/lead-time-settings", label: "Lead Times", section: "Settings", icon: "*" },
+  { href: "/lead-time-settings", label: "Inventory Rules", section: "Settings", icon: "*", minTier: "growth" },
   { href: "/billing", label: "Billing", section: "Settings", icon: "<>" },
   { href: "/account", label: "Account", section: "Settings", icon: "o" },
   { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "o" }
@@ -121,9 +126,9 @@ const pageMeta: Record<string, PageMeta> = {
   },
   "/lead-time-settings": {
     eyebrow: "Settings",
-    title: "Lead time configuration",
+    title: "Inventory rules",
     description:
-      "Global defaults, safety buffer, and supplier/category overrides."
+      "Global defaults, safety buffer, target coverage, and supplier/category overrides."
   },
   "/billing": {
     eyebrow: "Settings",
@@ -171,6 +176,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 type Subscription = {
   plan: string;
   status: string;
+  billing_provider?: "stripe" | "shopify";
+  shopify_installed?: boolean;
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -195,7 +202,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   })();
 
   useEffect(() => {
-    const storedDomain = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
+    const urlShop = new URLSearchParams(window.location.search).get("shop");
+    const storedDomain = urlShop || window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
+    if (urlShop) window.localStorage.setItem(SHOPIFY_DOMAIN_STORAGE_KEY, urlShop);
     setShopifyDomain(storedDomain || "");
     setStoreLoaded(true);
   }, [pathname]);
@@ -268,7 +277,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       ? planToTier(subscription.plan)
       : null;
   const hasActiveSubscription = subscriptionLoaded && paidTier !== null;
-  const unlockAll = user.id === 0 || Boolean(user.in_trial) || Boolean(user.is_admin) || !subscriptionLoaded;
+  const isShopifyInstalled =
+    subscription?.billing_provider === "shopify" || Boolean(subscription?.shopify_installed);
+  const directTrialAccess =
+    Boolean(user.in_trial) && !isShopifyInstalled && !isEmbeddedShopifyContext();
+  const unlockAll = user.id === 0 || directTrialAccess || Boolean(user.is_admin) || !subscriptionLoaded;
 
   return (
     <div className="app-shell">
@@ -296,18 +309,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                 return (
                   <Link
                     key={item.href}
-                    href={isLocked ? "/pricing" : item.href}
+                    href={item.href}
                     className={`nav-link${isActive ? " nav-link-active" : ""}${
                       isLocked ? " nav-link-locked" : ""
                     }`}
-                    title={isLocked ? `${item.label} is included on Growth and Scale.` : undefined}
+                    title={isLocked ? `${item.label} is included on ${planDisplayName(item.minTier!)}.` : undefined}
                   >
                     <span className="nav-link-icon" aria-hidden>
                       {item.icon}
                     </span>
                     <span className="nav-link-label">{item.label}</span>
                     {isLocked ? (
-                      <span className="nav-link-gate">Growth</span>
+                      <span className="nav-link-gate">{planDisplayName(item.minTier!)}</span>
                     ) : null}
                   </Link>
                 );
@@ -362,7 +375,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {trialDaysLeft === 0 ? (
                 <>
                   <strong>Your trial has ended.</strong>{" "}
-                  <Link href="/pricing" className="demo-banner-link">
+                  <Link href="/billing" className="demo-banner-link">
                     Choose a plan
                   </Link>{" "}
                   to keep access to your data and recommendations.
@@ -370,7 +383,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               ) : (
                 <>
                   <strong>{trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} left in your trial.</strong>{" "}
-                  <Link href="/pricing" className="demo-banner-link">
+                  <Link href="/billing" className="demo-banner-link">
                     See plans
                   </Link>{" "}
                   - 14-day free, no credit card required at signup.

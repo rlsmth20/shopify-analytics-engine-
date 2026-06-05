@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { EmptyState } from "@/components/empty-state";
+import { GatedFeature } from "@/components/gated-feature";
 import { SectionCard } from "@/components/section-card";
 import {
   fetchCategoryLeadTimes,
@@ -25,6 +26,18 @@ import {
 import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
 
 export default function LeadTimeSettingsPage() {
+  return (
+    <GatedFeature
+      capability="inventoryRules"
+      title="Customize inventory rules"
+      description="Upgrade to Growth to customize lead times, safety buffer, target coverage, and reorder assumptions."
+    >
+      <LeadTimeSettingsContent />
+    </GatedFeature>
+  );
+}
+
+function LeadTimeSettingsContent() {
   const { shopifyDomain, setShopifyDomain, hasHydrated } = useStoredShopDomain();
   const [defaultLeadTimeDays, setDefaultLeadTimeDays] = useState("14");
   const [safetyBufferDays, setSafetyBufferDays] = useState("7");

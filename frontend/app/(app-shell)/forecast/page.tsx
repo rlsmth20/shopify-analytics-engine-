@@ -7,6 +7,7 @@ import {
   ForecastBandChart,
   WeekdayIndexBars,
 } from "@/components/charts";
+import { GatedFeature } from "@/components/gated-feature";
 import {
   fetchForecasts,
   percent,
@@ -14,6 +15,18 @@ import {
 } from "@/lib/api-v2";
 
 export default function ForecastPage() {
+  return (
+    <GatedFeature
+      capability="forecast"
+      title="Restock on time, every time"
+      description="Upgrade to Growth to forecast demand, calculate reorder quantities, and plan replenishment from sales velocity and lead time."
+    >
+      <ForecastContent />
+    </GatedFeature>
+  );
+}
+
+function ForecastContent() {
   const [forecasts, setForecasts] = useState<ForecastResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

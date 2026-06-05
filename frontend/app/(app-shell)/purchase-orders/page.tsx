@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { GatedFeature } from "@/components/gated-feature";
 import {
   currency,
   fetchPurchaseOrders,
@@ -34,6 +35,18 @@ type EditablePoDraft = {
 type EditablePoDrafts = Record<string, EditablePoDraft>;
 
 export default function PurchaseOrdersPage() {
+  return (
+    <GatedFeature
+      capability="purchaseOrders"
+      title="Turn recommendations into purchase orders"
+      description="Upgrade to Growth to create saved PO drafts, track partial receipts, and build supplier lead-time history."
+    >
+      <PurchaseOrdersContent />
+    </GatedFeature>
+  );
+}
+
+function PurchaseOrdersContent() {
   const [drafts, setDrafts] = useState<PurchaseOrderDraft[]>([]);
   const [total, setTotal] = useState(0);
   const [serviceLevel, setServiceLevel] = useState(0.95);

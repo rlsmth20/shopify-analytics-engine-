@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
+import { GatedFeature } from "@/components/gated-feature";
 import {
   ReportEmptyState,
   ReportFilters,
@@ -28,6 +29,18 @@ type QuickView = "all" | "bundle" | "cross-sell" | "promo" | "high-confidence";
 type SortDirection = "asc" | "desc";
 
 export default function BundlesPage() {
+  return (
+    <GatedFeature
+      capability="bundleOpportunities"
+      title="Find products customers buy together"
+      description="Upgrade to Growth to use order history for bundle, kit, cross-sell, and promo opportunities."
+    >
+      <BundlesContent />
+    </GatedFeature>
+  );
+}
+
+function BundlesContent() {
   const [bundles, setBundles] = useState<BundleHealth[]>([]);
   const [opportunities, setOpportunities] = useState<BundleOpportunity[]>([]);
   const [ordersAnalyzed, setOrdersAnalyzed] = useState(0);

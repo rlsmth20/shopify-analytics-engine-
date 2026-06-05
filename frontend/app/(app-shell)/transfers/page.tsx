@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
+import { GatedFeature } from "@/components/gated-feature";
 import {
   ReportEmptyState,
   ReportFilters,
@@ -40,6 +41,18 @@ type TransferRow = {
 type SortDirection = "asc" | "desc";
 
 export default function TransfersPage() {
+  return (
+    <GatedFeature
+      capability="transfers"
+      title="Balance inventory across locations"
+      description="Upgrade to Scale to use location-level inventory for transfer planning when Shopify location data is available."
+    >
+      <TransfersContent />
+    </GatedFeature>
+  );
+}
+
+function TransfersContent() {
   const [transfers, setTransfers] = useState<TransferRecommendation[]>([]);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);

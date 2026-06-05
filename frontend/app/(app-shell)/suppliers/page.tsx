@@ -3,9 +3,22 @@
 import { useEffect, useState } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
+import { GatedFeature } from "@/components/gated-feature";
 import { fetchSuppliers, type SupplierScorecard } from "@/lib/api-v2";
 
 export default function SuppliersPage() {
+  return (
+    <GatedFeature
+      capability="supplierScorecards"
+      title="Measure supplier performance"
+      description="Upgrade to Scale to unlock supplier scorecards when PO receipt history is available."
+    >
+      <SuppliersContent />
+    </GatedFeature>
+  );
+}
+
+function SuppliersContent() {
   const [vendors, setVendors] = useState<SupplierScorecard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -642,6 +642,34 @@ code {
   gap: 12px;
 }
 
+.gated-feature-card {
+  max-width: 760px;
+}
+
+.gated-feature-content {
+  display: grid;
+  gap: 18px;
+}
+
+.gated-feature-panel {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #eff6ff;
+  color: #0f172a;
+}
+
+.gated-feature-panel strong {
+  font-size: 1rem;
+}
+
+.gated-feature-panel span {
+  color: #475569;
+  line-height: 1.5;
+}
+
 .button {
   display: inline-flex;
   align-items: center;

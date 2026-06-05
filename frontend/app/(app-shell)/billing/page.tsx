@@ -54,6 +54,7 @@ export default function BillingPage() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [approvingPlan, setApprovingPlan] = useState<PlanKey | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shopifyPlanNotice, setShopifyPlanNotice] = useState<string | null>(null);
   const [portalFallbackUrl, setPortalFallbackUrl] = useState<string | null>(null);
   const [embeddedBilling, setEmbeddedBilling] = useState(false);
 
@@ -121,6 +122,7 @@ export default function BillingPage() {
   async function approveShopifyPlan(plan: PlanKey) {
     setApprovingPlan(plan);
     setError(null);
+    setShopifyPlanNotice(null);
     try {
       const res = await authenticatedFetch(`${API_BASE}/billing/shopify/subscribe`, {
         method: "POST",
@@ -130,6 +132,16 @@ export default function BillingPage() {
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
+        const detail = String(body?.detail || "");
+        if (
+          detail.toLowerCase().includes("managed pricing") ||
+          detail.toLowerCase().includes("billing api")
+        ) {
+          setShopifyPlanNotice(
+            "Plan changes are managed through Shopify for this app. Open your Shopify app subscription settings or select a plan from the Shopify App Store listing."
+          );
+          return;
+        }
         setError(body?.detail || `Could not start Shopify approval (${res.status}).`);
         return;
       }
@@ -264,6 +276,9 @@ export default function BillingPage() {
             ) : null}
           </div>
           {error ? <p className="auth-error" style={{ marginTop: "16px" }}>{error}</p> : null}
+          {shopifyPlanNotice ? (
+            <p className="section-copy" style={{ marginTop: "16px" }}>{shopifyPlanNotice}</p>
+          ) : null}
         </SectionCard>
 
         <SectionCard>
@@ -295,7 +310,7 @@ export default function BillingPage() {
           </div>
           <p className="section-copy">
             Shopify-installed stores are billed through Shopify. Skubase does
-            not use Stripe Billing Portal or Stripe Checkout for this store.
+            not collect payment details inside the embedded app.
           </p>
           <div className="pricing-grid" style={{ marginTop: "24px" }}>
             {PRICING_TIERS.map((tier) => {
