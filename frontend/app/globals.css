@@ -3404,6 +3404,71 @@ code {
   align-items: center;
 }
 
+.alert-context-grid {
+  margin-bottom: 18px;
+}
+
+.alert-targeting-panel {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-muted);
+}
+
+.alert-targeting-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.alert-targeting-option {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--muted-strong);
+}
+
+.alert-targeting-option-active {
+  border-style: solid;
+  border-color: rgba(23, 92, 211, 0.28);
+  background: rgba(239, 246, 255, 0.8);
+  color: var(--ink);
+}
+
+.alert-targeting-option span {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.alert-targeting-option strong {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--neutral-soft);
+  color: var(--muted-strong);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.alert-targeting-option-active strong {
+  background: var(--accent-blue-soft);
+  color: var(--accent-blue);
+}
+
+.alert-targeting-option small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .rule-card-actions .toggle-row {
   display: inline-flex;
   align-items: center;

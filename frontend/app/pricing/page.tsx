@@ -64,12 +64,12 @@ export default function PricingPage() {
         <p className="marketing-section-kicker">Alerts + Action Queue</p>
         <h2 className="marketing-section-title">Stay ahead of inventory issues.</h2>
         <p className="marketing-section-sub">
-          Use configurable alerts and the Action Queue to catch stockout risk, dead stock, overstock, forecast risk, and reorder needs before they become expensive.
+          Use configurable storewide alerts and the Action Queue to catch stockout risk, dead stock, overstock, forecast risk, and reorder needs before they become expensive.
         </p>
         <div className="faq-grid">
           <article className="faq-card">
             <h3 className="faq-card-q">Configurable rules</h3>
-            <p className="faq-card-a">Set thresholds for stockout risk, overstock days of cover, dead-stock capital, forecast risk, and supplier slip.</p>
+            <p className="faq-card-a">Set storewide thresholds for stockout risk, overstock days of cover, dead-stock capital, forecast risk, and supplier slip.</p>
           </article>
           <article className="faq-card">
             <h3 className="faq-card-q">Automatic delivery</h3>

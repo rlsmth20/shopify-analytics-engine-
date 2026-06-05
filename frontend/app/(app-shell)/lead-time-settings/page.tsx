@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -201,6 +202,37 @@ export default function LeadTimeSettingsPage() {
       </SectionCard>
 
       <form className="page-stack" onSubmit={handleSaveSettings}>
+        <SectionCard>
+          <div className="section-heading">
+            <div>
+              <p className="section-eyebrow">Inventory rules</p>
+              <h2 className="section-title section-title-small">Manual thresholds and smart recommendations</h2>
+            </div>
+            <Link href="/alerts" className="button button-secondary button-sm">
+              Create alert rule
+            </Link>
+          </div>
+          <div className="step-list">
+            <div className="step-item">
+              <strong>1. Manual thresholds</strong>
+              <p>
+                Alerts & Rules supports trigger-level thresholds for stockout
+                risk, overstock, dead-stock capital, forecast risk, and supplier
+                slip. Product-level alert-below, target stock, restock-to, and
+                safety stock thresholds are planned.
+              </p>
+            </div>
+            <div className="step-item">
+              <strong>2. Smart recommendations</strong>
+              <p>
+                Skubase calculates risk from sales velocity, lead time, safety
+                buffer, and target coverage so the Action Queue and Reorder / POs
+                can tell you what to do first.
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+
         <div className="content-grid content-grid-2-1">
           <SectionCard>
             <div className="section-heading">

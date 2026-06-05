@@ -28,6 +28,7 @@ from app.api.routes.report_schedules import router as report_schedules_router
 from app.api.routes.shipstation_import import router as shipstation_import_router
 from app.api.routes.shop_settings import router as shop_settings_router
 from app.api.routes.shopify_ingestion import router as shopify_ingestion_router
+from app.api.routes.shopify_privacy_webhooks import router as shopify_privacy_webhooks_router
 from app.api.routes.skus import router as skus_router
 from app.api.routes.stocky_import import router as stocky_import_router
 from app.api.routes.suppliers import router as suppliers_router
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(billing_router)
     app.include_router(stripe_webhook_router)
+    app.include_router(shopify_privacy_webhooks_router)
 
     # v1 surfaces
     app.include_router(health_router)

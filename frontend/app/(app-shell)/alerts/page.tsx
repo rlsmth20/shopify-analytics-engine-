@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
@@ -41,6 +42,16 @@ const CHANNEL_MIN_TIER: Record<NotificationChannel, PlanTierKey> = {
   sms: "growth",
   webhook: "growth",
 };
+
+const TARGETING_OPTIONS = [
+  { label: "Storewide", status: "Available", detail: "Rules evaluate connected inventory signals across the store." },
+  { label: "Specific products/SKUs", status: "Planned", detail: "Product-level targeting is not saved on alert rules yet." },
+  { label: "Product categories", status: "Planned", detail: "Category filters are planned after rule targeting is added." },
+  { label: "Collections", status: "Planned", detail: "Collection targeting requires Shopify collection mappings." },
+  { label: "Tags", status: "Planned", detail: "Tag targeting requires synced Shopify product tags." },
+  { label: "Supplier/vendor", status: "Partial", detail: "Supplier slip alerts use supplier scorecards when supplier data exists." },
+  { label: "Locations", status: "Requires data", detail: "Location-specific alerts require location-level inventory and rule targeting support." },
+];
 
 export default function AlertsPage() {
   const { user } = useAuth();
@@ -126,6 +137,42 @@ export default function AlertsPage() {
 
   return (
     <div className="alerts-page">
+      <div className="content-grid content-grid-2-1 alert-context-grid">
+        <DataQualityNote title="Alert rules are storewide today">
+          <p>
+            Skubase evaluates enabled rules against connected inventory, forecast,
+            and supplier signals for the whole store. Advanced product, tag,
+            collection, and location targeting is planned; unsupported targeting
+            is shown below as a requirement, not an active filter.
+          </p>
+          <div className="button-row">
+            <Link href="/lead-time-settings" className="button button-secondary button-sm">
+              Adjust reorder assumptions
+            </Link>
+            <Link href="/store-sync" className="button button-secondary button-sm">
+              Check store sync
+            </Link>
+          </div>
+        </DataQualityNote>
+
+        <DataQualityNote title="Location-specific alerts require location-level inventory">
+          <p>
+            Your current alert rules use storewide inventory risk. When
+            location-level Shopify inventory is available, Skubase can show
+            location-aware planning surfaces; alert rule targeting is not active
+            yet.
+          </p>
+          <div className="button-row">
+            <Link href="/transfers?demo=1" className="button button-secondary button-sm">
+              View transfer requirements
+            </Link>
+            <button type="button" className="button button-primary button-sm" disabled>
+              Continue with storewide alerts
+            </button>
+          </div>
+        </DataQualityNote>
+      </div>
+
       <div className="tab-bar">
         {(["rules", "channels", "history"] as const).map((t) => (
           <button
@@ -204,6 +251,34 @@ function RulesPanel({
         <p className="panel-section-subtitle">
           Enabled rules are checked automatically. Use preview to inspect matches without sending notifications.
         </p>
+        <div className="alert-targeting-panel">
+          <div>
+            <p className="form-label">Choose what this rule applies to</p>
+            <p className="form-hint">
+              Today, alert rules are storewide and use the trigger threshold below.
+              Advanced product targeting is planned.
+            </p>
+          </div>
+          <div className="alert-targeting-options">
+            {TARGETING_OPTIONS.map((option) => (
+              <div
+                key={option.label}
+                className={`alert-targeting-option${option.status === "Available" ? " alert-targeting-option-active" : ""}`}
+                aria-disabled={option.status !== "Available"}
+              >
+                <span>{option.label}</span>
+                <strong>{option.status}</strong>
+                <small>{option.detail}</small>
+              </div>
+            ))}
+          </div>
+          <p className="form-hint">
+            Condition groups such as "match all conditions" or "match any
+            condition" are not active yet. Skubase can still monitor stockout,
+            dead-stock, overstock, forecast, and supplier signals from connected
+            product and order data.
+          </p>
+        </div>
         <div className="form-grid">
           <label className="form-field">
             <span className="form-label">Rule name</span>
@@ -257,6 +332,12 @@ function RulesPanel({
                 setNewRule({ ...newRule, threshold: Number(e.target.value) })
               }
             />
+            <span className="form-hint">
+              This is the manual threshold for the selected trigger. Product-level
+              alert-below, target stock, restock-to, and safety stock thresholds
+              are planned; smart recommendations use sales velocity, lead time,
+              and target coverage today.
+            </span>
           </label>
           <div className="form-field">
             <span className="form-label">Channels</span>
