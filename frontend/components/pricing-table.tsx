@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { PricingButton } from "@/components/pricing-button";
 import { PRICING_TIERS, type BillingCycle } from "@/lib/plans";
 
 export function PricingTable() {
@@ -69,11 +68,6 @@ export function PricingTable() {
                   </li>
                 ))}
               </ul>
-              <PricingButton
-                plan={variant.plan}
-                label={`Subscribe to ${tier.name}`}
-                variant={tier.featured ? "primary" : "ghost"}
-              />
             </article>
           );
         })}
