@@ -69,22 +69,35 @@ export function GatedFeature({
   const requiredPlan = planDisplayName(config.requiredPlan);
   const upgradeLabel = getUpgradeLabel(config.requiredPlan);
   const isShopifyInstalled = Boolean(entitlements?.is_shopify_installed);
+  const currentPlan = entitlements ? planDisplayName(entitlements.plan_id) : "Unverified";
 
   return (
     <section className="section-card gated-feature-card">
       <div className="gated-feature-content">
-        <p className="section-eyebrow">Plan upgrade</p>
-        <h2 className="section-title section-title-small">
-          {title ?? `Unlock ${config.title.toLowerCase()}`}
-        </h2>
-        <p className="section-copy">{description ?? config.description}</p>
+        <div className="gated-feature-head">
+          <div>
+            <p className="section-eyebrow">Plan upgrade</p>
+            <h2 className="section-title section-title-small">
+              {title ?? `Unlock ${config.title.toLowerCase()}`}
+            </h2>
+            <p className="section-copy">{description ?? config.description}</p>
+          </div>
+          <span className="status-badge status-neutral">{currentPlan}</span>
+        </div>
         <div className="gated-feature-panel">
-          <strong>{upgradeLabel}</strong>
-          <span>
-            {isShopifyInstalled
-              ? `This feature is included on ${requiredPlan}. Manage your app plan through Shopify.`
-              : `This feature is included on ${requiredPlan}. Upgrade from Billing to unlock it.`}
-          </span>
+          <div>
+            <strong>{upgradeLabel}</strong>
+            <span>
+              {isShopifyInstalled
+                ? `This workflow is included on ${requiredPlan}. Plan changes happen in Shopify.`
+                : `This workflow is included on ${requiredPlan}. Upgrade from Billing to unlock it.`}
+            </span>
+          </div>
+          <ul className="gated-feature-list">
+            <li>Keep the page visible for context while premium controls stay locked.</li>
+            <li>Billing status is checked before Skubase shows upgrade or locked states.</li>
+            <li>Data requirements still appear separately once the right plan is active.</li>
+          </ul>
         </div>
         {failed ? (
           <p className="section-copy">
@@ -96,8 +109,8 @@ export function GatedFeature({
           <Link href="/billing" className="button button-primary">
             {upgradeLabel}
           </Link>
-          <Link href="/sample-inventory-risk-snapshot" className="button button-ghost">
-            View sample report
+          <Link href="/dashboard?demo=1" className="button button-ghost">
+            View sample workspace
           </Link>
         </div>
       </div>

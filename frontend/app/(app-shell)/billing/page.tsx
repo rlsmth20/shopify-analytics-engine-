@@ -127,6 +127,10 @@ export default function BillingPage() {
   const isActive = sub.subscription_status === "active" || sub.subscription_status === "trialing";
   const isShopifyBilling = sub.is_shopify_installed;
   const showTrialCard = !isShopifyBilling && user.in_trial && !isActive && trialDaysLeft !== null;
+  const includedFeaturesByTier = PRICING_TIERS.map((tier) => ({
+    ...tier,
+    includedFeatures: tier.features.filter((feature) => feature.included).slice(0, 6),
+  }));
 
   return (
     <div className="page-stack">
@@ -198,7 +202,11 @@ export default function BillingPage() {
           </div>
 
           <div className="button-row">
-            {!isShopifyBilling && isActive ? (
+            {isShopifyBilling ? (
+              <button type="button" className="button button-primary" onClick={manageShopifyPlan}>
+                Manage plan in Shopify
+              </button>
+            ) : isActive ? (
               <>
                 <button
                   type="button"
@@ -266,12 +274,16 @@ export default function BillingPage() {
             {PRICING_TIERS.map((tier) => {
               const current = sub.plan_id === tier.key && isActive;
               return (
-                <article key={tier.key} className={`pricing-card ${tier.featured ? "pricing-card-featured" : ""}`}>
-                  <h3 className="pricing-card-title">{tier.name}</h3>
+                <article key={tier.key} className={`pricing-card billing-plan-card ${tier.featured ? "pricing-card-featured" : ""}${current ? " billing-plan-card-current" : ""}`}>
+                  <div className="billing-plan-card-head">
+                    <h3 className="pricing-card-title">{tier.name}</h3>
+                    {current ? <span className="status-badge status-succeeded">Current</span> : null}
+                  </div>
                   <p className="pricing-card-price">
                     {tier.monthly.price}<span>/mo</span>
                   </p>
                   <p className="section-copy">{tier.pitch}</p>
+                  <p className="pricing-card-limit">{tier.limit}</p>
                   <button
                     type="button"
                     className={`button ${current ? "button-ghost" : "button-primary"} button-full`}
@@ -297,17 +309,16 @@ export default function BillingPage() {
           </div>
         </div>
         <div className="signal-list">
-          {PRICING_TIERS.map((tier) => (
+          {includedFeaturesByTier.map((tier) => (
             <div key={tier.key} className="signal-item">
               <div>
                 <p className="signal-title">{tier.name}</p>
                 <p className="signal-copy">{tier.limit}</p>
-                <p className="signal-copy">
-                  {tier.features
-                    .filter((feature) => feature.included)
-                    .map((feature) => feature.label)
-                    .join(" | ")}
-                </p>
+                <ul className="billing-feature-list">
+                  {tier.includedFeatures.map((feature) => (
+                    <li key={feature.label}>{feature.label}</li>
+                  ))}
+                </ul>
               </div>
             </div>
           ))}

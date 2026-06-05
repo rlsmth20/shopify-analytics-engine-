@@ -25,23 +25,23 @@ type NavItem = {
 };
 
 const navigationItems: NavItem[] = [
-  { href: "/dashboard", label: "Today", section: "Command", icon: ">" },
-  { href: "/actions", label: "Action Queue", section: "Command", icon: "o" },
-  { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "*" },
-  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "o", minTier: "growth" },
-  { href: "/analytics", label: "Inventory Health", section: "Intelligence", icon: "<>" },
-  { href: "/reports", label: "Reports & Exports", section: "Intelligence", icon: ">" },
-  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "o", minTier: "scale" },
-  { href: "/purchase-orders", label: "Reorder / POs", section: "Operations", icon: "o", minTier: "growth" },
-  { href: "/stocky-migration", label: "Stocky Migration", section: "Operations", icon: ">" },
-  { href: "/transfers", label: "Transfers", section: "Operations", icon: "*", minTier: "scale" },
-  { href: "/bundles", label: "Bundle Opportunities", section: "Operations", icon: "<>", minTier: "growth" },
-  { href: "/liquidation", label: "Dead Stock", section: "Operations", icon: "o" },
-  { href: "/store-sync", label: "Store Sync", section: "Settings", icon: ">" },
-  { href: "/lead-time-settings", label: "Inventory Rules", section: "Settings", icon: "*", minTier: "growth" },
-  { href: "/billing", label: "Billing", section: "Settings", icon: "<>" },
-  { href: "/account", label: "Account", section: "Settings", icon: "o" },
-  { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "o" }
+  { href: "/dashboard", label: "Today", section: "Command", icon: "TD" },
+  { href: "/actions", label: "Action Queue", section: "Command", icon: "AQ" },
+  { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "AR" },
+  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "FC", minTier: "growth" },
+  { href: "/analytics", label: "Inventory Health", section: "Intelligence", icon: "IH" },
+  { href: "/reports", label: "Reports & Exports", section: "Intelligence", icon: "RX" },
+  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "SP", minTier: "scale" },
+  { href: "/purchase-orders", label: "Reorder / POs", section: "Operations", icon: "PO", minTier: "growth" },
+  { href: "/stocky-migration", label: "Stocky Migration", section: "Operations", icon: "SM" },
+  { href: "/transfers", label: "Transfers", section: "Operations", icon: "TR", minTier: "scale" },
+  { href: "/bundles", label: "Bundle Opportunities", section: "Operations", icon: "BO", minTier: "growth" },
+  { href: "/liquidation", label: "Dead Stock", section: "Operations", icon: "DS" },
+  { href: "/store-sync", label: "Store Sync", section: "Settings", icon: "SS" },
+  { href: "/lead-time-settings", label: "Inventory Rules", section: "Settings", icon: "IR", minTier: "growth" },
+  { href: "/billing", label: "Billing", section: "Settings", icon: "BL" },
+  { href: "/account", label: "Account", section: "Settings", icon: "AC" },
+  { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "CF" }
 ];
 
 type PageMeta = { eyebrow: string; title: string; description: string };
@@ -274,6 +274,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const directTrialAccess =
     Boolean(user.in_trial) && !isShopifyInstalled && !isEmbeddedShopifyContext();
   const unlockAll = user.id === 0 || directTrialAccess || Boolean(user.is_admin) || !subscriptionLoaded;
+  const planChipLabel =
+    user.id === 0
+      ? "Sample workspace"
+      : !subscriptionLoaded
+      ? "Loading plan..."
+      : subscription?.subscription_status === "active" || subscription?.subscription_status === "trialing"
+      ? planDisplayName(subscription.plan_id)
+      : "No active plan";
 
   return (
     <div className="app-shell">
@@ -321,14 +329,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="sidebar-note">
-          <p className="sidebar-note-title">Independent - Shopify-first</p>
+        <div className="sidebar-note sidebar-plan-note">
+          <p className="sidebar-note-title">Workspace status</p>
+          <span className="sidebar-plan-chip">{planChipLabel}</span>
           <p className="sidebar-note-copy">
-            No PE squeeze. No surprise renewal hikes. Founder-led and
-            shipping on a public changelog.
+            {isShopifyInstalled
+              ? "Plan access is managed through Shopify. Locked pages show the tier needed."
+              : "Direct accounts can manage plan access from Billing."}
           </p>
-          <Link href="/" className="sidebar-note-link">
-            See positioning -&gt;
+          <Link href="/billing" className="sidebar-note-link">
+            Manage billing -&gt;
           </Link>
         </div>
       </aside>
@@ -401,6 +411,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             {user.id !== 0 ? (
               <span className="header-chip header-chip-user" title={user.email}>
                 {user.email}
+              </span>
+            ) : null}
+            {user.id !== 0 ? (
+              <span className={`header-chip ${hasActiveSubscription ? "header-chip-success" : "header-chip-warning"}`}>
+                {planChipLabel}
               </span>
             ) : null}
             {user.id !== 0 ? (
