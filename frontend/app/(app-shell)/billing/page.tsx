@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { PLAN_LABELS, PRICING_TIERS } from "@/lib/plans";
-import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -38,6 +38,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [portalFallbackUrl, setPortalFallbackUrl] = useState<string | null>(null);
+  const [embeddedBilling, setEmbeddedBilling] = useState(false);
 
   const trialDaysLeft: number | null = (() => {
     if (!user.trial_ends_at) return null;
@@ -47,6 +49,7 @@ export default function BillingPage() {
   })();
 
   useEffect(() => {
+    setEmbeddedBilling(isEmbeddedShopifyContext());
     setLoading(true);
     authenticatedFetch(`${API_BASE}/billing/me`, { credentials: "include" })
       .then((r) => r.json())
@@ -57,6 +60,12 @@ export default function BillingPage() {
 
   async function openPortal() {
     setPortalLoading(true);
+    setPortalFallbackUrl(null);
+    const popup = embeddedBilling ? window.open("about:blank", "_blank") : null;
+    if (popup) {
+      popup.opener = null;
+      popup.document.title = "Opening Stripe billing...";
+    }
     try {
       const res = await authenticatedFetch(`${API_BASE}/billing/portal`, {
         method: "POST",
@@ -64,10 +73,27 @@ export default function BillingPage() {
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
+        if (popup && !popup.closed) popup.close();
         alert(body?.detail || `Could not open the billing portal (${res.status}).`);
         return;
       }
-      if (body?.url) window.location.href = body.url;
+      if (body?.url) {
+        if (embeddedBilling) {
+          if (popup && !popup.closed) {
+            popup.location.href = body.url;
+          } else {
+            const opened = window.open(body.url, "_blank", "noopener,noreferrer");
+            if (!opened) setPortalFallbackUrl(body.url);
+          }
+        } else {
+          window.location.href = body.url;
+        }
+      } else if (popup && !popup.closed) {
+        popup.close();
+      }
+    } catch (e) {
+      if (popup && !popup.closed) popup.close();
+      throw e;
     } finally {
       setPortalLoading(false);
     }
@@ -161,14 +187,26 @@ export default function BillingPage() {
 
           <div className="button-row">
             {isActive ? (
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={openPortal}
-                disabled={portalLoading}
-              >
-                {portalLoading ? "Opening..." : "Manage billing"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={openPortal}
+                  disabled={portalLoading}
+                >
+                  {portalLoading ? "Opening..." : "Open billing portal"}
+                </button>
+                {portalFallbackUrl ? (
+                  <a
+                    href={portalFallbackUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="button button-ghost"
+                  >
+                    Click here to open billing portal
+                  </a>
+                ) : null}
+              </>
             ) : (
               <Link href="/pricing" className="button button-primary">
                 See plans
@@ -230,10 +268,12 @@ export default function BillingPage() {
             </h2>
           </div>
         </div>
-        <p className="section-copy">
+          <p className="section-copy">
           Stripe hosts your invoice history, payment methods, and tax
-          information. Click <strong>Manage billing</strong> above to download
-          past invoices, update your card, or change plans.
+          information.{" "}
+          {embeddedBilling
+            ? "Billing opens securely in a new tab through Stripe."
+            : "Click Open billing portal above to download past invoices, update your card, or change plans."}
         </p>
       </SectionCard>
     </div>

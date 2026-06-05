@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import type { PlanKey } from "@/lib/plans";
-import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -20,17 +20,23 @@ export function PricingButton({
 
   async function handleClick() {
     setLoading(true);
+    const embedded = isEmbeddedShopifyContext();
+    const popup = embedded ? window.open("about:blank", "_blank") : null;
+    if (popup) {
+      popup.opener = null;
+      popup.document.title = "Opening Stripe checkout...";
+    }
+
     try {
-      // Check if user is already authenticated.
-      const meRes = await authenticatedFetch(`${API_BASE}/auth/me`, { credentials: "include" }).catch(() => null);
+      const meRes = await authenticatedFetch(`${API_BASE}/auth/me`, {
+        credentials: "include",
+      }).catch(() => null);
       if (!meRes || !meRes.ok) {
-        // Not signed in — send to login. After magic-link sign-in the user
-        // lands on /dashboard; they can return to /pricing and subscribe.
+        if (popup && !popup.closed) popup.close();
         window.location.href = `/login?next=${encodeURIComponent("/pricing")}`;
         return;
       }
 
-      // Authenticated — start a Checkout session and redirect.
       const res = await authenticatedFetch(`${API_BASE}/billing/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,8 +45,8 @@ export function PricingButton({
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
+        if (popup && !popup.closed) popup.close();
         if (res.status === 503) {
-          // Billing not yet wired — fall back to the waitlist.
           window.location.href = "/#waitlist";
           return;
         }
@@ -48,10 +54,20 @@ export function PricingButton({
         return;
       }
       if (body?.url) {
-        window.location.href = body.url;
+        if (embedded) {
+          if (popup && !popup.closed) {
+            popup.location.href = body.url;
+          } else {
+            window.open(body.url, "_blank", "noopener,noreferrer");
+          }
+        } else {
+          window.location.href = body.url;
+        }
+      } else if (popup && !popup.closed) {
+        popup.close();
       }
     } catch {
-      // Network error — fall back gracefully to login.
+      if (popup && !popup.closed) popup.close();
       window.location.href = `/login?next=${encodeURIComponent("/pricing")}`;
     } finally {
       setLoading(false);
@@ -65,7 +81,7 @@ export function PricingButton({
       disabled={loading}
       className={`button ${variant === "primary" ? "button-primary" : "button-ghost"} button-full`}
     >
-      {loading ? "One moment…" : label}
+      {loading ? "One moment..." : label}
     </button>
   );
 }

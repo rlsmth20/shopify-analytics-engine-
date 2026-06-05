@@ -176,8 +176,10 @@ type Subscription = {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [shopifyDomain, setShopifyDomain] = useState("");
+  const [shopifyDomain, setShopifyDomain] = useState<string | null>(null);
+  const [storeLoaded, setStoreLoaded] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   // hasRealData: true once the shop has any products in the DB. Hides the
   // "Sample data" chip and the yellow demo-mode banner so paid customers
   // don't see "demo" labels on their own data.
@@ -193,14 +195,15 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const storedDomain = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
-    if (storedDomain) {
-      setShopifyDomain(storedDomain);
-    }
+    setShopifyDomain(storedDomain || "");
+    setStoreLoaded(true);
   }, [pathname]);
 
   useEffect(() => {
+    setSubscriptionLoaded(false);
     if (user.id === 0) {
       setSubscription(null);
+      setSubscriptionLoaded(true);
       return;
     }
 
@@ -212,6 +215,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!cancelled) setSubscription(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSubscriptionLoaded(true);
       });
 
     return () => {
@@ -256,8 +262,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     subscription?.status === "active" || subscription?.status === "trialing"
       ? planToTier(subscription.plan)
       : null;
-  const hasActiveSubscription = paidTier !== null;
-  const unlockAll = user.id === 0 || Boolean(user.in_trial) || Boolean(user.is_admin);
+  const hasActiveSubscription = subscriptionLoaded && paidTier !== null;
+  const unlockAll = user.id === 0 || Boolean(user.in_trial) || Boolean(user.is_admin) || !subscriptionLoaded;
 
   return (
     <div className="app-shell">
@@ -344,7 +350,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ) : null}
 
-        {user.id !== 0 && !hasActiveSubscription && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
+        {user.id !== 0 && subscriptionLoaded && !hasActiveSubscription && trialDaysLeft !== null && trialDaysLeft <= 7 ? (
           <div className={`demo-banner ${trialDaysLeft <= 2 ? "demo-banner-preview" : ""}`} role="status">
             <span className="demo-banner-mark" aria-hidden>*</span>
             <span>
@@ -377,7 +383,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="header-meta">
             <span className="header-chip header-chip-tone">
-              {shopifyDomain ? shopifyDomain : "No store selected"}
+              {storeLoaded ? (shopifyDomain ? shopifyDomain : "No store selected") : "Loading store..."}
             </span>
             {hasRealData === false ? (
               <span className="header-chip">Sample data</span>

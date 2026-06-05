@@ -1,4 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+type AuthState = "loading" | "signed-out" | "signed-in";
 
 /**
  * Shared marketing-site header nav.
@@ -8,6 +15,24 @@ import Link from "next/link";
  * this file only.
  */
 export function MarketingNav() {
+  const [authState, setAuthState] = useState<AuthState>("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`${API_BASE}/auth/me`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setAuthState(data?.email ? "signed-in" : "signed-out");
+      })
+      .catch(() => {
+        if (!cancelled) setAuthState("signed-out");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <header className="marketing-nav">
       <Link href="/" className="marketing-brand">
@@ -25,9 +50,19 @@ export function MarketingNav() {
         <Link href="/dashboard?demo=1" className="button button-ghost button-sm">
           View demo
         </Link>
-        <Link href="/login" className="marketing-link-subtle">
-          Sign in
-        </Link>
+        {authState === "loading" ? (
+          <span className="marketing-link-subtle" aria-hidden>
+            &nbsp;
+          </span>
+        ) : authState === "signed-in" ? (
+          <Link href="/dashboard" className="marketing-link-subtle">
+            Dashboard
+          </Link>
+        ) : (
+          <Link href="/login" className="marketing-link-subtle">
+            Sign in
+          </Link>
+        )}
       </div>
     </header>
   );
