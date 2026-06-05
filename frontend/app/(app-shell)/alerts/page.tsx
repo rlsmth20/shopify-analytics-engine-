@@ -26,12 +26,60 @@ import {
 import { hasCapability, type PlanTierKey } from "@/lib/plans";
 
 const TRIGGER_OPTIONS: { value: AlertTrigger; label: string; help: string }[] = [
-  { value: "stockout_risk", label: "Stockout risk", help: "Fires when a SKU has fewer days of cover than the threshold" },
-  { value: "dead_stock", label: "Dead stock capital", help: "Fires when a dead SKU ties up more capital than the threshold (USD)" },
-  { value: "overstock", label: "Overstock days of cover", help: "Fires when days of cover exceed the threshold" },
-  { value: "forecast_miss", label: "High stockout probability", help: "Fires when forecast stockout probability exceeds the threshold (percent)" },
-  { value: "supplier_slip", label: "Supplier on-time slip", help: "Fires when a vendor's on-time rate falls below the threshold (percent)" },
+  { value: "stockout_risk", label: "Stockout risk", help: "Alert when a SKU has fewer days left than your chosen number." },
+  { value: "dead_stock", label: "Dead stock capital", help: "Alert when stale inventory has at least this much cash tied up." },
+  { value: "overstock", label: "Overstock days of cover", help: "Alert when a SKU has more days of cover than your chosen number." },
+  { value: "forecast_miss", label: "High stockout probability", help: "Alert when forecasted stockout risk reaches this percent." },
+  { value: "supplier_slip", label: "Supplier on-time slip", help: "Alert when a supplier's on-time delivery rate drops below this percent." },
 ];
+
+const TRIGGER_VALUE_COPY: Record<
+  AlertTrigger,
+  { label: string; suffix: string; helper: string; example: string }
+> = {
+  stockout_risk: {
+    label: "Alert when days left is below",
+    suffix: "days",
+    helper: "Example: enter 3 to alert when a SKU has fewer than 3 days of inventory left.",
+    example: "3",
+  },
+  dead_stock: {
+    label: "Alert when cash tied up is above",
+    suffix: "USD",
+    helper: "Example: enter 500 to alert when stale inventory ties up at least $500.",
+    example: "500",
+  },
+  overstock: {
+    label: "Alert when days of cover is above",
+    suffix: "days",
+    helper: "Example: enter 90 to alert when a SKU has more than 90 days of inventory cover.",
+    example: "90",
+  },
+  forecast_miss: {
+    label: "Alert when stockout risk is above",
+    suffix: "%",
+    helper: "Example: enter 70 to alert when forecasted stockout risk reaches 70%.",
+    example: "70",
+  },
+  supplier_slip: {
+    label: "Alert when supplier on-time rate is below",
+    suffix: "%",
+    helper: "Example: enter 80 to alert when supplier on-time delivery falls below 80%.",
+    example: "80",
+  },
+  bundle_break: {
+    label: "Alert when buildable bundle units is below",
+    suffix: "units",
+    helper: "Example: enter 5 to alert when component stock can build fewer than 5 bundles.",
+    example: "5",
+  },
+  price_drop: {
+    label: "Alert when markdown is above",
+    suffix: "%",
+    helper: "Example: enter 20 to alert when a product markdown is above 20%.",
+    example: "20",
+  },
+};
 
 const SEVERITY_OPTIONS: AlertSeverity[] = ["info", "warning", "critical"];
 const CHANNEL_OPTIONS: NotificationChannel[] = ["email", "sms", "slack", "webhook"];
@@ -241,6 +289,7 @@ function RulesPanel({
     locations: "",
     enabled: true,
   });
+  const thresholdCopy = TRIGGER_VALUE_COPY[newRule.trigger];
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -424,20 +473,18 @@ function RulesPanel({
             </select>
           </label>
           <label className="form-field">
-            <span className="form-label">Threshold</span>
+            <span className="form-label">{thresholdCopy.label}</span>
             <input
               type="number"
               step="any"
+              placeholder={thresholdCopy.example}
               value={newRule.threshold}
               onChange={(e) =>
                 setNewRule({ ...newRule, threshold: Number(e.target.value) })
               }
             />
             <span className="form-hint">
-              This is the manual threshold for the selected trigger. Product-level
-              alert-below, target stock, restock-to, and safety stock thresholds
-              are planned; smart recommendations use sales velocity, lead time,
-              and target coverage today.
+              {thresholdCopy.helper} Unit: {thresholdCopy.suffix}.
             </span>
           </label>
           <div className="form-field">
@@ -493,8 +540,14 @@ function RulesPanel({
                   {TRIGGER_OPTIONS.find((t) => t.value === rule.trigger)?.label ??
                     rule.trigger}
                 </strong>
-                {" - threshold "}
+                {" - "}
+                {TRIGGER_VALUE_COPY[rule.trigger].label.toLowerCase()}{" "}
                 {rule.threshold}
+                {TRIGGER_VALUE_COPY[rule.trigger].suffix === "%"
+                  ? "%"
+                  : TRIGGER_VALUE_COPY[rule.trigger].suffix === "USD"
+                  ? " USD"
+                  : ` ${TRIGGER_VALUE_COPY[rule.trigger].suffix}`}
               </p>
               <div className="rule-card-channels">
                 {rule.channels.map((c) => (
