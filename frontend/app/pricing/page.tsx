@@ -6,11 +6,11 @@ import { TrialExpiredBanner } from "@/components/trial-expired-banner";
 
 export const metadata = {
   title: "Pricing - skubase",
-  description: "Three published tiers. No quote-only pricing. A written price-lock clause that renewals cannot raise the rate on your plan.",
+  description: "Published Skubase pricing for action-first Shopify inventory planning, configurable alerts, reorder recommendations, and reports.",
   alternates: { canonical: "/pricing" },
   openGraph: {
     title: "Pricing - skubase",
-    description: "Three published tiers ($29/$99/$199) with a written price-lock pledge. Pay annually, save 15%.",
+    description: "Three published tiers for Shopify inventory alerts, Action Queue, reorder planning, and Reports & Exports.",
     url: "/pricing",
     type: "website",
   },
@@ -22,6 +22,7 @@ const FAQ_LD = {
   mainEntity: [
     { "@type": "Question", name: "Do you raise prices at renewal?", acceptedAnswer: { "@type": "Answer", text: "No. Every plan has a written price-lock clause in the terms of service: we will not raise the monthly or annual rate on a plan you are already subscribed to." } },
     { "@type": "Question", name: "Is there a free tier?", acceptedAnswer: { "@type": "Answer", text: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." } },
+    { "@type": "Question", name: "Does Skubase include inventory alerts?", acceptedAnswer: { "@type": "Answer", text: "Yes. Skubase includes configurable alert rules for stockout risk, dead stock, overstock, forecast risk, and supplier slip. Email and Slack are included on Starter; SMS and webhooks are included on Growth and Scale." } },
     { "@type": "Question", name: "How long does setup take?", acceptedAnswer: { "@type": "Answer", text: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." } },
     { "@type": "Question", name: "Can I pay annually?", acceptedAnswer: { "@type": "Answer", text: "Yes - pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." } },
   ],
@@ -31,6 +32,8 @@ const faqs = [
   { q: "Do you raise prices at renewal?", a: "No. Every plan has a written price-lock clause in the terms of service: we will not raise the monthly or annual rate on a plan you are already subscribed to for as long as you maintain the subscription." },
   { q: "What happens if I exceed my SKU or location limit?", a: "We notify you by email, the app shows a soft banner, and you get thirty days to decide whether to upgrade or prune. We will never silently auto-upgrade your plan." },
   { q: "Is there a free tier?", a: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." },
+  { q: "Do alerts send automatically?", a: "Yes. Enabled alert rules are evaluated automatically and delivered through enabled channels with real targets. You can also preview an evaluation before sending." },
+  { q: "Which alert channels are included?", a: "Starter includes email and Slack alert channels. Growth and Scale add SMS and webhook channels. Channels must be configured before notifications are delivered." },
   { q: "How long does setup take?", a: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." },
   { q: "Can I pay annually?", a: "Yes - pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." },
   { q: "How do you compare to Stocky / Inventory Planner / Cin7?", a: "Compared with Stocky we add real forecasting, supplier scorecards, and dead-stock plans. Compared with Inventory Planner we publish our price and commit to not raising it. Compared with Cin7 we publish our price and do not require a 6-month implementation." }
@@ -56,6 +59,28 @@ export default function PricingPage() {
       </section>
 
       <PricingTable />
+
+      <section className="marketing-section">
+        <p className="marketing-section-kicker">Alerts + Action Queue</p>
+        <h2 className="marketing-section-title">Stay ahead of inventory issues.</h2>
+        <p className="marketing-section-sub">
+          Use configurable alerts and the Action Queue to catch stockout risk, dead stock, overstock, forecast risk, and reorder needs before they become expensive.
+        </p>
+        <div className="faq-grid">
+          <article className="faq-card">
+            <h3 className="faq-card-q">Configurable rules</h3>
+            <p className="faq-card-a">Set thresholds for stockout risk, overstock days of cover, dead-stock capital, forecast risk, and supplier slip.</p>
+          </article>
+          <article className="faq-card">
+            <h3 className="faq-card-q">Automatic delivery</h3>
+            <p className="faq-card-a">Enabled rules are checked automatically and delivered through configured channels with real targets.</p>
+          </article>
+          <article className="faq-card">
+            <h3 className="faq-card-q">Action-first follow-up</h3>
+            <p className="faq-card-a">Alerts point back to the Action Queue, Reorder / POs, Dead Stock, and Reports & Exports workflows.</p>
+          </article>
+        </div>
+      </section>
 
       <section className="pricing-lock">
         <div className="pricing-lock-card">
