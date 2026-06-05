@@ -45,6 +45,15 @@ def _record_to_rule(record: AlertRuleRecord) -> AlertRule:
         severity=cast(AlertSeverity, record.severity),
         channels=[cast(NotificationChannel, c) for c in (record.channels or [])],
         threshold=record.threshold,
+        scope=cast(str, record.scope or "storewide"),
+        match_mode=cast(str, record.match_mode or "all"),
+        target_skus=list(record.target_skus or []),
+        product_title_contains=record.product_title_contains or "",
+        categories=list(record.categories or []),
+        suppliers=list(record.suppliers or []),
+        tags=list(record.tags or []),
+        collections=list(record.collections or []),
+        locations=list(record.locations or []),
         enabled=record.enabled,
         created_at=record.created_at,
         last_fired_at=record.last_fired_at,
@@ -178,6 +187,15 @@ def create_rule(
     severity: AlertSeverity,
     channels: list[NotificationChannel],
     threshold: float,
+    scope: str = "storewide",
+    match_mode: str = "all",
+    target_skus: list[str] | None = None,
+    product_title_contains: str = "",
+    categories: list[str] | None = None,
+    suppliers: list[str] | None = None,
+    tags: list[str] | None = None,
+    collections: list[str] | None = None,
+    locations: list[str] | None = None,
     enabled: bool = True,
 ) -> AlertRule:
     with SessionLocal() as session:
@@ -189,6 +207,15 @@ def create_rule(
             severity=str(severity),
             channels=list(channels),
             threshold=threshold,
+            scope=scope,
+            match_mode=match_mode,
+            target_skus=_clean_list(target_skus),
+            product_title_contains=(product_title_contains or "").strip(),
+            categories=_clean_list(categories),
+            suppliers=_clean_list(suppliers),
+            tags=_clean_list(tags),
+            collections=_clean_list(collections),
+            locations=_clean_list(locations),
             enabled=enabled,
         )
         session.add(record)
@@ -328,6 +355,8 @@ def _stockout_events(rule, context, now, deliver_channels, channels_by_key, allo
     for action in context.actions:
         if action.status != "urgent":
             continue
+        if not _rule_matches(rule, sku_id=action.sku_id, product_name=action.name):
+            continue
         days = getattr(action, "days_until_stockout", action.days_of_inventory)
         if days > rule.threshold:
             continue
@@ -343,6 +372,8 @@ def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key, al
     events = []
     for action in context.actions:
         if action.status != "dead":
+            continue
+        if not _rule_matches(rule, sku_id=action.sku_id, product_name=action.name):
             continue
         cash = getattr(action, "cash_tied_up", 0)
         if cash < rule.threshold:
@@ -360,6 +391,8 @@ def _overstock_events(rule, context, now, deliver_channels, channels_by_key, all
     for action in context.actions:
         if action.status != "optimize":
             continue
+        if not _rule_matches(rule, sku_id=action.sku_id, product_name=action.name):
+            continue
         if action.days_of_inventory < rule.threshold:
             continue
         msg = (
@@ -373,6 +406,8 @@ def _overstock_events(rule, context, now, deliver_channels, channels_by_key, all
 def _supplier_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for vendor in context.supplier_scores:
+        if not _rule_matches(rule, supplier=vendor.vendor, product_name=vendor.vendor):
+            continue
         if vendor.on_time_pct >= rule.threshold:
             continue
         msg = (
@@ -386,6 +421,8 @@ def _supplier_events(rule, context, now, deliver_channels, channels_by_key, allo
 def _forecast_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for forecast in context.forecasts:
+        if not _rule_matches(rule, sku_id=forecast.sku_id, product_name=forecast.sku_id):
+            continue
         if forecast.stockout_probability_30d * 100 < rule.threshold:
             continue
         msg = (
@@ -443,3 +480,79 @@ def _fire(rule, sku_id, sku_name, message, now, deliver_channels, channels_by_ke
 
 def _is_placeholder_target(target: str) -> bool:
     return target.strip().lower() in {"alerts@example.com", "example@example.com"}
+
+
+def _clean_list(values: list[str] | None) -> list[str]:
+    if not values:
+        return []
+    cleaned = []
+    seen = set()
+    for value in values:
+        text = str(value).strip()
+        key = text.lower()
+        if not text or key in seen:
+            continue
+        cleaned.append(text)
+        seen.add(key)
+    return cleaned
+
+
+def _matches_any_text(value: str | None, filters: list[str]) -> bool:
+    if not filters:
+        return True
+    if not value:
+        return False
+    normalized = value.strip().lower()
+    return any(normalized == item.strip().lower() for item in filters if item.strip())
+
+
+def _contains_text(value: str | None, needle: str) -> bool:
+    needle = needle.strip().lower()
+    if not needle:
+        return True
+    return needle in (value or "").strip().lower()
+
+
+def _rule_matches(
+    rule: AlertRule,
+    *,
+    sku_id: str | None = None,
+    product_name: str | None = None,
+    category: str | None = None,
+    supplier: str | None = None,
+    tags: list[str] | None = None,
+    collections: list[str] | None = None,
+    location: str | None = None,
+) -> bool:
+    """Apply saved alert targeting against the fields available for this event.
+
+    Missing source fields fail only their corresponding condition. This keeps
+    location/tag/collection rules honest until Shopify sync provides those
+    attributes to alert evaluation.
+    """
+    if rule.scope != "custom":
+        return True
+
+    checks: list[bool] = []
+    if rule.target_skus:
+        checks.append(_matches_any_text(sku_id, rule.target_skus))
+    if rule.product_title_contains:
+        checks.append(_contains_text(product_name, rule.product_title_contains))
+    if rule.categories:
+        checks.append(_matches_any_text(category, rule.categories))
+    if rule.suppliers:
+        checks.append(_matches_any_text(supplier, rule.suppliers))
+    if rule.locations:
+        checks.append(_matches_any_text(location, rule.locations))
+    if rule.tags:
+        source_tags = {tag.strip().lower() for tag in (tags or [])}
+        checks.append(any(tag.strip().lower() in source_tags for tag in rule.tags))
+    if rule.collections:
+        source_collections = {item.strip().lower() for item in (collections or [])}
+        checks.append(any(item.strip().lower() in source_collections for item in rule.collections))
+
+    if not checks:
+        return True
+    if rule.match_mode == "any":
+        return any(checks)
+    return all(checks)

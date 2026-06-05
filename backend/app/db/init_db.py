@@ -73,6 +73,42 @@ def run_safe_migrations() -> None:
                     "shop_id INTEGER REFERENCES shops(id) ON DELETE CASCADE"
                 ))
                 conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "scope VARCHAR(32) DEFAULT 'storewide'"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "match_mode VARCHAR(16) DEFAULT 'all'"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "target_skus JSON DEFAULT '[]'"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "product_title_contains VARCHAR(255) DEFAULT ''"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "categories JSON DEFAULT '[]'"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "suppliers JSON DEFAULT '[]'"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "tags JSON DEFAULT '[]'"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "collections JSON DEFAULT '[]'"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS "
+                    "locations JSON DEFAULT '[]'"
+                ))
+                conn.execute(text(
                     "CREATE INDEX IF NOT EXISTS ix_alert_rules_shop_id "
                     "ON alert_rules (shop_id)"
                 ))
@@ -184,6 +220,22 @@ def run_safe_migrations() -> None:
                         "ALTER TABLE alert_rules ADD COLUMN shop_id INTEGER "
                         "REFERENCES shops(id) ON DELETE CASCADE"
                     ))
+                sqlite_alert_columns = {
+                    "scope": "VARCHAR(32) DEFAULT 'storewide'",
+                    "match_mode": "VARCHAR(16) DEFAULT 'all'",
+                    "target_skus": "JSON DEFAULT '[]'",
+                    "product_title_contains": "VARCHAR(255) DEFAULT ''",
+                    "categories": "JSON DEFAULT '[]'",
+                    "suppliers": "JSON DEFAULT '[]'",
+                    "tags": "JSON DEFAULT '[]'",
+                    "collections": "JSON DEFAULT '[]'",
+                    "locations": "JSON DEFAULT '[]'",
+                }
+                for column_name, column_type in sqlite_alert_columns.items():
+                    if column_name not in alert_columns:
+                        conn.execute(text(
+                            f"ALTER TABLE alert_rules ADD COLUMN {column_name} {column_type}"
+                        ))
                 conn.execute(text(
                     "CREATE INDEX IF NOT EXISTS ix_alert_rules_shop_id "
                     "ON alert_rules (shop_id)"

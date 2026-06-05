@@ -343,6 +343,15 @@ export type AlertRule = {
   severity: AlertSeverity;
   channels: NotificationChannel[];
   threshold: number;
+  scope: "storewide" | "custom";
+  match_mode: "all" | "any";
+  target_skus: string[];
+  product_title_contains: string;
+  categories: string[];
+  suppliers: string[];
+  tags: string[];
+  collections: string[];
+  locations: string[];
   enabled: boolean;
   created_at: string;
   last_fired_at: string | null;
@@ -642,6 +651,15 @@ export const createAlertRule = (
     severity: AlertSeverity;
     channels: NotificationChannel[];
     threshold: number;
+    scope?: "storewide" | "custom";
+    match_mode?: "all" | "any";
+    target_skus?: string[];
+    product_title_contains?: string;
+    categories?: string[];
+    suppliers?: string[];
+    tags?: string[];
+    collections?: string[];
+    locations?: string[];
     enabled: boolean;
   },
   signal?: AbortSignal

@@ -352,6 +352,15 @@ class AlertRuleRecord(Base):
     severity: Mapped[str] = mapped_column(String(32))
     channels: Mapped[list[str]] = mapped_column(JSON, default=list)
     threshold: Mapped[float] = mapped_column(Float, default=0.0)
+    scope: Mapped[str] = mapped_column(String(32), default="storewide")
+    match_mode: Mapped[str] = mapped_column(String(16), default="all")
+    target_skus: Mapped[list[str]] = mapped_column(JSON, default=list)
+    product_title_contains: Mapped[str] = mapped_column(String(255), default="")
+    categories: Mapped[list[str]] = mapped_column(JSON, default=list)
+    suppliers: Mapped[list[str]] = mapped_column(JSON, default=list)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    collections: Mapped[list[str]] = mapped_column(JSON, default=list)
+    locations: Mapped[list[str]] = mapped_column(JSON, default=list)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

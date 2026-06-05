@@ -42,15 +42,16 @@ const CHANNEL_MIN_TIER: Record<NotificationChannel, PlanTierKey> = {
   webhook: "growth",
 };
 
-const TARGETING_OPTIONS = [
-  { label: "Storewide", status: "Available", detail: "Rules evaluate connected inventory signals across the store." },
-  { label: "Specific products/SKUs", status: "Planned", detail: "Product-level targeting is not saved on alert rules yet." },
-  { label: "Product categories", status: "Planned", detail: "Category filters are planned after rule targeting is added." },
-  { label: "Collections", status: "Planned", detail: "Collection targeting requires Shopify collection mappings." },
-  { label: "Tags", status: "Planned", detail: "Tag targeting requires synced Shopify product tags." },
-  { label: "Supplier/vendor", status: "Partial", detail: "Supplier slip alerts use supplier scorecards when supplier data exists." },
-  { label: "Locations", status: "Requires data", detail: "Location-specific alerts require location-level inventory and rule targeting support." },
-];
+function parseList(value: string): string[] {
+  return value
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function listToText(values: string[]): string {
+  return values.join(", ");
+}
 
 export default function AlertsPage() {
   const { user } = useAuth();
@@ -137,10 +138,10 @@ export default function AlertsPage() {
       <div className="content-grid content-grid-2-1 alert-context-grid">
         <DataQualityNote title="Alert rules are storewide today">
           <p>
-            Skubase evaluates enabled rules against connected inventory, forecast,
-            and supplier signals for the whole store. Advanced product, tag,
-            collection, and location targeting is planned; unsupported targeting
-            is shown below as a requirement, not an active filter.
+            Skubase evaluates enabled rules against connected inventory,
+            forecast, and supplier signals. Use targeting to narrow a rule by
+            SKU, product title, category, supplier, tags, collections, or
+            locations when those fields are available in synced data.
           </p>
           <div className="button-row">
             <Link href="/lead-time-settings" className="button button-secondary button-sm">
@@ -154,17 +155,16 @@ export default function AlertsPage() {
 
         <DataQualityNote title="Location-specific alerts require location-level inventory">
           <p>
-            Your current alert rules use storewide inventory risk. When
-            location-level Shopify inventory is available, Skubase can show
-            location-aware planning surfaces; alert rule targeting is not active
-            yet.
+            Location filters are saved on alert rules. They match once Shopify
+            location-level inventory is available to alert evaluation; otherwise
+            keep the rule storewide or use product/supplier targeting.
           </p>
           <div className="button-row">
             <Link href="/transfers?demo=1" className="button button-secondary button-sm">
               View transfer requirements
             </Link>
             <button type="button" className="button button-primary button-sm" disabled>
-              Continue with storewide alerts
+              Storewide alerts remain active
             </button>
           </div>
         </DataQualityNote>
@@ -230,13 +230,38 @@ function RulesPanel({
     severity: "critical" as AlertSeverity,
     channels: ["email"] as NotificationChannel[],
     threshold: 3,
+    scope: "storewide" as "storewide" | "custom",
+    match_mode: "all" as "all" | "any",
+    target_skus: "",
+    product_title_contains: "",
+    categories: "",
+    suppliers: "",
+    tags: "",
+    collections: "",
+    locations: "",
     enabled: true,
   });
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newRule.name.trim()) return;
-    await createAlertRule(newRule);
+    await createAlertRule({
+      name: newRule.name,
+      trigger: newRule.trigger,
+      severity: newRule.severity,
+      channels: newRule.channels,
+      threshold: newRule.threshold,
+      enabled: newRule.enabled,
+      scope: newRule.scope,
+      match_mode: newRule.match_mode,
+      target_skus: parseList(newRule.target_skus),
+      product_title_contains: newRule.product_title_contains,
+      categories: parseList(newRule.categories),
+      suppliers: parseList(newRule.suppliers),
+      tags: parseList(newRule.tags),
+      collections: parseList(newRule.collections),
+      locations: parseList(newRule.locations),
+    });
     setNewRule({ ...newRule, name: "" });
     onChange();
   }
@@ -252,28 +277,107 @@ function RulesPanel({
           <div>
             <p className="form-label">Choose what this rule applies to</p>
             <p className="form-hint">
-              Today, alert rules are storewide and use the trigger threshold below.
-              Advanced product targeting is planned.
+              Use storewide rules for broad monitoring, or custom targeting for
+              specific SKU, supplier, category, tag, collection, and location
+              conditions.
             </p>
           </div>
-          <div className="alert-targeting-options">
-            {TARGETING_OPTIONS.map((option) => (
-              <div
-                key={option.label}
-                className={`alert-targeting-option${option.status === "Available" ? " alert-targeting-option-active" : ""}`}
-                aria-disabled={option.status !== "Available"}
-              >
-                <span>{option.label}</span>
-                <strong>{option.status}</strong>
-                <small>{option.detail}</small>
-              </div>
-            ))}
+          <div className="alert-target-mode">
+            <button
+              type="button"
+              className={`alert-targeting-option${newRule.scope === "storewide" ? " alert-targeting-option-active" : ""}`}
+              onClick={() => setNewRule({ ...newRule, scope: "storewide" })}
+            >
+              <span>Storewide</span>
+              <strong>Active</strong>
+              <small>Evaluate connected inventory signals across the store.</small>
+            </button>
+            <button
+              type="button"
+              className={`alert-targeting-option${newRule.scope === "custom" ? " alert-targeting-option-active" : ""}`}
+              onClick={() => setNewRule({ ...newRule, scope: "custom" })}
+            >
+              <span>Custom targeting</span>
+              <strong>Active</strong>
+              <small>Apply this rule only to matching product conditions.</small>
+            </button>
           </div>
+          {newRule.scope === "custom" ? (
+            <div className="alert-targeting-fields">
+              <label className="form-field">
+                <span className="form-label">Condition matching</span>
+                <select
+                  value={newRule.match_mode}
+                  onChange={(event) =>
+                    setNewRule({ ...newRule, match_mode: event.target.value as "all" | "any" })
+                  }
+                >
+                  <option value="all">Match all conditions</option>
+                  <option value="any">Match any condition</option>
+                </select>
+              </label>
+              <label className="form-field">
+                <span className="form-label">Specific products/SKUs</span>
+                <input
+                  value={newRule.target_skus}
+                  onChange={(event) => setNewRule({ ...newRule, target_skus: event.target.value })}
+                  placeholder="sku-premium-linen, SKU-123"
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">Product title contains</span>
+                <input
+                  value={newRule.product_title_contains}
+                  onChange={(event) => setNewRule({ ...newRule, product_title_contains: event.target.value })}
+                  placeholder="hoodie"
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">Product categories</span>
+                <input
+                  value={newRule.categories}
+                  onChange={(event) => setNewRule({ ...newRule, categories: event.target.value })}
+                  placeholder="Apparel, Accessories"
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">Suppliers</span>
+                <input
+                  value={newRule.suppliers}
+                  onChange={(event) => setNewRule({ ...newRule, suppliers: event.target.value })}
+                  placeholder="Coastal Apparel Co."
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">Tags</span>
+                <input
+                  value={newRule.tags}
+                  onChange={(event) => setNewRule({ ...newRule, tags: event.target.value })}
+                  placeholder="bestseller, seasonal"
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">Collections</span>
+                <input
+                  value={newRule.collections}
+                  onChange={(event) => setNewRule({ ...newRule, collections: event.target.value })}
+                  placeholder="Spring launch"
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">Locations</span>
+                <input
+                  value={newRule.locations}
+                  onChange={(event) => setNewRule({ ...newRule, locations: event.target.value })}
+                  placeholder="Main Warehouse, Retail Store"
+                />
+              </label>
+            </div>
+          ) : null}
           <p className="form-hint">
-            Condition groups such as "match all conditions" or "match any
-            condition" are not active yet. Skubase can still monitor stockout,
-            dead-stock, overstock, forecast, and supplier signals from connected
-            product and order data.
+            Targeting is saved with each rule. Conditions only match when the
+            alert source has that field; location, tag, and collection matching
+            depend on Shopify sync data.
           </p>
         </div>
         <div className="form-grid">
@@ -399,6 +503,20 @@ function RulesPanel({
                   </span>
                 ))}
               </div>
+              {rule.scope === "custom" ? (
+                <div className="rule-target-summary">
+                  <span>{rule.match_mode === "any" ? "Any condition" : "All conditions"}</span>
+                  {rule.target_skus.length ? <span>SKUs: {listToText(rule.target_skus)}</span> : null}
+                  {rule.product_title_contains ? <span>Title contains: {rule.product_title_contains}</span> : null}
+                  {rule.categories.length ? <span>Categories: {listToText(rule.categories)}</span> : null}
+                  {rule.suppliers.length ? <span>Suppliers: {listToText(rule.suppliers)}</span> : null}
+                  {rule.tags.length ? <span>Tags: {listToText(rule.tags)}</span> : null}
+                  {rule.collections.length ? <span>Collections: {listToText(rule.collections)}</span> : null}
+                  {rule.locations.length ? <span>Locations: {listToText(rule.locations)}</span> : null}
+                </div>
+              ) : (
+                <p className="muted small">Applies storewide</p>
+              )}
               {rule.last_fired_at ? (
                 <p className="muted small">
                   Last fired {new Date(rule.last_fired_at).toLocaleString()}

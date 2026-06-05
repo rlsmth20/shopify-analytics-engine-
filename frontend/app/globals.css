@@ -3446,7 +3446,8 @@ code {
   background: var(--surface-muted);
 }
 
-.alert-targeting-options {
+.alert-targeting-options,
+.alert-target-mode {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
@@ -3454,12 +3455,15 @@ code {
 
 .alert-targeting-option {
   display: grid;
+  width: 100%;
+  text-align: left;
   gap: 5px;
   padding: 12px;
   border: 1px dashed var(--line-strong);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.66);
   color: var(--muted-strong);
+  cursor: pointer;
 }
 
 .alert-targeting-option-active {
@@ -3495,6 +3499,39 @@ code {
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.45;
+}
+
+.alert-targeting-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.rule-target-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.rule-target-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted-strong);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+@media (max-width: 840px) {
+  .alert-targeting-fields {
+    grid-template-columns: 1fr;
+  }
 }
 
 .rule-card-actions .toggle-row {

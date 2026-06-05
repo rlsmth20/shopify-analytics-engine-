@@ -76,6 +76,15 @@ def create_alert_rule(
         severity=request.severity,
         channels=request.channels,
         threshold=request.threshold,
+        scope=request.scope,
+        match_mode=request.match_mode,
+        target_skus=request.target_skus,
+        product_title_contains=request.product_title_contains,
+        categories=request.categories,
+        suppliers=request.suppliers,
+        tags=request.tags,
+        collections=request.collections,
+        locations=request.locations,
         enabled=request.enabled,
     )
 

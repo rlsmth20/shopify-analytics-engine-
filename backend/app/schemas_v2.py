@@ -404,6 +404,15 @@ class AlertRule(ApiModel):
     threshold: float = Field(
         description="Interpretation depends on trigger; see alert service docs."
     )
+    scope: Literal["storewide", "custom"] = "storewide"
+    match_mode: Literal["all", "any"] = "all"
+    target_skus: list[str] = Field(default_factory=list)
+    product_title_contains: str = ""
+    categories: list[str] = Field(default_factory=list)
+    suppliers: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    collections: list[str] = Field(default_factory=list)
+    locations: list[str] = Field(default_factory=list)
     enabled: bool = True
     created_at: datetime
     last_fired_at: Optional[datetime] = None
@@ -450,6 +459,15 @@ class CreateAlertRuleRequest(ApiModel):
     severity: AlertSeverity
     channels: list[NotificationChannel]
     threshold: float
+    scope: Literal["storewide", "custom"] = "storewide"
+    match_mode: Literal["all", "any"] = "all"
+    target_skus: list[str] = Field(default_factory=list)
+    product_title_contains: str = ""
+    categories: list[str] = Field(default_factory=list)
+    suppliers: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    collections: list[str] = Field(default_factory=list)
+    locations: list[str] = Field(default_factory=list)
     enabled: bool = True
 
 
