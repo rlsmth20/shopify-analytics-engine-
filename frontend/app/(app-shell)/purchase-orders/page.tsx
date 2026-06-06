@@ -311,7 +311,10 @@ function PurchaseOrdersContent() {
       ) : null}
 
       <div className="po-list">
-        {visibleDrafts.map((po) => (
+        {visibleDrafts.map((po) => {
+          const remainingUnits = remainingPurchaseOrderUnits(po);
+          const canReceiveUnits = remainingUnits > 0;
+          return (
           <div key={po.po_id} className="po-card">
             <div
               className="po-card-head"
@@ -480,7 +483,8 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-ghost"
                     onClick={() => startPartialReceipt(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits}
+                    title={!canReceiveUnits ? "All units on this PO have already been received." : undefined}
                   >
                     Receive partial
                   </button>
@@ -488,7 +492,8 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-ghost"
                     onClick={() => void receiveAll(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits}
+                    title={!canReceiveUnits ? "All units on this PO have already been received." : undefined}
                   >
                     {busyPo === po.po_id ? "Receiving..." : "Receive all"}
                   </button>
@@ -537,10 +542,12 @@ function PurchaseOrdersContent() {
                       </thead>
                       <tbody>
                         {po.lines.map((line) => {
+                          const remainingQty = remainingLineQuantity(line);
                           const draftLine = receiptDrafts[po.po_id]?.lines[line.sku_id] ?? {
-                            qty: String(line.qty),
+                            qty: String(remainingQty),
                             cost: line.unit_cost.toFixed(2),
                           };
+                          const safeDraftQty = clampReceiptInput(draftLine.qty, remainingQty);
                           return (
                             <tr key={line.sku_id}>
                               <td>{line.name}</td>
@@ -551,9 +558,10 @@ function PurchaseOrdersContent() {
                                   className="input-control"
                                   type="number"
                                   min="0"
-                                  max={Math.max(line.qty - (line.received_qty ?? 0), 0)}
+                                  max={remainingQty}
                                   step="1"
-                                  value={draftLine.qty}
+                                  value={safeDraftQty}
+                                  disabled={remainingQty === 0}
                                   onChange={(event) =>
                                     updateReceiptLine(po.po_id, line.sku_id, {
                                       qty: event.target.value,
@@ -603,7 +611,8 @@ function PurchaseOrdersContent() {
               </div>
             ) : null}
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );
@@ -675,6 +684,12 @@ function PurchaseOrdersContent() {
   }
 
   function startPartialReceipt(po: PurchaseOrderDraft) {
+    if (remainingPurchaseOrderUnits(po) <= 0) {
+      setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
+      setOperationError(null);
+      setReceivingPo(null);
+      return;
+    }
     setEditingPo(null);
     setReceivingPo(po.po_id);
     setReceiptDrafts((current) => {
@@ -686,7 +701,7 @@ function PurchaseOrdersContent() {
           lines: Object.fromEntries(
             po.lines.map((line) => [
               line.sku_id,
-              { qty: String(Math.max(line.qty - (line.received_qty ?? 0), 0)), cost: line.unit_cost.toFixed(2) },
+              { qty: String(remainingLineQuantity(line)), cost: line.unit_cost.toFixed(2) },
             ])
           ),
         },
@@ -851,15 +866,29 @@ function PurchaseOrdersContent() {
     }));
   }
 
+  function clearReceiptDraft(poId: string) {
+    setReceiptDrafts((current) => {
+      const rest = { ...current };
+      delete rest[poId];
+      return rest;
+    });
+  }
+
   async function recordPartialReceipt(po: PurchaseOrderDraft) {
     const draft = receiptDrafts[po.po_id];
     const receivedAt = receiptDateToIso(draft?.receivedAt ?? todayInputDate());
+    if (remainingPurchaseOrderUnits(po) <= 0) {
+      setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
+      setOperationError(null);
+      setReceivingPo(null);
+      return;
+    }
     const lines = po.lines
       .map((line) => {
         const receiptLine = draft?.lines[line.sku_id];
         const receivedQty = Number(receiptLine?.qty ?? 0);
         const receivedUnitCost = Number(receiptLine?.cost ?? line.unit_cost);
-        const remainingQty = Math.max(line.qty - (line.received_qty ?? 0), 0);
+        const remainingQty = remainingLineQuantity(line);
         return {
           sku_id: line.sku_id,
           received_qty: Number.isFinite(receivedQty)
@@ -874,7 +903,7 @@ function PurchaseOrdersContent() {
 
     if (lines.length === 0) {
       setOperationNotice(null);
-      setOperationError("Enter at least one quantity to receive.");
+      setOperationError("Enter a quantity for at least one SKU with units still remaining.");
       return;
     }
 
@@ -889,6 +918,7 @@ function PurchaseOrdersContent() {
       persistDemoPurchaseOrder(nextPo);
       upsertDraft(nextPo);
       setReceivingPo(null);
+      clearReceiptDraft(po.po_id);
       setOperationNotice(`Recorded ${sumReceiptQty(lines)} received unit${sumReceiptQty(lines) === 1 ? "" : "s"} for ${po.po_id} on ${formatReceiptDate(receivedAt)}.`);
       if (!isDemoMode()) await refresh();
     } catch (error) {
@@ -906,7 +936,7 @@ function PurchaseOrdersContent() {
       await savePurchaseOrder(po);
       const lines = po.lines.map((line) => ({
         sku_id: line.sku_id,
-        received_qty: Math.max(line.qty - (line.received_qty ?? 0), 0),
+        received_qty: remainingLineQuantity(line),
         received_unit_cost: line.unit_cost,
       })).filter((line) => line.received_qty > 0);
       if (lines.length === 0) {
@@ -918,6 +948,7 @@ function PurchaseOrdersContent() {
       const nextPo = markSaved(response.po ?? applyReceiptToPo(po, lines, receivedAt));
       persistDemoPurchaseOrder(nextPo);
       upsertDraft(nextPo);
+      clearReceiptDraft(po.po_id);
       setOperationNotice(`Received all remaining units for ${po.po_id}.`);
       if (!isDemoMode()) await refresh();
     } catch (error) {
@@ -956,6 +987,21 @@ function orderedUnits(po: PurchaseOrderDraft): number {
 
 function receivedUnits(po: PurchaseOrderDraft): number {
   return po.lines.reduce((sum, line) => sum + (line.received_qty ?? 0), 0);
+}
+
+function remainingLineQuantity(line: Pick<PurchaseOrderLine, "qty" | "received_qty">): number {
+  return Math.max(line.qty - (line.received_qty ?? 0), 0);
+}
+
+function remainingPurchaseOrderUnits(po: PurchaseOrderDraft): number {
+  return po.lines.reduce((sum, line) => sum + remainingLineQuantity(line), 0);
+}
+
+function clampReceiptInput(value: string, remainingQty: number): string {
+  if (value.trim() === "") return value;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "0";
+  return String(Math.min(Math.max(Math.round(parsed), 0), remainingQty));
 }
 
 function latestReceiptDate(po: PurchaseOrderDraft): string | null {
