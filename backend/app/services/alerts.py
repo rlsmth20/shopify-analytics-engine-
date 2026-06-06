@@ -112,11 +112,11 @@ def seed_default_rules_and_channels(shop_id: int) -> None:
             dict(
                 id=str(uuid.uuid4()),
                 shop_id=shop_id,
-                name="Overstock hitting 90+ days",
+                name="Overstock excess cover review",
                 trigger="overstock",
                 severity="warning",
                 channels=["email"],
-                threshold=90.0,
+                threshold=30.0,
                 enabled=True,
             ),
             dict(
@@ -396,11 +396,16 @@ def _overstock_events(rule, context, now, deliver_channels, channels_by_key, all
             continue
         if not _rule_matches(rule, sku_id=action.sku_id, product_name=action.name):
             continue
-        if action.days_of_inventory < rule.threshold:
+        lead_time_days = getattr(action, "lead_time_days_used", 0) or 0
+        target_coverage_days = getattr(action, "target_coverage_days", 0) or 0
+        extra_cover_days = action.days_of_inventory - lead_time_days - target_coverage_days
+        if extra_cover_days < rule.threshold:
             continue
         msg = (
-            f"{action.name} at {action.days_of_inventory:.0f} days of cover — "
-            f"${getattr(action, 'cash_tied_up', 0):,.0f} parked inventory."
+            f"{action.name} has {action.days_of_inventory:.0f} days of cover, "
+            f"a {lead_time_days:.0f}-day lead time, and a {target_coverage_days:.0f}-day target. "
+            f"That leaves {extra_cover_days:.0f} extra days of cover and "
+            f"${getattr(action, 'cash_tied_up', 0):,.0f} tied up in excess inventory."
         )
         events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key, allowed_channels))
     return events

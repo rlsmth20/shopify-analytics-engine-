@@ -28,10 +28,20 @@ import { hasCapability, type PlanTierKey } from "@/lib/plans";
 const TRIGGER_OPTIONS: { value: AlertTrigger; label: string; help: string }[] = [
   { value: "stockout_risk", label: "Reorder deadline risk", help: "Alert when the last safe reorder window is inside your chosen buffer." },
   { value: "dead_stock", label: "Dead stock capital", help: "Alert when stale inventory has at least this much cash tied up." },
-  { value: "overstock", label: "Overstock days of cover", help: "Alert when a SKU has more days of cover than your chosen number." },
+  { value: "overstock", label: "Excess inventory cover", help: "Alert when a SKU has extra cover beyond lead time and target coverage." },
   { value: "forecast_miss", label: "High stockout probability", help: "Alert when forecasted stockout risk reaches this percent." },
   { value: "supplier_slip", label: "Supplier on-time slip", help: "Alert when a supplier's on-time delivery rate drops below this percent." },
 ];
+
+const TRIGGER_DEFAULT_VALUE: Record<AlertTrigger, number> = {
+  stockout_risk: 3,
+  dead_stock: 500,
+  overstock: 30,
+  forecast_miss: 70,
+  supplier_slip: 80,
+  bundle_break: 5,
+  price_drop: 20,
+};
 
 const TRIGGER_VALUE_COPY: Record<
   AlertTrigger,
@@ -50,10 +60,10 @@ const TRIGGER_VALUE_COPY: Record<
     example: "500",
   },
   overstock: {
-    label: "Alert when days of cover is above",
+    label: "Alert when extra cover is above",
     suffix: "days",
-    helper: "Example: enter 90 to alert when a SKU has more than 90 days of inventory cover.",
-    example: "90",
+    helper: "Example: enter 30 to alert when a SKU has more than 30 extra days after lead time and target coverage. Skubase calculates this as days of cover minus lead time minus target coverage.",
+    example: "30",
   },
   forecast_miss: {
     label: "Alert when stockout risk is above",
@@ -90,7 +100,7 @@ function formatRuleTriggerValue(trigger: AlertTrigger, value: number): string {
     return `Cash tied up is at least $${value.toLocaleString()}`;
   }
   if (trigger === "overstock") {
-    return `Days of cover is above ${value}`;
+    return `Extra cover is above ${value} days`;
   }
   if (trigger === "forecast_miss") {
     return `Stockout risk is at least ${value}%`;
@@ -297,7 +307,7 @@ function RulesPanel({
     trigger: "stockout_risk" as AlertTrigger,
     severity: "critical" as AlertSeverity,
     channels: ["email"] as NotificationChannel[],
-    threshold: 3,
+    threshold: TRIGGER_DEFAULT_VALUE.stockout_risk,
     scope: "storewide" as "storewide" | "custom",
     match_mode: "all" as "all" | "any",
     target_skus: "",
@@ -464,7 +474,11 @@ function RulesPanel({
             <select
               value={newRule.trigger}
               onChange={(e) =>
-                setNewRule({ ...newRule, trigger: e.target.value as AlertTrigger })
+                setNewRule({
+                  ...newRule,
+                  trigger: e.target.value as AlertTrigger,
+                  threshold: TRIGGER_DEFAULT_VALUE[e.target.value as AlertTrigger],
+                })
               }
             >
               {TRIGGER_OPTIONS.map((o) => (
