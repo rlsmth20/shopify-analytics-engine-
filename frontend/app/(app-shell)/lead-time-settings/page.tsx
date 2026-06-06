@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { GatedFeature } from "@/components/gated-feature";
@@ -9,21 +9,34 @@ import { SectionCard } from "@/components/section-card";
 import {
   fetchCategoryLeadTimes,
   fetchShopSettings,
+  fetchSkuLeadTimes,
+  fetchSkus,
   fetchVendorLeadTimes,
   saveCategoryLeadTimes,
   saveShopSettings,
+  saveSkuLeadTimes,
   saveVendorLeadTimes,
   type CategoryLeadTimeEntry,
   type ShopSettingsResponse,
+  type SkuDetail,
+  type SkuLeadTimeEntry,
   type VendorLeadTimeEntry
 } from "@/lib/api";
-import {
-  formatCategoryLeadTimes,
-  formatVendorLeadTimes,
-  parseCategoryLeadTimes,
-  parseVendorLeadTimes
-} from "@/lib/app-helpers";
 import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
+
+type OverrideRow = {
+  id: string;
+  name: string;
+  lead_time_days: string;
+};
+
+type SkuOverrideRow = OverrideRow & {
+  productName: string;
+  supplier: string;
+  category: string;
+};
+
+type LeadTimeSource = "sku" | "supplier" | "category" | "global";
 
 export default function LeadTimeSettingsPage() {
   return (
@@ -42,13 +55,64 @@ function LeadTimeSettingsContent() {
   const [defaultLeadTimeDays, setDefaultLeadTimeDays] = useState("14");
   const [safetyBufferDays, setSafetyBufferDays] = useState("7");
   const [allowMockFallback, setAllowMockFallback] = useState(true);
-  const [vendorLeadTimesText, setVendorLeadTimesText] = useState("");
-  const [categoryLeadTimesText, setCategoryLeadTimesText] = useState("");
+  const [supplierRows, setSupplierRows] = useState<OverrideRow[]>([]);
+  const [categoryRows, setCategoryRows] = useState<OverrideRow[]>([]);
+  const [skuRows, setSkuRows] = useState<SkuOverrideRow[]>([]);
+  const [syncedSkus, setSyncedSkus] = useState<SkuDetail[]>([]);
+  const [skuSearch, setSkuSearch] = useState("");
   const [settingsPersisted, setSettingsPersisted] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+
+  const supplierNames = useMemo(
+    () => uniqueValues(syncedSkus.map((sku) => sku.vendor)),
+    [syncedSkus]
+  );
+  const categoryNames = useMemo(
+    () => uniqueValues(syncedSkus.map((sku) => sku.category)),
+    [syncedSkus]
+  );
+
+  const supplierMap = useMemo(
+    () => rowsToMap(supplierRows),
+    [supplierRows]
+  );
+  const categoryMap = useMemo(
+    () => rowsToMap(categoryRows),
+    [categoryRows]
+  );
+  const skuMap = useMemo(() => rowsToMap(skuRows), [skuRows]);
+
+  const filteredSkuSuggestions = useMemo(() => {
+    const query = skuSearch.trim().toLowerCase();
+    if (!query) {
+      return syncedSkus.slice(0, 8);
+    }
+    return syncedSkus
+      .filter((sku) =>
+        [sku.sku_id, sku.name, sku.vendor, sku.category]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)
+      )
+      .slice(0, 8);
+  }, [skuSearch, syncedSkus]);
+
+  const effectivePreview = useMemo(
+    () =>
+      syncedSkus.slice(0, 8).map((sku) =>
+        resolveEffectiveLeadTime({
+          sku,
+          defaultLeadTimeDays,
+          skuMap,
+          supplierMap,
+          categoryMap
+        })
+      ),
+    [categoryMap, defaultLeadTimeDays, skuMap, supplierMap, syncedSkus]
+  );
 
   async function loadSettings(domain: string, options?: { requireDomain?: boolean }) {
     const targetDomain = domain.trim() || "current-shop";
@@ -64,19 +128,41 @@ function LeadTimeSettingsContent() {
     setSettingsNotice(null);
 
     try {
-      const [settings, vendorLeadTimes, categoryLeadTimes] = await Promise.all([
-        fetchShopSettings(targetDomain),
-        fetchVendorLeadTimes(targetDomain),
-        fetchCategoryLeadTimes(targetDomain)
-      ]);
+      const [settings, vendorLeadTimes, categoryLeadTimes, skuLeadTimes, skus] =
+        await Promise.all([
+          fetchShopSettings(targetDomain),
+          fetchVendorLeadTimes(targetDomain),
+          fetchCategoryLeadTimes(targetDomain),
+          fetchSkuLeadTimes(targetDomain),
+          fetchSkus()
+        ]);
       applyShopSettings(settings);
       setShopifyDomain(settings.shopify_domain);
-      setVendorLeadTimesText(formatVendorLeadTimes(vendorLeadTimes.items));
-      setCategoryLeadTimesText(formatCategoryLeadTimes(categoryLeadTimes.items));
+      setSyncedSkus(skus);
+      setSupplierRows(
+        withEmptyFallback(
+          vendorLeadTimes.items.map((item) =>
+            buildOverrideRow(item.vendor, item.lead_time_days)
+          )
+        )
+      );
+      setCategoryRows(
+        withEmptyFallback(
+          categoryLeadTimes.items.map((item) =>
+            buildOverrideRow(item.category, item.lead_time_days)
+          )
+        )
+      );
+      setSkuRows(
+        skuLeadTimes.items.map((item) => {
+          const sku = skus.find((candidate) => candidate.sku_id === item.sku_id);
+          return buildSkuRow(item.sku_id, item.lead_time_days ?? "", sku);
+        })
+      );
       setSettingsNotice(
         settings.is_persisted
-          ? "Loaded persisted shop settings and lead-time overrides."
-          : "Loaded default settings and any saved lead-time overrides for this shop."
+          ? "Loaded saved lead-time rules. SKU overrides beat supplier and category defaults."
+          : "Loaded default lead-time rules. Add supplier, category, or SKU overrides as needed."
       );
     } catch (error) {
       setSettingsError(
@@ -99,25 +185,39 @@ function LeadTimeSettingsContent() {
 
     const nextDefaultLeadTimeDays = Number.parseInt(defaultLeadTimeDays, 10);
     const nextSafetyBufferDays = Number.parseInt(safetyBufferDays, 10);
-    let vendorLeadTimes: VendorLeadTimeEntry[] = [];
-    let categoryLeadTimes: CategoryLeadTimeEntry[] = [];
 
     if (
       Number.isNaN(nextDefaultLeadTimeDays) ||
-      Number.isNaN(nextSafetyBufferDays)
+      nextDefaultLeadTimeDays < 1 ||
+      Number.isNaN(nextSafetyBufferDays) ||
+      nextSafetyBufferDays < 0
     ) {
-      setSettingsError("Lead time and safety buffer must be valid numbers.");
+      setSettingsError("Lead time must be at least 1 day and safety buffer cannot be negative.");
       return;
     }
 
+    let supplierLeadTimes: VendorLeadTimeEntry[] = [];
+    let categoryLeadTimes: CategoryLeadTimeEntry[] = [];
+    let skuLeadTimes: SkuLeadTimeEntry[] = [];
+
     try {
-      vendorLeadTimes = parseVendorLeadTimes(vendorLeadTimesText);
-      categoryLeadTimes = parseCategoryLeadTimes(categoryLeadTimesText);
+      supplierLeadTimes = parseOverrideRows(supplierRows, "supplier").map((item) => ({
+        vendor: item.name,
+        lead_time_days: item.lead_time_days
+      }));
+      categoryLeadTimes = parseOverrideRows(categoryRows, "category").map((item) => ({
+        category: item.name,
+        lead_time_days: item.lead_time_days
+      }));
+      skuLeadTimes = parseOverrideRows(skuRows, "SKU").map((item) => ({
+        sku_id: item.name,
+        lead_time_days: item.lead_time_days
+      }));
     } catch (error) {
       setSettingsError(
         error instanceof Error
           ? error.message
-          : "Lead-time overrides could not be parsed."
+          : "Lead-time overrides could not be validated."
       );
       return;
     }
@@ -127,7 +227,7 @@ function LeadTimeSettingsContent() {
     setSettingsNotice(null);
 
     try {
-      const [settings, savedVendorLeadTimes, savedCategoryLeadTimes] =
+      const [settings, savedSupplierLeadTimes, savedCategoryLeadTimes, savedSkuLeadTimes] =
         await Promise.all([
           saveShopSettings({
             shopify_domain: targetDomain,
@@ -137,20 +237,42 @@ function LeadTimeSettingsContent() {
           }),
           saveVendorLeadTimes({
             shopify_domain: targetDomain,
-            items: vendorLeadTimes
+            items: supplierLeadTimes
           }),
           saveCategoryLeadTimes({
             shopify_domain: targetDomain,
             items: categoryLeadTimes
+          }),
+          saveSkuLeadTimes({
+            shopify_domain: targetDomain,
+            items: skuLeadTimes
           })
         ]);
       applyShopSettings(settings);
       setShopifyDomain(settings.shopify_domain);
-      setVendorLeadTimesText(formatVendorLeadTimes(savedVendorLeadTimes.items));
-      setCategoryLeadTimesText(
-        formatCategoryLeadTimes(savedCategoryLeadTimes.items)
+      setSupplierRows(
+        withEmptyFallback(
+          savedSupplierLeadTimes.items.map((item) =>
+            buildOverrideRow(item.vendor, item.lead_time_days)
+          )
+        )
       );
-      setSettingsNotice("Shop settings and lead-time overrides saved.");
+      setCategoryRows(
+        withEmptyFallback(
+          savedCategoryLeadTimes.items.map((item) =>
+            buildOverrideRow(item.category, item.lead_time_days)
+          )
+        )
+      );
+      setSkuRows(
+        savedSkuLeadTimes.items.map((item) => {
+          const sku = syncedSkus.find((candidate) => candidate.sku_id === item.sku_id);
+          return buildSkuRow(item.sku_id, item.lead_time_days ?? "", sku);
+        })
+      );
+      setSettingsNotice(
+        `Saved ${savedSkuLeadTimes.items.length} SKU, ${savedSupplierLeadTimes.items.length} supplier, and ${savedCategoryLeadTimes.items.length} category lead-time rules.`
+      );
     } catch (error) {
       setSettingsError(
         error instanceof Error
@@ -169,6 +291,24 @@ function LeadTimeSettingsContent() {
     setSettingsPersisted(settings.is_persisted);
   }
 
+  function addSupplierRow(name = "") {
+    setSupplierRows((rows) => [...trimBlankRows(rows), buildOverrideRow(name, "")]);
+  }
+
+  function addCategoryRow(name = "") {
+    setCategoryRows((rows) => [...trimBlankRows(rows), buildOverrideRow(name, "")]);
+  }
+
+  function addSkuRow(sku: SkuDetail) {
+    setSkuRows((rows) => {
+      if (rows.some((row) => row.name === sku.sku_id)) {
+        return rows;
+      }
+      return [...rows, buildSkuRow(sku.sku_id, sku.sku_lead_time_days ?? "", sku)];
+    });
+    setSkuSearch("");
+  }
+
   useEffect(() => {
     if (!hasHydrated) {
       return;
@@ -183,11 +323,11 @@ function LeadTimeSettingsContent() {
       <SectionCard>
         <div className="section-heading">
           <div>
-            <p className="section-eyebrow">Shop Scope</p>
-            <h2 className="section-title">Shop configuration target</h2>
+            <p className="section-eyebrow">Inventory Rules</p>
+            <h2 className="section-title">Lead-time control center</h2>
           </div>
           <p className="section-copy">
-            Settings are scoped to one Shopify domain and feed the live action engine.
+            Set default, supplier, category, and SKU-specific lead times that feed the Action Queue, Forecast, and Reorder / POs.
           </p>
         </div>
 
@@ -209,7 +349,7 @@ function LeadTimeSettingsContent() {
             disabled={isLoadingSettings}
             onClick={() => void handleLoadSettings()}
           >
-            {isLoadingSettings ? "Loading..." : "Load settings"}
+            {isLoadingSettings ? "Loading..." : "Refresh rules"}
           </button>
         </div>
       </SectionCard>
@@ -218,31 +358,18 @@ function LeadTimeSettingsContent() {
         <SectionCard>
           <div className="section-heading">
             <div>
-              <p className="section-eyebrow">Inventory rules</p>
-              <h2 className="section-title section-title-small">Manual thresholds and smart recommendations</h2>
+              <p className="section-eyebrow">How Skubase decides</p>
+              <h2 className="section-title section-title-small">Most specific rule wins</h2>
             </div>
             <Link href="/alerts" className="button button-secondary button-sm">
               Create alert rule
             </Link>
           </div>
-          <div className="step-list">
-            <div className="step-item">
-              <strong>1. Manual thresholds</strong>
-              <p>
-                Alerts & Rules supports trigger-level thresholds for stockout
-                risk, overstock, dead-stock capital, forecast risk, and supplier
-                slip. Product-level alert-below, target stock, restock-to, and
-                safety stock thresholds are planned.
-              </p>
-            </div>
-            <div className="step-item">
-              <strong>2. Smart recommendations</strong>
-              <p>
-                Skubase calculates risk from sales velocity, lead time, safety
-                buffer, and target coverage so the Action Queue and Reorder / POs
-                can tell you what to do first.
-              </p>
-            </div>
+          <div className="lead-time-priority-grid">
+            <PriorityStep number="1" title="SKU override" copy="Use this for hero SKUs, fragile items, import products, or anything with a known exception." />
+            <PriorityStep number="2" title="Supplier lead time" copy="Set the normal delivery window for each supplier so all their SKUs inherit it." />
+            <PriorityStep number="3" title="Category lead time" copy="Use category defaults for product types that behave similarly, like accessories or apparel." />
+            <PriorityStep number="4" title="Global default" copy="Everything else falls back to the shop-wide default and safety buffer." />
           </div>
         </SectionCard>
 
@@ -250,17 +377,17 @@ function LeadTimeSettingsContent() {
           <SectionCard>
             <div className="section-heading">
               <div>
-                <p className="section-eyebrow">Global Settings</p>
-                <h2 className="section-title section-title-small">Defaults and fallback</h2>
+                <p className="section-eyebrow">Global Defaults</p>
+                <h2 className="section-title section-title-small">Baseline assumptions</h2>
               </div>
               <span className="status-badge status-neutral">
-                {settingsPersisted ? "Persisted" : "Default"}
+                {settingsPersisted ? "Saved" : "Default"}
               </span>
             </div>
 
             <div className="form-grid">
               <label className="field-label">
-                <span>Default lead time days</span>
+                <span>Default supplier lead time</span>
                 <input
                   className="input-control"
                   type="number"
@@ -268,6 +395,7 @@ function LeadTimeSettingsContent() {
                   value={defaultLeadTimeDays}
                   onChange={(event) => setDefaultLeadTimeDays(event.target.value)}
                 />
+                <small>Used when no SKU, supplier, or category rule exists.</small>
               </label>
 
               <label className="field-label">
@@ -279,6 +407,7 @@ function LeadTimeSettingsContent() {
                   value={safetyBufferDays}
                   onChange={(event) => setSafetyBufferDays(event.target.value)}
                 />
+                <small>Extra cover added to reorder targets so late receipts do not immediately create stockouts.</small>
               </label>
             </div>
 
@@ -288,8 +417,7 @@ function LeadTimeSettingsContent() {
                 <div>
                   <span className="toggle-title">Allow sample fallback</span>
                   <p className="toggle-copy">
-                    If disabled, the Action Queue returns an error when the DB does
-                    not have usable live data.
+                    If disabled, the Action Queue returns an error when the database does not have usable live data.
                   </p>
                 </div>
                 <input
@@ -304,74 +432,168 @@ function LeadTimeSettingsContent() {
           <SectionCard>
             <div className="section-heading">
               <div>
-                <p className="section-eyebrow">Resolution Order</p>
-                <h2 className="section-title section-title-small">How lead times resolve</h2>
+                <p className="section-eyebrow">Effective Preview</p>
+                <h2 className="section-title section-title-small">Which rule will apply</h2>
               </div>
             </div>
-            <div className="step-list">
-              <div className="step-item">
-                <strong>1. SKU override</strong>
-                <p>Uses the SKU-specific lead time when it exists.</p>
+            {effectivePreview.length ? (
+              <div className="lead-time-preview-list">
+                {effectivePreview.map((item) => (
+                  <div className="lead-time-preview-row" key={item.sku.sku_id}>
+                    <div>
+                      <strong>{item.sku.name}</strong>
+                      <span>{item.sku.sku_id}</span>
+                    </div>
+                    <div>
+                      <b>{item.days} days</b>
+                      <span>{sourceLabel(item.source)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="step-item">
-                <strong>2. Supplier override</strong>
-                <p>Uses the shop-scoped supplier lead time table.</p>
-              </div>
-              <div className="step-item">
-                <strong>3. Category override</strong>
-                <p>Uses the shop-scoped category lead time table.</p>
-              </div>
-              <div className="step-item">
-                <strong>4. Global default</strong>
-                <p>Falls back to the shop default, then file config if needed.</p>
-              </div>
-            </div>
+            ) : (
+              <p className="section-copy">
+                Sync products to preview which SKU, supplier, category, or default lead time will be used.
+              </p>
+            )}
           </SectionCard>
         </div>
 
         <div className="content-grid content-grid-2-2">
-          <SectionCard>
-            <div className="section-heading">
-              <div>
-                <p className="section-eyebrow">Supplier Overrides</p>
-                <h2 className="section-title section-title-small">Supplier lead times</h2>
-              </div>
-            </div>
-            <label className="field-label">
-              <span>One supplier per line</span>
-              <textarea
-                className="input-control textarea-control"
-                value={vendorLeadTimesText}
-                onChange={(event) => setVendorLeadTimesText(event.target.value)}
-                placeholder={"Northstar Apparel | 16\nSummit Sportswear | 19"}
-              />
-            </label>
-            <p className="section-copy">Format: supplier name | lead time days</p>
-          </SectionCard>
+          <LeadTimeTable
+            eyebrow="Supplier rules"
+            title="Supplier lead times"
+            description="Every SKU from the same supplier inherits this lead time unless the SKU has its own override."
+            nameLabel="Supplier"
+            rows={supplierRows}
+            suggestions={supplierNames}
+            onAdd={addSupplierRow}
+            onRowsChange={setSupplierRows}
+          />
 
-          <SectionCard>
-            <div className="section-heading">
-              <div>
-                <p className="section-eyebrow">Category Overrides</p>
-                <h2 className="section-title section-title-small">Category lead times</h2>
-              </div>
-            </div>
-            <label className="field-label">
-              <span>One category per line</span>
-              <textarea
-                className="input-control textarea-control"
-                value={categoryLeadTimesText}
-                onChange={(event) => setCategoryLeadTimesText(event.target.value)}
-                placeholder={"outerwear | 18\ntops | 12"}
-              />
-            </label>
-            <p className="section-copy">Format: category | lead time days</p>
-          </SectionCard>
+          <LeadTimeTable
+            eyebrow="Category rules"
+            title="Category lead times"
+            description="Use category defaults when the supplier is unknown or a product type has a predictable fulfillment window."
+            nameLabel="Category"
+            rows={categoryRows}
+            suggestions={categoryNames}
+            onAdd={addCategoryRow}
+            onRowsChange={setCategoryRows}
+          />
         </div>
 
-        <div className="button-row">
+        <SectionCard>
+          <div className="section-heading">
+            <div>
+              <p className="section-eyebrow">SKU rules</p>
+              <h2 className="section-title section-title-small">SKU-specific lead times</h2>
+            </div>
+            <span className="status-badge status-neutral">
+              {skuRows.length} overrides
+            </span>
+          </div>
+          <p className="section-copy">
+            Use SKU overrides for exceptions: imported products, made-to-order items, best sellers with special freight, or products with supplier-specific delays.
+          </p>
+
+          <div className="lead-time-sku-search">
+            <label className="field-label field-label-grow">
+              <span>Find SKU to override</span>
+              <input
+                className="input-control"
+                type="search"
+                placeholder="Search product, SKU, supplier, or category"
+                value={skuSearch}
+                onChange={(event) => setSkuSearch(event.target.value)}
+              />
+            </label>
+            <span className="status-badge status-neutral">
+              {syncedSkus.length} synced SKUs
+            </span>
+          </div>
+
+          {filteredSkuSuggestions.length ? (
+            <div className="lead-time-sku-suggestions">
+              {filteredSkuSuggestions.map((sku) => (
+                <button
+                  type="button"
+                  className="lead-time-suggestion"
+                  key={sku.sku_id}
+                  onClick={() => addSkuRow(sku)}
+                >
+                  <span>{sku.name}</span>
+                  <small>{sku.sku_id} · {sku.vendor} · {sku.category}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="section-copy">
+              No matching synced SKUs. Sync products first, then add SKU-specific lead times.
+            </p>
+          )}
+
+          {skuRows.length ? (
+            <div className="lead-time-table-wrap">
+              <table className="lead-time-table">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Supplier</th>
+                    <th>Category</th>
+                    <th>Lead time</th>
+                    <th aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {skuRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <strong>{row.productName || row.name}</strong>
+                        <span>{row.name}</span>
+                      </td>
+                      <td>{row.supplier || "Unassigned"}</td>
+                      <td>{row.category || "Uncategorized"}</td>
+                      <td>
+                        <input
+                          className="input-control lead-time-days-input"
+                          type="number"
+                          min={1}
+                          value={row.lead_time_days}
+                          onChange={(event) =>
+                            setSkuRows((rows) =>
+                              updateRow(rows, row.id, "lead_time_days", event.target.value)
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="button button-secondary button-sm"
+                          onClick={() =>
+                            setSkuRows((rows) => rows.filter((candidate) => candidate.id !== row.id))
+                          }
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              title="No SKU overrides yet"
+              description="Add SKU overrides only for products whose lead time is different from supplier or category defaults."
+            />
+          )}
+        </SectionCard>
+
+        <div className="button-row sticky-action-row">
           <button type="submit" className="button button-primary" disabled={isSavingSettings}>
-            {isSavingSettings ? "Saving settings..." : "Save settings"}
+            {isSavingSettings ? "Saving lead-time rules..." : "Save lead-time rules"}
           </button>
         </div>
       </form>
@@ -389,4 +611,242 @@ function LeadTimeSettingsContent() {
       ) : null}
     </div>
   );
+}
+
+function PriorityStep({
+  number,
+  title,
+  copy
+}: {
+  number: string;
+  title: string;
+  copy: string;
+}) {
+  return (
+    <div className="lead-time-priority-step">
+      <span>{number}</span>
+      <div>
+        <strong>{title}</strong>
+        <p>{copy}</p>
+      </div>
+    </div>
+  );
+}
+
+function LeadTimeTable({
+  eyebrow,
+  title,
+  description,
+  nameLabel,
+  rows,
+  suggestions,
+  onAdd,
+  onRowsChange
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  nameLabel: string;
+  rows: OverrideRow[];
+  suggestions: string[];
+  onAdd: (name?: string) => void;
+  onRowsChange: (rows: OverrideRow[]) => void;
+}) {
+  return (
+    <SectionCard>
+      <div className="section-heading">
+        <div>
+          <p className="section-eyebrow">{eyebrow}</p>
+          <h2 className="section-title section-title-small">{title}</h2>
+        </div>
+        <button
+          type="button"
+          className="button button-secondary button-sm"
+          onClick={() => onAdd()}
+        >
+          Add row
+        </button>
+      </div>
+      <p className="section-copy">{description}</p>
+
+      {suggestions.length ? (
+        <div className="lead-time-chip-row">
+          {suggestions.slice(0, 8).map((suggestion) => (
+            <button
+              type="button"
+              className="filter-chip"
+              key={suggestion}
+              onClick={() => onAdd(suggestion)}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="lead-time-table-wrap">
+        <table className="lead-time-table">
+          <thead>
+            <tr>
+              <th>{nameLabel}</th>
+              <th>Lead time</th>
+              <th aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  <input
+                    className="input-control"
+                    type="text"
+                    value={row.name}
+                    placeholder={nameLabel}
+                    onChange={(event) =>
+                      onRowsChange(updateRow(rows, row.id, "name", event.target.value))
+                    }
+                  />
+                </td>
+                <td>
+                  <input
+                    className="input-control lead-time-days-input"
+                    type="number"
+                    min={1}
+                    value={row.lead_time_days}
+                    onChange={(event) =>
+                      onRowsChange(
+                        updateRow(rows, row.id, "lead_time_days", event.target.value)
+                      )
+                    }
+                  />
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="button button-secondary button-sm"
+                    onClick={() =>
+                      onRowsChange(
+                        withEmptyFallback(rows.filter((candidate) => candidate.id !== row.id))
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
+function buildOverrideRow(name: string, leadTimeDays: number | string): OverrideRow {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    lead_time_days: leadTimeDays === "" ? "" : String(leadTimeDays)
+  };
+}
+
+function buildSkuRow(
+  skuId: string,
+  leadTimeDays: number | string,
+  sku?: SkuDetail
+): SkuOverrideRow {
+  return {
+    ...buildOverrideRow(skuId, leadTimeDays),
+    productName: sku?.name ?? "",
+    supplier: sku?.vendor ?? "",
+    category: sku?.category ?? ""
+  };
+}
+
+function updateRow<T extends OverrideRow>(
+  rows: T[],
+  id: string,
+  field: "name" | "lead_time_days",
+  value: string
+): T[] {
+  return rows.map((row) => (row.id === id ? { ...row, [field]: value } : row));
+}
+
+function trimBlankRows<T extends OverrideRow>(rows: T[]): T[] {
+  return rows.filter((row) => row.name.trim() || row.lead_time_days.trim());
+}
+
+function withEmptyFallback(rows: OverrideRow[]): OverrideRow[] {
+  return rows.length ? rows : [buildOverrideRow("", "")];
+}
+
+function parseOverrideRows(rows: OverrideRow[], label: string) {
+  const normalized = trimBlankRows(rows);
+  const seen = new Set<string>();
+
+  return normalized.map((row) => {
+    const name = row.name.trim();
+    const leadTimeDays = Number.parseInt(row.lead_time_days, 10);
+    if (!name) {
+      throw new Error(`${label} lead-time rows need a name.`);
+    }
+    if (Number.isNaN(leadTimeDays) || leadTimeDays < 1) {
+      throw new Error(`${label} lead-time rows need a whole number of at least 1 day.`);
+    }
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      throw new Error(`Duplicate ${label} lead-time row: ${name}.`);
+    }
+    seen.add(key);
+    return { name, lead_time_days: leadTimeDays };
+  });
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+}
+
+function rowsToMap(rows: OverrideRow[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const name = row.name.trim();
+    const days = Number.parseInt(row.lead_time_days, 10);
+    if (name && !Number.isNaN(days) && days > 0) {
+      map.set(name, days);
+    }
+  }
+  return map;
+}
+
+function resolveEffectiveLeadTime({
+  sku,
+  defaultLeadTimeDays,
+  skuMap,
+  supplierMap,
+  categoryMap
+}: {
+  sku: SkuDetail;
+  defaultLeadTimeDays: string;
+  skuMap: Map<string, number>;
+  supplierMap: Map<string, number>;
+  categoryMap: Map<string, number>;
+}): { sku: SkuDetail; days: number; source: LeadTimeSource } {
+  const fallback = Number.parseInt(defaultLeadTimeDays, 10);
+  const defaultDays = Number.isNaN(fallback) || fallback < 1 ? 14 : fallback;
+  const skuDays = skuMap.get(sku.sku_id);
+  if (skuDays) return { sku, days: skuDays, source: "sku" };
+  const supplierDays = supplierMap.get(sku.vendor);
+  if (supplierDays) return { sku, days: supplierDays, source: "supplier" };
+  const categoryDays = categoryMap.get(sku.category);
+  if (categoryDays) return { sku, days: categoryDays, source: "category" };
+  return { sku, days: defaultDays, source: "global" };
+}
+
+function sourceLabel(source: LeadTimeSource): string {
+  if (source === "sku") return "SKU override";
+  if (source === "supplier") return "Supplier rule";
+  if (source === "category") return "Category rule";
+  return "Global default";
 }

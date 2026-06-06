@@ -11,8 +11,11 @@ from app.schemas import (
     CategoryLeadTimeEntry,
     CategoryLeadTimeSettingsResponse,
     ShopSettingsResponse,
+    SkuLeadTimeEntry,
+    SkuLeadTimeSettingsResponse,
     UpdateCategoryLeadTimesRequest,
     UpdateShopSettingsRequest,
+    UpdateSkuLeadTimesRequest,
     UpdateVendorLeadTimesRequest,
     VendorLeadTimeEntry,
     VendorLeadTimeSettingsResponse,
@@ -22,9 +25,11 @@ from app.services.shop_settings import (
     ShopSettingsInputError,
     get_category_lead_times,
     get_shop_settings,
+    get_sku_lead_times,
     get_vendor_lead_times,
     upsert_category_lead_times,
     upsert_shop_settings,
+    upsert_sku_lead_times,
     upsert_vendor_lead_times,
 )
 
@@ -174,6 +179,57 @@ def update_category_lead_times(
         shopify_domain=normalized_domain,
         items=[
             CategoryLeadTimeEntry(category=item.name, lead_time_days=item.lead_time_days)
+            for item in items
+        ],
+    )
+
+
+@router.get("/sku-lead-times", response_model=SkuLeadTimeSettingsResponse)
+def read_sku_lead_times(
+    user: Annotated[User, Depends(require_active_access)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> SkuLeadTimeSettingsResponse:
+    domain = _user_shop_domain(db, user)
+    try:
+        shop_id, normalized_domain, items = get_sku_lead_times(domain)
+    except ShopSettingsInputError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SkuLeadTimeSettingsResponse(
+        shop_id=shop_id,
+        shopify_domain=normalized_domain,
+        items=[
+            SkuLeadTimeEntry(sku_id=item.name, lead_time_days=item.lead_time_days)
+            for item in items
+        ],
+    )
+
+
+@router.put("/sku-lead-times", response_model=SkuLeadTimeSettingsResponse)
+def update_sku_lead_times(
+    payload: UpdateSkuLeadTimesRequest,
+    user: Annotated[User, Depends(require_active_access)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+) -> SkuLeadTimeSettingsResponse:
+    domain = _user_shop_domain(db, user)
+    try:
+        shop_id, normalized_domain, items = upsert_sku_lead_times(
+            shopify_domain=domain,
+            items=[
+                LeadTimeOverrideValue(
+                    name=item.sku_id,
+                    lead_time_days=item.lead_time_days,
+                )
+                for item in payload.items
+                if item.lead_time_days is not None
+            ],
+        )
+    except ShopSettingsInputError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SkuLeadTimeSettingsResponse(
+        shop_id=shop_id,
+        shopify_domain=normalized_domain,
+        items=[
+            SkuLeadTimeEntry(sku_id=item.name, lead_time_days=item.lead_time_days)
             for item in items
         ],
     )

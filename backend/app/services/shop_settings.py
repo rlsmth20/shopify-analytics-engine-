@@ -8,7 +8,7 @@ from app.config.lead_time import (
     LeadTimeConfig,
     build_lead_time_config,
 )
-from app.db.models import CategoryLeadTime, Shop, ShopSettings, VendorLeadTime
+from app.db.models import CategoryLeadTime, Product, Shop, ShopSettings, VendorLeadTime
 from app.db.session import session_scope
 
 
@@ -308,6 +308,76 @@ def upsert_category_lead_times(
         )
 
 
+def get_sku_lead_times(
+    shopify_domain: str,
+) -> tuple[int | None, str, list[LeadTimeOverrideValue]]:
+    normalized_domain = normalize_shopify_domain(shopify_domain)
+
+    with session_scope() as session:
+        shop = session.scalar(
+            select(Shop).where(Shop.shopify_domain == normalized_domain)
+        )
+        if shop is None:
+            return None, normalized_domain, []
+
+        products = session.scalars(
+            select(Product)
+            .where(Product.shop_id == shop.id)
+            .where(Product.sku_lead_time_days.is_not(None))
+            .order_by(Product.sku.asc(), Product.name.asc())
+        ).all()
+        return (
+            shop.id,
+            shop.shopify_domain,
+            [
+                LeadTimeOverrideValue(
+                    name=_sku_id_for_product(product),
+                    lead_time_days=int(product.sku_lead_time_days or 0),
+                )
+                for product in products
+                if product.sku_lead_time_days is not None
+            ],
+        )
+
+
+def upsert_sku_lead_times(
+    *,
+    shopify_domain: str,
+    items: list[LeadTimeOverrideValue],
+) -> tuple[int, str, list[LeadTimeOverrideValue]]:
+    normalized_domain = normalize_shopify_domain(shopify_domain)
+    normalized_items = _normalize_lead_time_items(items, kind="SKU")
+
+    with session_scope() as session:
+        shop = _get_or_create_shop(session, normalized_domain)
+        products = session.scalars(
+            select(Product).where(Product.shop_id == shop.id)
+        ).all()
+        products_by_sku_id = {_sku_id_for_product(product): product for product in products}
+
+        for product in products:
+            product.sku_lead_time_days = None
+
+        for sku_id, lead_time_days in normalized_items.items():
+            product = products_by_sku_id.get(sku_id)
+            if product is None:
+                raise ShopSettingsInputError(
+                    f"SKU lead time entry '{sku_id}' does not match a synced SKU."
+                )
+            product.sku_lead_time_days = lead_time_days
+
+        session.flush()
+        saved_items = [
+            LeadTimeOverrideValue(
+                name=sku_id,
+                lead_time_days=int(product.sku_lead_time_days),
+            )
+            for sku_id, product in sorted(products_by_sku_id.items())
+            if product.sku_lead_time_days is not None
+        ]
+        return shop.id, shop.shopify_domain, saved_items
+
+
 def normalize_shopify_domain(shopify_domain: str) -> str:
     candidate = shopify_domain.strip()
     if not candidate:
@@ -439,3 +509,18 @@ def _normalize_lead_time_items(
         normalized_items[name] = item.lead_time_days
 
     return normalized_items
+
+
+def _sku_id_for_product(product: Product) -> str:
+    if product.sku:
+        return product.sku[:128]
+
+    bits = []
+    for part in (product.name, product.variant_name, str(product.id)):
+        if part is None:
+            continue
+        slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(part))
+        slug = "-".join(filter(None, slug.split("-")))
+        if slug:
+            bits.append(slug)
+    return ("-".join(bits) or "sku-unknown")[:128]

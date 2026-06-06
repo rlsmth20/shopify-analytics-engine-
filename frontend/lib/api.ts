@@ -73,6 +73,11 @@ export type CategoryLeadTimeEntry = {
   lead_time_days: number;
 };
 
+export type SkuLeadTimeEntry = {
+  sku_id: string;
+  lead_time_days: number | null;
+};
+
 export type VendorLeadTimeSettingsResponse = {
   shop_id: number | null;
   shopify_domain: string;
@@ -85,6 +90,12 @@ export type CategoryLeadTimeSettingsResponse = {
   items: CategoryLeadTimeEntry[];
 };
 
+export type SkuLeadTimeSettingsResponse = {
+  shop_id: number | null;
+  shopify_domain: string;
+  items: SkuLeadTimeEntry[];
+};
+
 export type UpdateVendorLeadTimesRequest = {
   shopify_domain: string;
   items: VendorLeadTimeEntry[];
@@ -93,6 +104,25 @@ export type UpdateVendorLeadTimesRequest = {
 export type UpdateCategoryLeadTimesRequest = {
   shopify_domain: string;
   items: CategoryLeadTimeEntry[];
+};
+
+export type UpdateSkuLeadTimesRequest = {
+  shopify_domain: string;
+  items: SkuLeadTimeEntry[];
+};
+
+export type SkuDetail = {
+  sku_id: string;
+  name: string;
+  vendor: string;
+  category: string;
+  price: number;
+  cost: number;
+  inventory: number;
+  last_30_day_sales: number;
+  last_7_day_sales: number;
+  days_since_last_sale: number;
+  sku_lead_time_days: number | null;
 };
 
 type BaseInventoryAction = {
@@ -399,6 +429,110 @@ export async function fetchCategoryLeadTimes(
   }
 
   return (await response.json()) as CategoryLeadTimeSettingsResponse;
+}
+
+export async function fetchSkuLeadTimes(
+  _shopifyDomain: string,
+  signal?: AbortSignal
+): Promise<SkuLeadTimeSettingsResponse> {
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/shop-settings/sku-lead-times`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json"
+      },
+      cache: "no-store",
+      credentials: "include",
+      signal
+    }
+  );
+
+  if (!response.ok) {
+    throw new ApiError(
+      (await readApiError(response)) ??
+        `SKU lead times request failed with status ${response.status}.`,
+      response.status
+    );
+  }
+
+  return (await response.json()) as SkuLeadTimeSettingsResponse;
+}
+
+export async function saveSkuLeadTimes(
+  payload: UpdateSkuLeadTimesRequest,
+  signal?: AbortSignal
+): Promise<SkuLeadTimeSettingsResponse> {
+  const response = await authenticatedFetch(
+    `${API_BASE_URL}/shop-settings/sku-lead-times`,
+    {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      credentials: "include",
+      signal
+    }
+  );
+
+  if (!response.ok) {
+    throw new ApiError(
+      (await readApiError(response)) ??
+        `SKU lead times save failed with status ${response.status}.`,
+      response.status
+    );
+  }
+
+  return (await response.json()) as SkuLeadTimeSettingsResponse;
+}
+
+export async function fetchSkus(signal?: AbortSignal): Promise<SkuDetail[]> {
+  if (isDemo()) {
+    const { DEMO_ACTION_FEED } = await import("@/lib/demo-data");
+    const seen = new Set<string>();
+    return DEMO_ACTION_FEED.actions
+      .filter((action) => {
+        if (seen.has(action.sku_id)) return false;
+        seen.add(action.sku_id);
+        return true;
+      })
+      .map((action) => ({
+        sku_id: action.sku_id,
+        name: action.name,
+        vendor: "Sample supplier",
+        category: action.status,
+        price: 0,
+        cost: 0,
+        inventory: action.current_on_hand,
+        last_30_day_sales: Math.round(action.daily_velocity * 30),
+        last_7_day_sales: Math.round(action.daily_velocity * 7),
+        days_since_last_sale: 0,
+        sku_lead_time_days: null
+      }));
+  }
+
+  const response = await authenticatedFetch(`${API_BASE_URL}/skus`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json"
+    },
+    cache: "no-store",
+    credentials: "include",
+    signal
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      (await readApiError(response)) ??
+        `SKU list request failed with status ${response.status}.`,
+      response.status
+    );
+  }
+
+  return (await response.json()) as SkuDetail[];
 }
 
 export async function saveCategoryLeadTimes(

@@ -87,6 +87,11 @@ class CategoryLeadTimeEntry(ApiModel):
     lead_time_days: int = Field(ge=1)
 
 
+class SkuLeadTimeEntry(ApiModel):
+    sku_id: str = Field(min_length=1)
+    lead_time_days: int | None = Field(default=None, ge=1)
+
+
 class VendorLeadTimeSettingsResponse(ApiModel):
     shop_id: int | None = None
     shopify_domain: str
@@ -99,6 +104,12 @@ class CategoryLeadTimeSettingsResponse(ApiModel):
     items: list[CategoryLeadTimeEntry]
 
 
+class SkuLeadTimeSettingsResponse(ApiModel):
+    shop_id: int | None = None
+    shopify_domain: str
+    items: list[SkuLeadTimeEntry]
+
+
 class UpdateVendorLeadTimesRequest(ApiModel):
     shopify_domain: str = Field(min_length=1)
     items: list[VendorLeadTimeEntry] = Field(default_factory=list)
@@ -107,6 +118,11 @@ class UpdateVendorLeadTimesRequest(ApiModel):
 class UpdateCategoryLeadTimesRequest(ApiModel):
     shopify_domain: str = Field(min_length=1)
     items: list[CategoryLeadTimeEntry] = Field(default_factory=list)
+
+
+class UpdateSkuLeadTimesRequest(ApiModel):
+    shopify_domain: str = Field(min_length=1)
+    items: list[SkuLeadTimeEntry] = Field(default_factory=list)
 
 
 class BaseInventoryAction(ApiModel):
