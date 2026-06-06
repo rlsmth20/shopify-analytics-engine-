@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -9,7 +10,7 @@ import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import { PRICING_TIERS } from "@/lib/plans";
 import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = APP_API_BASE_URL;
 
 function formatDate(iso: string | null): string {
   if (!iso) return "-";

@@ -1,6 +1,7 @@
 "use client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
+const API_BASE = APP_API_BASE_URL;
 const SHOPIFY_CLIENT_ID = process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "";
 const EMBEDDED_CONTEXT_KEY = "skubase_shopify_embedded_context";
 

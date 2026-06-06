@@ -1,3 +1,4 @@
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 // V2 API client for forecast, analytics, reorder, suppliers, bundles, transfers,
 // liquidation, alerts, and dashboard endpoints.
 
@@ -18,8 +19,7 @@ import {
 } from "@/lib/demo-data";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = APP_API_BASE_URL;
 
 // ---------------------------------------------------------------------------
 // Demo-mode detection

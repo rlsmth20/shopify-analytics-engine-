@@ -1,12 +1,13 @@
 "use client";
 
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = APP_API_BASE_URL;
 
 type ContactType = "bug" | "feedback" | "billing" | "general";
 

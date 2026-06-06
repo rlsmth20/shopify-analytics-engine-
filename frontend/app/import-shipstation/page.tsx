@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -27,7 +28,7 @@ type ImportResult = {
   top_skus_by_velocity: Velocity[];
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = APP_API_BASE_URL;
 
 export default function ImportShipStationPage() {
   const router = useRouter();

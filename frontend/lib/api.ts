@@ -1,3 +1,4 @@
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 export type ActionableStatus = "urgent" | "optimize" | "dead";
@@ -186,8 +187,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = APP_API_BASE_URL;
 
 function isDemo(): boolean {
   if (typeof window === "undefined") return false;

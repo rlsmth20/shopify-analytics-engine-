@@ -1,5 +1,6 @@
 "use client";
 
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
@@ -9,7 +10,7 @@ import {
   redirectToShopifyInstall,
 } from "@/lib/shopify-embedded";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = APP_API_BASE_URL;
 
 export type AuthUser = {
   id: number;

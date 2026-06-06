@@ -1,12 +1,13 @@
 "use client";
 
+import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import { useState } from "react";
 
 import type { PlanKey } from "@/lib/plans";
 import { fetchEntitlements } from "@/lib/entitlements";
 import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = APP_API_BASE_URL;
 
 export function PricingButton({
   plan,
