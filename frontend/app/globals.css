@@ -662,6 +662,8 @@ code {
 }
 
 .gated-feature-panel strong {
+  display: block;
+  margin-bottom: 4px;
   font-size: 1rem;
 }
 
@@ -1018,6 +1020,14 @@ code {
   margin-top: 16px;
 }
 
+.lead-time-sku-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 220px;
+}
+
 .lead-time-suggestion {
   display: grid;
   gap: 3px;
@@ -1041,6 +1051,20 @@ code {
 
 .lead-time-suggestion small {
   color: var(--muted);
+}
+
+.lead-time-override-section {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.lead-time-override-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .sticky-action-row {
@@ -3700,6 +3724,10 @@ code {
     align-items: stretch;
     flex-direction: column;
   }
+
+  .lead-time-sku-counts {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 640px) {
@@ -4365,6 +4393,12 @@ code {
 .segmented-btn-active {
   background: var(--ink);
   color: #ffffff;
+}
+
+.po-service-level-control {
+  display: grid;
+  gap: 6px;
+  max-width: 520px;
 }
 
 .po-total-value {

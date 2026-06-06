@@ -37,6 +37,8 @@ type SkuOverrideRow = OverrideRow & {
 };
 
 type LeadTimeSource = "sku" | "supplier" | "category" | "global";
+const SKU_SEARCH_MIN_LENGTH = 2;
+const SKU_OVERRIDE_PAGE_SIZE = 25;
 
 export default function LeadTimeSettingsPage() {
   return (
@@ -60,6 +62,7 @@ function LeadTimeSettingsContent() {
   const [skuRows, setSkuRows] = useState<SkuOverrideRow[]>([]);
   const [syncedSkus, setSyncedSkus] = useState<SkuDetail[]>([]);
   const [skuSearch, setSkuSearch] = useState("");
+  const [skuOverridePage, setSkuOverridePage] = useState(1);
   const [settingsPersisted, setSettingsPersisted] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -87,8 +90,8 @@ function LeadTimeSettingsContent() {
 
   const filteredSkuSuggestions = useMemo(() => {
     const query = skuSearch.trim().toLowerCase();
-    if (!query) {
-      return syncedSkus.slice(0, 8);
+    if (query.length < SKU_SEARCH_MIN_LENGTH) {
+      return [];
     }
     return syncedSkus
       .filter((sku) =>
@@ -97,8 +100,18 @@ function LeadTimeSettingsContent() {
           .toLowerCase()
           .includes(query)
       )
-      .slice(0, 8);
+      .slice(0, 10);
   }, [skuSearch, syncedSkus]);
+
+  const pagedSkuRows = useMemo(() => {
+    const start = (skuOverridePage - 1) * SKU_OVERRIDE_PAGE_SIZE;
+    return skuRows.slice(start, start + SKU_OVERRIDE_PAGE_SIZE);
+  }, [skuOverridePage, skuRows]);
+
+  const skuOverridePageCount = Math.max(
+    1,
+    Math.ceil(skuRows.length / SKU_OVERRIDE_PAGE_SIZE)
+  );
 
   const effectivePreview = useMemo(
     () =>
@@ -159,6 +172,7 @@ function LeadTimeSettingsContent() {
           return buildSkuRow(item.sku_id, item.lead_time_days ?? "", sku);
         })
       );
+      setSkuOverridePage(1);
       setSettingsNotice(
         settings.is_persisted
           ? "Loaded saved lead-time rules. SKU overrides beat supplier and category defaults."
@@ -270,6 +284,7 @@ function LeadTimeSettingsContent() {
           return buildSkuRow(item.sku_id, item.lead_time_days ?? "", sku);
         })
       );
+      setSkuOverridePage(1);
       setSettingsNotice(
         `Saved ${savedSkuLeadTimes.items.length} SKU, ${savedSupplierLeadTimes.items.length} supplier, and ${savedCategoryLeadTimes.items.length} category lead-time rules.`
       );
@@ -307,6 +322,7 @@ function LeadTimeSettingsContent() {
       return [...rows, buildSkuRow(sku.sku_id, sku.sku_lead_time_days ?? "", sku)];
     });
     setSkuSearch("");
+    setSkuOverridePage(1);
   }
 
   useEffect(() => {
@@ -507,13 +523,23 @@ function LeadTimeSettingsContent() {
                 value={skuSearch}
                 onChange={(event) => setSkuSearch(event.target.value)}
               />
+              <small>Type at least 2 characters. Skubase only shows the top 10 matches so large catalogs stay usable.</small>
             </label>
-            <span className="status-badge status-neutral">
-              {syncedSkus.length} synced SKUs
-            </span>
+            <div className="lead-time-sku-counts">
+              <span className="status-badge status-neutral">
+                {syncedSkus.length} synced SKUs
+              </span>
+              <span className="status-badge status-neutral">
+                {skuRows.length} overrides
+              </span>
+            </div>
           </div>
 
-          {filteredSkuSuggestions.length ? (
+          {skuSearch.trim().length < SKU_SEARCH_MIN_LENGTH ? (
+            <p className="section-copy">
+              Search for a SKU when you need an exception. Supplier and category rules cover the bulk of the catalog.
+            </p>
+          ) : filteredSkuSuggestions.length ? (
             <div className="lead-time-sku-suggestions">
               {filteredSkuSuggestions.map((sku) => (
                 <button
@@ -534,54 +560,96 @@ function LeadTimeSettingsContent() {
           )}
 
           {skuRows.length ? (
-            <div className="lead-time-table-wrap">
-              <table className="lead-time-table">
-                <thead>
-                  <tr>
-                    <th>SKU</th>
-                    <th>Supplier</th>
-                    <th>Category</th>
-                    <th>Lead time</th>
-                    <th aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {skuRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        <strong>{row.productName || row.name}</strong>
-                        <span>{row.name}</span>
-                      </td>
-                      <td>{row.supplier || "Unassigned"}</td>
-                      <td>{row.category || "Uncategorized"}</td>
-                      <td>
-                        <input
-                          className="input-control lead-time-days-input"
-                          type="number"
-                          min={1}
-                          value={row.lead_time_days}
-                          onChange={(event) =>
-                            setSkuRows((rows) =>
-                              updateRow(rows, row.id, "lead_time_days", event.target.value)
-                            )
-                          }
-                        />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="button button-secondary button-sm"
-                          onClick={() =>
-                            setSkuRows((rows) => rows.filter((candidate) => candidate.id !== row.id))
-                          }
-                        >
-                          Remove
-                        </button>
-                      </td>
+            <div className="lead-time-override-section">
+              <div className="lead-time-override-toolbar">
+                <p className="section-copy">
+                  Showing {pagedSkuRows.length} of {skuRows.length} SKU overrides.
+                </p>
+                {skuOverridePageCount > 1 ? (
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="button button-secondary button-sm"
+                      disabled={skuOverridePage === 1}
+                      onClick={() => setSkuOverridePage((page) => Math.max(1, page - 1))}
+                    >
+                      Previous
+                    </button>
+                    <span className="status-badge status-neutral">
+                      Page {skuOverridePage} of {skuOverridePageCount}
+                    </span>
+                    <button
+                      type="button"
+                      className="button button-secondary button-sm"
+                      disabled={skuOverridePage === skuOverridePageCount}
+                      onClick={() =>
+                        setSkuOverridePage((page) =>
+                          Math.min(skuOverridePageCount, page + 1)
+                        )
+                      }
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <div className="lead-time-table-wrap">
+                <table className="lead-time-table">
+                  <thead>
+                    <tr>
+                      <th>SKU</th>
+                      <th>Supplier</th>
+                      <th>Category</th>
+                      <th>Lead time</th>
+                      <th aria-label="Actions" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {pagedSkuRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          <strong>{row.productName || row.name}</strong>
+                          <span>{row.name}</span>
+                        </td>
+                        <td>{row.supplier || "Unassigned"}</td>
+                        <td>{row.category || "Uncategorized"}</td>
+                        <td>
+                          <input
+                            className="input-control lead-time-days-input"
+                            type="number"
+                            min={1}
+                            value={row.lead_time_days}
+                            onChange={(event) =>
+                              setSkuRows((rows) =>
+                                updateRow(rows, row.id, "lead_time_days", event.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="button button-secondary button-sm"
+                            onClick={() =>
+                              setSkuRows((rows) => {
+                                const nextRows = rows.filter((candidate) => candidate.id !== row.id);
+                                const nextPageCount = Math.max(
+                                  1,
+                                  Math.ceil(nextRows.length / SKU_OVERRIDE_PAGE_SIZE)
+                                );
+                                setSkuOverridePage((page) => Math.min(page, nextPageCount));
+                                return nextRows;
+                              })
+                            }
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <EmptyState

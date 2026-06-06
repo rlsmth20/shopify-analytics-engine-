@@ -358,10 +358,13 @@ def _stockout_events(rule, context, now, deliver_channels, channels_by_key, allo
         if not _rule_matches(rule, sku_id=action.sku_id, product_name=action.name):
             continue
         days = getattr(action, "days_until_stockout", action.days_of_inventory)
-        if days > rule.threshold:
+        lead_time_days = getattr(action, "lead_time_days_used", 0)
+        reorder_buffer_days = days - lead_time_days
+        if reorder_buffer_days > rule.threshold:
             continue
         msg = (
-            f"{action.name} will stock out in {days:.1f} days at current velocity. "
+            f"{action.name} has {days:.1f} days left and a {lead_time_days:.0f}-day lead time. "
+            f"That leaves {reorder_buffer_days:.1f} days before a reorder may arrive too late. "
             f"Recommended: {action.recommended_action}"
         )
         events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key, allowed_channels))

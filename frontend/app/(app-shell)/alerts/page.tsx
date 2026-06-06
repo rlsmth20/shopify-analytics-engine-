@@ -26,7 +26,7 @@ import {
 import { hasCapability, type PlanTierKey } from "@/lib/plans";
 
 const TRIGGER_OPTIONS: { value: AlertTrigger; label: string; help: string }[] = [
-  { value: "stockout_risk", label: "Stockout risk", help: "Alert when a SKU has fewer days left than your chosen number." },
+  { value: "stockout_risk", label: "Reorder deadline risk", help: "Alert when the last safe reorder window is inside your chosen buffer." },
   { value: "dead_stock", label: "Dead stock capital", help: "Alert when stale inventory has at least this much cash tied up." },
   { value: "overstock", label: "Overstock days of cover", help: "Alert when a SKU has more days of cover than your chosen number." },
   { value: "forecast_miss", label: "High stockout probability", help: "Alert when forecasted stockout risk reaches this percent." },
@@ -38,9 +38,9 @@ const TRIGGER_VALUE_COPY: Record<
   { label: string; suffix: string; helper: string; example: string }
 > = {
   stockout_risk: {
-    label: "Alert when days left is below",
+    label: "Alert when reorder buffer is below",
     suffix: "days",
-    helper: "Example: enter 3 to alert when a SKU has fewer than 3 days of inventory left.",
+    helper: "Example: enter 3 to alert when a SKU is 3 days or less from the point where a reorder may not arrive before stockout. Skubase calculates this as days left minus lead time.",
     example: "3",
   },
   dead_stock: {

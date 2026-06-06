@@ -15,6 +15,12 @@ import {
 import { exportPurchaseOrderReport } from "@/lib/report-export";
 
 const SERVICE_LEVELS = [0.9, 0.95, 0.975, 0.99];
+const SERVICE_LEVEL_COPY: Record<number, string> = {
+  0.9: "Lean plan: lower safety stock, more stockout tolerance.",
+  0.95: "Balanced plan: standard safety stock for most replenishment decisions.",
+  0.975: "Protected plan: more safety stock for important or less predictable SKUs.",
+  0.99: "Maximum protection: highest safety stock and capital requirement.",
+};
 const DEMO_PO_STORAGE_KEY = "skubase_demo_saved_purchase_orders";
 type ReceiptDraftLine = { qty: string; cost: string };
 type ReceiptDrafts = Record<string, Record<string, ReceiptDraftLine>>;
@@ -98,7 +104,7 @@ function PurchaseOrdersContent() {
   return (
     <div className="po-page">
       <div className="po-toolbar">
-        <div>
+        <div className="po-service-level-control">
           <p className="muted small">Service level</p>
           <div className="segmented">
             {SERVICE_LEVELS.map((l) => (
@@ -108,12 +114,18 @@ function PurchaseOrdersContent() {
                 className={`segmented-btn${
                   serviceLevel === l ? " segmented-btn-active" : ""
                 }`}
-                onClick={() => setServiceLevel(l)}
+                onClick={() => {
+                  setOperationNotice(null);
+                  setServiceLevel(l);
+                }}
               >
                 {(l * 100).toFixed(1)}%
               </button>
             ))}
           </div>
+          <p className="muted small">
+            {SERVICE_LEVEL_COPY[serviceLevel]} {loading ? "Updating reorder plan..." : "Changes recalculate safety stock and recommended quantities."}
+          </p>
         </div>
         <div className="po-total">
           <p className="muted small">Total capital required, incl. shipping</p>
