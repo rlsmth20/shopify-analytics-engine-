@@ -114,7 +114,8 @@ function BundlesContent() {
         { label: "Confidence B to A", value: (row) => percent(row.confidence_b_to_a) },
         { label: "Lift", value: (row) => row.lift ?? "" },
         { label: "Combined revenue", value: (row) => row.combined_revenue },
-        { label: "Suggested action", value: (row) => row.suggested_action },
+        { label: "Suggested action", value: (row) => displayBundleAction(row.suggested_action) },
+        { label: "Inventory requirement", value: inventoryRequirementText },
         { label: "Opportunity type", value: (row) => row.opportunity_type },
         { label: "Explanation", value: (row) => row.explanation },
       ],
@@ -301,6 +302,9 @@ function BundleOpportunityDetails({ row }: { row: BundleOpportunity }) {
         This does not create a Shopify bundle automatically. Use it to test a bundle,
         cross-sell, or promotion in your merchandising workflow.
       </div>
+      <div className="bundle-requirement-note">
+        <strong>Inventory requirement:</strong> {inventoryRequirementText(row)}
+      </div>
     </div>
   );
 }
@@ -388,8 +392,37 @@ function buildColumns(): ReportColumn<BundleOpportunity>[] {
     percentColumn("confidence_a_to_b", "Confidence", (row) => row.confidence_a_to_b),
     numberColumn("lift", "Lift", (row) => row.lift),
     moneyColumn("combined_revenue", "Combined revenue", (row) => row.combined_revenue),
-    badgeColumn("suggested_action", "Suggested action", (row) => row.suggested_action),
+    badgeColumn("suggested_action", "Suggested action", (row) => displayBundleAction(row.suggested_action)),
+    badgeColumn("inventory_requirement", "Inventory requirement", inventoryRequirementLabel),
   ];
+}
+
+function displayBundleAction(action: string): string {
+  if (action === "Create bundle") return "Bundle candidate";
+  if (action === "Add cross-sell") return "Cross-sell candidate";
+  return action;
+}
+
+function inventoryRequirementLabel(row: BundleOpportunity): string {
+  if (row.opportunity_type === "Bundle" || row.suggested_action === "Create bundle") {
+    return "Needs component mapping";
+  }
+  if (row.opportunity_type === "Cross-sell") return "No bundle mapping needed";
+  if (row.opportunity_type === "Promo test") return "No bundle mapping needed";
+  return "Review before mapping";
+}
+
+function inventoryRequirementText(row: BundleOpportunity): string {
+  if (row.opportunity_type === "Bundle" || row.suggested_action === "Create bundle") {
+    return "Map the parent bundle and component SKUs before Skubase can calculate buildable units, bottlenecks, or component stock risk for this idea.";
+  }
+  if (row.opportunity_type === "Cross-sell") {
+    return "This can be tested as a merchandising or cart cross-sell from order history. Bundle inventory tracking is only needed if you package it as a kit.";
+  }
+  if (row.opportunity_type === "Promo test") {
+    return "This can be tested as a promotion from order history. Add component mappings only if it becomes a physical bundle or kit.";
+  }
+  return "Review the idea first; add component mappings only if you want Skubase to track bundle inventory health.";
 }
 
 function buildMetrics(
@@ -536,12 +569,20 @@ function badgeColumn(
     key,
     label,
     render: (row) => (
-      <ReportStatusBadge tone={value(row) === "Create bundle" ? "positive" : value(row) === "Watch" ? "neutral" : "warning"}>
+      <ReportStatusBadge tone={bundleBadgeTone(value(row))}>
         {value(row)}
       </ReportStatusBadge>
     ),
     sortValue: value,
   };
+}
+
+function bundleBadgeTone(value: string): "positive" | "warning" | "neutral" | "demo" {
+  if (value === "Bundle candidate" || value === "Cross-sell candidate") return "positive";
+  if (value === "Needs component mapping") return "warning";
+  if (value === "Watch" || value === "Review before mapping") return "neutral";
+  if (value === "No bundle mapping needed") return "demo";
+  return "warning";
 }
 
 function selectFilter(key: string, label: string, values: string[]): ReportFilterConfig {
