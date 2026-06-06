@@ -6,6 +6,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://skubase.io";
+const SHOPIFY_CLIENT_ID = process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -79,6 +80,14 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
+      <head>
+        {SHOPIFY_CLIENT_ID ? (
+          <>
+            <meta name="shopify-api-key" content={SHOPIFY_CLIENT_ID} />
+            <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" />
+          </>
+        ) : null}
+      </head>
       <body>
         {children}
         <Analytics />

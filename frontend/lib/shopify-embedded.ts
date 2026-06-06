@@ -24,30 +24,29 @@ export function getEmbeddedShopifyContext(): EmbeddedContext | null {
   const params = new URLSearchParams(window.location.search);
   const shop = params.get("shop");
   const host = params.get("host");
-  if (shop) {
-    const context = { shop, host };
+  const embeddedParam = params.get("embedded") === "1";
+  const stored = readStoredEmbeddedContext();
+
+  if (shop || host || stored?.shop) {
+    const context = { shop: shop ?? stored?.shop ?? "", host };
     try {
       sessionStorage.setItem(EMBEDDED_CONTEXT_KEY, JSON.stringify(context));
     } catch {
       // Storage is best-effort; the current URL still carries context.
     }
+    debugEmbedded("embedded context detected from URL", {
+      hasShop: Boolean(shop),
+      hasHost: Boolean(host),
+      embeddedParam,
+    });
     return context;
   }
 
-  if (window.top === window.self) {
+  if (window.top === window.self && !embeddedParam) {
     return null;
   }
 
-  try {
-    const raw = sessionStorage.getItem(EMBEDDED_CONTEXT_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<EmbeddedContext>;
-    return typeof parsed.shop === "string" && parsed.shop
-      ? { shop: parsed.shop, host: typeof parsed.host === "string" ? parsed.host : null }
-      : null;
-  } catch {
-    return null;
-  }
+  return stored;
 }
 
 export function isEmbeddedShopifyContext(): boolean {
@@ -59,8 +58,13 @@ export async function getShopifySessionToken(): Promise<string | null> {
   if (!context) return null;
   await ensureShopifyAppBridge();
   try {
-    return (await window.shopify?.idToken?.()) || null;
-  } catch {
+    const token = (await window.shopify?.idToken?.()) || null;
+    debugEmbedded("session token fetch complete", { hasToken: Boolean(token) });
+    return token;
+  } catch (error) {
+    debugEmbedded("session token fetch failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -70,6 +74,9 @@ export async function authHeaders(headers?: HeadersInit): Promise<Headers> {
   const token = await getShopifySessionToken();
   if (token) {
     merged.set("Authorization", `Bearer ${token}`);
+    debugEmbedded("attached Shopify bearer token to API request", {
+      hasAuthorization: true,
+    });
   }
   return merged;
 }
@@ -87,7 +94,7 @@ export async function authenticatedFetch(
 
 export function redirectToShopifyInstall(): boolean {
   const context = getEmbeddedShopifyContext();
-  if (!context) return false;
+  if (!context?.shop) return false;
   const params = new URLSearchParams({ shop: context.shop });
   if (context.host) params.set("host", context.host);
   const installUrl = `${API_BASE}/integrations/shopify/install?${params}`;
@@ -108,6 +115,9 @@ async function ensureShopifyAppBridge(): Promise<void> {
   if (typeof window === "undefined" || window.shopify?.idToken) return;
   ensureApiKeyMeta();
   await loadAppBridgeScript();
+  debugEmbedded("Shopify App Bridge script ready", {
+    hasIdToken: Boolean(window.shopify?.idToken),
+  });
 }
 
 function ensureApiKeyMeta(): void {
@@ -118,6 +128,25 @@ function ensureApiKeyMeta(): void {
   meta.name = "shopify-api-key";
   meta.content = SHOPIFY_CLIENT_ID;
   document.head.appendChild(meta);
+}
+
+function readStoredEmbeddedContext(): EmbeddedContext | null {
+  try {
+    const raw = sessionStorage.getItem(EMBEDDED_CONTEXT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<EmbeddedContext>;
+    return typeof parsed.shop === "string" && parsed.shop
+      ? { shop: parsed.shop, host: typeof parsed.host === "string" ? parsed.host : null }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function debugEmbedded(message: string, meta?: Record<string, unknown>): void {
+  if (process.env.NODE_ENV !== "development") return;
+  // Never log the session token itself. These breadcrumbs only show the auth path.
+  console.debug(`[skubase embedded] ${message}`, meta ?? {});
 }
 
 function loadAppBridgeScript(): Promise<void> {
