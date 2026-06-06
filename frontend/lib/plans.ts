@@ -116,13 +116,13 @@ export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
   },
   limited_today: {
     requiredPlan: "none",
-    title: "Today",
+    title: "Dashboard",
     description: "See a limited starting view before choosing a plan.",
-    cta: "View Today",
+    cta: "View Dashboard",
   },
   today_basic: {
     requiredPlan: "starter",
-    title: "Today",
+    title: "Dashboard",
     description: "Review the most important inventory signals for your Shopify store.",
     cta: "Choose Starter",
   },

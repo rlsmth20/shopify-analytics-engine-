@@ -36,7 +36,7 @@ const pillars = [
     href: "/bundles?demo=1",
   },
   {
-    kicker: "Today",
+    kicker: "Dashboard",
     title: "What should I do today?",
     body: "An action-ranked queue — urgent, optimize, dead — instead of a wall of dashboards. Rank the list, work it from the top.",
     href: "/dashboard?demo=1",

@@ -33,6 +33,11 @@ TRIAL_TTL = timedelta(days=14)
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "production").lower() != "development"
 COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN") or os.getenv("COOKIE_DOMAIN") or None
+ADMIN_EMAILS = {
+    email.strip().lower()
+    for email in os.getenv("ADMIN_EMAILS", "skubase.io@gmail.com").split(",")
+    if email.strip()
+}
 
 
 def _sha256(value: str) -> str:
@@ -60,6 +65,19 @@ def _as_naive_utc(dt: datetime) -> datetime:
 
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def should_be_admin(email: str) -> bool:
+    return normalize_email(email) in ADMIN_EMAILS
+
+
+def ensure_admin_flag(db: DbSession, user: User) -> User:
+    if should_be_admin(user.email) and not user.is_admin:
+        user.is_admin = True
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
 
 
 MagicLinkStatus = Literal["valid", "invalid_token", "used_token", "expired_token"]
@@ -144,7 +162,9 @@ def resolve_session(db: DbSession, *, raw_token: str) -> Optional[User]:
     record.last_seen_at = _now()
     db.commit()
     user = db.get(User, record.user_id)
-    return user
+    if user is None:
+        return None
+    return ensure_admin_flag(db, user)
 
 
 def revoke_session(db: DbSession, *, raw_token: str) -> None:
@@ -177,6 +197,8 @@ def get_or_create_user_for_email(
     user = db.scalar(select(User).where(User.email == email))
     if user is not None:
         user.last_login_at = _now()
+        if should_be_admin(user.email):
+            user.is_admin = True
         # Back-fill trial for waitlist users who existed before trial launch.
         if user.trial_ends_at is None:
             user.trial_ends_at = _now() + TRIAL_TTL
@@ -199,7 +221,7 @@ def get_or_create_user_for_email(
     user = User(
         email=email,
         shop_id=shop.id,
-        is_admin=False,
+        is_admin=should_be_admin(email),
         trial_ends_at=_now() + TRIAL_TTL,
         last_login_at=_now(),
     )

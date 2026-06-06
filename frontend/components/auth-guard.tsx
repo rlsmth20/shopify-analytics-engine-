@@ -113,6 +113,13 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     const embedded = getEmbeddedShopifyContext() !== null;
     setIsEmbedded(embedded);
 
+    if (demo && !embedded) {
+      setUser(DEMO_USER);
+      setIsDemo(true);
+      setLoading(false);
+      return;
+    }
+
     authenticatedFetch(`${API_BASE}/auth/me`, { credentials: "include" })
       .then(async (res) => {
         if (res.ok) {

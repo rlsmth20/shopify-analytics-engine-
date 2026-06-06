@@ -71,6 +71,15 @@ export function GatedFeature({
   const isShopifyInstalled = Boolean(entitlements?.is_shopify_installed);
   const currentPlan = entitlements ? planDisplayName(entitlements.plan_id) : "Unverified";
 
+  function openSampleWorkspace() {
+    try {
+      sessionStorage.setItem("skubase_demo", "1");
+    } catch {
+      // ignore storage failures; the query param still signals demo mode.
+    }
+    window.location.href = "/dashboard?demo=1";
+  }
+
   return (
     <section className="section-card gated-feature-card">
       <div className="gated-feature-content">
@@ -109,9 +118,9 @@ export function GatedFeature({
           <Link href="/billing" className="button button-primary">
             {upgradeLabel}
           </Link>
-          <Link href="/dashboard?demo=1" className="button button-ghost">
+          <button type="button" className="button button-ghost" onClick={openSampleWorkspace}>
             View sample workspace
-          </Link>
+          </button>
         </div>
       </div>
     </section>

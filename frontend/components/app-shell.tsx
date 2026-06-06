@@ -25,7 +25,7 @@ type NavItem = {
 };
 
 const navigationItems: NavItem[] = [
-  { href: "/dashboard", label: "Today", section: "Command", icon: "TD" },
+  { href: "/dashboard", label: "Dashboard", section: "Command", icon: "DB" },
   { href: "/actions", label: "Action Queue", section: "Command", icon: "AQ" },
   { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "AR" },
   { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "FC", minTier: "growth" },
@@ -49,9 +49,9 @@ type PageMeta = { eyebrow: string; title: string; description: string };
 const pageMeta: Record<string, PageMeta> = {
   "/dashboard": {
     eyebrow: "Command",
-    title: "What should I do today?",
+    title: "Dashboard",
     description:
-      "An action-ranked queue over your Shopify catalog. Work it from the top."
+      "What should I do today? Start with the highest-impact inventory signals in your Shopify catalog."
   },
   "/actions": {
     eyebrow: "Command",
