@@ -23,7 +23,8 @@ const SERVICE_LEVEL_COPY: Record<number, string> = {
 };
 const DEMO_PO_STORAGE_KEY = "skubase_demo_saved_purchase_orders";
 type ReceiptDraftLine = { qty: string; cost: string };
-type ReceiptDrafts = Record<string, Record<string, ReceiptDraftLine>>;
+type ReceiptDraft = { receivedAt: string; lines: Record<string, ReceiptDraftLine> };
+type ReceiptDrafts = Record<string, ReceiptDraft>;
 type EditablePoLine = {
   sku_id: string;
   name: string;
@@ -225,6 +226,7 @@ function PurchaseOrdersContent() {
                   <th>Status</th>
                   <th>Received</th>
                   <th>Remaining</th>
+                  <th>Receipts</th>
                   <th>Expected</th>
                   <th>Total</th>
                   <th>Next step</th>
@@ -235,6 +237,8 @@ function PurchaseOrdersContent() {
                   const received = receivedUnits(po);
                   const ordered = orderedUnits(po);
                   const remaining = Math.max(ordered - received, 0);
+                  const latestReceipt = latestReceiptDate(po);
+                  const receiptCount = po.receipts?.length ?? 0;
                   return (
                     <tr key={`saved-${po.po_id}`}>
                       <td>
@@ -249,6 +253,10 @@ function PurchaseOrdersContent() {
                       </td>
                       <td>{received} / {ordered}</td>
                       <td>{remaining}</td>
+                      <td>
+                        {receiptCount}
+                        <span>{latestReceipt ? `Last ${latestReceipt}` : "No receipt dates"}</span>
+                      </td>
                       <td>{po.expected_arrival_date}</td>
                       <td>{currency(po.total_cost)}</td>
                       <td>
@@ -379,6 +387,57 @@ function PurchaseOrdersContent() {
                       <span>Shipping {currency(po.shipping_cost)}</span>
                       <strong>Total {currency(po.total_cost)}</strong>
                     </div>
+                    {po.receipts?.length ? (
+                      <div className="po-receipt-history">
+                        <div className="section-heading section-heading-compact">
+                          <div>
+                            <p className="section-eyebrow">Receipt history</p>
+                            <h3>Supplier delivery observations</h3>
+                            <p className="muted small">
+                              Receipt dates feed supplier on-time delivery, fill rate,
+                              and lead-time history.
+                            </p>
+                          </div>
+                        </div>
+                        <table className="po-table">
+                          <thead>
+                            <tr>
+                              <th>Receipt date</th>
+                              <th>SKU</th>
+                              <th>Qty received</th>
+                              <th>Unit cost</th>
+                              <th>Days to receipt</th>
+                              <th>Expected</th>
+                              <th>Timing</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {po.receipts.map((receipt) => (
+                              <tr key={`${receipt.id}-${receipt.sku_id}`}>
+                                <td>{formatReceiptDate(receipt.received_at)}</td>
+                                <td>
+                                  <strong>{lineNameForSku(po, receipt.sku_id)}</strong>
+                                  <span className="po-line-sku">{receipt.sku_id}</span>
+                                </td>
+                                <td>{receipt.received_qty}</td>
+                                <td>{currency(receipt.received_unit_cost)}</td>
+                                <td>{formatDaysToReceipt(po.created_at, receipt.received_at)}</td>
+                                <td>{receipt.expected_arrival_date || "Not set"}</td>
+                                <td>{formatReceiptTiming(receipt.expected_arrival_date, receipt.received_at)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="po-receipt-empty">
+                        <strong>No receipt dates recorded yet.</strong>
+                        <span>
+                          Record a receipt date when inventory arrives so supplier
+                          on-time delivery and lead-time history can be measured.
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
                 <div className="po-card-actions">
@@ -448,8 +507,24 @@ function PurchaseOrdersContent() {
                       <div>
                         <p className="section-eyebrow">Receiving</p>
                         <h3>Record shipment quantities</h3>
+                        <p className="muted small">
+                          Use the actual receipt date for this shipment. Partial
+                          shipments can be recorded as separate receipt events.
+                        </p>
                       </div>
                     </div>
+                    <label className="field-label po-receipt-date-field">
+                      <span>Receipt date</span>
+                      <input
+                        className="input-control"
+                        type="date"
+                        value={receiptDrafts[po.po_id]?.receivedAt ?? todayInputDate()}
+                        onChange={(event) => updateReceiptDate(po.po_id, event.target.value)}
+                      />
+                      <small>
+                        Used to calculate supplier on-time delivery and days to receipt.
+                      </small>
+                    </label>
                     <table className="po-table">
                       <thead>
                         <tr>
@@ -462,7 +537,7 @@ function PurchaseOrdersContent() {
                       </thead>
                       <tbody>
                         {po.lines.map((line) => {
-                          const draftLine = receiptDrafts[po.po_id]?.[line.sku_id] ?? {
+                          const draftLine = receiptDrafts[po.po_id]?.lines[line.sku_id] ?? {
                             qty: String(line.qty),
                             cost: line.unit_cost.toFixed(2),
                           };
@@ -606,12 +681,15 @@ function PurchaseOrdersContent() {
       if (current[po.po_id]) return current;
       return {
         ...current,
-        [po.po_id]: Object.fromEntries(
-          po.lines.map((line) => [
-            line.sku_id,
-            { qty: String(Math.max(line.qty - (line.received_qty ?? 0), 0)), cost: line.unit_cost.toFixed(2) },
-          ])
-        ),
+        [po.po_id]: {
+          receivedAt: todayInputDate(),
+          lines: Object.fromEntries(
+            po.lines.map((line) => [
+              line.sku_id,
+              { qty: String(Math.max(line.qty - (line.received_qty ?? 0), 0)), cost: line.unit_cost.toFixed(2) },
+            ])
+          ),
+        },
       };
     });
   }
@@ -750,21 +828,35 @@ function PurchaseOrdersContent() {
     setReceiptDrafts((current) => ({
       ...current,
       [poId]: {
-        ...current[poId],
-        [skuId]: {
-          qty: current[poId]?.[skuId]?.qty ?? "",
-          cost: current[poId]?.[skuId]?.cost ?? "",
-          ...patch,
+        receivedAt: current[poId]?.receivedAt ?? todayInputDate(),
+        lines: {
+          ...current[poId]?.lines,
+          [skuId]: {
+            qty: current[poId]?.lines[skuId]?.qty ?? "",
+            cost: current[poId]?.lines[skuId]?.cost ?? "",
+            ...patch,
+          },
         },
+      },
+    }));
+  }
+
+  function updateReceiptDate(poId: string, receivedAt: string) {
+    setReceiptDrafts((current) => ({
+      ...current,
+      [poId]: {
+        receivedAt,
+        lines: current[poId]?.lines ?? {},
       },
     }));
   }
 
   async function recordPartialReceipt(po: PurchaseOrderDraft) {
     const draft = receiptDrafts[po.po_id];
+    const receivedAt = receiptDateToIso(draft?.receivedAt ?? todayInputDate());
     const lines = po.lines
       .map((line) => {
-        const receiptLine = draft?.[line.sku_id];
+        const receiptLine = draft?.lines[line.sku_id];
         const receivedQty = Number(receiptLine?.qty ?? 0);
         const receivedUnitCost = Number(receiptLine?.cost ?? line.unit_cost);
         const remainingQty = Math.max(line.qty - (line.received_qty ?? 0), 0);
@@ -791,13 +883,13 @@ function PurchaseOrdersContent() {
     setOperationNotice(null);
     try {
       await savePurchaseOrder(po);
-      const response = await receivePurchaseOrder(po.po_id, { lines });
-      const fallbackPo = applyReceiptToPo(po, lines);
+      const response = await receivePurchaseOrder(po.po_id, { lines, received_at: receivedAt });
+      const fallbackPo = applyReceiptToPo(po, lines, receivedAt);
       const nextPo = markSaved(response.po ?? fallbackPo);
       persistDemoPurchaseOrder(nextPo);
       upsertDraft(nextPo);
       setReceivingPo(null);
-      setOperationNotice(`Recorded ${sumReceiptQty(lines)} received unit${sumReceiptQty(lines) === 1 ? "" : "s"} for ${po.po_id}.`);
+      setOperationNotice(`Recorded ${sumReceiptQty(lines)} received unit${sumReceiptQty(lines) === 1 ? "" : "s"} for ${po.po_id} on ${formatReceiptDate(receivedAt)}.`);
       if (!isDemoMode()) await refresh();
     } catch (error) {
       setOperationError(errorMessage(error, "Could not record purchase order receipt."));
@@ -821,8 +913,9 @@ function PurchaseOrdersContent() {
         setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
         return;
       }
-      const response = await receivePurchaseOrder(po.po_id, { lines });
-      const nextPo = markSaved(response.po ?? applyReceiptToPo(po, lines));
+      const receivedAt = new Date().toISOString();
+      const response = await receivePurchaseOrder(po.po_id, { lines, received_at: receivedAt });
+      const nextPo = markSaved(response.po ?? applyReceiptToPo(po, lines, receivedAt));
       persistDemoPurchaseOrder(nextPo);
       upsertDraft(nextPo);
       setOperationNotice(`Received all remaining units for ${po.po_id}.`);
@@ -863,6 +956,60 @@ function orderedUnits(po: PurchaseOrderDraft): number {
 
 function receivedUnits(po: PurchaseOrderDraft): number {
   return po.lines.reduce((sum, line) => sum + (line.received_qty ?? 0), 0);
+}
+
+function latestReceiptDate(po: PurchaseOrderDraft): string | null {
+  const latest = po.receipts?.[0]?.received_at ?? po.received_at;
+  return latest ? formatReceiptDate(latest) : null;
+}
+
+function lineNameForSku(po: PurchaseOrderDraft, skuId: string): string {
+  return po.lines.find((line) => line.sku_id === skuId)?.name ?? skuId;
+}
+
+function todayInputDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function receiptDateToIso(value: string): string {
+  if (!value) return new Date().toISOString();
+  const parsed = new Date(`${value}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function formatReceiptDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Date unavailable";
+  return parsed.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatReceiptTiming(expectedDate: string, receivedAt: string): string {
+  const expected = parseDateOnly(expectedDate);
+  const received = parseDateOnly(receivedAt);
+  if (!expected || !received) return "Expected date unavailable";
+  const diffDays = Math.round((received.getTime() - expected.getTime()) / 86_400_000);
+  if (diffDays === 0) return "On expected date";
+  if (diffDays < 0) return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} early`;
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} late`;
+}
+
+function formatDaysToReceipt(createdAt: string, receivedAt: string): string {
+  const created = parseDateOnly(createdAt);
+  const received = parseDateOnly(receivedAt);
+  if (!created || !received) return "Unavailable";
+  const diffDays = Math.max(0, Math.round((received.getTime() - created.getTime()) / 86_400_000));
+  return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
+}
+
+function parseDateOnly(value: string): Date | null {
+  if (!value) return null;
+  const datePart = value.includes("T") ? value.slice(0, 10) : value;
+  const parsed = new Date(`${datePart}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function mergeDemoSavedPurchaseOrders(drafts: PurchaseOrderDraft[]): PurchaseOrderDraft[] {
@@ -1241,7 +1388,11 @@ type ReceiptLinePayload = {
   received_unit_cost?: number | null;
 };
 
-function applyReceiptToPo(po: PurchaseOrderDraft, receiptLines: ReceiptLinePayload[]): PurchaseOrderDraft {
+function applyReceiptToPo(
+  po: PurchaseOrderDraft,
+  receiptLines: ReceiptLinePayload[],
+  receivedAt: string
+): PurchaseOrderDraft {
   const receivedBySku = new Map(receiptLines.map((line) => [line.sku_id, line.received_qty]));
   const lines = po.lines.map((line) => {
     const receiptQty = receivedBySku.get(line.sku_id) ?? 0;
@@ -1252,11 +1403,28 @@ function applyReceiptToPo(po: PurchaseOrderDraft, receiptLines: ReceiptLinePaylo
   });
   const fullyReceived = lines.every((line) => line.received_qty >= line.qty);
   const anyReceived = lines.some((line) => line.received_qty > 0);
+  const receiptEvents = receiptLines
+    .filter((line) => line.received_qty > 0)
+    .map((receiptLine, index) => {
+      const originalLine = po.lines.find((line) => line.sku_id === receiptLine.sku_id);
+      return {
+        id: `${po.po_id}-${Date.now()}-${index}`,
+        sku_id: receiptLine.sku_id,
+        ordered_qty: originalLine?.qty ?? receiptLine.received_qty,
+        received_qty: receiptLine.received_qty,
+        ordered_unit_cost: originalLine?.unit_cost ?? receiptLine.received_unit_cost ?? 0,
+        received_unit_cost: receiptLine.received_unit_cost ?? originalLine?.unit_cost ?? 0,
+        expected_arrival_date: po.expected_arrival_date,
+        received_at: receivedAt,
+        created_at: new Date().toISOString(),
+      };
+    });
   return {
     ...po,
     lines,
     status: fullyReceived ? "received" : anyReceived ? "partially_received" : po.status,
-    received_at: anyReceived ? new Date().toISOString() : po.received_at,
+    received_at: anyReceived ? receivedAt : po.received_at,
+    receipts: [...receiptEvents, ...(po.receipts ?? [])],
   };
 }
 

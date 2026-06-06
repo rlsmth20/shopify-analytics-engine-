@@ -4722,8 +4722,40 @@ code {
   border-top: 1px solid var(--line);
 }
 
+.po-receipt-date-field {
+  max-width: 280px;
+}
+
 .po-receipt-form .input-control {
   max-width: 140px;
+}
+
+.po-receipt-date-field .input-control {
+  max-width: none;
+}
+
+.po-receipt-history {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.po-receipt-empty {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  font-size: 0.9rem;
+}
+
+.po-receipt-empty strong {
+  color: var(--ink);
 }
 
 .po-edit-form {

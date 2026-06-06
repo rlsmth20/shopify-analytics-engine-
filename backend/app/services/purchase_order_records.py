@@ -12,7 +12,7 @@ from app.db.models import (
     PurchaseOrderReceiptRecord,
     PurchaseOrderRecord,
 )
-from app.schemas_v2 import PurchaseOrderDraft, PurchaseOrderLine
+from app.schemas_v2 import PurchaseOrderDraft, PurchaseOrderLine, PurchaseOrderReceipt
 from app.services.supplier_scoring import SupplierObservation
 
 
@@ -187,6 +187,11 @@ def _record_to_schema(db: DbSession, record: PurchaseOrderRecord) -> PurchaseOrd
     lines = db.scalars(
         select(PurchaseOrderLineRecord).where(PurchaseOrderLineRecord.purchase_order_id == record.id)
     ).all()
+    receipts = db.scalars(
+        select(PurchaseOrderReceiptRecord)
+        .where(PurchaseOrderReceiptRecord.purchase_order_id == record.id)
+        .order_by(PurchaseOrderReceiptRecord.received_at.desc(), PurchaseOrderReceiptRecord.id.desc())
+    ).all()
     return PurchaseOrderDraft(
         po_id=record.po_id,
         vendor=record.vendor,
@@ -213,6 +218,20 @@ def _record_to_schema(db: DbSession, record: PurchaseOrderRecord) -> PurchaseOrd
         approved_by_user_id=record.approved_by_user_id,
         sent_at=record.sent_at,
         received_at=record.received_at,
+        receipts=[
+            PurchaseOrderReceipt(
+                id=receipt.id,
+                sku_id=receipt.sku_id,
+                ordered_qty=receipt.ordered_qty,
+                received_qty=receipt.received_qty,
+                ordered_unit_cost=float(receipt.ordered_unit_cost),
+                received_unit_cost=float(receipt.received_unit_cost),
+                expected_arrival_date=receipt.expected_arrival_date,
+                received_at=receipt.received_at,
+                created_at=receipt.created_at,
+            )
+            for receipt in receipts
+        ],
     )
 
 

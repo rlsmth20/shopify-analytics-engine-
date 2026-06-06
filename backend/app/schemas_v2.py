@@ -290,6 +290,18 @@ class PurchaseOrderLine(ApiModel):
     received_qty: int = 0
 
 
+class PurchaseOrderReceipt(ApiModel):
+    id: int
+    sku_id: str
+    ordered_qty: int
+    received_qty: int
+    ordered_unit_cost: float
+    received_unit_cost: float
+    expected_arrival_date: str
+    received_at: datetime
+    created_at: datetime
+
+
 class PurchaseOrderDraft(ApiModel):
     po_id: str
     vendor: str
@@ -306,6 +318,7 @@ class PurchaseOrderDraft(ApiModel):
     approved_by_user_id: Optional[int] = None
     sent_at: Optional[datetime] = None
     received_at: Optional[datetime] = None
+    receipts: list[PurchaseOrderReceipt] = Field(default_factory=list)
 
 
 class PurchaseOrderDraftsResponse(ApiModel):

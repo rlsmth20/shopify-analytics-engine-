@@ -297,6 +297,18 @@ export type PurchaseOrderLine = {
   received_qty: number;
 };
 
+export type PurchaseOrderReceipt = {
+  id: number | string;
+  sku_id: string;
+  ordered_qty: number;
+  received_qty: number;
+  ordered_unit_cost: number;
+  received_unit_cost: number;
+  expected_arrival_date: string;
+  received_at: string;
+  created_at: string;
+};
+
 export type PurchaseOrderDraft = {
   po_id: string;
   vendor: string;
@@ -313,6 +325,7 @@ export type PurchaseOrderDraft = {
   approved_by_user_id: number | null;
   sent_at: string | null;
   received_at: string | null;
+  receipts?: PurchaseOrderReceipt[];
 };
 
 export type AuditLogEvent = {
