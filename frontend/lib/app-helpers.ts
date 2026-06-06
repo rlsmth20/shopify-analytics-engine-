@@ -52,7 +52,7 @@ export const confidenceLabel = {
 
 export const leadTimeSourceLabel = {
   sku_override: "SKU Override",
-  vendor: "Vendor",
+  vendor: "Supplier",
   category: "Category",
   global_default: "Global Default"
 } satisfies Record<LeadTimeSource, string>;
@@ -61,7 +61,7 @@ export function buildActionErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 503) {
     return (
       error.message ||
-      "Live action data is unavailable because mock fallback is disabled."
+      "Live action data is unavailable because sample fallback is disabled."
     );
   }
 
@@ -103,7 +103,7 @@ export function summarizeDataSource(
     return null;
   }
 
-  return dataSource === "db" ? "Live DB data" : "Mock fallback";
+  return dataSource === "db" ? "Live store data" : "Sample fallback";
 }
 
 export function summarizeSyncStatus(

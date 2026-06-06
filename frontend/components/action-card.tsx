@@ -151,7 +151,7 @@ export function ActionCard({
           <Meta label="Target units" value={formatNumber(action.target_inventory_units)} />
           <Meta label="Lead time source" value={leadTimeSourceLabel[action.lead_time_source]} />
           {action.status === "urgent" ? (
-            <Meta label="Exact stockout probability" value={riskTextFromExplanation(action.explanation)} />
+            <Meta label="Stockout risk estimate" value={riskTextFromExplanation(action.explanation)} />
           ) : (
             <Meta label="Excess units" value={formatNumber(action.excess_units)} />
           )}

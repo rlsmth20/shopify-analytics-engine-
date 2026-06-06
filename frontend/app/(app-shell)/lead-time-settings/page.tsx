@@ -431,9 +431,10 @@ function LeadTimeSettingsContent() {
               <summary>Advanced settings</summary>
               <label className="toggle-row">
                 <div>
-                  <span className="toggle-title">Allow sample fallback</span>
+                  <span className="toggle-title">Use sample data when live data is unavailable</span>
                   <p className="toggle-copy">
-                    If disabled, the Action Queue returns an error when the database does not have usable live data.
+                    Keeps the app explorable before Shopify sync has enough product,
+                    inventory, and order history. Turn off only when testing live-data requirements.
                   </p>
                 </div>
                 <input
@@ -549,7 +550,7 @@ function LeadTimeSettingsContent() {
                   onClick={() => addSkuRow(sku)}
                 >
                   <span>{sku.name}</span>
-                  <small>{sku.sku_id} · {sku.vendor} · {sku.category}</small>
+                  <small>{sku.sku_id} - {sku.vendor} - {sku.category}</small>
                 </button>
               ))}
             </div>

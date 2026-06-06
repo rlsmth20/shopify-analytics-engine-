@@ -81,6 +81,26 @@ const TRIGGER_VALUE_COPY: Record<
   },
 };
 
+function formatRuleTriggerValue(trigger: AlertTrigger, value: number): string {
+  const copy = TRIGGER_VALUE_COPY[trigger];
+  if (trigger === "stockout_risk") {
+    return `Reorder buffer is ${value} ${value === 1 ? "day" : "days"} or less`;
+  }
+  if (trigger === "dead_stock") {
+    return `Cash tied up is at least $${value.toLocaleString()}`;
+  }
+  if (trigger === "overstock") {
+    return `Days of cover is above ${value}`;
+  }
+  if (trigger === "forecast_miss") {
+    return `Stockout risk is at least ${value}%`;
+  }
+  if (trigger === "supplier_slip") {
+    return `Supplier on-time rate is below ${value}%`;
+  }
+  return `${copy.label} ${value} ${copy.suffix}`;
+}
+
 const SEVERITY_OPTIONS: AlertSeverity[] = ["info", "warning", "critical"];
 const CHANNEL_OPTIONS: NotificationChannel[] = ["email", "sms", "slack", "webhook"];
 const CHANNEL_MIN_TIER: Record<NotificationChannel, PlanTierKey> = {
@@ -184,7 +204,7 @@ export default function AlertsPage() {
   return (
     <div className="alerts-page">
       <div className="content-grid content-grid-2-1 alert-context-grid">
-        <DataQualityNote title="Alert rules are storewide today">
+        <DataQualityNote title="Choose broad or targeted alerts">
           <p>
             Skubase evaluates enabled rules against connected inventory,
             forecast, and supplier signals. Use targeting to narrow a rule by
@@ -484,7 +504,7 @@ function RulesPanel({
               }
             />
             <span className="form-hint">
-              {thresholdCopy.helper} Unit: {thresholdCopy.suffix}.
+              {thresholdCopy.helper}
             </span>
           </label>
           <div className="form-field">
@@ -541,13 +561,7 @@ function RulesPanel({
                     rule.trigger}
                 </strong>
                 {" - "}
-                {TRIGGER_VALUE_COPY[rule.trigger].label.toLowerCase()}{" "}
-                {rule.threshold}
-                {TRIGGER_VALUE_COPY[rule.trigger].suffix === "%"
-                  ? "%"
-                  : TRIGGER_VALUE_COPY[rule.trigger].suffix === "USD"
-                  ? " USD"
-                  : ` ${TRIGGER_VALUE_COPY[rule.trigger].suffix}`}
+                {formatRuleTriggerValue(rule.trigger, rule.threshold)}
               </p>
               <div className="rule-card-channels">
                 {rule.channels.map((c) => (

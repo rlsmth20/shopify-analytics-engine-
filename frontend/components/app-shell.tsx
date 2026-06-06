@@ -57,19 +57,19 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Command",
     title: "Action queue",
     description:
-      "Ranked Action Queue - urgent, optimize, dead - ready to triage."
+      "Ranked SKU recommendations grouped by urgency, cash impact, and what to do next."
   },
   "/alerts": {
     eyebrow: "Command",
-    title: "Alerts that reach you where you work.",
+    title: "Inventory alerts and rules",
     description:
-      "Email, SMS, Slack, and webhooks driven by a real rule engine - not an 'email only' limitation."
+      "Create stockout, dead-stock, reorder, supplier, and forecast alerts. Send through the channels you enable."
   },
   "/forecast": {
     eyebrow: "Intelligence",
-    title: "Stockout probability, not stockout guesswork.",
+    title: "Forecast and replenishment",
     description:
-      "Holt double-exponential smoothing with weekly seasonality. Every recommended quantity explains itself."
+      "See which SKUs may run short, how lead time affects timing, and what should be reordered."
   },
   "/analytics": {
     eyebrow: "Intelligence",
@@ -129,7 +129,7 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Settings",
     title: "Inventory rules",
     description:
-      "Global defaults, safety buffer, target coverage, and supplier/category overrides."
+      "Set global, supplier, category, and SKU lead-time rules for reorder recommendations."
   },
   "/billing": {
     eyebrow: "Settings",

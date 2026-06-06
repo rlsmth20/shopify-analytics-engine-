@@ -46,7 +46,7 @@ export default function LiquidationPage() {
       <div className="empty-state">
         <p className="empty-state-title">No stale inventory to clear</p>
         <p className="empty-state-copy">
-          Nothing has crossed the dead-stock threshold yet.
+          No SKU has enough stale inventory or cash tied up to need a recovery plan right now.
         </p>
       </div>
     );

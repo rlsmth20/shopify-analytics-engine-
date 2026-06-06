@@ -271,7 +271,7 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "Basic inventory alerts and Action Queue", included: true },
       { label: "Storewide stockout and dead-stock monitoring", included: true },
       { label: "Automatic email + Slack alerts when enabled rules match", included: true },
-      { label: "Basic custom thresholds for stockout, overstock, and dead-stock triggers", included: true },
+      { label: "Basic alert trigger values for stockout, overstock, and dead-stock rules", included: true },
       { label: "Reorder recommendations from smart defaults", included: true },
       { label: "Reports & Exports", included: true },
       { label: "Shopify sync", included: true },
@@ -281,8 +281,8 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "Bundle Opportunities and transfer planning", included: false },
       { label: "Admin roles and audit history", included: false },
     ],
-    monthly: { plan: "starter_monthly", price: "$49" },
-    annual: { plan: "starter_annual", price: "$41.65", yearTotal: "$500" },
+    monthly: { plan: "starter_monthly", price: "$29" },
+    annual: { plan: "starter_annual", price: "$24.65", yearTotal: "$296" },
   },
   {
     key: "growth",
@@ -318,7 +318,7 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "Higher-volume catalog support", included: true },
       { label: "Supplier scorecards when PO receipt history exists", included: true },
       { label: "Advanced planning views", included: true },
-      { label: "Advanced alert routing through enabled channels; targeting expands as data support grows", included: true },
+      { label: "Scale alert coverage for larger catalogs and multi-location workflows", included: true },
       { label: "Priority support (same-business-day response)", included: true },
       { label: "Onboarding concierge", included: true },
       { label: "14-day free trial", included: true },
@@ -329,7 +329,7 @@ export const PRICING_TIERS: PricingTier[] = [
 ];
 
 export const PLAN_LABELS: Record<string, string> = {
-  starter_monthly: "Starter ($49/mo)",
+  starter_monthly: "Starter ($29/mo)",
   growth_monthly: "Growth ($99/mo)",
   scale_monthly: "Scale ($199/mo)",
   starter_annual: "Starter (annual)",

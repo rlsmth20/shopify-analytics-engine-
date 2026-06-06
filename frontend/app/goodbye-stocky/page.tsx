@@ -16,8 +16,8 @@ const compareRows = [
   { capability: "Supplier scorecards", stocky: "Vendors are free-text.", skubase: "On-time delivery, fill rate, lead-time stability, tiering." },
   { capability: "Dead-stock plans", stocky: "Aged-stock flag.", skubase: "Markdown / bundle / wholesale / write-off plans." },
   { capability: "Reorder math", stocky: "Manual reorder point.", skubase: "Service-level-segmented safety stock + ROP + EOQ." },
-  { capability: "Alerts", stocky: "Basic.", skubase: "Rule engine for email, SMS, Slack, webhooks." },
-  { capability: "Pricing", stocky: "POS Pro $89/mo.", skubase: "Published from $49/mo. No POS Pro requirement." },
+  { capability: "Alerts", stocky: "Basic.", skubase: "Configurable rules with enabled notification channels." },
+  { capability: "Pricing", stocky: "POS Pro $89/mo.", skubase: "Published from $29/mo. No POS Pro requirement." },
   { capability: "Future", stocky: "Ending August 31, 2026.", skubase: "Independent, founder-led, public changelog." }
 ];
 

@@ -98,14 +98,14 @@ export function GatedFeature({
             <strong>{upgradeLabel}</strong>
             <span>
               {isShopifyInstalled
-                ? `This workflow is included on ${requiredPlan}. Plan changes happen in Shopify.`
-                : `This workflow is included on ${requiredPlan}. Upgrade from Billing to unlock it.`}
+                ? `Included on ${requiredPlan}. Plan changes are handled securely in Shopify.`
+                : `Included on ${requiredPlan}. Upgrade from Billing to unlock it.`}
             </span>
           </div>
           <ul className="gated-feature-list">
-            <li>Keep the page visible for context while premium controls stay locked.</li>
-            <li>Billing status is checked before Skubase shows upgrade or locked states.</li>
-            <li>Data requirements still appear separately once the right plan is active.</li>
+            <li>Use the sample workspace to see the workflow before upgrading.</li>
+            <li>Your store data stays connected; the workflow unlocks after the plan changes.</li>
+            <li>If the feature needs more Shopify data, Skubase will show that separately.</li>
           </ul>
         </div>
         {failed ? (

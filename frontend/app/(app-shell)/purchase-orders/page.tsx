@@ -16,10 +16,10 @@ import { exportPurchaseOrderReport } from "@/lib/report-export";
 
 const SERVICE_LEVELS = [0.9, 0.95, 0.975, 0.99];
 const SERVICE_LEVEL_COPY: Record<number, string> = {
-  0.9: "Lean plan: lower safety stock, more stockout tolerance.",
-  0.95: "Balanced plan: standard safety stock for most replenishment decisions.",
-  0.975: "Protected plan: more safety stock for important or less predictable SKUs.",
-  0.99: "Maximum protection: highest safety stock and capital requirement.",
+  0.9: "Lean: lower safety stock and less cash tied up, with more stockout tolerance.",
+  0.95: "Balanced: standard protection for most replenishment decisions.",
+  0.975: "Protected: more buffer for important or less predictable SKUs.",
+  0.99: "Maximum: highest buffer and highest capital requirement.",
 };
 const DEMO_PO_STORAGE_KEY = "skubase_demo_saved_purchase_orders";
 type ReceiptDraftLine = { qty: string; cost: string };
@@ -105,7 +105,7 @@ function PurchaseOrdersContent() {
     <div className="po-page">
       <div className="po-toolbar">
         <div className="po-service-level-control">
-          <p className="muted small">Service level</p>
+          <p className="muted small">Stockout protection target</p>
           <div className="segmented">
             {SERVICE_LEVELS.map((l) => (
               <button

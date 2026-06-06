@@ -34,7 +34,7 @@ function SuppliersContent() {
   }, []);
 
   if (loading && vendors.length === 0) {
-    return <div className="page-loading">Scoring suppliers…</div>;
+    return <div className="page-loading">Scoring suppliers...</div>;
   }
   if (error) return <p className="page-error-copy">{error}</p>;
 
@@ -54,7 +54,7 @@ function SuppliersContent() {
         }
       >
         <p>
-          Vendor names come from Shopify product data, but on-time rate, fill rate,
+          Supplier names come from Shopify product data, but on-time rate, fill rate,
           lead-time variance, and cost stability require expected and received dates.
           Import PO history or keep using the reorder workflow to build supplier
           performance data.
@@ -87,7 +87,7 @@ function SuppliersContent() {
               <div>
                 <h4 className="supplier-name">{v.vendor}</h4>
                 <p className="supplier-meta">
-                  {v.sku_count} SKUs · {v.avg_lead_time_days.toFixed(1)}d avg lead
+                  {v.sku_count} SKUs - {v.avg_lead_time_days.toFixed(1)}d avg lead
                 </p>
               </div>
               <div className="score-ring" data-score={v.overall_score}>
@@ -110,7 +110,7 @@ function SuppliersContent() {
               <Metric label="Fill rate" value={`${v.fill_rate_pct.toFixed(0)}%`} />
               <Metric
                 label="Lead variance"
-                value={`±${v.lead_time_variance_days.toFixed(1)}d`}
+                value={`+/-${v.lead_time_variance_days.toFixed(1)}d`}
               />
               <Metric
                 label="Cost stability"

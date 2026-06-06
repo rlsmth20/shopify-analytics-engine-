@@ -114,7 +114,7 @@ export function ActionFeed({
           title={errorStatus === 503 ? "Live feed unavailable" : "Feed unavailable"}
           description={
             errorStatus === 503
-              ? `${errorMessage} Run a Shopify ingest or re-enable mock fallback in Lead Time Settings.`
+              ? `${errorMessage} Run a Shopify sync or turn sample fallback back on in Inventory Rules.`
               : errorMessage
           }
           tone="error"

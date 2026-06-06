@@ -5,7 +5,7 @@ import { MarketingNav } from "@/components/marketing-nav";
 import { WaitlistForm } from "@/components/waitlist-form";
 
 export const metadata = {
-  title: "skubase — The Shopify inventory tool that tells you what to do first",
+  title: "skubase - The Shopify inventory tool that tells you what to do first",
   description:
     "Forecast 90 days. Rank every SKU. Score every supplier. Recover cash from dead stock. Shopify-first, founder-led, price-locked.",
 };
@@ -14,19 +14,19 @@ const pillars = [
   {
     kicker: "Forecasting",
     title: "Stockout probability, not stockout guesswork.",
-    body: "Holt double-exponential smoothing with weekly seasonality and a real probability of stockout on every SKU — not a moving average with a guess on top.",
+    body: "Forecast stockout risk from sales velocity, seasonality, lead time, and current stock so reorder recommendations are easier to trust.",
     href: "/forecast?demo=1",
   },
   {
     kicker: "Suppliers",
     title: "Suppliers you can measure.",
-    body: "On-time delivery, fill rate, lead-time stability, and preferred / acceptable / at-risk tiering. 23 of the 25 tools we studied still treat suppliers as contact records.",
+    body: "Track on-time delivery, fill rate, lead-time stability, and supplier tiers when purchase-order receipt history is available.",
     href: "/suppliers?demo=1",
   },
   {
     kicker: "Dead Stock",
     title: "Cash recovery on stale inventory.",
-    body: "Every dead-stock SKU comes with a concrete plan: markdown, bundle, wholesale, or write-off — with the dollar impact attached. 24 of 25 competitors surface aged stock and stop.",
+    body: "Dead-stock SKUs include practical next steps like markdown, bundle, wholesale, or write-off, with the cash impact attached.",
     href: "/liquidation?demo=1",
   },
   {
@@ -38,13 +38,13 @@ const pillars = [
   {
     kicker: "Dashboard",
     title: "What should I do today?",
-    body: "An action-ranked queue — urgent, optimize, dead — instead of a wall of dashboards. Rank the list, work it from the top.",
+    body: "An action-ranked queue - urgent, optimize, dead - instead of a wall of dashboards. Rank the list, work it from the top.",
     href: "/dashboard?demo=1",
   },
   {
     kicker: "Alerts",
     title: "Alerts that reach you where you work.",
-    body: "Email, SMS, Slack, and webhooks driven by a real rule engine. No 'email only' limitation like the rest of the market.",
+    body: "Create rules for stockout risk, reorder deadlines, overstock, dead stock, forecasts, and supplier slips. Send through the channels you enable.",
     href: "/alerts?demo=1",
   },
 ];
@@ -61,9 +61,9 @@ const migrationCards = [
   },
   {
     eyebrow: "Forecasting in a spreadsheet?",
-    date: "ShipStation export → Google Sheet → trailing average",
+    date: "ShipStation export -> Google Sheet -> trailing average",
     title: "Better than your spreadsheet.",
-    body: "If your reorder math is a 6-month moving average in a Google Sheet, you're tying up cash you don't need to and missing every seasonal ramp. skubase fixes both — drop in your ShipStation export and see real velocity in minutes.",
+    body: "If your reorder math is a 6-month moving average in a Google Sheet, you're tying up cash you don't need to and missing every seasonal ramp. skubase fixes both - drop in your ShipStation export and see real velocity in minutes.",
     cta: "See why",
     href: "/vs-spreadsheet",
     tone: "steady",
@@ -72,7 +72,7 @@ const migrationCards = [
     eyebrow: "Leaving Genie?",
     date: "Genie closed Aug 31, 2025",
     title: "Genie is gone. skubase is the upgrade.",
-    body: "Genie merchants loved simple. We kept the simple and added the math — forecasting, supplier metrics, and a real reorder engine.",
+    body: "Genie merchants loved simple. We kept the simple and added the math - forecasting, supplier metrics, and a real reorder engine.",
     cta: "See the migration path",
     href: "/goodbye-genie",
     tone: "steady",
@@ -90,7 +90,7 @@ const positioning = [
   },
   {
     title: "Math you can see.",
-    body: "Every recommended quantity explains itself — trailing demand, seasonality factor, service level, stockout probability. Explainability is a feature.",
+    body: "Every recommended quantity explains itself - trailing demand, seasonality, lead time, stockout risk, and the inventory buffer behind the recommendation.",
   },
   {
     title: "Fair pricing. Locked pricing.",
@@ -110,12 +110,12 @@ export default function HomePage() {
         </h1>
         <p className="marketing-hero-sub">
           Forecast the next 90 days, rank every SKU, score every supplier, and recover cash from
-          dead stock — in one Shopify-first product, at a price that doesn&apos;t triple at renewal.
+          dead stock - in one Shopify-first product, at a price that doesn&apos;t triple at renewal.
         </p>
         <HeroCta source="home_hero" />
         <p className="marketing-hero-trust">
-          14-day free trial · No credit card · <Link href="/dashboard?demo=1">See a live demo</Link> ·{" "}
-          <Link href="/inventory-risk-snapshot">Get a free inventory risk snapshot</Link> ·{" "}
+          14-day free trial - No credit card - <Link href="/dashboard?demo=1">See a live demo</Link> -{" "}
+          <Link href="/inventory-risk-snapshot">Get a free inventory risk snapshot</Link> -{" "}
           <strong>Prices locked at renewal</strong>
         </p>
       </section>
@@ -127,7 +127,7 @@ export default function HomePage() {
             <p className="migration-card-date">{card.date}</p>
             <h2 className="migration-card-title">{card.title}</h2>
             <p className="migration-card-body">{card.body}</p>
-            <Link href={card.href} className="migration-card-cta">{card.cta} →</Link>
+            <Link href={card.href} className="migration-card-cta">{card.cta} -&gt;</Link>
           </article>
         ))}
       </section>
@@ -137,7 +137,7 @@ export default function HomePage() {
         <h2 className="marketing-section-title">Six things the rest of the market gets wrong.</h2>
         <p className="marketing-section-sub">
           We studied twenty-five inventory products. These are the six gaps that appeared over and
-          over — and every one of them ships in skubase today.
+          over - and every one of them is addressed in skubase today.
         </p>
         <div className="pillar-grid">
           {pillars.map((pillar) => (
@@ -145,7 +145,7 @@ export default function HomePage() {
               <p className="pillar-card-kicker">{pillar.kicker}</p>
               <h3 className="pillar-card-title">{pillar.title}</h3>
               <p className="pillar-card-body">{pillar.body}</p>
-              <Link href={pillar.href} className="pillar-card-link">See in demo →</Link>
+              <Link href={pillar.href} className="pillar-card-link">See in demo -&gt;</Link>
             </article>
           ))}
         </div>
@@ -154,7 +154,7 @@ export default function HomePage() {
       <section className="marketing-section marketing-section-alt">
         <p className="marketing-section-kicker">Positioning</p>
         <h2 className="marketing-section-title">
-          Why the rest of the market is the way it is — and why skubase isn&apos;t.
+          Why the rest of the market is the way it is - and why skubase isn&apos;t.
         </h2>
         <div className="positioning-grid">
           {positioning.map((item) => (
@@ -169,7 +169,7 @@ export default function HomePage() {
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">See what your next reorder should be.</h2>
         <p className="marketing-section-sub">
-          Start free in 30 seconds — no credit card required. The demo is also live if you want to
+          Start free in 30 seconds - no credit card required. The demo is also live if you want to
           look first.
         </p>
         <WaitlistForm source="home_footer" />
@@ -193,7 +193,7 @@ export default function HomePage() {
           <Link href="/terms">Terms</Link>
         </div>
         <p className="marketing-footer-fine">
-          © {new Date().getFullYear()} skubase · Independent · Founder-led · Prices locked at renewal
+          (c) {new Date().getFullYear()} skubase - Independent - Founder-led - Prices locked at renewal
         </p>
       </footer>
     </div>

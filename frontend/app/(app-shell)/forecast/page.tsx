@@ -59,7 +59,7 @@ function ForecastContent() {
   );
 
   if (loading && forecasts.length === 0) {
-    return <div className="page-loading">Computing forecasts…</div>;
+    return <div className="page-loading">Computing forecasts...</div>;
   }
   if (error) return <p className="page-error-copy">{error}</p>;
 
@@ -78,7 +78,7 @@ function ForecastContent() {
     <div className="forecast-page">
       <aside className="forecast-list">
         <h3 className="panel-section-title">SKUs</h3>
-        <p className="panel-section-subtitle">Ranked by stockout probability</p>
+        <p className="panel-section-subtitle">Highest stockout risk first</p>
         <label className="forecast-search">
           <span>Search</span>
           <input
@@ -200,14 +200,14 @@ function ForecastContent() {
               />
               <PlanningCard
                 title="Replenishment Signal"
-                label="Stockout probability"
+                label="30-day stockout risk"
                 value={percent(selected.stockout_probability_30d, 0)}
-                note="Use purchase orders for quantity and vendor grouping."
+                note="Use purchase orders for quantity and supplier grouping."
               />
             </section>
 
             <ChartPanel
-              title={`Forecast · ${selected.sku_id.replace(/^sku_/, "")}`}
+              title={`Forecast - ${selected.sku_id.replace(/^sku_/, "")}`}
               subtitle={selected.explain}
               accent="primary"
             >
@@ -310,7 +310,7 @@ function ExplainCard({ selected }: { selected: ForecastResult }) {
           Why this number? Show the forecasting math.
         </span>
         <span className="explain-card-chevron" aria-hidden>
-          {open ? "▾" : "▸"}
+          {open ? "v" : ">"}
         </span>
       </button>
       {open ? (
@@ -322,7 +322,7 @@ function ExplainCard({ selected }: { selected: ForecastResult }) {
             <div><dt>Method</dt><dd>{selected.method.replace(/_/g, " ")}</dd></div>
             <div><dt>Confidence</dt><dd>{selected.confidence}</dd></div>
             <div><dt>Seasonality</dt><dd>{selected.seasonality.replace(/_/g, " ")}</dd></div>
-            <div><dt>30d stockout probability</dt><dd>{percent(selected.stockout_probability_30d, 0)}</dd></div>
+            <div><dt>30d stockout risk</dt><dd>{percent(selected.stockout_probability_30d, 0)}</dd></div>
           </dl>
           <p className="explain-card-explain">{selected.explain}</p>
           {selected.data_quality_warnings?.length ? (
@@ -349,7 +349,7 @@ function ExplainCard({ selected }: { selected: ForecastResult }) {
             </p>
           ) : null}
           <p className="explain-card-footnote">
-            This is the math the rest of the market hides.
+            Use this detail when you want to audit why Skubase ranked the SKU.
           </p>
         </div>
       ) : null}
