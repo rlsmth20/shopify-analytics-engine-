@@ -52,11 +52,7 @@ export default function ImportStockyPage() {
     try {
       const fd = new FormData();
       fd.append("csv_file", file);
-      const res = await authenticatedFetch(`${API_BASE}/integrations/stocky/import`, {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-      });
+      const res = await postStockyImport(fd);
       if (res.status === 401) {
         if (getEmbeddedShopifyContext()) {
           redirectToShopifyInstall();
@@ -186,13 +182,35 @@ export default function ImportStockyPage() {
   );
 }
 
+async function postStockyImport(formData: FormData): Promise<Response> {
+  try {
+    return await authenticatedFetch(`${API_BASE}/integrations/stocky/import`, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+  } catch (error) {
+    if (!isNetworkFetchError(error)) throw error;
+    return authenticatedFetch("/api/stocky-import", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+  }
+}
+
 function importErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+  if (isNetworkFetchError(error)) {
     return (
       "Could not reach the Skubase import service. Refresh the page and try again. " +
-      "If this keeps happening, check that the CSV is under 25 MB and try a different browser or network."
+      "If this keeps happening, contact support with your browser, store domain, and CSV file size."
     );
   }
   return message;
+}
+
+function isNetworkFetchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /failed to fetch|networkerror|load failed/i.test(message);
 }
