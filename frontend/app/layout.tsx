@@ -6,7 +6,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://skubase.io";
-const SHOPIFY_CLIENT_ID = process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "";
+const SHOPIFY_CLIENT_ID =
+  process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "2df2104b538d6705dcb0fdce43d0a0b9";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -68,7 +69,7 @@ const SOFTWARE_APP_LD = {
   url: SITE_URL,
   description: "Forecast 90 days, rank every SKU, score every supplier, and recover cash from dead stock.",
   offers: [
-    { "@type": "Offer", name: "Starter", price: "49", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
+    { "@type": "Offer", name: "Starter", price: "29", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
     { "@type": "Offer", name: "Growth", price: "99", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
     { "@type": "Offer", name: "Scale", price: "199", priceCurrency: "USD", url: `${SITE_URL}/pricing` },
   ],

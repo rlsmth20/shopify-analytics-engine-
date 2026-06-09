@@ -2,7 +2,8 @@
 
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 const API_BASE = APP_API_BASE_URL;
-const SHOPIFY_CLIENT_ID = process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "";
+const SHOPIFY_CLIENT_ID =
+  process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "2df2104b538d6705dcb0fdce43d0a0b9";
 const EMBEDDED_CONTEXT_KEY = "skubase_shopify_embedded_context";
 
 type EmbeddedContext = {
