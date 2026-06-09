@@ -184,14 +184,14 @@ export default function ImportStockyPage() {
 
 async function postStockyImport(formData: FormData): Promise<Response> {
   try {
-    return await authenticatedFetch(`${API_BASE}/integrations/stocky/import`, {
+    return await authenticatedFetch("/api/stocky-import", {
       method: "POST",
       body: formData,
       credentials: "include",
     });
   } catch (error) {
     if (!isNetworkFetchError(error)) throw error;
-    return authenticatedFetch("/api/stocky-import", {
+    return authenticatedFetch(`${API_BASE}/integrations/stocky/import`, {
       method: "POST",
       body: formData,
       credentials: "include",
