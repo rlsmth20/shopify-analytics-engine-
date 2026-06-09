@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { authenticatedFetch } from "@/lib/shopify-embedded";
+import {
+  authenticatedFetch,
+  getEmbeddedShopifyContext,
+  redirectToShopifyInstall,
+} from "@/lib/shopify-embedded";
 
 type ImportResult = {
   shop_id: number;
@@ -19,6 +23,7 @@ type ImportResult = {
 };
 
 const API_BASE = APP_API_BASE_URL;
+const MAX_CSV_BYTES = 25 * 1024 * 1024;
 
 export default function ImportStockyPage() {
   const router = useRouter();
@@ -32,6 +37,17 @@ export default function ImportStockyPage() {
     setError(null);
     setResult(null);
     if (!file) return setError("Please choose your Stocky CSV.");
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      return setError("Please upload a .csv file exported from Stocky.");
+    }
+    if (file.size === 0) {
+      return setError("That CSV is empty. Export Inventory On Hand from Stocky and try again.");
+    }
+    if (file.size > MAX_CSV_BYTES) {
+      return setError(
+        "That CSV is larger than 25 MB. Export a smaller Stocky file or split the export before importing."
+      );
+    }
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -42,14 +58,18 @@ export default function ImportStockyPage() {
         credentials: "include",
       });
       if (res.status === 401) {
-        router.replace("/login");
+        if (getEmbeddedShopifyContext()) {
+          redirectToShopifyInstall();
+        } else {
+          router.replace("/login");
+        }
         return;
       }
       const body = await res.json().catch(() => null);
       if (!res.ok) throw new Error(body?.detail || `Import failed (${res.status}).`);
       setResult(body as ImportResult);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(importErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -164,4 +184,15 @@ export default function ImportStockyPage() {
       </footer>
     </div>
   );
+}
+
+function importErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return (
+      "Could not reach the Skubase import service. Refresh the page and try again. " +
+      "If this keeps happening, check that the CSV is under 25 MB and try a different browser or network."
+    );
+  }
+  return message;
 }
