@@ -41,6 +41,14 @@ SHOPIFY_PLAN_BY_NAME = {
 }
 
 
+class ShopifyBillingError(RuntimeError):
+    """Base error for Shopify billing lookups."""
+
+
+class ShopifyBillingAuthError(ShopifyBillingError):
+    """Raised when Shopify rejects the stored Admin API access token."""
+
+
 def has_active_shopify_connection(db: DbSession, *, shop_id: int) -> bool:
     return _connection_for_shop(db, shop_id=shop_id) is not None
 
@@ -53,7 +61,51 @@ def current_shopify_subscription_summary(db: DbSession, *, user: User) -> dict:
             "shopify_installed": False,
         }
 
-    active = _fetch_active_subscription(conn)
+    try:
+        active = _fetch_active_subscription(conn)
+    except ShopifyBillingAuthError:
+        logger.warning(
+            "Shopify billing lookup unauthorized for shop_id=%s shop_domain=%s; using mirrored local subscription state",
+            user.shop_id,
+            conn.shopify_domain,
+        )
+        local = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+        return {
+            "billing_provider": "shopify",
+            "shopify_installed": True,
+            "shopify_domain": conn.shopify_domain,
+            "shopify_manage_url": _shopify_manage_url(conn.shopify_domain),
+            "plan": local.plan if local else "none",
+            "status": local.status if local else "unknown",
+            "current_period_end": local.current_period_end.isoformat() if local and local.current_period_end else None,
+            "cancel_at_period_end": False,
+            "has_payment_method": bool(local and local.status in {"active", "trialing"}),
+            "stripe_configured": False,
+            "shopify_billing_test": SHOPIFY_BILLING_TEST,
+            "billing_status_error": "shopify_unauthorized",
+        }
+    except ShopifyBillingError:
+        logger.warning(
+            "Shopify billing lookup failed for shop_id=%s shop_domain=%s; using mirrored local subscription state",
+            user.shop_id,
+            conn.shopify_domain,
+        )
+        local = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+        return {
+            "billing_provider": "shopify",
+            "shopify_installed": True,
+            "shopify_domain": conn.shopify_domain,
+            "shopify_manage_url": _shopify_manage_url(conn.shopify_domain),
+            "plan": local.plan if local else "none",
+            "status": local.status if local else "unknown",
+            "current_period_end": local.current_period_end.isoformat() if local and local.current_period_end else None,
+            "cancel_at_period_end": False,
+            "has_payment_method": bool(local and local.status in {"active", "trialing"}),
+            "stripe_configured": False,
+            "shopify_billing_test": SHOPIFY_BILLING_TEST,
+            "billing_status_error": "shopify_unavailable",
+        }
+
     local = _mirror_shopify_subscription(db, user=user, active_subscription=active)
     return {
         "billing_provider": "shopify",
@@ -225,10 +277,18 @@ def _gql(conn: ShopifyConnection, query: str, variables: dict[str, Any]) -> dict
             body_preview = exc.read().decode("utf-8", errors="replace")[:500]
         except Exception:
             body_preview = "<unavailable>"
-        logger.error("Shopify billing HTTP error code=%s body=%s", exc.code, body_preview)
-        raise RuntimeError(f"Shopify billing request failed: {exc.code} {exc.reason}") from exc
+        if exc.code in {401, 403}:
+            logger.warning("Shopify billing unauthorized code=%s body=%s", exc.code, body_preview)
+            raise ShopifyBillingAuthError(
+                f"Shopify billing request unauthorized: {exc.code} {exc.reason}"
+            ) from exc
+        logger.warning("Shopify billing HTTP error code=%s body=%s", exc.code, body_preview)
+        raise ShopifyBillingError(f"Shopify billing request failed: {exc.code} {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        logger.warning("Shopify billing network error reason=%s", exc.reason)
+        raise ShopifyBillingError(f"Shopify billing request failed: {exc.reason}") from exc
     if payload.get("errors"):
-        raise RuntimeError(f"Shopify billing GraphQL error: {payload['errors']}")
+        raise ShopifyBillingError(f"Shopify billing GraphQL error: {payload['errors']}")
     return payload
 
 
