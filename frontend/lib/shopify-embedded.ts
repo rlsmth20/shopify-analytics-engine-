@@ -48,7 +48,7 @@ export function getEmbeddedShopifyContext(): EmbeddedContext | null {
     return null;
   }
 
-  return stored;
+  return stored ?? { shop: "", host: null };
 }
 
 export function isEmbeddedShopifyContext(): boolean {

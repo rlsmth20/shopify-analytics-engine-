@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Suspense } from "react";
 
+import { EmbeddedShopifyBootstrap } from "@/components/embedded-shopify-bootstrap";
 import "./globals.css";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://skubase.io";
@@ -90,6 +92,9 @@ export default function RootLayout({
         ) : null}
       </head>
       <body>
+        <Suspense fallback={null}>
+          <EmbeddedShopifyBootstrap />
+        </Suspense>
         {children}
         <Analytics />
         <SpeedInsights />
