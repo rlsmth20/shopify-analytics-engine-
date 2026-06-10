@@ -52,7 +52,13 @@ function CallbackInner() {
           return;
         }
 
-        router.replace("/dashboard");
+        const returnTo = sessionStorage.getItem("skubase_login_return_to");
+        if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
+          sessionStorage.removeItem("skubase_login_return_to");
+          router.replace(returnTo);
+        } else {
+          router.replace("/dashboard");
+        }
       } catch {
         if (cancelled) return;
         setStatus("error");

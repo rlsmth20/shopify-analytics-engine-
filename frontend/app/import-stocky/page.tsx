@@ -57,7 +57,7 @@ export default function ImportStockyPage() {
         if (getEmbeddedShopifyContext()) {
           redirectToShopifyInstall();
         } else {
-          router.replace("/login");
+          router.replace(`/login?return_to=${encodeURIComponent("/import-stocky")}`);
         }
         return;
       }

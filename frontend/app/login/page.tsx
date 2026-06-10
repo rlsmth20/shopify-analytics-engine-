@@ -3,7 +3,7 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -13,6 +13,14 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = params.get("return_to");
+    if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
+      sessionStorage.setItem("skubase_login_return_to", returnTo);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
