@@ -7,6 +7,8 @@ from app.api.deps import require_plan_feature
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import (
+    CashPlanResponse,
+    CashPlanVendor,
     PurchaseOrderDraftsResponse,
     PurchaseOrderStatusResponse,
     ReceivePurchaseOrderRequest,
@@ -74,6 +76,98 @@ def list_reorder_suggestions(
         suggestions=suggestions,
         total_extended_cost=round(sum(s.landed_extended_cost for s in suggestions), 2),
         vendor_totals=totals,
+    )
+
+
+@router.get("/cash-plan", response_model=CashPlanResponse)
+def read_cash_plan(
+    user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
+    db: Annotated[DbSession, Depends(get_db_session)],
+    service_level: float = Query(0.95, ge=0.80, le=0.999),
+    shipping_cost: float = Query(35.0, ge=0.0, le=10000.0),
+) -> CashPlanResponse:
+    """Open-to-buy view: cash the reorder queue needs now vs. what can wait.
+
+    "Order now" = inventory is at or below the reorder point, so waiting risks
+    a stockout within the lead time. Everything else is a deferrable top-up.
+    """
+    empty = CashPlanResponse(
+        order_now_cost=0.0,
+        deferrable_cost=0.0,
+        total_cost=0.0,
+        order_now_items=0,
+        deferrable_items=0,
+        vendors=[],
+        explanation="No reorders recommended right now.",
+    )
+    skus = load_skus_for_shop(db, user.shop_id)
+    if not skus:
+        return empty
+    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    if settings is None:
+        settings = build_default_shop_settings()
+    histories = load_daily_history_for_shop_skus(
+        db,
+        user.shop_id,
+        [sku.sku_id for sku in skus],
+        90,
+    )
+    suggestions = build_reorder_suggestions(
+        skus,
+        lambda sku_id: histories.get(sku_id, []),
+        lead_time_config=settings.to_lead_time_config(),
+        service_level=service_level,
+        order_cost=shipping_cost,
+    )
+    if not suggestions:
+        return empty
+
+    vendors: dict[str, dict[str, float | int]] = {}
+    order_now_cost = deferrable_cost = 0.0
+    order_now_items = deferrable_items = 0
+    for s in suggestions:
+        urgent = s.current_on_hand <= s.reorder_point
+        bucket = vendors.setdefault(
+            s.vendor or "Unassigned",
+            {"now": 0.0, "later": 0.0, "items": 0, "lead": 0},
+        )
+        bucket["items"] = int(bucket["items"]) + 1
+        bucket["lead"] = max(int(bucket["lead"]), s.lead_time_days)
+        if urgent:
+            order_now_cost += s.landed_extended_cost
+            order_now_items += 1
+            bucket["now"] = float(bucket["now"]) + s.landed_extended_cost
+        else:
+            deferrable_cost += s.landed_extended_cost
+            deferrable_items += 1
+            bucket["later"] = float(bucket["later"]) + s.landed_extended_cost
+
+    vendor_rows = sorted(
+        (
+            CashPlanVendor(
+                vendor=name,
+                order_now_cost=round(float(data["now"]), 2),
+                deferrable_cost=round(float(data["later"]), 2),
+                item_count=int(data["items"]),
+                max_lead_time_days=int(data["lead"]),
+            )
+            for name, data in vendors.items()
+        ),
+        key=lambda row: row.order_now_cost + row.deferrable_cost,
+        reverse=True,
+    )
+    return CashPlanResponse(
+        order_now_cost=round(order_now_cost, 2),
+        deferrable_cost=round(deferrable_cost, 2),
+        total_cost=round(order_now_cost + deferrable_cost, 2),
+        order_now_items=order_now_items,
+        deferrable_items=deferrable_items,
+        vendors=vendor_rows,
+        explanation=(
+            f"{order_now_items} SKU(s) are at or below their reorder point and need "
+            f"${order_now_cost:,.0f} this week to avoid stockouts. "
+            f"${deferrable_cost:,.0f} more is recommended but deferrable if cash is tight."
+        ),
     )
 
 

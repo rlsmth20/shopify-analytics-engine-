@@ -20,6 +20,8 @@ export type Entitlements = {
   shopify_domain?: string | null;
   shopify_manage_url?: string | null;
   stripe_configured?: boolean;
+  // "shopify_unauthorized" => stored token is stale; prompt re-authorization.
+  billing_status_error?: string | null;
 };
 
 export async function fetchEntitlements(): Promise<Entitlements> {

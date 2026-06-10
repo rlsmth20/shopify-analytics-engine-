@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { BuyListEmailCard } from "@/components/buy-list-email-card";
+import { CashPlanCard } from "@/components/cash-plan-card";
 import { GatedFeature } from "@/components/gated-feature";
 import {
   currency,
@@ -104,6 +106,7 @@ function PurchaseOrdersContent() {
 
   return (
     <div className="po-page">
+      <CashPlanCard serviceLevel={serviceLevel} shippingCost={shippingCost} />
       <div className="po-toolbar">
         <div className="po-service-level-control">
           <p className="muted small">Stockout protection target</p>
@@ -614,6 +617,7 @@ function PurchaseOrdersContent() {
         );
         })}
       </div>
+      <BuyListEmailCard />
     </div>
   );
 

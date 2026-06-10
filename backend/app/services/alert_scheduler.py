@@ -11,10 +11,13 @@ from sqlalchemy import select
 from app.db.models import User
 from app.db.session import SessionLocal
 from app.services.alert_evaluation import evaluate_shop_alerts, user_has_active_access
+from app.services.inventory_value import capture_all_inventory_snapshots
+from app.services.weekly_digest import run_weekly_digests_once
 
 logger = logging.getLogger(__name__)
 
 _task: asyncio.Task[None] | None = None
+_last_snapshot_date: str | None = None
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -67,6 +70,23 @@ def run_alert_evaluation_once(*, cooldown_seconds: int) -> int:
     return total_events
 
 
+def _run_daily_jobs() -> None:
+    """Once-per-UTC-day jobs piggybacking on the alert scheduler tick."""
+    global _last_snapshot_date
+    from datetime import datetime, timezone
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if _last_snapshot_date == today:
+        return
+    _last_snapshot_date = today
+    captured = capture_all_inventory_snapshots()
+    if captured:
+        logger.info("Captured inventory value snapshots for %s shop(s)", captured)
+    sent = run_weekly_digests_once()
+    if sent:
+        logger.info("Sent %s weekly buy-list digest(s)", sent)
+
+
 async def _scheduler_loop(interval_seconds: int, cooldown_seconds: int) -> None:
     logger.info(
         "Automatic alert evaluation enabled; interval=%ss cooldown=%ss",
@@ -81,6 +101,7 @@ async def _scheduler_loop(interval_seconds: int, cooldown_seconds: int) -> None:
             )
             if count:
                 logger.info("Automatic alert evaluation created %s event(s)", count)
+            await asyncio.to_thread(_run_daily_jobs)
         except asyncio.CancelledError:
             raise
         except Exception:

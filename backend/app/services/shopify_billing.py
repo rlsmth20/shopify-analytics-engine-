@@ -117,6 +117,7 @@ def current_shopify_subscription_summary(db: DbSession, *, user: User) -> dict:
     local = _mirror_shopify_subscription(db, user=user, active_subscription=active)
     return {
         "billing_provider": "shopify",
+        "billing_status_error": None,
         "shopify_installed": True,
         "shopify_domain": conn.shopify_domain,
         "shopify_manage_url": _shopify_manage_url(conn.shopify_domain),
@@ -263,8 +264,10 @@ def _return_url(shopify_domain: str) -> str:
 
 
 def _shopify_manage_url(shopify_domain: str) -> str:
+    # /settings/billing/subscriptions 404s in current Shopify admin; the
+    # billing settings home is the stable destination.
     handle = shopify_domain.split(".")[0]
-    return f"https://admin.shopify.com/store/{handle}/settings/billing/subscriptions"
+    return f"https://admin.shopify.com/store/{handle}/settings/billing"
 
 
 def _gql(conn: ShopifyConnection, query: str, variables: dict[str, Any]) -> dict:

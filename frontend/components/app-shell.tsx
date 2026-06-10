@@ -181,6 +181,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [embedded, setEmbedded] = useState(false);
   const [shopifyDomain, setShopifyDomain] = useState<string | null>(null);
   const [storeLoaded, setStoreLoaded] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [syncConnected, setSyncConnected] = useState<boolean>(false);
   const [subscription, setSubscription] = useState<Entitlements | null>(null);
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [subscriptionStatusFailed, setSubscriptionStatusFailed] = useState(false);
@@ -236,6 +238,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user.id]);
 
   useEffect(() => {
+    if (user.id === 0) return;
+    let cancelled = false;
+    void authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, {
+      credentials: "include",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((conn: { connected?: boolean; last_sync_at?: string | null } | null) => {
+        if (cancelled || !conn) return;
+        setSyncConnected(Boolean(conn.connected));
+        setLastSyncAt(conn.last_sync_at ?? null);
+      })
+      .catch(() => {
+        // Sync chip is best-effort.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
+
+  useEffect(() => {
     let cancelled = false;
     void authenticatedFetch(`${API_BASE}/skus/summary`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { product_count: 0 }))
@@ -257,6 +279,32 @@ export function AppShell({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [pathname]);
+
+  // Sync freshness chip — silent sync breakage is the #1 trust killer in
+  // competing tools, so surface staleness instead of hiding it.
+  const syncChip = (() => {
+    if (user.id === 0 || !syncConnected) return null;
+    if (!lastSyncAt) {
+      return { label: "Never synced", warn: true, title: "Run a sync from Store Sync." };
+    }
+    const ageMs = Date.now() - new Date(lastSyncAt).getTime();
+    if (!Number.isFinite(ageMs)) return null;
+    const hours = ageMs / (1000 * 60 * 60);
+    if (hours < 1) return { label: "Synced just now", warn: false, title: "Shopify data is fresh." };
+    if (hours < 26) {
+      return {
+        label: `Synced ${Math.round(hours)}h ago`,
+        warn: false,
+        title: "Shopify data is fresh.",
+      };
+    }
+    const days = Math.floor(hours / 24);
+    return {
+      label: `Sync stale (${days}d)`,
+      warn: true,
+      title: "Data may be out of date - run a sync from the Store Sync page.",
+    };
+  })();
 
   const meta = pageMeta[pathname] ?? pageMeta["/dashboard"];
   const isWideAppRoute = WIDE_APP_ROUTES.has(pathname);
@@ -408,6 +456,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="header-chip header-chip-tone">
               {storeLoaded ? (shopifyDomain ? shopifyDomain : "No store selected") : "Loading store..."}
             </span>
+            {syncChip ? (
+              <span
+                className={`header-chip ${syncChip.warn ? "header-chip-warning" : "header-chip-success"}`}
+                title={syncChip.title}
+              >
+                {syncChip.label}
+              </span>
+            ) : null}
             {hasRealData === false ? (
               <span className="header-chip">Sample data</span>
             ) : null}

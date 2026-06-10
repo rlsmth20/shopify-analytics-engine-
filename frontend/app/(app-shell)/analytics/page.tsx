@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { API_BASE_URL } from "@/lib/api-base";
+import { authenticatedFetch } from "@/lib/shopify-embedded";
 import { ChartCard } from "@/components/chart-card";
+import { AreaLineChart } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { KpiCard } from "@/components/kpi-card";
 import {
@@ -82,11 +85,36 @@ function RiskList({
   );
 }
 
+type InventoryValueHistory = {
+  points: { date: string; total_units: number; cost_value: number; retail_value: number }[];
+  latest_cost_value: number;
+  latest_retail_value: number;
+  change_30d_pct: number | null;
+};
+
 export default function AnalyticsPage() {
   const { actions, dataSource, isLoading, errorMessage } = useActionFeed();
   const [health, setHealth] = useState<InventoryHealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
+  const [valueHistory, setValueHistory] = useState<InventoryValueHistory | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void authenticatedFetch(`${API_BASE_URL}/analytics/inventory-value?days=90`, {
+      credentials: "include",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setValueHistory(data as InventoryValueHistory);
+      })
+      .catch(() => {
+        // Chart is additive; the rest of the page works without it.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -165,6 +193,26 @@ export default function AnalyticsPage() {
               />
             ))}
       </div>
+
+      {valueHistory && valueHistory.points.length > 0 ? (
+        <ChartCard
+          title="Inventory value over time"
+          description={
+            `Capital tied up in on-hand stock at cost - currently ${currencyFormatter.format(valueHistory.latest_cost_value)}` +
+            (valueHistory.change_30d_pct !== null
+              ? ` (${valueHistory.change_30d_pct > 0 ? "+" : ""}${valueHistory.change_30d_pct}% vs ~30 days ago)`
+              : ". History builds daily from today.")
+          }
+        >
+          <AreaLineChart
+            points={valueHistory.points.map((point) => ({
+              label: point.date.slice(5),
+              value: point.cost_value,
+            }))}
+            yFormatter={(v) => currencyFormatter.format(v)}
+          />
+        </ChartCard>
+      ) : null}
 
       {health && health.insights.length > 0 ? (
         <div className="content-grid content-grid-2-2">

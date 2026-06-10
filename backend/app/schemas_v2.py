@@ -522,3 +522,80 @@ class DashboardResponse(ApiModel):
     forecast_vs_actual_7d: list[DashboardSeriesPoint]
     alert_counts_by_severity: list[DashboardSeriesPoint]
     generated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Dead-stock bundle pairings
+# ---------------------------------------------------------------------------
+
+class DeadStockPairing(ApiModel):
+    """A fast mover paired with a dead-stock SKU to clear it as a bundle."""
+
+    id: str
+    anchor_product_name: str
+    anchor_sku: str | None = None
+    anchor_monthly_units: int
+    anchor_price: float
+    anchor_cost: float
+    dead_product_name: str
+    dead_sku: str | None = None
+    dead_on_hand: int
+    dead_days_since_last_sale: int
+    dead_price: float
+    dead_cost: float
+    dead_capital_tied_up: float
+    match_reason: str
+    suggested_bundle_price: float
+    bundle_unit_cost: float
+    bundle_margin_pct: float
+    estimated_monthly_bundles: int
+    estimated_months_to_clear: float | None = None
+    projected_cash_recovered: float
+    explanation: str
+
+
+class DeadStockPairingsResponse(ApiModel):
+    pairings: list[DeadStockPairing]
+    dead_stock_sku_count: int
+    dead_stock_capital: float
+
+
+# ---------------------------------------------------------------------------
+# Open-to-buy cash plan
+# ---------------------------------------------------------------------------
+
+class CashPlanVendor(ApiModel):
+    vendor: str
+    order_now_cost: float
+    deferrable_cost: float
+    item_count: int
+    max_lead_time_days: int
+
+
+class CashPlanResponse(ApiModel):
+    order_now_cost: float
+    deferrable_cost: float
+    total_cost: float
+    order_now_items: int
+    deferrable_items: int
+    vendors: list[CashPlanVendor]
+    explanation: str
+
+
+# ---------------------------------------------------------------------------
+# Inventory value history
+# ---------------------------------------------------------------------------
+
+class InventoryValuePoint(ApiModel):
+    date: str
+    total_units: int
+    sku_count: int
+    cost_value: float
+    retail_value: float
+
+
+class InventoryValueHistoryResponse(ApiModel):
+    points: list[InventoryValuePoint]
+    latest_cost_value: float
+    latest_retail_value: float
+    change_30d_pct: float | None = None

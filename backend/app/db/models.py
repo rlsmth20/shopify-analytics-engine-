@@ -599,3 +599,46 @@ class ShopifyConnection(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+
+class InventoryValueSnapshot(Base):
+    """Daily roll-up of what the on-hand inventory is worth.
+
+    Captured by the background scheduler (and on demand the first time the
+    history endpoint is hit) so merchants can see whether the capital tied up
+    in inventory is growing or shrinking — Shopify has no native equivalent.
+    """
+
+    __tablename__ = "inventory_value_snapshots"
+    __table_args__ = (
+        UniqueConstraint("shop_id", "snapshot_date", name="uq_inventory_value_shop_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    snapshot_date: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD (UTC)
+    total_units: Mapped[int] = mapped_column(Integer, default=0)
+    sku_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_cost_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    total_retail_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )
+
+
+class DigestSendLog(Base):
+    """Dedup log for scheduled email digests (e.g. the weekly buy list)."""
+
+    __tablename__ = "digest_send_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    digest_type: Mapped[str] = mapped_column(String(64), index=True)
+    recipient_email: Mapped[str] = mapped_column(String(320))
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=func.now(),
+    )

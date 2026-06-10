@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
+import { DeadStockPairingsCard } from "@/components/dead-stock-pairings-card";
 import { GatedFeature } from "@/components/gated-feature";
 import {
   ReportEmptyState,
@@ -129,6 +130,7 @@ function BundlesContent() {
 
   return (
     <div className="bundles-page page-stack">
+      <DeadStockPairingsCard />
       <section className="section-card bundle-hero">
         <div className="section-heading">
           <div>

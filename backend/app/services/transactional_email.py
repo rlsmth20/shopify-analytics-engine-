@@ -315,3 +315,95 @@ def send_magic_link_email(email: str, link: str) -> bool:
     except Exception as exc:
         logger.exception("failed to send magic-link to %s: %s", _mask_email(email), exc)
         return False
+
+
+def send_buy_list_email(
+    *,
+    email: str,
+    items: list[dict],
+    total_cost: float,
+    vendor_totals: dict[str, float],
+) -> bool:
+    """Send the weekly Monday Buy List digest. Never raises."""
+    client = _client()
+    if client is None:
+        return False
+
+    rows = "".join(
+        f"""<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;">{item['name']}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#475569;font-size:13px;">{item['vendor'] or '-'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;text-align:right;">{item['qty']}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;text-align:right;">${item['cost']:,.0f}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:{'#b91c1c' if item['stockout_prob'] >= 0.5 else '#475569'};font-size:13px;text-align:right;">{item['stockout_prob']:.0%}</td>
+        </tr>"""
+        for item in items
+    )
+    vendor_lines = "".join(
+        f'<li style="margin:0 0 4px;color:#475569;font-size:13px;">{vendor or "Unassigned"}: <strong>${amount:,.0f}</strong></li>'
+        for vendor, amount in sorted(vendor_totals.items(), key=lambda kv: kv[1], reverse=True)
+    )
+    text_lines = "\n".join(
+        f"- {item['name']} ({item['vendor'] or '-'}): order {item['qty']} (~${item['cost']:,.0f}, "
+        f"stockout risk {item['stockout_prob']:.0%}, lead time {item['lead_time_days']}d)"
+        for item in items
+    )
+
+    html = f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
+        <tr><td>
+          <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase weekly buy list</p>
+          <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#0f172a;">What to order this week.</h1>
+          <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+            Your top {len(items)} reorders, ranked by stockout risk. Total cash required:
+            <strong>${total_cost:,.0f}</strong>.
+          </p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            <tr>
+              <th style="padding:8px 12px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:left;">Product</th>
+              <th style="padding:8px 12px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:left;">Vendor</th>
+              <th style="padding:8px 12px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:right;">Qty</th>
+              <th style="padding:8px 12px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:right;">Cost</th>
+              <th style="padding:8px 12px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:right;">Risk</th>
+            </tr>
+            {rows}
+          </table>
+          <p style="margin:20px 0 8px;color:#0f172a;font-size:14px;font-weight:600;">Cash by vendor</p>
+          <ul style="margin:0 0 20px;padding-left:18px;">{vendor_lines}</ul>
+          <p style="margin:0 0 24px;">
+            <a href="{DEFAULT_PRODUCT_URL}/purchase-orders" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:10px;">Open PO drafts</a>
+          </p>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">
+            skubase &middot; weekly buy list &middot; manage this email on the
+            <a href="{DEFAULT_PRODUCT_URL}/reports" style="color:#64748b;">Reports page</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    try:
+        params = {
+            "from": DEFAULT_FROM,
+            "to": [email],
+            "reply_to": DEFAULT_REPLY_TO,
+            "subject": f"Your Monday buy list - {len(items)} reorders, ${total_cost:,.0f} required",
+            "html": html,
+            "text": (
+                f"Your weekly skubase buy list ({len(items)} reorders, ${total_cost:,.0f} total):\n\n"
+                f"{text_lines}\n\nOpen PO drafts: {DEFAULT_PRODUCT_URL}/purchase-orders\n"
+                f"Manage this email: {DEFAULT_PRODUCT_URL}/reports\n"
+            ),
+            "tags": [{"name": "category", "value": "weekly_buy_list"}],
+        }
+        result = client.Emails.send(params)
+        logger.info("buy list email sent: id=%s to=%s", result.get("id"), _mask_email(email))
+        return True
+    except Exception as exc:
+        logger.exception("failed to send buy list email to %s: %s", _mask_email(email), exc)
+        return False

@@ -466,4 +466,7 @@ def current_entitlements_summary(db: DbSession, *, user: User) -> dict:
         "shopify_domain": raw.get("shopify_domain"),
         "shopify_manage_url": raw.get("shopify_manage_url"),
         "stripe_configured": raw.get("stripe_configured", False),
+        # "shopify_unauthorized" means the stored Admin API token went stale
+        # and the merchant must re-authorize (rerun OAuth) to fix billing.
+        "billing_status_error": raw.get("billing_status_error"),
     }

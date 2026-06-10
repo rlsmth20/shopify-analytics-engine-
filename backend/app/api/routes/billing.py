@@ -17,6 +17,7 @@ from app.services.billing import (
     verify_webhook_signature,
 )
 from app.services.shopify_billing import (
+    ShopifyBillingAuthError,
     create_shopify_subscription,
     has_active_shopify_connection,
 )
@@ -117,6 +118,16 @@ def start_shopify_subscription(
         )
     try:
         url = create_shopify_subscription(db, user=user, plan=payload.plan)
+    except ShopifyBillingAuthError as exc:
+        # Stored Admin API token went stale (e.g. app reinstalled). The
+        # frontend reacts to 409 by sending the merchant back through OAuth.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify no longer accepts this store's access token. "
+                "Re-authorize skubase to continue."
+            ),
+        ) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return CheckoutResponse(url=url)

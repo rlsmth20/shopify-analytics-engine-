@@ -105,6 +105,28 @@ export default function BillingPage() {
     );
   }
 
+  async function reauthorizeShopify() {
+    if (!sub?.shopify_domain) {
+      setShopifyPlanNotice(
+        "We could not determine your store domain. Reconnect from the Store Sync page."
+      );
+      return;
+    }
+    const params = new URLSearchParams({ shop: sub.shopify_domain });
+    const res = await authenticatedFetch(
+      `${API_BASE}/integrations/shopify/install?${params}`,
+      { credentials: "include" }
+    ).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    if (body?.authorize_url) {
+      redirectTopLevel(body.authorize_url);
+    } else {
+      setShopifyPlanNotice(
+        "Could not start Shopify re-authorization. Try the Store Sync page."
+      );
+    }
+  }
+
   async function chooseShopifyPlan(plan: string) {
     setShopifyPlanNotice(null);
     setSubscribingPlan(plan);
@@ -116,6 +138,11 @@ export default function BillingPage() {
         body: JSON.stringify({ plan }),
       });
       const body = await res.json().catch(() => null);
+      if (res.status === 409) {
+        // Stale access token — run OAuth again, then the merchant can retry.
+        await reauthorizeShopify();
+        return;
+      }
       if (!res.ok) {
         setShopifyPlanNotice(
           body?.detail || `Could not start the Shopify plan approval (${res.status}).`
@@ -225,6 +252,23 @@ export default function BillingPage() {
             </p>
           </div>
 
+          {isShopifyBilling && sub.billing_status_error === "shopify_unauthorized" ? (
+            <div className="import-error" role="alert" style={{ marginBottom: "16px" }}>
+              <strong>Shopify connection needs attention.</strong> Your store&apos;s
+              access token is no longer valid, so billing and sync calls are
+              failing. Re-authorize to fix it - your data and settings are kept.
+              <div className="button-row" style={{ marginTop: "12px" }}>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => void reauthorizeShopify()}
+                >
+                  Re-authorize skubase
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="button-row">
             {isShopifyBilling ? (
               isActive ? (
@@ -331,6 +375,11 @@ export default function BillingPage() {
               );
             })}
           </div>
+          {shopifyPlanNotice ? (
+            <p className="auth-error" role="alert" style={{ marginTop: "16px" }}>
+              {shopifyPlanNotice}
+            </p>
+          ) : null}
           <p className="section-copy" style={{ marginTop: "16px" }}>
             Every plan starts with a 14-day free trial. You approve the charge
             on Shopify&apos;s confirmation page, and it appears on your regular

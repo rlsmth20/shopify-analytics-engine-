@@ -161,3 +161,133 @@ def _suggested_action(opportunity_type: str) -> str:
     if opportunity_type == "Promo test":
         return "Test promo"
     return "Watch"
+
+
+# ---------------------------------------------------------------------------
+# Dead-stock pairings — clear slow stock by attaching it to a fast mover
+# ---------------------------------------------------------------------------
+
+DEAD_STOCK_DAYS = 45
+MIN_ANCHOR_MONTHLY_UNITS = 5
+DEAD_ITEM_DISCOUNT = 0.20
+ATTACH_RATE = 0.20  # assumed share of anchor orders that take the bundle
+
+
+def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
+    """Pair dead-stock SKUs with fast movers to clear them as bundles.
+
+    Match preference: same category, then same vendor, then the overall
+    fastest mover. The attach-rate assumption (20% of anchor volume) is stated
+    in the explanation so merchants can judge the projection.
+    """
+    from app.schemas_v2 import DeadStockPairing, DeadStockPairingsResponse
+    from app.services.shop_skus import load_skus_for_shop
+
+    skus = load_skus_for_shop(db, shop_id)
+    dead = [
+        sku for sku in skus
+        if sku.inventory > 0 and sku.days_since_last_sale >= DEAD_STOCK_DAYS
+    ]
+    anchors = sorted(
+        (
+            sku for sku in skus
+            if sku.inventory > 0
+            and sku.last_30_day_sales >= MIN_ANCHOR_MONTHLY_UNITS
+            and sku.days_since_last_sale < DEAD_STOCK_DAYS
+        ),
+        key=lambda sku: sku.last_30_day_sales,
+        reverse=True,
+    )
+    dead_capital = round(sum(sku.inventory * sku.cost for sku in dead), 2)
+    if not dead or not anchors:
+        return DeadStockPairingsResponse(
+            pairings=[],
+            dead_stock_sku_count=len(dead),
+            dead_stock_capital=dead_capital,
+        )
+
+    dead.sort(key=lambda sku: sku.inventory * sku.cost, reverse=True)
+    pairings: list[DeadStockPairing] = []
+    for dead_sku in dead[: limit * 2]:
+        anchor, reason = _best_anchor(dead_sku, anchors)
+        if anchor is None:
+            continue
+
+        bundle_price = round(anchor.price + dead_sku.price * (1 - DEAD_ITEM_DISCOUNT), 2)
+        bundle_cost = round(anchor.cost + dead_sku.cost, 2)
+        margin_pct = (
+            round((bundle_price - bundle_cost) / bundle_price * 100, 1)
+            if bundle_price > 0
+            else 0.0
+        )
+        monthly_bundles = max(1, int(anchor.last_30_day_sales * ATTACH_RATE))
+        months_to_clear = (
+            round(dead_sku.inventory / monthly_bundles, 1) if monthly_bundles else None
+        )
+        capital = round(dead_sku.inventory * dead_sku.cost, 2)
+        recovered = round(
+            min(dead_sku.inventory, monthly_bundles * 3)
+            * dead_sku.price
+            * (1 - DEAD_ITEM_DISCOUNT),
+            2,
+        )
+
+        pairings.append(
+            DeadStockPairing(
+                id=f"{anchor.sku_id}+{dead_sku.sku_id}",
+                anchor_product_name=anchor.name,
+                anchor_sku=anchor.sku_id,
+                anchor_monthly_units=anchor.last_30_day_sales,
+                anchor_price=round(anchor.price, 2),
+                anchor_cost=round(anchor.cost, 2),
+                dead_product_name=dead_sku.name,
+                dead_sku=dead_sku.sku_id,
+                dead_on_hand=dead_sku.inventory,
+                dead_days_since_last_sale=dead_sku.days_since_last_sale,
+                dead_price=round(dead_sku.price, 2),
+                dead_cost=round(dead_sku.cost, 2),
+                dead_capital_tied_up=capital,
+                match_reason=reason,
+                suggested_bundle_price=bundle_price,
+                bundle_unit_cost=bundle_cost,
+                bundle_margin_pct=margin_pct,
+                estimated_monthly_bundles=monthly_bundles,
+                estimated_months_to_clear=months_to_clear,
+                projected_cash_recovered=recovered,
+                explanation=(
+                    f"{dead_sku.name} has not sold in {dead_sku.days_since_last_sale} days "
+                    f"with ${capital:,.0f} tied up in {dead_sku.inventory} units. "
+                    f"{anchor.name} sells {anchor.last_30_day_sales} units/month ({reason}). "
+                    f"Bundled at ${bundle_price:,.2f} ({int(DEAD_ITEM_DISCOUNT * 100)}% off the slow item), "
+                    f"a {int(ATTACH_RATE * 100)}% attach rate moves ~{monthly_bundles} bundles/month "
+                    f"at {margin_pct:.0f}% margin - projected ${recovered:,.0f} recovered in the first quarter."
+                ),
+            )
+        )
+        if len(pairings) >= limit:
+            break
+
+    pairings.sort(key=lambda p: p.dead_capital_tied_up, reverse=True)
+    return DeadStockPairingsResponse(
+        pairings=pairings,
+        dead_stock_sku_count=len(dead),
+        dead_stock_capital=dead_capital,
+    )
+
+
+def _best_anchor(dead_sku, anchors):
+    """Pick the strongest anchor, preferring catalog affinity over raw speed."""
+    for anchor in anchors:
+        if anchor.sku_id == dead_sku.sku_id:
+            continue
+        if dead_sku.category and anchor.category == dead_sku.category:
+            return anchor, f"same category: {anchor.category}"
+    for anchor in anchors:
+        if anchor.sku_id == dead_sku.sku_id:
+            continue
+        if dead_sku.vendor and anchor.vendor == dead_sku.vendor:
+            return anchor, f"same vendor: {anchor.vendor}"
+    for anchor in anchors:
+        if anchor.sku_id != dead_sku.sku_id:
+            return anchor, "store's fastest mover"
+    return None, ""
