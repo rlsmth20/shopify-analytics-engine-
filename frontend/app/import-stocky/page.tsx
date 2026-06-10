@@ -183,15 +183,19 @@ export default function ImportStockyPage() {
 }
 
 async function postStockyImport(formData: FormData): Promise<Response> {
+  const embedded = getEmbeddedShopifyContext() !== null;
+  const primaryUrl = embedded ? "/api/stocky-import" : `${API_BASE}/integrations/stocky/import`;
+  const fallbackUrl = embedded ? `${API_BASE}/integrations/stocky/import` : "/api/stocky-import";
+
   try {
-    return await authenticatedFetch("/api/stocky-import", {
+    return await authenticatedFetch(primaryUrl, {
       method: "POST",
       body: formData,
       credentials: "include",
     });
   } catch (error) {
     if (!isNetworkFetchError(error)) throw error;
-    return authenticatedFetch(`${API_BASE}/integrations/stocky/import`, {
+    return authenticatedFetch(fallbackUrl, {
       method: "POST",
       body: formData,
       credentials: "include",
