@@ -9,8 +9,6 @@ from app.api.deps import get_current_user
 from app.db.models import User
 from app.db.session import get_db_session
 from app.services.billing import (
-    PRICE_IDS,
-    create_checkout_session,
     create_portal_session,
     current_entitlements_summary,
     current_subscription_summary,
@@ -19,6 +17,7 @@ from app.services.billing import (
     verify_webhook_signature,
 )
 from app.services.shopify_billing import (
+    create_shopify_subscription,
     has_active_shopify_connection,
 )
 
@@ -40,27 +39,18 @@ def start_checkout(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> CheckoutResponse:
+    # Stripe checkout is retired: skubase is distributed through the Shopify
+    # App Store, and Shopify requires app charges to go through its Billing
+    # API. Existing Stripe subscriptions keep working via the webhook/portal.
     if has_active_shopify_connection(db, shop_id=user.shop_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Shopify-installed merchants must use Shopify billing.",
-        )
-    if not is_configured():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Billing is not yet enabled. Please contact support.",
-        )
-    price_id = PRICE_IDS.get(payload.plan, "")
-    if not price_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown plan '{payload.plan}'.",
-        )
-    try:
-        url = create_checkout_session(db, user=user, price_id=price_id)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return CheckoutResponse(url=url)
+        return start_shopify_subscription(payload, user, db)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            "skubase subscriptions are billed through Shopify. Connect your "
+            "Shopify store on the Store Sync page, then choose a plan."
+        ),
+    )
 
 
 class PortalResponse(BaseModel):
@@ -111,15 +101,25 @@ def start_shopify_subscription(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> CheckoutResponse:
+    """Create a Shopify app subscription and return its confirmation URL.
+
+    The frontend redirects the merchant (top-level, out of the iframe) to the
+    confirmation URL where Shopify hosts charge approval; Shopify then sends
+    them back into the embedded app's billing page.
+    """
     if not has_active_shopify_connection(db, shop_id=user.shop_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No active Shopify install for this workspace.",
+            detail=(
+                "Connect your Shopify store on the Store Sync page before "
+                "choosing a plan."
+            ),
         )
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Plan changes are managed through Shopify Managed Pricing for this app.",
-    )
+    try:
+        url = create_shopify_subscription(db, user=user, plan=payload.plan)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return CheckoutResponse(url=url)
 
 
 # Stripe webhook — separate prefix so signature verification is clean.

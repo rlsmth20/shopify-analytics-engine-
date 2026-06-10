@@ -3,11 +3,12 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   authenticatedFetch,
   getEmbeddedShopifyContext,
+  isEmbeddedShopifyContext,
   redirectToShopifyInstall,
 } from "@/lib/shopify-embedded";
 
@@ -32,6 +33,11 @@ export default function ImportStockyPage() {
   const [error, setError] = useState<string | null>(null);
   const [upgradeNeeded, setUpgradeNeeded] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [embedded, setEmbedded] = useState(false);
+
+  useEffect(() => {
+    setEmbedded(isEmbeddedShopifyContext());
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,17 +86,19 @@ export default function ImportStockyPage() {
 
   return (
     <div className="marketing-shell">
-      <header className="marketing-nav">
-        <Link href="/" className="marketing-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span className="marketing-brand-name">skubase</span>
-        </Link>
-        <nav className="marketing-nav-links" aria-label="Primary">
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/blog">Blog</Link>
-        </nav>
-      </header>
+      {embedded ? null : (
+        <header className="marketing-nav">
+          <Link href="/" className="marketing-brand">
+            <span className="marketing-brand-mark">sb</span>
+            <span className="marketing-brand-name">skubase</span>
+          </Link>
+          <nav className="marketing-nav-links" aria-label="Primary">
+            <Link href="/dashboard">Dashboard</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/blog">Blog</Link>
+          </nav>
+        </header>
+      )}
 
       <section className="marketing-hero marketing-hero-migration">
         <p className="marketing-eyebrow">Stocky migration</p>
@@ -173,26 +181,30 @@ export default function ImportStockyPage() {
             <li>Set vendor lead times on the <Link href="/lead-time-settings">Lead Times</Link> page.</li>
             <li>Connect Shopify on the <Link href="/store-sync">Store Sync</Link> page when ready.</li>
           </ol>
-          <p className="import-help" style={{ marginTop: "16px" }}>
-            You need to be signed in to import. <Link href="/login">Sign in</Link> if you haven&apos;t already.
-          </p>
+          {embedded ? null : (
+            <p className="import-help" style={{ marginTop: "16px" }}>
+              You need to be signed in to import. <Link href="/login">Sign in</Link> if you haven&apos;t already.
+            </p>
+          )}
         </aside>
       </section>
 
-      <footer className="marketing-footer">
-        <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span>skubase</span>
-        </div>
-        <div className="marketing-footer-links">
-          <Link href="/">Home</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
-      </footer>
+      {embedded ? null : (
+        <footer className="marketing-footer">
+          <div className="marketing-footer-brand">
+            <span className="marketing-brand-mark">sb</span>
+            <span>skubase</span>
+          </div>
+          <div className="marketing-footer-links">
+            <Link href="/">Home</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/about">About</Link>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+          </div>
+          <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
+        </footer>
+      )}
     </div>
   );
 }

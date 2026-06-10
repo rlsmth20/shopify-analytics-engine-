@@ -8,7 +8,11 @@ import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import { PRICING_TIERS } from "@/lib/plans";
-import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
+import {
+  authenticatedFetch,
+  isEmbeddedShopifyContext,
+  redirectTopLevel,
+} from "@/lib/shopify-embedded";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -25,18 +29,6 @@ function formatDate(iso: string | null): string {
   }
 }
 
-function openTopLevel(url: string) {
-  try {
-    if (window.top && window.top !== window.self) {
-      window.top.location.href = url;
-      return;
-    }
-  } catch {
-    // Fall through to same-window navigation.
-  }
-  window.location.href = url;
-}
-
 export default function BillingPage() {
   const { user } = useAuth();
   const [sub, setSub] = useState<Entitlements | null>(null);
@@ -46,6 +38,7 @@ export default function BillingPage() {
   const [shopifyPlanNotice, setShopifyPlanNotice] = useState<string | null>(null);
   const [portalFallbackUrl, setPortalFallbackUrl] = useState<string | null>(null);
   const [embeddedBilling, setEmbeddedBilling] = useState(false);
+  const [subscribingPlan, setSubscribingPlan] = useState<string | null>(null);
 
   const trialDaysLeft: number | null = (() => {
     if (!user.trial_ends_at) return null;
@@ -104,12 +97,42 @@ export default function BillingPage() {
   function manageShopifyPlan() {
     setShopifyPlanNotice(null);
     if (sub?.shopify_manage_url) {
-      openTopLevel(sub.shopify_manage_url);
+      redirectTopLevel(sub.shopify_manage_url);
       return;
     }
     setShopifyPlanNotice(
       "Plan changes are managed through Shopify. Open your Shopify Admin app subscription settings or select a plan from the Shopify App Store listing."
     );
+  }
+
+  async function chooseShopifyPlan(plan: string) {
+    setShopifyPlanNotice(null);
+    setSubscribingPlan(plan);
+    try {
+      const res = await authenticatedFetch(`${API_BASE}/billing/shopify/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ plan }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setShopifyPlanNotice(
+          body?.detail || `Could not start the Shopify plan approval (${res.status}).`
+        );
+        return;
+      }
+      if (body?.url) {
+        // Shopify's charge-approval page cannot render inside the app iframe.
+        redirectTopLevel(body.url);
+        return;
+      }
+      setShopifyPlanNotice("Shopify did not return an approval link. Try again in a moment.");
+    } catch {
+      setShopifyPlanNotice("Network error - try again in a moment.");
+    } finally {
+      setSubscribingPlan(null);
+    }
   }
 
   if (loading) {
@@ -191,22 +214,24 @@ export default function BillingPage() {
               {isShopifyBilling
                 ? isActive
                   ? `Your Shopify app subscription is active. Next billing date: ${formatDate(sub.current_period_end)}.`
-                  : "Billing is managed through Shopify. Choose or change your plan from Shopify Admin."
+                  : "Pick a plan below - you approve the charge on Shopify's confirmation page and it lands on your Shopify invoice."
                 : isActive
                 ? `Your subscription is active. Next billing date: ${formatDate(sub.current_period_end)}.`
                 : user.in_trial
                 ? trialDaysLeft === 0
-                  ? "Your trial has ended. Subscribe to keep your access."
-                  : `Trial ends ${formatDate(user.trial_ends_at)}. No credit card required to keep exploring until then.`
-                : "You don't have an active subscription. Pick a plan to get started."}
+                  ? "Your trial has ended. Connect your Shopify store to subscribe and keep your access."
+                  : `Trial ends ${formatDate(user.trial_ends_at)}. Connect your Shopify store to subscribe when you're ready.`
+                : "Subscriptions are billed through Shopify. Connect your Shopify store to pick a plan."}
             </p>
           </div>
 
           <div className="button-row">
             {isShopifyBilling ? (
-              <button type="button" className="button button-primary" onClick={manageShopifyPlan}>
-                Manage plan in Shopify
-              </button>
+              isActive ? (
+                <button type="button" className="button button-primary" onClick={manageShopifyPlan}>
+                  Manage plan in Shopify
+                </button>
+              ) : null
             ) : isActive ? (
               <>
                 <button
@@ -229,8 +254,8 @@ export default function BillingPage() {
                 ) : null}
               </>
             ) : !isShopifyBilling ? (
-              <Link href="/pricing" className="button button-primary">
-                See plans
+              <Link href="/store-sync" className="button button-primary">
+                Connect Shopify store
               </Link>
             ) : null}
           </div>
@@ -264,16 +289,19 @@ export default function BillingPage() {
           <div className="section-heading">
             <div>
               <p className="section-eyebrow">Plans</p>
-              <h2 className="section-title section-title-small">Manage through Shopify</h2>
+              <h2 className="section-title section-title-small">
+                {isActive ? "Change your plan" : "Choose your plan"}
+              </h2>
             </div>
           </div>
           <p className="section-copy">
-            Shopify-installed stores are billed through Shopify. Skubase does
-            not collect payment details inside the embedded app.
+            Billing runs through Shopify - skubase never collects payment
+            details. Charges appear on your Shopify invoice.
           </p>
           <div className="pricing-grid" style={{ marginTop: "24px" }}>
             {PRICING_TIERS.map((tier) => {
               const current = sub.plan_id === tier.key && isActive;
+              const subscribing = subscribingPlan === tier.monthly.plan;
               return (
                 <article key={tier.key} className={`pricing-card billing-plan-card ${tier.featured ? "pricing-card-featured" : ""}${current ? " billing-plan-card-current" : ""}`}>
                   <div className="billing-plan-card-head">
@@ -288,17 +316,26 @@ export default function BillingPage() {
                   <button
                     type="button"
                     className={`button ${current ? "button-ghost" : "button-primary"} button-full`}
-                    disabled={current}
-                    onClick={manageShopifyPlan}
+                    disabled={current || subscribingPlan !== null}
+                    onClick={() => void chooseShopifyPlan(tier.monthly.plan)}
                   >
                     {current
                       ? "Current plan"
-                      : `Manage ${tier.name} in Shopify`}
+                      : subscribing
+                      ? "Opening Shopify approval..."
+                      : isActive
+                      ? `Switch to ${tier.name}`
+                      : `Choose ${tier.name}`}
                   </button>
                 </article>
               );
             })}
           </div>
+          <p className="section-copy" style={{ marginTop: "16px" }}>
+            Every plan starts with a 14-day free trial. You approve the charge
+            on Shopify&apos;s confirmation page, and it appears on your regular
+            Shopify invoice.
+          </p>
         </SectionCard>
       ) : null}
 
@@ -331,14 +368,18 @@ export default function BillingPage() {
           <div>
             <p className="section-eyebrow">Invoices &amp; receipts</p>
             <h2 className="section-title section-title-small">
-              {isShopifyBilling ? "Managed by Shopify" : "Managed in the Stripe Customer Portal"}
+              {isShopifyBilling || !isActive
+                ? "Managed by Shopify"
+                : "Managed in the Stripe Customer Portal"}
             </h2>
           </div>
         </div>
         <p className="section-copy">
           {isShopifyBilling
             ? "Shopify hosts app subscription approval, app charges, invoices, and payment handling for this installed store."
-            : "Stripe hosts your invoice history, payment methods, and tax information. Click Open billing portal above to download past invoices, update your card, or change plans."}
+            : isActive
+            ? "Stripe hosts your invoice history, payment methods, and tax information. Click Open billing portal above to download past invoices, update your card, or change plans."
+            : "Once your Shopify store is connected and you subscribe, app charges and invoices appear in your Shopify admin billing settings."}
         </p>
       </SectionCard>
     </div>

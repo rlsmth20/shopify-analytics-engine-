@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
-import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -21,6 +21,11 @@ export default function AccountPage() {
   const { user, logout } = useAuth();
   const [sub, setSub] = useState<Entitlements | null>(null);
   const [conn, setConn] = useState<Connection | null>(null);
+  const [embedded, setEmbedded] = useState(false);
+
+  useEffect(() => {
+    setEmbedded(isEmbeddedShopifyContext());
+  }, []);
 
   useEffect(() => {
     void fetchEntitlements()
@@ -44,8 +49,12 @@ export default function AccountPage() {
         <div className="signal-list">
           <div className="signal-item">
             <div>
-              <p className="signal-title">Email</p>
-              <p className="signal-copy">{user.email}</p>
+              <p className="signal-title">{embedded ? "Signed in via" : "Email"}</p>
+              <p className="signal-copy">
+                {user.email.startsWith("shopify-admin+")
+                  ? "Shopify admin"
+                  : user.email}
+              </p>
             </div>
           </div>
           <div className="signal-item">
@@ -63,17 +72,19 @@ export default function AccountPage() {
             </div>
           ) : null}
         </div>
-        <div className="button-row" style={{ marginTop: "24px" }}>
-          <button
-            type="button"
-            className="button button-ghost"
-            onClick={() => {
-              void logout();
-            }}
-          >
-            Sign out of all sessions
-          </button>
-        </div>
+        {embedded ? null : (
+          <div className="button-row" style={{ marginTop: "24px" }}>
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => {
+                void logout();
+              }}
+            >
+              Sign out of all sessions
+            </button>
+          </div>
+        )}
       </SectionCard>
 
       <div className="content-grid content-grid-2-1">

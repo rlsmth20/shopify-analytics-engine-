@@ -108,22 +108,27 @@ export async function authenticatedFetch(
   });
 }
 
+export function redirectTopLevel(url: string): void {
+  // Shopify-hosted pages (billing confirmation, OAuth) refuse to render
+  // inside the app iframe, so navigation must escape to the top window.
+  try {
+    if (window.top && window.top !== window.self) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch {
+    // Cross-origin top — fall through to same-window navigation.
+  }
+  window.location.href = url;
+}
+
 export function redirectToShopifyInstall(): boolean {
   const context = getEmbeddedShopifyContext();
   if (!context?.shop) return false;
   const params = new URLSearchParams({ shop: context.shop });
   if (context.host) params.set("host", context.host);
   const installUrl = `${API_BASE}/integrations/shopify/install?${params}`;
-
-  try {
-    if (window.top && window.top !== window.self) {
-      window.top.location.href = installUrl;
-    } else {
-      window.location.href = installUrl;
-    }
-  } catch {
-    window.location.href = installUrl;
-  }
+  redirectTopLevel(installUrl);
   return true;
 }
 

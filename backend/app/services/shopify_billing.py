@@ -22,22 +22,30 @@ GRAPHQL_VERSION = os.getenv("SHOPIFY_API_VERSION", "2026-04")
 FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0]).strip().rstrip("/")
 SHOPIFY_BILLING_TEST = os.getenv("SHOPIFY_BILLING_TEST", "false").lower() in {"1", "true", "yes"}
 
+# Amounts must match the published prices in frontend/lib/plans.ts — the
+# price-lock pledge makes a mismatch a broken promise, not just a bug.
 SHOPIFY_PLAN_AMOUNTS: dict[str, Decimal] = {
-    "starter_monthly": Decimal("49.00"),
+    "starter_monthly": Decimal("29.00"),
     "growth_monthly": Decimal("99.00"),
     "scale_monthly": Decimal("199.00"),
+    "starter_annual": Decimal("296.00"),
+    "growth_annual": Decimal("1010.00"),
+    "scale_annual": Decimal("2030.00"),
 }
 
 SHOPIFY_PLAN_NAMES: dict[str, str] = {
     "starter_monthly": "Skubase Starter",
     "growth_monthly": "Skubase Growth",
     "scale_monthly": "Skubase Scale",
+    "starter_annual": "Skubase Starter (Annual)",
+    "growth_annual": "Skubase Growth (Annual)",
+    "scale_annual": "Skubase Scale (Annual)",
 }
 
 SHOPIFY_PLAN_BY_NAME = {
     normalized: key
     for key, name in SHOPIFY_PLAN_NAMES.items()
-    for normalized in {name.lower(), key.replace("_monthly", "").lower()}
+    for normalized in {name.lower(), key.lower()}
 }
 
 
@@ -126,7 +134,6 @@ def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:
     conn = _connection_for_shop(db, shop_id=user.shop_id)
     if conn is None:
         raise RuntimeError("No active Shopify connection for this workspace.")
-    plan = plan.replace("_annual", "_monthly")
     if plan not in SHOPIFY_PLAN_AMOUNTS:
         raise RuntimeError(f"Unknown Shopify billing plan '{plan}'.")
 
@@ -144,7 +151,7 @@ def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:
                             "amount": str(SHOPIFY_PLAN_AMOUNTS[plan]),
                             "currencyCode": "USD",
                         },
-                        "interval": "EVERY_30_DAYS",
+                        "interval": "ANNUAL" if plan.endswith("_annual") else "EVERY_30_DAYS",
                     }
                 }
             }
@@ -248,8 +255,11 @@ def _normalize_shopify_status(status: str) -> str:
 
 
 def _return_url(shopify_domain: str) -> str:
-    params = urlencode({"shop": shopify_domain, "billing": "approved"})
-    return f"{FRONTEND_URL}/billing?{params}"
+    # After approving the charge the merchant should land back inside the
+    # embedded app in Shopify admin, not on the bare website.
+    from app.services.shopify_oauth import embedded_admin_redirect_url
+
+    return embedded_admin_redirect_url(shop_domain=shopify_domain, path="/billing")
 
 
 def _shopify_manage_url(shopify_domain: str) -> str:

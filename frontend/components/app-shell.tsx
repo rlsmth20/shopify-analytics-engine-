@@ -178,6 +178,7 @@ const API_BASE = APP_API_BASE_URL;
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const [embedded, setEmbedded] = useState(false);
   const [shopifyDomain, setShopifyDomain] = useState<string | null>(null);
   const [storeLoaded, setStoreLoaded] = useState(false);
   const [subscription, setSubscription] = useState<Entitlements | null>(null);
@@ -197,6 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   })();
 
   useEffect(() => {
+    setEmbedded(isEmbeddedShopifyContext());
     const urlShop = new URLSearchParams(window.location.search).get("shop");
     const storedDomain = urlShop || window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
     if (urlShop) window.localStorage.setItem(SHOPIFY_DOMAIN_STORAGE_KEY, urlShop);
@@ -339,7 +341,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               : "Direct accounts can manage plan access from Billing."}
           </p>
           <Link href="/billing" className="sidebar-note-link">
-            Manage billing -&gt;
+            Manage billing →
           </Link>
         </div>
       </aside>
@@ -409,7 +411,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             {hasRealData === false ? (
               <span className="header-chip">Sample data</span>
             ) : null}
-            {user.id !== 0 ? (
+            {user.id !== 0 && !embedded ? (
+              // Embedded users authenticate via Shopify; their synthetic
+              // shopify-admin+... address would only confuse.
               <span className="header-chip header-chip-user" title={user.email}>
                 {user.email}
               </span>
@@ -420,13 +424,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
             ) : null}
             {user.id !== 0 ? (
-              <button
-                type="button"
-                onClick={() => { void logout(); }}
-                className="header-logout"
-              >
-                Sign out
-              </button>
+              embedded ? null : (
+                // No sign-out inside Shopify admin — the session belongs to
+                // Shopify, and logging out would strand the iframe on the
+                // marketing site.
+                <button
+                  type="button"
+                  onClick={() => { void logout(); }}
+                  className="header-logout"
+                >
+                  Sign out
+                </button>
+              )
             ) : (
               <Link href="/login" className="button button-primary button-sm">
                 Sign up free

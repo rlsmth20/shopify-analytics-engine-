@@ -263,14 +263,23 @@ def get_or_create_embedded_user_for_shop(db: DbSession, *, shop_domain: str) -> 
     return user
 
 
-def embedded_admin_redirect_url(*, shop_domain: str, host: str | None = None) -> str:
-    """Return a post-OAuth URL that keeps Shopify-originated installs embedded."""
+def embedded_admin_redirect_url(
+    *,
+    shop_domain: str,
+    host: str | None = None,
+    path: str = "",
+) -> str:
+    """Return a URL that lands the merchant inside the embedded app.
+
+    `path` is an in-app route like "/billing"; it defaults to the app home.
+    Used after OAuth installs and as the Shopify billing returnUrl.
+    """
     app_handle = os.getenv("SHOPIFY_APP_HANDLE", "").strip()
     if app_handle:
         store_handle = shop_domain.removesuffix(".myshopify.com")
-        return f"https://admin.shopify.com/store/{store_handle}/apps/{app_handle}"
+        return f"https://admin.shopify.com/store/{store_handle}/apps/{app_handle}{path}"
 
     params = {"shop": shop_domain, "embedded": "1", "connected": "1"}
     if host:
         params["host"] = host
-    return f"{FRONTEND_URL}/dashboard?{urlencode(params)}"
+    return f"{FRONTEND_URL}{path or '/dashboard'}?{urlencode(params)}"

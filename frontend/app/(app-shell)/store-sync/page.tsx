@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { SectionCard } from "@/components/section-card";
-import { authenticatedFetch, getEmbeddedShopifyContext } from "@/lib/shopify-embedded";
+import {
+  authenticatedFetch,
+  getEmbeddedShopifyContext,
+  redirectTopLevel,
+} from "@/lib/shopify-embedded";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -75,7 +79,8 @@ export default function StoreSyncPage() {
         return;
       }
       if (body?.authorize_url) {
-        window.location.href = body.authorize_url;
+        // Shopify's OAuth page refuses to render inside the app iframe.
+        redirectTopLevel(body.authorize_url);
       }
     } finally {
       setInstallLoading(false);
@@ -156,7 +161,7 @@ export default function StoreSyncPage() {
                   );
                   const body = await res.json().catch(() => null);
                   if (body?.authorize_url) {
-                    window.location.href = body.authorize_url;
+                    redirectTopLevel(body.authorize_url);
                   }
                 }}
               >
