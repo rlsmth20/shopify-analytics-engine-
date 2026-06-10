@@ -4,8 +4,11 @@ Design rules:
 - Random tokens are generated with secrets.token_urlsafe(32) (256 bits).
 - Only the SHA-256 hash of the token is persisted; the raw value never
   hits the database. A DB compromise does not yield usable cookies.
-- Magic-link tokens are single-use (used=True after redemption) and short-
-  lived (15 minutes by default). Sessions live 30 days.
+- Magic-link tokens are short-lived (15 minutes by default) and may be
+  redeemed more than once within that window: corporate email scanners
+  open links (and run the page) before the user does, and strict
+  single-use locked real users out. `used` records the first redemption
+  for audit. Sessions live 30 days.
 - Cookie is set HTTP-only, Secure, SameSite=None so the cross-origin
   Vercel-frontend / Railway-backend split works. Local dev tolerates
   SameSite=Lax via the IS_PRODUCTION flag.
@@ -112,10 +115,10 @@ def get_magic_link_token_status(
     )
     if record is None:
         return "invalid_token", None
-    if record.used:
-        return "used_token", record
     if _as_naive_utc(record.expires_at) < _now():
-        return "expired_token", record
+        # Within the TTL a token stays redeemable even after first use (email
+        # scanners pre-open links); after expiry, report the most useful error.
+        return ("used_token" if record.used else "expired_token"), record
     return "valid", record
 
 
@@ -209,7 +212,11 @@ def get_or_create_user_for_email(
     if domain is None:
         # Synthesize a placeholder so the NOT NULL + UNIQUE constraints hold.
         # The real Shopify domain is set later when the merchant connects.
-        local = email.split("@", 1)[0].replace(".", "-").replace("+", "-")
+        # Strip everything that isn't alphanumeric — emails with underscores
+        # etc. otherwise produce domains normalize_shopify_domain rejects,
+        # which broke CSV imports for those users.
+        local = "".join(c if c.isalnum() else "-" for c in email.split("@", 1)[0])
+        local = "-".join(part for part in local.split("-") if part) or "user"
         domain = f"pending-{local}-{secrets.token_hex(4)}.skubase.invalid"
 
     shop = db.scalar(select(Shop).where(Shop.shopify_domain == domain))

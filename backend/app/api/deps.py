@@ -33,6 +33,7 @@ def get_current_user(
     """
     bearer = _bearer_token(request)
     if bearer:
+        bearer_failure: HTTPException | None = None
         try:
             user = resolve_user_from_shopify_session_token(db, bearer)
         except ShopifySessionTokenError as exc:
@@ -41,20 +42,27 @@ def get_current_user(
                 request.headers.get("origin"),
                 exc,
             )
-            raise HTTPException(
+            bearer_failure = HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Shopify session token.",
-            ) from exc
+            )
+            user = None
         if user is not None:
             return user
-        logger.info(
-            "auth_me_failed reason=shopify_session_not_installed origin=%s",
-            request.headers.get("origin"),
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Shopify app is not installed for this shop.",
-        )
+        if bearer_failure is None:
+            logger.info(
+                "auth_me_failed reason=shopify_session_not_installed origin=%s",
+                request.headers.get("origin"),
+            )
+            bearer_failure = HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Shopify app is not installed for this shop.",
+            )
+        # A bad bearer must not lock out a browser session that also carries a
+        # valid cookie (e.g. stale App Bridge token alongside a magic-link
+        # session). Fall through to cookie auth; raise only if that is absent.
+        if not session_token:
+            raise bearer_failure
 
     if not session_token:
         logger.info(
@@ -87,9 +95,12 @@ def get_optional_user(
     bearer = _bearer_token(request)
     if bearer:
         try:
-            return resolve_user_from_shopify_session_token(db, bearer)
+            user = resolve_user_from_shopify_session_token(db, bearer)
         except ShopifySessionTokenError:
-            return None
+            user = None
+        if user is not None:
+            return user
+        # Fall through to cookie auth, mirroring get_current_user.
     if not session_token:
         return None
     return resolve_session(db, raw_token=session_token)

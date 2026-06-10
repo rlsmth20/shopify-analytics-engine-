@@ -30,11 +30,13 @@ export default function ImportStockyPage() {
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [upgradeNeeded, setUpgradeNeeded] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setUpgradeNeeded(false);
     setResult(null);
     if (!file) return setError("Please choose your Stocky CSV.");
     if (!file.name.toLowerCase().endsWith(".csv")) {
@@ -62,6 +64,11 @@ export default function ImportStockyPage() {
         return;
       }
       const body = await res.json().catch(() => null);
+      if (res.status === 402) {
+        setUpgradeNeeded(true);
+        setError(body?.detail || "Your trial has ended. Subscribe to continue using skubase.");
+        return;
+      }
       if (!res.ok) throw new Error(body?.detail || `Import failed (${res.status}).`);
       setResult(body as ImportResult);
     } catch (err) {
@@ -126,6 +133,14 @@ export default function ImportStockyPage() {
           {error ? (
             <div className="import-error" role="alert">
               <strong>Import failed.</strong> {error}
+              {upgradeNeeded ? (
+                <>
+                  {" "}
+                  <Link href="/billing" className="auth-link">
+                    Open billing
+                  </Link>
+                </>
+              ) : null}
             </div>
           ) : null}
 

@@ -5,7 +5,7 @@ import csv
 import io
 import os
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated, Literal, Optional
 from urllib.parse import urlparse
 
@@ -293,7 +293,7 @@ def _build_leads_summary_sheet(ws, leads) -> None:
     gen = ws.cell(
         row=1,
         column=cols - 1,
-        value=f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+        value=f"Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
     )
     gen.font = Font(name="Calibri", size=10, color=_BRAND_MUTED)
     gen.alignment = Alignment(vertical="center", horizontal="right", indent=1)

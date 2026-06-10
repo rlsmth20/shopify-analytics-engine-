@@ -52,7 +52,7 @@ export default function ImportShipStationPage() {
         credentials: "include",
       });
       if (res.status === 401) {
-        router.replace("/login");
+        router.replace(`/login?return_to=${encodeURIComponent("/import-shipstation")}`);
         return;
       }
       const body = await res.json().catch(() => null);

@@ -29,14 +29,23 @@ export function getEmbeddedShopifyContext(): EmbeddedContext | null {
   const embeddedParam = params.get("embedded") === "1";
   const stored = readStoredEmbeddedContext();
 
+  // A regular top-level browser tab is never embedded, even when ?shop=/?host=
+  // linger in the URL (e.g. after a redirect out of Shopify admin) or a stale
+  // context sits in sessionStorage from an earlier embedded visit. Treating
+  // those tabs as embedded routed cookie-authenticated users down the App
+  // Bridge path, where requests 401 and imports fail.
+  if (!isFramed() && !embeddedParam) {
+    return null;
+  }
+
   if (shop || host || stored?.shop) {
-    const context = { shop: shop ?? stored?.shop ?? "", host };
+    const context = { shop: shop ?? stored?.shop ?? "", host: host ?? stored?.host ?? null };
     try {
       sessionStorage.setItem(EMBEDDED_CONTEXT_KEY, JSON.stringify(context));
     } catch {
       // Storage is best-effort; the current URL still carries context.
     }
-    debugEmbedded("embedded context detected from URL", {
+    debugEmbedded("embedded context detected", {
       hasShop: Boolean(shop),
       hasHost: Boolean(host),
       embeddedParam,
@@ -44,11 +53,16 @@ export function getEmbeddedShopifyContext(): EmbeddedContext | null {
     return context;
   }
 
-  if (window.top === window.self && !embeddedParam) {
-    return null;
-  }
-
   return stored ?? { shop: "", host: null };
+}
+
+function isFramed(): boolean {
+  try {
+    return window.top !== window.self;
+  } catch {
+    // Cross-origin access to window.top throws — which itself means we are framed.
+    return true;
+  }
 }
 
 export function isEmbeddedShopifyContext(): boolean {

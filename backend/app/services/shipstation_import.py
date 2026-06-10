@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app.db.models import OrderLineItem, Product, Shop
 from app.db.session import session_scope
-from app.services.shop_settings import normalize_shopify_domain
+from app.services.shop_settings import ShopSettingsInputError, normalize_shopify_domain
 
 
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
@@ -130,7 +130,15 @@ def import_shipstation_csv(
     shopify_domain: str,
     csv_bytes: bytes,
 ) -> ShipStationImportResult:
-    domain = normalize_shopify_domain(shopify_domain)
+    try:
+        domain = normalize_shopify_domain(shopify_domain)
+    except ShopSettingsInputError as exc:
+        # Pre-existing workspaces can hold placeholder domains that fail
+        # normalization; surface a 400 instead of a 500.
+        raise ShipStationImportError(
+            "Your workspace's shop domain could not be validated. "
+            "Connect your Shopify store on the Store Sync page, then retry the import."
+        ) from exc
     if not domain:
         raise ShipStationImportError("Shopify domain is required.")
 

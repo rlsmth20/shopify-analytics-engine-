@@ -123,7 +123,7 @@ export default function LoginPage() {
             </div>
 
             <p className="auth-fine">
-              <Link href="/dashboard?demo=1" className="auth-link">View demo first -&gt;</Link>
+              <Link href="/dashboard?demo=1" className="auth-link">View demo first →</Link>
             </p>
           </>
         )}

@@ -10,10 +10,24 @@ const API_BASE = APP_API_BASE_URL;
 function CallbackInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const [status, setStatus] = useState<"verifying" | "error">("verifying");
+  const [status, setStatus] = useState<"checking" | "ready" | "verifying" | "error">("checking");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
+  function redirectAfterLogin() {
+    const returnTo = sessionStorage.getItem("skubase_login_return_to");
+    if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
+      sessionStorage.removeItem("skubase_login_return_to");
+      router.replace(returnTo);
+    } else {
+      router.replace("/dashboard");
+    }
+  }
+
+  // Verification only runs from the button click below, never automatically on
+  // page load. Corporate email scanners open magic links (and execute the
+  // page) before the user does — auto-verifying let them consume the token,
+  // so the real click landed on "already used" and bounced back to login.
   useEffect(() => {
     const token = params.get("token");
     if (!token) {
@@ -25,52 +39,61 @@ function CallbackInner() {
 
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/auth/magic-link/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
-          credentials: "include",
-        });
-        if (!res.ok) {
-          const detail = parseAuthError(await res.json().catch(() => ({})));
-          if (cancelled) return;
-          setStatus("error");
-          setErrorCode(detail.code);
-          setErrorMessage(detail.message);
-          return;
-        }
-
-        const sessionReady = await confirmSession();
-        if (cancelled) return;
-        if (!sessionReady) {
-          setStatus("error");
-          setErrorCode("session_cookie_failed");
-          setErrorMessage(
-            "Your link verified, but your browser did not store the Skubase session cookie. Please request a fresh sign-in link. If this keeps happening, open the newest link in an incognito/private window or another browser."
-          );
-          return;
-        }
-
-        const returnTo = sessionStorage.getItem("skubase_login_return_to");
-        if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
-          sessionStorage.removeItem("skubase_login_return_to");
-          router.replace(returnTo);
-        } else {
-          router.replace("/dashboard");
-        }
-      } catch {
-        if (cancelled) return;
-        setStatus("error");
-        setErrorCode("unknown_error");
-        setErrorMessage("Network error - try the link again in a moment.");
+      // Already signed in (e.g. the link was opened twice)? Skip verification.
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        credentials: "include",
+        cache: "no-store",
+      }).catch(() => null);
+      if (cancelled) return;
+      if (res?.ok) {
+        redirectAfterLogin();
+      } else {
+        setStatus("ready");
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [params, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+
+  async function handleVerify() {
+    const token = params.get("token");
+    if (!token || status === "verifying") return;
+    setStatus("verifying");
+    try {
+      const res = await fetch(`${API_BASE}/auth/magic-link/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const detail = parseAuthError(await res.json().catch(() => ({})));
+        setStatus("error");
+        setErrorCode(detail.code);
+        setErrorMessage(detail.message);
+        return;
+      }
+
+      const sessionReady = await confirmSession();
+      if (!sessionReady) {
+        setStatus("error");
+        setErrorCode("session_cookie_failed");
+        setErrorMessage(
+          "Your link verified, but your browser did not store the Skubase session cookie. Please request a fresh sign-in link. If this keeps happening, open the newest link in an incognito/private window or another browser."
+        );
+        return;
+      }
+
+      redirectAfterLogin();
+    } catch {
+      setStatus("error");
+      setErrorCode("unknown_error");
+      setErrorMessage("Network error - try the link again in a moment.");
+    }
+  }
 
   return (
     <div className="auth-shell">
@@ -79,10 +102,25 @@ function CallbackInner() {
           <span className="auth-brand-mark">sb</span>
           <span className="auth-brand-name">skubase</span>
         </Link>
-        {status === "verifying" ? (
+        {status === "checking" ? (
           <>
-            <h1 className="auth-title">Signing you in...</h1>
-            <p className="auth-copy">One moment - verifying your link.</p>
+            <h1 className="auth-title">One moment...</h1>
+            <p className="auth-copy">Checking your sign-in status.</p>
+          </>
+        ) : status === "ready" || status === "verifying" ? (
+          <>
+            <h1 className="auth-title">You&apos;re almost in.</h1>
+            <p className="auth-copy">Confirm to finish signing in to skubase.</p>
+            <div className="auth-action-stack">
+              <button
+                type="button"
+                onClick={handleVerify}
+                disabled={status === "verifying"}
+                className="button button-primary button-full"
+              >
+                {status === "verifying" ? "Signing you in..." : "Continue to skubase"}
+              </button>
+            </div>
           </>
         ) : (
           <>

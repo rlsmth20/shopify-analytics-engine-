@@ -486,7 +486,7 @@ function priorityRank(priority: TransferRow["priority"]): number {
 
 function coverChange(before: number | null, after: number | null): string {
   if (before === null || after === null) return "Unavailable";
-  return `${formatNumber(before)}d -> ${formatNumber(after)}d`;
+  return `${formatNumber(before)}d → ${formatNumber(after)}d`;
 }
 
 function formatNumber(value: number | null): string {

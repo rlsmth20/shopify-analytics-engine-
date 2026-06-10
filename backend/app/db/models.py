@@ -481,11 +481,12 @@ class User(Base):
 
 
 class MagicLinkToken(Base):
-    """One-time token sent via email to authenticate.
+    """Short-lived token sent via email to authenticate.
 
     We store the SHA-256 hash of the raw token; the raw value never persists.
-    The token consumed (used=True) once redeemed; expired or consumed tokens
-    are rejected at verify time.
+    Tokens stay redeemable until expires_at — email scanners pre-open links,
+    so strict single-use locked real users out. used=True records the first
+    redemption for audit.
     """
 
     __tablename__ = "magic_link_tokens"

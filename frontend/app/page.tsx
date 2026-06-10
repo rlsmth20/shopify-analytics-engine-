@@ -61,7 +61,7 @@ const migrationCards = [
   },
   {
     eyebrow: "Forecasting in a spreadsheet?",
-    date: "ShipStation export -> Google Sheet -> trailing average",
+    date: "ShipStation export → Google Sheet → trailing average",
     title: "Better than your spreadsheet.",
     body: "If your reorder math is a 6-month moving average in a Google Sheet, you're tying up cash you don't need to and missing every seasonal ramp. skubase fixes both - drop in your ShipStation export and see real velocity in minutes.",
     cta: "See why",
@@ -127,7 +127,7 @@ export default function HomePage() {
             <p className="migration-card-date">{card.date}</p>
             <h2 className="migration-card-title">{card.title}</h2>
             <p className="migration-card-body">{card.body}</p>
-            <Link href={card.href} className="migration-card-cta">{card.cta} -&gt;</Link>
+            <Link href={card.href} className="migration-card-cta">{card.cta} →</Link>
           </article>
         ))}
       </section>
@@ -145,7 +145,7 @@ export default function HomePage() {
               <p className="pillar-card-kicker">{pillar.kicker}</p>
               <h3 className="pillar-card-title">{pillar.title}</h3>
               <p className="pillar-card-body">{pillar.body}</p>
-              <Link href={pillar.href} className="pillar-card-link">See in demo -&gt;</Link>
+              <Link href={pillar.href} className="pillar-card-link">See in demo →</Link>
             </article>
           ))}
         </div>

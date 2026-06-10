@@ -116,18 +116,18 @@ export default function InventoryPlannerAlternativePage() {
         </p>
         <ol className="blog-article-ol">
           <li>
-            <strong>How many channels?</strong> Shopify-only -&gt; skubase or Prediko. Multi-channel with
-            order routing -&gt; Linnworks or a channel-sync tool plus a forecasting layer.
+            <strong>How many channels?</strong> Shopify-only → skubase or Prediko. Multi-channel with
+            order routing → Linnworks or a channel-sync tool plus a forecasting layer.
           </li>
           <li>
-            <strong>What&apos;s the pain?</strong> Forecasting accuracy -&gt; skubase or Prediko.
-            Pricing opacity -&gt; skubase (price-locked published tiers). Support degradation -&gt;
+            <strong>What&apos;s the pain?</strong> Forecasting accuracy → skubase or Prediko.
+            Pricing opacity → skubase (price-locked published tiers). Support degradation →
             any founder-led independent.
           </li>
           <li>
-            <strong>How many SKUs?</strong> Under 500 SKUs and simple demand -&gt; spreadsheet or Sumtracker.
-            500-10,000 SKUs with seasonal variation -&gt; skubase or Prediko. Over 10,000 with complex
-            multi-location -&gt; Inventory Planner or Cin7 may still be right despite the cost.
+            <strong>How many SKUs?</strong> Under 500 SKUs and simple demand → spreadsheet or Sumtracker.
+            500-10,000 SKUs with seasonal variation → skubase or Prediko. Over 10,000 with complex
+            multi-location → Inventory Planner or Cin7 may still be right despite the cost.
           </li>
         </ol>
 
@@ -166,7 +166,7 @@ export default function InventoryPlannerAlternativePage() {
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
         </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase - Independent - Founder-led</p>
+        <p className="marketing-footer-fine">Â© {new Date().getFullYear()} skubase - Independent - Founder-led</p>
       </footer>
     </div>
   );
