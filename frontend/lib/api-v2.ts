@@ -432,13 +432,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     },
     path
   );
-  if (response.status === 402 || response.status === 403) {
-    // Trial expired or no active subscription — send to pricing.
-    if (typeof window !== "undefined") {
-      window.location.href = "/pricing?trial_expired=1";
-    }
-    throw new Error("Plan upgrade required. Redirecting to pricing.");
-  }
+  await handlePlanGate(response, path);
   if (!response.ok) {
     throw new Error(
       `${path} failed with ${response.status}: ${await response
@@ -447,6 +441,24 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     );
   }
   return (await response.json()) as T;
+}
+
+// 402 = no active trial/subscription -> billing page. 403 = the plan does
+// not include this feature; surface the message in place instead of falsely
+// claiming the trial ended (GatedFeature renders the upgrade card).
+async function handlePlanGate(response: Response, path: string): Promise<void> {
+  if (response.status === 402) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/billing?trial_expired=1";
+    }
+    throw new Error("Your trial has ended. Redirecting to billing.");
+  }
+  if (response.status === 403) {
+    const body = await response.json().catch(() => null);
+    throw new Error(
+      body?.detail || `Your current plan does not include this feature (${path}).`
+    );
+  }
 }
 
 async function postJson<T>(
@@ -471,12 +483,7 @@ async function postJson<T>(
     },
     path
   );
-  if (response.status === 402 || response.status === 403) {
-    if (typeof window !== "undefined") {
-      window.location.href = "/pricing?trial_expired=1";
-    }
-    throw new Error("Plan upgrade required. Redirecting to pricing.");
-  }
+  await handlePlanGate(response, path);
   if (!response.ok) {
     throw new Error(
       `${path} failed with ${response.status}: ${await response

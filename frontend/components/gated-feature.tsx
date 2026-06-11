@@ -77,7 +77,9 @@ export function GatedFeature({
     } catch {
       // ignore storage failures; the query param still signals demo mode.
     }
-    window.location.href = "/dashboard?demo=1";
+    // Open the demo on the feature the merchant was just looking at,
+    // not the dashboard — they came here to see THIS workflow.
+    window.location.href = `${window.location.pathname}?demo=1`;
   }
 
   return (
