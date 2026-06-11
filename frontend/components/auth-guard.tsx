@@ -114,9 +114,21 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     const embedded = getEmbeddedShopifyContext() !== null;
     setIsEmbedded(embedded);
 
-    // A real session always beats the sticky demo flag — otherwise one
-    // "View demo" click leaves signed-in merchants looking at sample data
-    // for the rest of the browser session.
+    // An explicit ?demo=1 in the URL is an intentional request for the
+    // sample workspace — honor it even for signed-in users (it has no plan
+    // gates, so it doubles as the full product tour).
+    const explicitDemo =
+      new URLSearchParams(window.location.search).get("demo") === "1";
+    if (explicitDemo && !embedded) {
+      setUser(DEMO_USER);
+      setIsDemo(true);
+      setLoading(false);
+      return;
+    }
+
+    // The *sticky* demo flag is different: a real session beats it —
+    // otherwise one "View demo" click leaves signed-in merchants looking at
+    // sample data for the rest of the browser session.
     authenticatedFetch(`${API_BASE}/auth/me`, { credentials: "include" })
       .then(async (res) => {
         if (res.ok) {

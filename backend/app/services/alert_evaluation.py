@@ -55,6 +55,9 @@ def user_has_active_access(db: DbSession, user: User) -> bool:
 
 
 def allowed_alert_channels(db: DbSession, user: User) -> set[NotificationChannel]:
+    if user.is_admin:
+        return set(ALERT_CHANNEL_MIN_TIER.keys())
+
     trial_ends = user.trial_ends_at
     if trial_ends is not None:
         if trial_ends.tzinfo is None:

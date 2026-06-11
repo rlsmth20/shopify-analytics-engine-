@@ -438,6 +438,25 @@ def current_entitlements_summary(db: DbSession, *, user: User) -> dict:
     status = str(raw.get("status") or "inactive")
     raw_plan = str(raw.get("plan") or "none")
 
+    if user.is_admin:
+        # Admins see and use everything regardless of subscription state.
+        return {
+            "billing_provider": "shopify_managed_pricing" if is_shopify_installed else "none",
+            "is_shopify_installed": is_shopify_installed,
+            "plan_id": "scale",
+            "plan_name": "Admin (full access)",
+            "raw_plan": raw_plan,
+            "subscription_status": "active",
+            "trial_ends_at": user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+            "current_period_end": raw.get("current_period_end"),
+            "billing_status_loaded": True,
+            "capabilities": capabilities_for_plan("scale"),
+            "shopify_domain": raw.get("shopify_domain"),
+            "shopify_manage_url": raw.get("shopify_manage_url"),
+            "stripe_configured": raw.get("stripe_configured", False),
+            "billing_status_error": raw.get("billing_status_error"),
+        }
+
     if is_shopify_installed:
         plan_id = normalize_plan_name(raw_plan) if status in ACTIVE_SUBSCRIPTION_STATUSES else "none"
         billing_provider = "shopify_managed_pricing"
