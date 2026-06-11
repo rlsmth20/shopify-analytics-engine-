@@ -49,7 +49,7 @@ const entries: ChangelogEntry[] = [
     { type: "Shipped", text: "Bundle / kit bottleneck analysis." },
     { type: "Shipped", text: "Multi-location transfer recommendations." },
     { type: "Shipped", text: "Dead-stock liquidation plans." },
-    { type: "Shipped", text: "Alert rule engine: email, SMS, Slack, webhook." }
+    { type: "Shipped", text: "Alert rule engine: email, Slack, webhook (SMS planned)." }
   ]},
   { version: "v0.1.0", date: "2026-03-12", title: "Mock-data MVP and action feed", items: [
     { type: "Shipped", text: "Backend action engine with urgent / optimize / dead outputs." },

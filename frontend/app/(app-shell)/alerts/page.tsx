@@ -526,14 +526,21 @@ function RulesPanel({
             <div className="channel-chips">
               {CHANNEL_OPTIONS.map((c) => {
                 const active = newRule.channels.includes(c);
-                const allowed = isChannelAllowed(c);
+                const planned = c === "sms"; // SMS delivery is not live yet
+                const allowed = !planned && isChannelAllowed(c);
                 return (
                   <button
                     key={c}
                     type="button"
                     className={`channel-chip${active ? " channel-chip-active" : ""}`}
                     disabled={!allowed}
-                    title={allowed ? undefined : `${c} alerts are included on Growth and Scale.`}
+                    title={
+                      planned
+                        ? "SMS alerts are planned - use email or Slack for now."
+                        : allowed
+                        ? undefined
+                        : `${c} alerts are included on Growth and Scale.`
+                    }
                     onClick={() =>
                       setNewRule({
                         ...newRule,
@@ -543,7 +550,7 @@ function RulesPanel({
                       })
                     }
                   >
-                    {allowed ? c : `${c} (Growth)`}
+                    {planned ? "sms (planned)" : allowed ? c : `${c} (Growth)`}
                   </button>
                 );
               })}
@@ -678,11 +685,27 @@ function ChannelCard({
   const [enabled, setEnabled] = useState(channel.enabled);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  // SMS delivery is not live yet (Twilio + A2P registration pending), so the
+  // channel shows as planned instead of taking config that would go nowhere.
+  if (channel.channel === "sms") {
+    return (
+      <div className="channel-card">
+        <div className="channel-card-head">
+          <h4 className="channel-card-title">SMS</h4>
+          <span className="status-badge status-neutral">Planned</span>
+        </div>
+        <p className="muted small">
+          SMS alerts are on the roadmap and will be included on Growth and
+          Scale when they launch. Use email or Slack for now - they deliver
+          the same alert rules today.
+        </p>
+      </div>
+    );
+  }
+
   const placeholder =
     channel.channel === "email"
       ? "alerts@yourshop.com"
-      : channel.channel === "sms"
-      ? "+15551234567"
       : channel.channel === "slack"
       ? "https://hooks.slack.com/services/..."
       : "https://your-webhook-endpoint.example.com/hook";

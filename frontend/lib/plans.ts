@@ -276,7 +276,7 @@ export const PRICING_TIERS: PricingTier[] = [
       { label: "Reports & Exports", included: true },
       { label: "Shopify sync", included: true },
       { label: "14-day free trial", included: true },
-      { label: "SMS + webhook alert channels", included: false },
+      { label: "Webhook alert channels", included: false },
       { label: "Supplier scorecards when PO receipt history is connected", included: false },
       { label: "Bundle Opportunities and transfer planning", included: false },
       { label: "Admin roles and audit history", included: false },
@@ -293,7 +293,8 @@ export const PRICING_TIERS: PricingTier[] = [
     features: [
       { label: "Everything in Starter", included: true },
       { label: "Configurable storewide alert rules for stockout, overstock, dead stock, forecast risk, and supplier slip", included: true },
-      { label: "SMS + webhook alert channels", included: true },
+      { label: "Webhook alert channels", included: true },
+      { label: "SMS alerts (planned)", included: false },
       { label: "Configurable lead times and target coverage", included: true },
       { label: "Reorder / PO planning with styled export", included: true },
       { label: "Projected Stock Health", included: true },

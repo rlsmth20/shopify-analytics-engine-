@@ -22,7 +22,7 @@ const FAQ_LD = {
   mainEntity: [
     { "@type": "Question", name: "Do you raise prices at renewal?", acceptedAnswer: { "@type": "Answer", text: "No. Every plan has a written price-lock clause in the terms of service: we will not raise the monthly or annual rate on a plan you are already subscribed to." } },
     { "@type": "Question", name: "Is there a free tier?", acceptedAnswer: { "@type": "Answer", text: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." } },
-    { "@type": "Question", name: "Does Skubase include inventory alerts?", acceptedAnswer: { "@type": "Answer", text: "Yes. Skubase includes configurable alert rules for stockout risk, dead stock, overstock, forecast risk, and supplier slip. Email and Slack are included on Starter; SMS and webhooks are included on Growth and Scale." } },
+    { "@type": "Question", name: "Does Skubase include inventory alerts?", acceptedAnswer: { "@type": "Answer", text: "Yes. Skubase includes configurable alert rules for stockout risk, dead stock, overstock, forecast risk, and supplier slip. Email and Slack are included on Starter; webhook channels are included on Growth and Scale. SMS alerts are planned." } },
     { "@type": "Question", name: "How long does setup take?", acceptedAnswer: { "@type": "Answer", text: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." } },
     { "@type": "Question", name: "Can I pay annually?", acceptedAnswer: { "@type": "Answer", text: "Yes - pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." } },
   ],
@@ -33,7 +33,7 @@ const faqs = [
   { q: "What happens if I exceed my SKU or location limit?", a: "We notify you by email, the app shows a soft banner, and you get thirty days to decide whether to upgrade or prune. We will never silently auto-upgrade your plan." },
   { q: "Is there a free tier?", a: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." },
   { q: "Do alerts send automatically?", a: "Yes. Enabled alert rules are evaluated automatically and delivered through enabled channels with real targets. You can also preview an evaluation before sending." },
-  { q: "Which alert channels are included?", a: "Starter includes email and Slack alert channels. Growth and Scale add SMS and webhook channels. Channels must be configured before notifications are delivered." },
+  { q: "Which alert channels are included?", a: "Starter includes email and Slack alert channels. Growth and Scale add webhook channels. SMS alerts are planned - they'll land on Growth and Scale when they ship. Channels must be configured before notifications are delivered." },
   { q: "How long does setup take?", a: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." },
   { q: "Can I pay annually?", a: "Yes - pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." },
   { q: "How do you compare to Stocky / Inventory Planner / Cin7?", a: "Compared with Stocky we add real forecasting, supplier scorecards, and dead-stock plans. Compared with Inventory Planner we publish our price and commit to not raising it. Compared with Cin7 we publish our price and do not require a 6-month implementation." }
