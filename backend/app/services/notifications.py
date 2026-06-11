@@ -105,13 +105,23 @@ def _send_email(target: str, subject: str, body: str) -> None:
         )
 
 
+def _is_development() -> bool:
+    return os.getenv("ENVIRONMENT", "production").lower() == "development"
+
+
 def _send_sms(target: str, body: str) -> None:
     sid = os.getenv("TWILIO_ACCOUNT_SID")
     token = os.getenv("TWILIO_AUTH_TOKEN")
     sender = os.getenv("TWILIO_FROM")
     if not (sid and token and sender):
-        logger.info("[dev-sms] to=%s body=%s", target, body[:80])
-        return
+        if _is_development():
+            logger.info("[dev-sms] to=%s body=%s", target, body[:80])
+            return
+        # Never pretend a production alert was sent when it wasn't.
+        raise RuntimeError(
+            "SMS delivery is not configured on the server (Twilio credentials "
+            "missing). Use email or Slack until SMS is enabled."
+        )
 
     url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
     data = f"From={sender}&To={target}&Body={body[:1400]}".encode("utf-8")
@@ -132,8 +142,13 @@ def _send_slack(webhook_url: str, subject: str, body: str) -> None:
     if not webhook_url:
         webhook_url = os.getenv("SLACK_WEBHOOK_URL", "")
     if not webhook_url:
-        logger.info("[dev-slack] subject=%s", subject)
-        return
+        if _is_development():
+            logger.info("[dev-slack] subject=%s", subject)
+            return
+        raise RuntimeError(
+            "No Slack webhook URL is configured for this alert. Paste your "
+            "Slack incoming-webhook URL into the channel target."
+        )
 
     payload = {
         "text": f"*{subject}*\n{body}",
@@ -161,7 +176,7 @@ def _send_webhook(target: str, subject: str, body: str) -> None:
         "subject": subject,
         "body": body,
         "emitted_at": datetime.now(timezone.utc).isoformat(),
-        "source": "inventory-command",
+        "source": "skubase",
     }
     timeout = int(os.getenv("GENERIC_WEBHOOK_TIMEOUT", "10"))
     req = urllib_request.Request(
