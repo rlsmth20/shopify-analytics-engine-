@@ -581,11 +581,11 @@ function ReportSchedulePanel({
             Report delivery preferences
           </h2>
           <p className="section-copy">
-            Save the selected report cadence and recipient. Automated email
-            delivery is planned; exports are available now.
+            The selected report is emailed to the recipient automatically -
+            weekly schedules send Monday morning, monthly on the 1st (UTC).
           </p>
         </div>
-        <ReportStatusBadge tone="warning">Delivery planned</ReportStatusBadge>
+        <ReportStatusBadge tone="positive">Email delivery live</ReportStatusBadge>
       </div>
       <div className="report-schedule-form">
         <label className="report-filter-field">

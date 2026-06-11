@@ -407,3 +407,80 @@ def send_buy_list_email(
     except Exception as exc:
         logger.exception("failed to send buy list email to %s: %s", _mask_email(email), exc)
         return False
+
+
+def send_scheduled_report_email(
+    *,
+    email: str,
+    title: str,
+    intro: str,
+    headers: list[str],
+    rows: list[list[str]],
+    cta_path: str,
+    cadence: str,
+) -> bool:
+    """Send a scheduled report digest (Reports page schedules). Never raises."""
+    client = _client()
+    if client is None:
+        return False
+
+    header_cells = "".join(
+        f'<th style="padding:8px 10px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:left;">{h}</th>'
+        for h in headers
+    )
+    body_rows = "".join(
+        "<tr>" + "".join(
+            f'<td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:13px;">{cell}</td>'
+            for cell in row
+        ) + "</tr>"
+        for row in rows
+    )
+    text_rows = "\n".join(" | ".join(row) for row in rows)
+
+    html = f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
+        <tr><td>
+          <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase {cadence} report</p>
+          <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#0f172a;">{title}</h1>
+          <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">{intro}</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            <tr>{header_cells}</tr>
+            {body_rows}
+          </table>
+          <p style="margin:24px 0 0;">
+            <a href="{DEFAULT_PRODUCT_URL}{cta_path}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 18px;border-radius:10px;">Open in skubase</a>
+          </p>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 16px;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">
+            skubase &middot; scheduled report &middot; manage delivery on the
+            <a href="{DEFAULT_PRODUCT_URL}/reports" style="color:#64748b;">Reports page</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    try:
+        params = {
+            "from": DEFAULT_FROM,
+            "to": [email],
+            "reply_to": DEFAULT_REPLY_TO,
+            "subject": f"{title} - skubase {cadence} report",
+            "html": html,
+            "text": (
+                f"{title}\n{intro}\n\n{' | '.join(headers)}\n{text_rows}\n\n"
+                f"Open in skubase: {DEFAULT_PRODUCT_URL}{cta_path}\n"
+                f"Manage delivery: {DEFAULT_PRODUCT_URL}/reports\n"
+            ),
+            "tags": [{"name": "category", "value": "scheduled_report"}],
+        }
+        result = client.Emails.send(params)
+        logger.info("scheduled report email sent: id=%s to=%s", result.get("id"), _mask_email(email))
+        return True
+    except Exception as exc:
+        logger.exception("failed to send scheduled report to %s: %s", _mask_email(email), exc)
+        return False

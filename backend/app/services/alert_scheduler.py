@@ -12,6 +12,7 @@ from app.db.models import User
 from app.db.session import SessionLocal
 from app.services.alert_evaluation import evaluate_shop_alerts, user_has_active_access
 from app.services.inventory_value import capture_all_inventory_snapshots
+from app.services.scheduled_reports import run_scheduled_reports_once
 from app.services.weekly_digest import run_weekly_digests_once
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,9 @@ def _run_daily_jobs() -> None:
     sent = run_weekly_digests_once()
     if sent:
         logger.info("Sent %s weekly buy-list digest(s)", sent)
+    reports_sent = run_scheduled_reports_once()
+    if reports_sent:
+        logger.info("Sent %s scheduled report email(s)", reports_sent)
 
 
 async def _scheduler_loop(interval_seconds: int, cooldown_seconds: int) -> None:
