@@ -9,6 +9,10 @@ embedded = true
 api_version = "2026-04"
 
   [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://api.skubase.io/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
   uri = "https://api.skubase.io/webhooks/customers/data_request"
   compliance_topics = [ "customers/data_request" ]
 

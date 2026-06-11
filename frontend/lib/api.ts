@@ -229,33 +229,6 @@ function fetchActionFeed(path: string, signal?: AbortSignal): Promise<Response> 
   });
 }
 
-export async function triggerShopifyIngestion(
-  payload: ShopifyIngestionRequest,
-  signal?: AbortSignal
-): Promise<ShopifyIngestionResponse> {
-  const response = await authenticatedFetch(`${API_BASE_URL}/integrations/shopify/ingest`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-    credentials: "include",
-    signal
-  });
-
-  if (!response.ok) {
-    throw new ApiError(
-      (await readApiError(response)) ??
-        `Shopify ingestion failed with status ${response.status}.`,
-      response.status
-    );
-  }
-
-  return (await response.json()) as ShopifyIngestionResponse;
-}
-
 export async function fetchShopSettings(
   _shopifyDomain: string,
   signal?: AbortSignal

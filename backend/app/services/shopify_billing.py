@@ -143,7 +143,9 @@ def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:
         "name": SHOPIFY_PLAN_NAMES[plan],
         "returnUrl": return_url,
         "trialDays": 14,
-        "test": SHOPIFY_BILLING_TEST,
+        # Development stores (incl. the App Store review store) cannot accept
+        # real charges — always issue test subscriptions there.
+        "test": SHOPIFY_BILLING_TEST or _is_partner_development_shop(conn),
         "lineItems": [
             {
                 "plan": {
@@ -168,6 +170,16 @@ def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:
     if not confirmation_url:
         raise RuntimeError("Shopify did not return a billing confirmation URL.")
     return str(confirmation_url)
+
+
+def _is_partner_development_shop(conn: ShopifyConnection) -> bool:
+    """True for partner development stores, which only accept test charges."""
+    try:
+        payload = _gql(conn, "query { shop { plan { partnerDevelopment } } }", {})
+    except ShopifyBillingError:
+        return False
+    plan = (((payload.get("data") or {}).get("shop") or {}).get("plan")) or {}
+    return bool(plan.get("partnerDevelopment"))
 
 
 def _connection_for_shop(db: DbSession, *, shop_id: int) -> ShopifyConnection | None:

@@ -24,7 +24,19 @@ from app.db.models import Inventory, OrderLineItem, Product, ShopifyConnection, 
 logger = logging.getLogger(__name__)
 
 
-GRAPHQL_VERSION = os.getenv("SHOPIFY_API_VERSION", "2025-01")
+# Shopify supports each API version for 12 months; a sunset version silently
+# falls back to the oldest supported one. Keep this current (matches billing).
+GRAPHQL_VERSION = os.getenv("SHOPIFY_API_VERSION", "2026-04")
+
+# The message shown when Shopify denies access to order data. This is the
+# "Protected customer data" gate: the app must be approved for order-level
+# data in the Partner Dashboard (Apps -> skubase -> API access).
+PROTECTED_DATA_HELP = (
+    "Shopify denied access to order data (403). The app needs 'Protected "
+    "customer data' access approved in the Shopify Partner Dashboard "
+    "(Apps -> skubase -> API access -> Protected customer data: select "
+    "order-level data only). Products and inventory still synced."
+)
 
 
 def _gql(domain: str, token: str, query: str, variables: Optional[dict] = None) -> dict:
@@ -351,41 +363,65 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
         products_count = _ingest_products(
             db, shop_id=shop_id, domain=conn.shopify_domain, token=conn.access_token
         )
+    except Exception as exc:
+        run.status = "failed"
+        run.error_message = _friendly_sync_error(exc)[:1000]
+        run.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        logger.exception("Shopify product sync failed for shop_id=%s", shop_id)
+        raise RuntimeError(run.error_message) from exc
+
+    # Orders are ingested separately so an order-permission failure (the
+    # Protected Customer Data gate) does not throw away a good product +
+    # inventory sync — the app stays useful and the error stays actionable.
+    line_items_count = 0
+    orders_error: str | None = None
+    try:
         line_items_count = _ingest_orders(
             db, shop_id=shop_id, domain=conn.shopify_domain, token=conn.access_token
         )
-        run.products_count = products_count
-        run.order_line_items_count = line_items_count
-        run.status = "succeeded"
-        run.finished_at = datetime.now(timezone.utc)
-        conn.last_sync_at = datetime.now(timezone.utc)
-        db.commit()
-        return {
-            "status": "succeeded",
-            "products_count": products_count,
-            "order_line_items_count": line_items_count,
-            "duration_seconds": (run.finished_at - started_at).total_seconds(),
-        }
-    except urllib.error.HTTPError as exc:
-        # Log Shopify HTTP errors loudly so 401/403/429 are visible in Railway
-        # logs immediately, not just propagated as a 400 response message.
+    except Exception as exc:
+        orders_error = _friendly_sync_error(exc)
+        logger.exception("Shopify order sync failed for shop_id=%s", shop_id)
+
+    run.products_count = products_count
+    run.order_line_items_count = line_items_count
+    run.status = "succeeded" if orders_error is None else "partial"
+    run.error_message = orders_error[:1000] if orders_error else None
+    run.finished_at = datetime.now(timezone.utc)
+    conn.last_sync_at = datetime.now(timezone.utc)
+    db.commit()
+    return {
+        "status": run.status,
+        "products_count": products_count,
+        "order_line_items_count": line_items_count,
+        "orders_error": orders_error,
+        "duration_seconds": (run.finished_at - started_at).total_seconds(),
+    }
+
+
+def _friendly_sync_error(exc: Exception) -> str:
+    """Translate raw Shopify failures into something a merchant can act on."""
+    if isinstance(exc, urllib.error.HTTPError):
         try:
             body_preview = exc.read().decode("utf-8", errors="replace")[:500]
         except Exception:
             body_preview = "<unavailable>"
         logger.error(
-            "Shopify HTTP error for shop_id=%s: code=%s reason=%s body=%s",
-            shop_id, exc.code, exc.reason, body_preview,
+            "Shopify HTTP error: code=%s reason=%s body=%s",
+            exc.code, exc.reason, body_preview,
         )
-        run.status = "failed"
-        run.error_message = f"Shopify HTTP error: {exc.code} {exc.reason}"
-        run.finished_at = datetime.now(timezone.utc)
-        db.commit()
-        raise RuntimeError(run.error_message) from exc
-    except Exception as exc:
-        run.status = "failed"
-        run.error_message = str(exc)[:1000]
-        run.finished_at = datetime.now(timezone.utc)
-        db.commit()
-        logger.exception("Shopify sync failed for shop_id=%s", shop_id)
-        raise RuntimeError(f"Sync failed: {exc}") from exc
+        if exc.code == 403:
+            return PROTECTED_DATA_HELP
+        if exc.code == 401:
+            return (
+                "Shopify rejected the store's access token (401). "
+                "Re-authorize skubase from the Billing or Store Sync page."
+            )
+        if exc.code == 429:
+            return "Shopify rate-limited the sync (429). Try again in a minute."
+        return f"Shopify HTTP error: {exc.code} {exc.reason}"
+    message = str(exc)
+    if "ACCESS_DENIED" in message or "not approved" in message.lower():
+        return PROTECTED_DATA_HELP
+    return f"Sync failed: {message}"

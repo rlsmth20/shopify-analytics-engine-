@@ -304,6 +304,13 @@ def embedded_admin_redirect_url(
         store_handle = shop_domain.removesuffix(".myshopify.com")
         return f"https://admin.shopify.com/store/{store_handle}/apps/{app_handle}{path}"
 
+    # Without a handle, the legacy admin path with the API key still lands
+    # inside the embedded app — never strand a fresh install on the bare
+    # website outside Shopify admin.
+    client_id = os.getenv("SHOPIFY_CLIENT_ID", "").strip()
+    if client_id:
+        return f"https://{shop_domain}/admin/apps/{client_id}{path}"
+
     params = {"shop": shop_domain, "embedded": "1", "connected": "1"}
     if host:
         params["host"] = host

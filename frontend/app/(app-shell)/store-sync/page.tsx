@@ -38,8 +38,10 @@ export default function StoreSyncPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<{
+    status?: string;
     products_count?: number;
     order_line_items_count?: number;
+    orders_error?: string | null;
   } | null>(null);
 
   async function loadConnection() {
@@ -181,6 +183,12 @@ export default function StoreSyncPage() {
                 <strong>{(syncResult.order_line_items_count ?? 0).toLocaleString()}</strong>{" "}
                 order line items.
               </p>
+            ) : null}
+            {syncResult?.status === "partial" && syncResult.orders_error ? (
+              <div className="import-error" role="alert" style={{ marginTop: "12px" }}>
+                <strong>Products synced, but order history did not.</strong>{" "}
+                {syncResult.orders_error}
+              </div>
             ) : null}
           </>
         ) : (

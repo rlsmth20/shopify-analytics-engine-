@@ -151,11 +151,37 @@ async def shop_redact(
     return {"status": "accepted"}
 
 
+@router.post("/app/uninstalled")
+async def app_uninstalled(
+    request: Request,
+    x_shopify_hmac_sha256: str | None = Header(default=None),
+    x_shopify_shop_domain: str | None = Header(default=None),
+    x_shopify_webhook_id: str | None = Header(default=None),
+) -> dict[str, str]:
+    """Mark the connection uninstalled the moment the merchant removes the app.
+
+    Without this, the stored access token only gets cleared by shop/redact
+    48 hours later, and every background job in between fails with 401s.
+    """
+    payload = await _verified_payload(
+        request,
+        topic="app/uninstalled",
+        hmac_header=x_shopify_hmac_sha256,
+        shop_domain=x_shopify_shop_domain,
+        webhook_id=x_shopify_webhook_id,
+    )
+    shop = _extract_shop_domain(payload, x_shopify_shop_domain)
+    if shop:
+        _mark_shop_connection_redacted(shop)
+    return {"status": "accepted"}
+
+
 # Shopify examples sometimes use topic-style paths without slashes. Keep these
 # aliases so either registration style reaches the same compliance handlers.
 router.add_api_route("/customers_data_request", customers_data_request, methods=["POST"])
 router.add_api_route("/customers_redact", customers_redact, methods=["POST"])
 router.add_api_route("/shop_redact", shop_redact, methods=["POST"])
+router.add_api_route("/app_uninstalled", app_uninstalled, methods=["POST"])
 
 
 def _mark_shop_connection_redacted(shop_domain: str) -> None:
