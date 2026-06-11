@@ -73,13 +73,20 @@ def build_install_url(*, shop_domain: str, state: str) -> str:
         raise RuntimeError("SHOPIFY_CLIENT_ID is not set on the server.")
 
     redirect_uri = f"{BACKEND_URL}/integrations/shopify/callback"
+    # No grant_options here: "per-user" would request an ONLINE token that
+    # expires after ~24h, breaking background sync and billing with 401s.
+    # The default (offline) token persists until the app is uninstalled.
     params = {
         "client_id": api_key,
         "scope": SCOPES,
         "redirect_uri": redirect_uri,
         "state": state,
-        "grant_options[]": "per-user",
     }
+    logger.info(
+        "shopify_oauth_install shop=%s redirect_uri=%s (must be whitelisted in the Partner Dashboard)",
+        shop_domain,
+        redirect_uri,
+    )
     return f"https://{shop_domain}/admin/oauth/authorize?{urlencode(params)}"
 
 

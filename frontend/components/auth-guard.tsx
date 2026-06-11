@@ -114,19 +114,20 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     const embedded = getEmbeddedShopifyContext() !== null;
     setIsEmbedded(embedded);
 
-    if (demo && !embedded) {
-      setUser(DEMO_USER);
-      setIsDemo(true);
-      setLoading(false);
-      return;
-    }
-
+    // A real session always beats the sticky demo flag — otherwise one
+    // "View demo" click leaves signed-in merchants looking at sample data
+    // for the rest of the browser session.
     authenticatedFetch(`${API_BASE}/auth/me`, { credentials: "include" })
       .then(async (res) => {
         if (res.ok) {
           const data = (await res.json()) as AuthUser;
           setUser(data);
           setIsDemo(false);
+          try {
+            sessionStorage.removeItem("skubase_demo");
+          } catch {
+            // ignore
+          }
         } else if (embedded) {
           setUser(null);
           redirectToShopifyInstall();

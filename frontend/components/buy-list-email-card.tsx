@@ -83,7 +83,25 @@ export function BuyListEmailCard() {
     }
   }
 
-  if (user.id === 0 || !loaded) return null;
+  if (user.id === 0) {
+    return (
+      <div className="chart-card">
+        <div className="section-heading">
+          <div>
+            <p className="section-eyebrow">Weekly digest</p>
+            <h2 className="section-title section-title-small">Monday buy list email</h2>
+          </div>
+          <span className="status-badge status-failed">Demo</span>
+        </div>
+        <p className="section-copy">
+          Every Monday: your top reorders ranked by stockout risk, with the cash
+          required by vendor. Sign in with your store to turn this on.
+        </p>
+      </div>
+    );
+  }
+
+  if (!loaded) return null;
 
   return (
     <div className="chart-card">
