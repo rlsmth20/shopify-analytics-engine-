@@ -23,7 +23,7 @@ import {
   type BundleHealth,
   type BundleOpportunity,
 } from "@/lib/api-v2";
-import { exportReportRowsCsv } from "@/lib/report-export";
+import { exportFormattedReport } from "@/lib/report-export";
 
 type BundleTab = "opportunities" | "mappings" | "requirements";
 type QuickView = "all" | "bundle" | "cross-sell" | "promo" | "high-confidence";
@@ -103,22 +103,96 @@ function BundlesContent() {
   }
 
   function exportOpportunities() {
-    exportReportRowsCsv({
-      filename: `skubase-bundle-opportunities-${new Date().toISOString().slice(0, 10)}.csv`,
+    const totalRevenue = visibleOpportunities.reduce((sum, row) => sum + row.combined_revenue, 0);
+    const bundleCount = visibleOpportunities.filter((row) => row.opportunity_type === "Bundle").length;
+    void exportFormattedReport({
+      title: "Bundle Opportunities",
+      subtitle:
+        `Products customers already buy together, mined from ${ordersAnalyzed.toLocaleString()} orders. ` +
+        "Confidence shows how often the pair appears in the same cart.",
+      filename: `skubase-bundle-opportunities-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      detailSheetName: "Opportunities",
+      kpis: [
+        { label: "Opportunities", value: String(visibleOpportunities.length) },
+        { label: "Bundle-ready pairs", value: String(bundleCount), tone: "good" },
+        { label: "Orders analyzed", value: ordersAnalyzed.toLocaleString() },
+        { label: "Combined revenue", value: currency(totalRevenue), tone: "good" },
+      ],
+      charts: [
+        {
+          title: "Most frequently bought together",
+          points: [...visibleOpportunities]
+            .sort((l, r) => r.co_purchase_count - l.co_purchase_count)
+            .slice(0, 8)
+            .map((row) => ({
+              label: bundleIdea(row),
+              value: row.co_purchase_count,
+              display: `${row.co_purchase_count} orders`,
+              tone: row.opportunity_type === "Bundle" ? "good" : "neutral",
+            })),
+        },
+      ],
+      todos: [
+        { label: "Build the top bundle pairs", detail: "Start with pairs marked Bundle - they have the volume to support a real offer.", tone: "good" },
+        { label: "Test cross-sells on product pages", detail: "Cross-sell pairs convert as 'frequently bought together' widgets.", tone: "warning" },
+        { label: "Check component stock before launching", detail: "A bundle dies when its slowest component runs out.", tone: "danger" },
+      ],
+      tableTitle: "Co-purchase Opportunities",
       rows: visibleOpportunities,
       columns: [
-        { label: "Bundle idea", value: (row) => bundleIdea(row) },
-        { label: "Product A", value: (row) => row.product_a_name },
-        { label: "Product B", value: (row) => row.product_b_name },
-        { label: "Co-purchase count", value: (row) => row.co_purchase_count },
-        { label: "Confidence A to B", value: (row) => percent(row.confidence_a_to_b) },
-        { label: "Confidence B to A", value: (row) => percent(row.confidence_b_to_a) },
-        { label: "Lift", value: (row) => row.lift ?? "" },
-        { label: "Combined revenue", value: (row) => row.combined_revenue },
-        { label: "Suggested action", value: (row) => displayBundleAction(row.suggested_action) },
-        { label: "Inventory requirement", value: inventoryRequirementText },
-        { label: "Opportunity type", value: (row) => row.opportunity_type },
-        { label: "Explanation", value: (row) => row.explanation },
+        { key: "idea", label: "Bundle idea", width: 44, format: (row) => bundleIdea(row) },
+        { key: "productA", label: "Product A", width: 28, format: (row) => row.product_a_name },
+        { key: "productB", label: "Product B", width: 28, format: (row) => row.product_b_name },
+        {
+          key: "count",
+          label: "Co-purchases",
+          align: "right",
+          width: 14,
+          format: (row) => String(row.co_purchase_count),
+          numericValue: (row) => row.co_purchase_count,
+          numFmt: "#,##0",
+          summarize: "sum",
+        },
+        {
+          key: "confidence",
+          label: "Confidence",
+          align: "right",
+          width: 12,
+          format: (row) => percent(Math.max(row.confidence_a_to_b, row.confidence_b_to_a)),
+          numericValue: (row) => Math.max(row.confidence_a_to_b, row.confidence_b_to_a),
+          numFmt: "0%",
+          tone: (row) =>
+            Math.max(row.confidence_a_to_b, row.confidence_b_to_a) >= 0.25 ? "good" : null,
+        },
+        {
+          key: "lift",
+          label: "Lift",
+          align: "right",
+          width: 10,
+          format: (row) => (row.lift === null || row.lift === undefined ? "-" : row.lift.toFixed(2)),
+          numericValue: (row) => row.lift ?? null,
+          numFmt: "0.00",
+        },
+        {
+          key: "revenue",
+          label: "Combined revenue",
+          align: "right",
+          width: 17,
+          format: (row) => currency(row.combined_revenue),
+          numericValue: (row) => row.combined_revenue,
+          numFmt: '"$"#,##0',
+          summarize: "sum",
+        },
+        {
+          key: "type",
+          label: "Type",
+          width: 12,
+          format: (row) => row.opportunity_type,
+          tone: (row) => (row.opportunity_type === "Bundle" ? "good" : null),
+        },
+        { key: "action", label: "Suggested action", width: 18, format: (row) => displayBundleAction(row.suggested_action) },
+        { key: "requirement", label: "Inventory requirement", width: 28, format: inventoryRequirementText },
+        { key: "explanation", label: "Explanation", width: 64, format: (row) => row.explanation },
       ],
     });
   }
@@ -179,7 +253,7 @@ function BundlesContent() {
               onClick={exportOpportunities}
               disabled={visibleOpportunities.length === 0}
             >
-              Export filtered CSV
+              Export styled Excel
             </button>
           </div>
 

@@ -14,7 +14,7 @@ import {
   type PurchaseOrderDraft,
   type PurchaseOrderLine,
 } from "@/lib/api-v2";
-import { exportPurchaseOrderReport } from "@/lib/report-export";
+import { exportBuyPlanReport, exportPurchaseOrderReport } from "@/lib/report-export";
 
 const SERVICE_LEVELS = [0.9, 0.95, 0.975, 0.99];
 const SERVICE_LEVEL_COPY: Record<number, string> = {
@@ -134,6 +134,15 @@ function PurchaseOrdersContent() {
         <div className="po-total">
           <p className="muted small">Total capital required, incl. shipping</p>
           <p className="po-total-value">{currency(total)}</p>
+          <button
+            type="button"
+            className="button button-secondary"
+            style={{ marginTop: "8px" }}
+            disabled={visibleDrafts.length === 0}
+            onClick={() => void exportBuyPlanReport(visibleDrafts)}
+          >
+            Export full buy plan
+          </button>
         </div>
       </div>
       <div className="po-shipping-control">

@@ -15,7 +15,7 @@ import {
   type ReportFilterConfig,
   type ReportMetric,
 } from "@/components/reports/report-components";
-import { exportReportRowsCsv } from "@/lib/report-export";
+import { exportFormattedReport } from "@/lib/report-export";
 import { fetchTransfers, type TransferRecommendation } from "@/lib/api-v2";
 
 type TransferRow = {
@@ -104,22 +104,100 @@ function TransfersContent() {
   }
 
   function exportPlan() {
-    exportReportRowsCsv({
-      filename: `skubase-transfer-plan-${new Date().toISOString().slice(0, 10)}.csv`,
+    const totalUnits = visibleRows.reduce((sum, row) => sum + row.recommendedQty, 0);
+    const criticalCount = visibleRows.filter((row) => row.priority === "Critical").length;
+    void exportFormattedReport({
+      title: "Inter-location Transfer Plan",
+      subtitle:
+        "Recommended stock moves between locations, ranked by urgency. Rebalance before placing new purchase orders.",
+      filename: `skubase-transfer-plan-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      detailSheetName: "Transfers",
+      kpis: [
+        { label: "Transfers", value: String(visibleRows.length) },
+        { label: "Units to move", value: totalUnits.toLocaleString() },
+        { label: "Critical", value: String(criticalCount), tone: criticalCount > 0 ? "danger" : "good" },
+        {
+          label: "Locations involved",
+          value: String(
+            new Set(visibleRows.flatMap((row) => [row.sourceLocation, row.destinationLocation])).size,
+          ),
+        },
+      ],
+      charts: [
+        {
+          title: "Largest moves",
+          points: [...visibleRows]
+            .sort((l, r) => r.recommendedQty - l.recommendedQty)
+            .slice(0, 8)
+            .map((row) => ({
+              label: `${row.product} → ${row.destinationLocation}`,
+              value: row.recommendedQty,
+              display: `${row.recommendedQty} units`,
+              tone: row.priority === "Critical" ? "danger" : row.priority === "High" ? "warning" : "neutral",
+            })),
+        },
+      ],
+      todos: [
+        { label: "Move critical transfers first", detail: "Destinations inside their lead-time window stock out without them.", tone: "danger" },
+        { label: "Batch moves by location pair", detail: "Combine transfers travelling the same route to cut freight.", tone: "warning" },
+        { label: "Re-export after syncing", detail: "Quantities shift as orders come in - refresh before the truck leaves.", tone: "good" },
+      ],
+      tableTitle: "Transfer Plan",
       rows: visibleRows,
       columns: [
-        { label: "Product", value: (row) => row.product },
-        { label: "SKU", value: (row) => row.sku },
-        { label: "Source location", value: (row) => row.sourceLocation },
-        { label: "Destination location", value: (row) => row.destinationLocation },
-        { label: "Source stock", value: (row) => row.sourceStock ?? "" },
-        { label: "Destination stock", value: (row) => row.destinationStock ?? "" },
-        { label: "Destination days left", value: (row) => row.destinationDaysLeft ?? "" },
-        { label: "Lead time", value: (row) => row.leadTimeDays ?? "" },
-        { label: "Recommended transfer qty", value: (row) => row.recommendedQty },
-        { label: "Priority", value: (row) => row.priority },
-        { label: "Status", value: (row) => row.status },
-        { label: "Reason", value: (row) => row.reason },
+        { key: "product", label: "Product", width: 32, format: (row) => row.product },
+        { key: "sku", label: "SKU", width: 18, format: (row) => row.sku },
+        { key: "from", label: "From", width: 20, format: (row) => row.sourceLocation },
+        { key: "to", label: "To", width: 20, format: (row) => row.destinationLocation },
+        {
+          key: "sourceStock",
+          label: "Source stock",
+          align: "right",
+          width: 13,
+          format: (row) => (row.sourceStock === null ? "-" : String(row.sourceStock)),
+          numericValue: (row) => row.sourceStock,
+          numFmt: "#,##0",
+        },
+        {
+          key: "destStock",
+          label: "Dest. stock",
+          align: "right",
+          width: 12,
+          format: (row) => (row.destinationStock === null ? "-" : String(row.destinationStock)),
+          numericValue: (row) => row.destinationStock,
+          numFmt: "#,##0",
+        },
+        {
+          key: "daysLeft",
+          label: "Dest. days left",
+          align: "right",
+          width: 14,
+          format: (row) => (row.destinationDaysLeft === null ? "-" : String(row.destinationDaysLeft)),
+          numericValue: (row) => row.destinationDaysLeft,
+          numFmt: "#,##0",
+          tone: (row) =>
+            row.destinationDaysLeft !== null && row.destinationDaysLeft <= 7 ? "danger" : null,
+        },
+        {
+          key: "qty",
+          label: "Move qty",
+          align: "right",
+          width: 12,
+          format: (row) => String(row.recommendedQty),
+          numericValue: (row) => row.recommendedQty,
+          numFmt: "#,##0",
+          summarize: "sum",
+        },
+        {
+          key: "priority",
+          label: "Priority",
+          width: 12,
+          format: (row) => row.priority,
+          tone: (row) =>
+            row.priority === "Critical" ? "danger" : row.priority === "High" ? "warning" : null,
+        },
+        { key: "status", label: "Status", width: 14, format: (row) => row.status },
+        { key: "reason", label: "Reason", width: 56, format: (row) => row.reason },
       ],
     });
   }
@@ -209,7 +287,7 @@ function TransfersContent() {
               onClick={exportPlan}
               disabled={visibleRows.length === 0}
             >
-              Export transfer plan CSV
+              Export styled Excel
             </button>
             <a className="button button-secondary" href="/reports">
               Open stockout report

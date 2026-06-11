@@ -60,7 +60,27 @@ export type ReportTableColumn<T> = {
   numericValue?: (row: T) => number | null;
   tone?: (row: T) => Tone | null;
   numFmt?: string;
+  // "sum" renders a styled totals row at the bottom of the detail sheet.
+  summarize?: "sum";
 };
+
+// Extra data tabs beyond the main detail sheet. Types are erased so one
+// workbook can carry differently-shaped tables; build them with sheetOf().
+export type AnyReportSheet = {
+  sheetName: string;
+  tableTitle: string;
+  rows: unknown[];
+  columns: ReportTableColumn<unknown>[];
+};
+
+export function sheetOf<T>(spec: {
+  sheetName: string;
+  tableTitle: string;
+  rows: T[];
+  columns: ReportTableColumn<T>[];
+}): AnyReportSheet {
+  return spec as unknown as AnyReportSheet;
+}
 
 export type ReportKpi = {
   label: string;
@@ -106,7 +126,7 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
     title: "Inventory Action Report",
     subtitle:
       "Prioritized SKUs grouped by urgency, working-capital impact, and recommended next move.",
-    filename: `inventory-actions-${todayStamp()}.xlsx`,
+    filename: `skubase-inventory-actions-${todayStamp()}.xlsx`,
     summarySheetName: "Summary",
     detailSheetName: "Actions",
     kpis: [
@@ -187,6 +207,7 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
         numericValue: (action) => getActionImpactValue(action),
         numFmt: '"$"#,##0',
         tone: (action) => (getActionImpactValue(action) >= 1000 ? "good" : null),
+        summarize: "sum",
       },
       {
         key: "coverage",
@@ -343,6 +364,7 @@ export async function exportLiquidationReport(
         numericValue: (item) => item.capital_tied_up,
         numFmt: '"$"#,##0',
         tone: () => "danger",
+        summarize: "sum",
       },
       {
         key: "recovery",
@@ -353,6 +375,7 @@ export async function exportLiquidationReport(
         numericValue: (item) => item.projected_recovered_capital,
         numFmt: '"$"#,##0',
         tone: () => "good",
+        summarize: "sum",
       },
     ],
   });
@@ -362,7 +385,7 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
   await buildWorkbook({
     title: `${po.po_id} - Purchase Order`,
     subtitle: `${po.vendor} - expected arrival ${po.expected_arrival_date}. ${po.rationale}`,
-    filename: `${po.po_id.toLowerCase()}-${slugify(po.vendor)}-${todayStamp()}.xlsx`,
+    filename: `skubase-${po.po_id.toLowerCase()}-${slugify(po.vendor)}-${todayStamp()}.xlsx`,
     summarySheetName: "Summary",
     detailSheetName: "Lines",
     kpis: [
@@ -403,6 +426,7 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
         format: (line) => String(line.qty),
         numericValue: (line) => line.qty,
         numFmt: "#,##0",
+        summarize: "sum",
       },
       {
         key: "unit",
@@ -422,7 +446,147 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
         numericValue: (line) => line.extended_cost,
         numFmt: '"$"#,##0.00',
         tone: (line) => (line.extended_cost >= 1000 ? "warning" : null),
+        summarize: "sum",
       },
+    ],
+  });
+}
+
+export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise<void> {
+  const totalCapital = drafts.reduce((sum, po) => sum + po.total_cost, 0);
+  const totalLines = drafts.reduce((sum, po) => sum + po.lines.length, 0);
+  const totalUnits = drafts.reduce(
+    (sum, po) => sum + po.lines.reduce((lineSum, line) => lineSum + line.qty, 0),
+    0,
+  );
+  const allLines = drafts.flatMap((po) =>
+    po.lines.map((line) => ({ po_id: po.po_id, vendor: po.vendor, ...line })),
+  );
+
+  await buildWorkbook({
+    title: "Reorder Buy Plan",
+    subtitle:
+      "Every supplier purchase order draft in one workbook - share with your team or your suppliers.",
+    filename: `skubase-buy-plan-${todayStamp()}.xlsx`,
+    summarySheetName: "Summary",
+    detailSheetName: "POs by supplier",
+    kpis: [
+      { label: "Purchase orders", value: String(drafts.length) },
+      { label: "Lines", value: String(totalLines) },
+      { label: "Units", value: totalUnits.toLocaleString() },
+      { label: "Total capital required", value: currency(totalCapital), tone: "warning" },
+    ],
+    charts: [
+      {
+        title: "Capital by supplier",
+        points: [...drafts]
+          .sort((l, r) => r.total_cost - l.total_cost)
+          .slice(0, 8)
+          .map((po) => ({
+            label: po.vendor,
+            value: po.total_cost,
+            display: currency(po.total_cost),
+            tone: (po.total_cost >= totalCapital / Math.max(drafts.length, 1)
+              ? "warning"
+              : "neutral") as Tone,
+          })),
+      },
+    ],
+    todos: [
+      { label: "Approve urgent POs first", detail: "Start with suppliers covering SKUs at or below their reorder point.", tone: "danger" },
+      { label: "Send each PO to its supplier", detail: "Use the per-PO export or email draft from the Purchase Orders page.", tone: "warning" },
+      { label: "Record receipts when stock arrives", detail: "Receipt history powers supplier scorecards and lead-time confidence.", tone: "good" },
+    ],
+    tableTitle: "Purchase Orders",
+    tableRows: drafts,
+    columns: [
+      { key: "po", label: "PO", width: 20, format: (po) => po.po_id },
+      { key: "vendor", label: "Supplier", width: 26, format: (po) => po.vendor },
+      {
+        key: "lines",
+        label: "Lines",
+        align: "right",
+        width: 10,
+        format: (po) => String(po.lines.length),
+        numericValue: (po) => po.lines.length,
+        numFmt: "#,##0",
+        summarize: "sum",
+      },
+      { key: "arrival", label: "Expected arrival", width: 18, format: (po) => po.expected_arrival_date },
+      { key: "status", label: "Status", width: 14, format: (po) => po.status ?? "draft" },
+      {
+        key: "subtotal",
+        label: "Items",
+        align: "right",
+        width: 14,
+        format: (po) => currency(po.subtotal_cost),
+        numericValue: (po) => po.subtotal_cost,
+        numFmt: '"$"#,##0',
+        summarize: "sum",
+      },
+      {
+        key: "shipping",
+        label: "Shipping",
+        align: "right",
+        width: 12,
+        format: (po) => currency(po.shipping_cost),
+        numericValue: (po) => po.shipping_cost,
+        numFmt: '"$"#,##0',
+        summarize: "sum",
+      },
+      {
+        key: "total",
+        label: "Total",
+        align: "right",
+        width: 14,
+        format: (po) => currency(po.total_cost),
+        numericValue: (po) => po.total_cost,
+        numFmt: '"$"#,##0',
+        tone: (po) => (po.total_cost >= 2500 ? "warning" : null),
+        summarize: "sum",
+      },
+      { key: "rationale", label: "Rationale", width: 60, format: (po) => po.rationale },
+    ],
+    extraSheets: [
+      sheetOf({
+        sheetName: "All lines",
+        tableTitle: "Every Line, Every Supplier",
+        rows: allLines,
+        columns: [
+          { key: "po", label: "PO", width: 20, format: (line) => line.po_id },
+          { key: "vendor", label: "Supplier", width: 24, format: (line) => line.vendor },
+          { key: "sku", label: "SKU", width: 36, format: (line) => line.name },
+          {
+            key: "qty",
+            label: "Qty",
+            align: "right",
+            width: 10,
+            format: (line) => String(line.qty),
+            numericValue: (line) => line.qty,
+            numFmt: "#,##0",
+            summarize: "sum",
+          },
+          {
+            key: "unit",
+            label: "Unit cost",
+            align: "right",
+            width: 14,
+            format: (line) => currency(line.unit_cost),
+            numericValue: (line) => line.unit_cost,
+            numFmt: '"$"#,##0.00',
+          },
+          {
+            key: "extended",
+            label: "Extended",
+            align: "right",
+            width: 16,
+            format: (line) => currency(line.extended_cost),
+            numericValue: (line) => line.extended_cost,
+            numFmt: '"$"#,##0.00',
+            summarize: "sum",
+          },
+        ],
+      }),
     ],
   });
 }
@@ -444,6 +608,7 @@ export async function exportFormattedReport<T>(spec: {
   tableTitle: string;
   rows: T[];
   columns: ReportTableColumn<T>[];
+  extraSheets?: AnyReportSheet[];
 }): Promise<void> {
   await buildWorkbook({
     title: spec.title,
@@ -457,6 +622,7 @@ export async function exportFormattedReport<T>(spec: {
     tableTitle: spec.tableTitle,
     tableRows: spec.rows,
     columns: spec.columns,
+    extraSheets: spec.extraSheets,
   });
 }
 
@@ -507,6 +673,7 @@ type WorkbookSpec<T> = {
   tableTitle: string;
   tableRows: T[];
   columns: ReportTableColumn<T>[];
+  extraSheets?: AnyReportSheet[];
 };
 
 async function buildWorkbook<T>(spec: WorkbookSpec<T>): Promise<void> {
@@ -516,7 +683,15 @@ async function buildWorkbook<T>(spec: WorkbookSpec<T>): Promise<void> {
   wb.created = new Date();
   wb.modified = new Date();
   await buildSummarySheet(wb, spec);
-  buildDetailSheet(wb, spec);
+  buildDetailSheet(wb, {
+    sheetName: spec.detailSheetName,
+    tableTitle: spec.tableTitle,
+    rows: spec.tableRows,
+    columns: spec.columns,
+  });
+  for (const sheet of spec.extraSheets ?? []) {
+    buildDetailSheet(wb, sheet);
+  }
   const buffer = await wb.xlsx.writeBuffer();
   triggerDownload(buffer as ArrayBuffer, spec.filename);
 }
@@ -690,7 +865,11 @@ async function buildSummarySheet<T>(
   row += 1;
   ws.mergeCells(row, 1, row, COLS);
   const ptr = ws.getCell(row, 1);
-  ptr.value = `Full data on the "${spec.detailSheetName}" tab.`;
+  const dataTabs = [spec.detailSheetName, ...(spec.extraSheets ?? []).map((s) => s.sheetName)];
+  ptr.value =
+    dataTabs.length === 1
+      ? `Full data on the "${dataTabs[0]}" tab.`
+      : `Full data on the ${dataTabs.map((name) => `"${name}"`).join(", ")} tabs.`;
   ptr.font = { name: FONT_BASE, italic: true, size: 11, color: { argb: "FF64748B" } };
   ptr.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
   ws.getRow(row).height = 22;
@@ -698,25 +877,33 @@ async function buildSummarySheet<T>(
   ws.views = [{ state: "frozen", xSplit: 0, ySplit: 3, showGridLines: false }];
 }
 
-function buildDetailSheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<T>): void {
-  const ws = wb.addWorksheet(spec.detailSheetName, {
+function buildDetailSheet<T>(
+  wb: import("exceljs").Workbook,
+  sheet: {
+    sheetName: string;
+    tableTitle: string;
+    rows: T[];
+    columns: ReportTableColumn<T>[];
+  },
+): void {
+  const ws = wb.addWorksheet(sheet.sheetName, {
     views: [{ showGridLines: false }],
     properties: { defaultRowHeight: 18 },
   });
 
-  spec.columns.forEach((col, idx) => { ws.getColumn(idx + 1).width = col.width ?? 16; });
-  const colCount = spec.columns.length;
+  sheet.columns.forEach((col, idx) => { ws.getColumn(idx + 1).width = col.width ?? 16; });
+  const colCount = sheet.columns.length;
 
   ws.mergeCells(1, 1, 1, colCount);
   const titleCell = ws.getCell(1, 1);
-  titleCell.value = spec.tableTitle;
+  titleCell.value = sheet.tableTitle;
   titleCell.font = { name: FONT_DISPLAY, bold: true, size: 18, color: { argb: COLOR_BRAND_INK } };
   titleCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
   fillCells(ws, 1, 1, 1, colCount, COLOR_BRAND);
   ws.getRow(1).height = 32;
 
   const headerRow = 2;
-  spec.columns.forEach((col, idx) => {
+  sheet.columns.forEach((col, idx) => {
     const cell = ws.getCell(headerRow, idx + 1);
     cell.value = col.label;
     cell.font = { name: FONT_BASE, bold: true, size: 10, color: { argb: COLOR_HEADER_INK } };
@@ -731,10 +918,11 @@ function buildDetailSheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<
   });
   ws.getRow(headerRow).height = 26;
 
-  spec.tableRows.forEach((row, idx) => {
+  const wrapKeys = new Set(["recommendation", "recommendedAction", "reason", "explanation", "notes", "rationale"]);
+  sheet.rows.forEach((row, idx) => {
     const r = headerRow + 1 + idx;
     const isAlt = idx % 2 === 1;
-    spec.columns.forEach((col, cIdx) => {
+    sheet.columns.forEach((col, cIdx) => {
       const cell = ws.getCell(r, cIdx + 1);
       const numeric = col.numericValue?.(row);
       if (numeric !== undefined && numeric !== null && Number.isFinite(numeric)) {
@@ -751,7 +939,7 @@ function buildDetailSheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<
         vertical: "middle",
         horizontal: col.align ?? "left",
         indent: 1,
-        wrapText: col.key === "recommendation" || col.key === "recommendedAction" || col.key === "reason",
+        wrapText: wrapKeys.has(col.key),
       };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: baseFill } };
       cell.border = {
@@ -761,20 +949,51 @@ function buildDetailSheet<T>(wb: import("exceljs").Workbook, spec: WorkbookSpec<
         right: { style: "hair", color: { argb: COLOR_BORDER } },
       };
     });
-    const wraps = spec.columns.some(
-      (c) => c.key === "recommendation" || c.key === "recommendedAction" || c.key === "reason",
-    );
+    const wraps = sheet.columns.some((c) => wrapKeys.has(c.key));
     ws.getRow(r).height = wraps ? 36 : 22;
   });
 
-  const numericCols = spec.columns
+  // Totals row for any column marked summarize: "sum".
+  const summarized = sheet.columns
+    .map((col, idx) => ({ col, idx }))
+    .filter(({ col }) => col.summarize === "sum" && col.numericValue !== undefined);
+  if (summarized.length > 0 && sheet.rows.length > 0) {
+    const totalRow = headerRow + sheet.rows.length + 1;
+    sheet.columns.forEach((col, cIdx) => {
+      const cell = ws.getCell(totalRow, cIdx + 1);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_SECTION_BG } };
+      cell.border = {
+        top: { style: "medium", color: { argb: COLOR_BRAND } },
+        bottom: { style: "thin", color: { argb: COLOR_BORDER } },
+      };
+      const summary = summarized.find((entry) => entry.idx === cIdx);
+      if (cIdx === 0 && !summary) {
+        cell.value = "Total";
+        cell.font = { name: FONT_BASE, bold: true, size: 10, color: { argb: COLOR_BRAND } };
+        cell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        return;
+      }
+      if (!summary) return;
+      const total = sheet.rows.reduce((sum, row) => {
+        const value = summary.col.numericValue?.(row);
+        return sum + (value !== null && value !== undefined && Number.isFinite(value) ? value : 0);
+      }, 0);
+      cell.value = total;
+      if (summary.col.numFmt) cell.numFmt = summary.col.numFmt;
+      cell.font = { name: FONT_BASE, bold: true, size: 11, color: { argb: COLOR_BRAND } };
+      cell.alignment = { vertical: "middle", horizontal: summary.col.align ?? "right", indent: 1 };
+    });
+    ws.getRow(totalRow).height = 24;
+  }
+
+  const numericCols = sheet.columns
     .map((col, idx) => ({ col, idx }))
     .filter(({ col }) => col.numericValue !== undefined);
-  if (numericCols.length > 0 && spec.tableRows.length > 0) {
+  if (numericCols.length > 0 && sheet.rows.length > 0) {
     const target = numericCols[numericCols.length - 1];
     const colLetter = columnLetter(target.idx + 1);
     const firstDataRow = headerRow + 1;
-    const lastDataRow = headerRow + spec.tableRows.length;
+    const lastDataRow = headerRow + sheet.rows.length;
     ws.addConditionalFormatting({
       ref: `${colLetter}${firstDataRow}:${colLetter}${lastDataRow}`,
       rules: [

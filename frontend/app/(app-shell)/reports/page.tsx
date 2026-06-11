@@ -1952,6 +1952,7 @@ function moneyCol(
     },
     numFmt: '"$"#,##0',
     tone: tone ?? undefined,
+    summarize: "sum",
   };
 }
 

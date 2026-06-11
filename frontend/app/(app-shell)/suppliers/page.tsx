@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { DataQualityNote } from "@/components/data-quality-note";
 import { GatedFeature } from "@/components/gated-feature";
 import { fetchSuppliers, type SupplierScorecard } from "@/lib/api-v2";
+import { exportFormattedReport } from "@/lib/report-export";
 
 export default function SuppliersPage() {
   return (
@@ -63,8 +64,148 @@ function SuppliersContent() {
     );
   }
 
+  function exportScorecards() {
+    const tierTone = (tier: SupplierScorecard["tier"]) =>
+      tier === "preferred" ? ("good" as const) : tier === "at_risk" ? ("danger" as const) : null;
+    void exportFormattedReport({
+      title: "Supplier Scorecards",
+      subtitle:
+        "On-time delivery, fill rate, lead-time stability, and cost stability per supplier, built from purchase order receipt history.",
+      filename: `skubase-supplier-scorecards-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      detailSheetName: "Suppliers",
+      kpis: [
+        { label: "Suppliers", value: String(vendors.length) },
+        {
+          label: "Preferred",
+          value: String(vendors.filter((v) => v.tier === "preferred").length),
+          tone: "good",
+        },
+        {
+          label: "At risk",
+          value: String(vendors.filter((v) => v.tier === "at_risk").length),
+          tone: "danger",
+        },
+        {
+          label: "Avg on-time",
+          value: vendors.length
+            ? `${(vendors.reduce((sum, v) => sum + v.on_time_pct, 0) / vendors.length).toFixed(0)}%`
+            : "-",
+        },
+      ],
+      charts: [
+        {
+          title: "Overall score by supplier",
+          points: [...vendors]
+            .sort((l, r) => r.overall_score - l.overall_score)
+            .slice(0, 8)
+            .map((v) => ({
+              label: v.vendor,
+              value: v.overall_score,
+              display: v.overall_score.toFixed(0),
+              tone: tierTone(v.tier) ?? "neutral",
+            })),
+        },
+      ],
+      todos: [
+        { label: "Review at-risk suppliers", detail: "Slipping lead times and fill rates feed directly into stockouts.", tone: "danger" },
+        { label: "Shift volume toward preferred suppliers", detail: "Reward consistent on-time delivery with bigger orders.", tone: "good" },
+        { label: "Keep recording receipts", detail: "Every received PO sharpens these scores.", tone: "neutral" },
+      ],
+      tableTitle: "Supplier Scorecards",
+      rows: vendors,
+      columns: [
+        { key: "vendor", label: "Supplier", width: 30, format: (v) => v.vendor },
+        {
+          key: "tier",
+          label: "Tier",
+          width: 13,
+          format: (v) => v.tier.replace("_", " "),
+          tone: (v) => tierTone(v.tier),
+        },
+        {
+          key: "score",
+          label: "Score",
+          align: "right",
+          width: 10,
+          format: (v) => v.overall_score.toFixed(0),
+          numericValue: (v) => v.overall_score,
+          numFmt: "#,##0",
+          tone: (v) => (v.overall_score >= 80 ? "good" : v.overall_score < 60 ? "danger" : null),
+        },
+        {
+          key: "skus",
+          label: "SKUs",
+          align: "right",
+          width: 9,
+          format: (v) => String(v.sku_count),
+          numericValue: (v) => v.sku_count,
+          numFmt: "#,##0",
+          summarize: "sum",
+        },
+        {
+          key: "onTime",
+          label: "On-time",
+          align: "right",
+          width: 11,
+          format: (v) => `${v.on_time_pct.toFixed(0)}%`,
+          numericValue: (v) => v.on_time_pct / 100,
+          numFmt: "0%",
+          tone: (v) => (v.on_time_pct < 80 ? "danger" : null),
+        },
+        {
+          key: "fillRate",
+          label: "Fill rate",
+          align: "right",
+          width: 11,
+          format: (v) => `${v.fill_rate_pct.toFixed(0)}%`,
+          numericValue: (v) => v.fill_rate_pct / 100,
+          numFmt: "0%",
+        },
+        {
+          key: "leadTime",
+          label: "Avg lead (d)",
+          align: "right",
+          width: 13,
+          format: (v) => v.avg_lead_time_days.toFixed(1),
+          numericValue: (v) => v.avg_lead_time_days,
+          numFmt: "0.0",
+        },
+        {
+          key: "leadVar",
+          label: "Lead variance (d)",
+          align: "right",
+          width: 17,
+          format: (v) => v.lead_time_variance_days.toFixed(1),
+          numericValue: (v) => v.lead_time_variance_days,
+          numFmt: "0.0",
+          tone: (v) => (v.lead_time_variance_days > 7 ? "warning" : null),
+        },
+        {
+          key: "costStability",
+          label: "Cost stability",
+          align: "right",
+          width: 14,
+          format: (v) => `${v.cost_stability_score.toFixed(0)}%`,
+          numericValue: (v) => v.cost_stability_score / 100,
+          numFmt: "0%",
+        },
+        {
+          key: "notes",
+          label: "Notes",
+          width: 50,
+          format: (v) => v.notes.join(" "),
+        },
+      ],
+    });
+  }
+
   return (
     <div className="suppliers-page">
+      <div className="button-row" style={{ justifyContent: "flex-end", marginBottom: "12px" }}>
+        <button type="button" className="button button-secondary" onClick={exportScorecards}>
+          Export styled Excel
+        </button>
+      </div>
       <div className="tier-summary">
         <TierBox
           tier="preferred"
