@@ -102,11 +102,22 @@ def resolve_user_from_shopify_session_token(
     user_email = f"shopify-admin+{claims.user_sub}@{claims.shop_domain}"
     user = db.scalar(select(User).where(User.email == user_email))
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # If any user on this shop is a skubase admin (e.g. the founder's own
+    # store), the embedded session inherits admin so full access applies
+    # inside Shopify admin too — not just on the website session.
+    shop_has_admin = (
+        db.scalar(
+            select(User).where(User.shop_id == shop.id, User.is_admin.is_(True)).limit(1)
+        )
+        is not None
+    )
+
     if user is None:
         user = User(
             email=user_email,
             shop_id=shop.id,
-            is_admin=False,
+            is_admin=shop_has_admin,
             trial_ends_at=now + timedelta(days=14),
             last_login_at=now,
         )
@@ -115,6 +126,8 @@ def resolve_user_from_shopify_session_token(
         db.refresh(user)
     else:
         user.last_login_at = now
+        if shop_has_admin and not user.is_admin:
+            user.is_admin = True
         if user.trial_ends_at is None:
             user.trial_ends_at = now + timedelta(days=14)
         db.commit()

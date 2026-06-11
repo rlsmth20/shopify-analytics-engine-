@@ -69,6 +69,22 @@ export function isEmbeddedShopifyContext(): boolean {
   return getEmbeddedShopifyContext() !== null;
 }
 
+export function isDemoActive(): boolean {
+  // Demo (sample-workspace) mode never applies inside the Shopify admin
+  // iframe — embedded merchants must always see their own store, and a
+  // stray demo flag would silently swap their data for fixtures.
+  if (typeof window === "undefined") return false;
+  if (isEmbeddedShopifyContext()) return false;
+  try {
+    return (
+      sessionStorage.getItem("skubase_demo") === "1" ||
+      new URLSearchParams(window.location.search).get("demo") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function getShopifySessionToken(): Promise<string | null> {
   const context = getEmbeddedShopifyContext();
   if (!context) return null;

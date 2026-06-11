@@ -1,5 +1,7 @@
 "use client";
 
+import { isDemoActive } from "@/lib/shopify-embedded";
+
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -710,13 +712,5 @@ function formatNumber(value: number | null): string {
 }
 
 function isDemoMode(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return (
-      sessionStorage.getItem("skubase_demo") === "1" ||
-      new URLSearchParams(window.location.search).get("demo") === "1"
-    );
-  } catch {
-    return false;
-  }
+  return isDemoActive();
 }

@@ -17,7 +17,7 @@ import {
   DEMO_SUPPLIERS,
   DEMO_TRANSFERS,
 } from "@/lib/demo-data";
-import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { authenticatedFetch, isDemoActive } from "@/lib/shopify-embedded";
 
 const API_BASE_URL = APP_API_BASE_URL;
 
@@ -26,15 +26,7 @@ const API_BASE_URL = APP_API_BASE_URL;
 // ---------------------------------------------------------------------------
 
 function isDemo(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return (
-      sessionStorage.getItem("skubase_demo") === "1" ||
-      new URLSearchParams(window.location.search).get("demo") === "1"
-    );
-  } catch {
-    return false;
-  }
+  return isDemoActive();
 }
 
 // Map API paths to their demo fixtures.

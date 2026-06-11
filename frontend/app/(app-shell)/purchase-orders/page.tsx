@@ -1,5 +1,7 @@
 "use client";
 
+import { isDemoActive } from "@/lib/shopify-embedded";
+
 import { useEffect, useState } from "react";
 
 import { BuyListEmailCard } from "@/components/buy-list-email-card";
@@ -1492,15 +1494,7 @@ function sumReceiptQty(lines: ReceiptLinePayload[]): number {
 }
 
 function isDemoMode(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return (
-      sessionStorage.getItem("skubase_demo") === "1" ||
-      new URLSearchParams(window.location.search).get("demo") === "1"
-    );
-  } catch {
-    return false;
-  }
+  return isDemoActive();
 }
 
 function errorMessage(error: unknown, fallback: string): string {

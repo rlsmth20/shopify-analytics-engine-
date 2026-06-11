@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { entitlementHas, fetchEntitlements, type Entitlements } from "@/lib/entitlements";
+import { isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
 import {
   PLAN_CAPABILITIES,
   getUpgradeLabel,
@@ -72,14 +73,23 @@ export function GatedFeature({
   const currentPlan = entitlements ? planDisplayName(entitlements.plan_id) : "Unverified";
 
   function openSampleWorkspace() {
+    // Open the demo on the feature the merchant was just looking at,
+    // not the dashboard — they came here to see THIS workflow.
+    const demoUrl = `${window.location.pathname}?demo=1`;
+    if (isEmbeddedShopifyContext()) {
+      // Demo mode never runs inside the Shopify admin iframe (embedded
+      // merchants must see their own store), so open it in a real tab.
+      // Deliberately no sessionStorage flag here — it would make the
+      // embedded app serve fixture data.
+      window.open(demoUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
     try {
       sessionStorage.setItem("skubase_demo", "1");
     } catch {
       // ignore storage failures; the query param still signals demo mode.
     }
-    // Open the demo on the feature the merchant was just looking at,
-    // not the dashboard — they came here to see THIS workflow.
-    window.location.href = `${window.location.pathname}?demo=1`;
+    window.location.href = demoUrl;
   }
 
   return (

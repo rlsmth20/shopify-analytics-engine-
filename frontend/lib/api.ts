@@ -1,5 +1,5 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
-import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { authenticatedFetch, isDemoActive } from "@/lib/shopify-embedded";
 
 export type ActionableStatus = "urgent" | "optimize" | "dead";
 export type UrgencyLevel = "critical" | "high" | "medium";
@@ -190,15 +190,7 @@ export class ApiError extends Error {
 const API_BASE_URL = APP_API_BASE_URL;
 
 function isDemo(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return (
-      sessionStorage.getItem("skubase_demo") === "1" ||
-      new URLSearchParams(window.location.search).get("demo") === "1"
-    );
-  } catch {
-    return false;
-  }
+  return isDemoActive();
 }
 
 export async function fetchInventoryActions(
