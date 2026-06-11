@@ -34,7 +34,25 @@ logger = logging.getLogger(__name__)
 SCOPES = "read_products,read_inventory,read_orders,read_locations"
 
 FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
-BACKEND_URL = os.getenv("BACKEND_PUBLIC_URL", "").rstrip("/")
+
+
+def _backend_url() -> str:
+    """Public backend origin used for the OAuth redirect_uri.
+
+    Prefers the explicit BACKEND_PUBLIC_URL, falling back to Railway's
+    injected public domain (the custom domain when one is attached). The
+    result must match a whitelisted redirect URL in the Partner Dashboard.
+    """
+    explicit = os.getenv("BACKEND_PUBLIC_URL", "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip().rstrip("/")
+    if railway_domain:
+        return f"https://{railway_domain}"
+    return ""
+
+
+BACKEND_URL = _backend_url()
 
 
 @dataclass(frozen=True)
