@@ -8272,3 +8272,223 @@ code {
     display: grid;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Features page (/features) + pricing plan-comparison matrix
+ * ------------------------------------------------------------------------- */
+
+.feature-group-title {
+  max-width: 760px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.feature-card {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feature-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feature-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.feature-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.feature-badge-all {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.feature-badge-growth {
+  background: var(--optimize-soft);
+  color: var(--optimize);
+}
+
+.feature-badge-scale {
+  background: var(--dead-soft);
+  color: var(--dead);
+}
+
+.feature-badge-planned {
+  background: var(--neutral-soft);
+  color: var(--muted-strong);
+}
+
+.feature-card-body {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.feature-card-detail {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+}
+
+.feature-card-link {
+  margin-top: auto;
+  font-weight: 600;
+  color: #1e3a8a;
+  font-size: 13px;
+}
+
+.plan-matrix-wrapper {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.plan-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.plan-matrix thead th {
+  text-align: left;
+  padding: 14px 20px;
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-weight: 700;
+  border-bottom: 1px solid var(--line-strong);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.plan-matrix thead th.plan-matrix-tier {
+  text-align: center;
+  width: 14%;
+  min-width: 96px;
+}
+
+.plan-matrix tbody td,
+.plan-matrix tbody th {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.plan-matrix tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.plan-matrix-group th {
+  text-align: left;
+  background: var(--bg-strong);
+  color: var(--muted-strong);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 10px 20px;
+}
+
+.plan-matrix-feature {
+  color: var(--ink);
+}
+
+.plan-matrix-feature-name {
+  display: block;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.plan-matrix-feature-detail {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.plan-matrix-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.plan-matrix-yes {
+  color: var(--success);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.plan-matrix-no {
+  color: var(--muted);
+}
+
+.plan-matrix-partial,
+.plan-matrix-planned {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.plan-matrix-partial {
+  background: var(--optimize-soft);
+  color: var(--optimize);
+}
+
+.plan-matrix-planned {
+  background: var(--neutral-soft);
+  color: var(--muted-strong);
+}
+
+.plan-matrix-footnote {
+  margin: 14px 2px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 980px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}

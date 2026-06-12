@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { MarketingFooter } from "@/components/marketing-footer";
 
 type Velocity = {
   sku: string;
@@ -172,20 +173,7 @@ export default function ImportShipStationPage() {
         </aside>
       </section>
 
-      <footer className="marketing-footer">
-        <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span>skubase</span>
-        </div>
-        <div className="marketing-footer-links">
-          <Link href="/">Home</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

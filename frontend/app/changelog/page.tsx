@@ -2,6 +2,7 @@
 
 import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
+import { MarketingFooter } from "@/components/marketing-footer";
 
 export const metadata = {
   title: "Changelog — skubase",
@@ -13,6 +14,23 @@ export const metadata = {
 type ChangelogEntry = { version: string; date: string; title: string; items: { type: "Added" | "Changed" | "Fixed" | "Shipped"; text: string }[]; };
 
 const entries: ChangelogEntry[] = [
+  { version: "v0.7.0", date: "2026-06-12", title: "Scheduled reports, rebuilt exports, and a features page", items: [
+    { type: "Shipped", text: "Scheduled email reports: pick a report, cadence, and recipient — delivered weekly (Monday morning) or monthly (the 1st) with a deep link back into the workflow (Scale)." },
+    { type: "Shipped", text: "Monday Buy List: a weekly email digest of what to reorder this week, with quantities and cash required." },
+    { type: "Shipped", text: "Excel exports rebuilt as branded multi-sheet workbooks with KPI summaries, charts, and totals rows — plus new full buy plan, supplier scorecard, and bundle plan exports." },
+    { type: "Shipped", text: "Bundle Opportunities from order history, and dead-stock bundle pairings with blended-margin math." },
+    { type: "Shipped", text: "Open-to-buy cash plan on Reorder / POs and inventory value over time on the Dashboard." },
+    { type: "Added", text: "A public features page (/features) explaining every feature and the plan that includes it, plus a full plan-comparison matrix on pricing." },
+    { type: "Fixed", text: "Shopify sync reliability: moved to Shopify's expiring offline tokens after the platform retired legacy tokens (previously surfaced as 403 sync errors)." },
+    { type: "Fixed", text: "Magic links no longer bounce back to login when email security scanners pre-open them; Stocky CSV imports no longer fail on customer-exported files." },
+  ]},
+  { version: "v0.6.0", date: "2026-06-10", title: "Shopify App Store pivot", items: [
+    { type: "Shipped", text: "skubase now runs embedded inside Shopify admin, with billing through the Shopify Billing API — no separate checkout." },
+    { type: "Shipped", text: "Sync health indicator on Store Sync: when the store last synced and exactly what failed if it didn't." },
+    { type: "Shipped", text: "Order sync is partial-tolerant: products and inventory always land, and any order-history issue is reported with an actionable message." },
+    { type: "Changed", text: "Admin API moved to GraphQL 2026-04; the legacy REST client was removed entirely." },
+    { type: "Changed", text: "Uninstalling the app revokes stored tokens immediately via the app/uninstalled webhook." },
+  ]},
   { version: "v0.5.0", date: "2026-04-29", title: "14-day free trial + paywall", items: [
     { type: "Shipped", text: "14-day free trial for all new accounts — no credit card required. trial_ends_at set at signup." },
     { type: "Shipped", text: "Backend access gate: require_active_access() on all 15 protected routes (402 when trial expired or no active subscription)." },
@@ -108,21 +126,7 @@ export default function ChangelogPage() {
         <WaitlistForm source="changelog" ctaLabel="Start free trial" />
       </section>
 
-      <footer className="marketing-footer">
-        <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span>skubase</span>
-        </div>
-        <div className="marketing-footer-links">
-          <Link href="/">Home</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

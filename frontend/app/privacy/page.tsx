@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
+import { MarketingFooter } from "@/components/marketing-footer";
 
 export const metadata = {
   title: "Privacy Policy — skubase",
@@ -116,20 +117,7 @@ export default function PrivacyPage() {
         </p>
       </article>
 
-      <footer className="marketing-footer">
-        <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span>skubase</span>
-        </div>
-        <div className="marketing-footer-links">
-          <Link href="/">Home</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

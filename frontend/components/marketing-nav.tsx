@@ -41,7 +41,7 @@ export function MarketingNav() {
         <span className="marketing-brand-name">skubase</span>
       </Link>
       <nav className="marketing-nav-links" aria-label="Primary">
-        <Link href="/#pillars">Product</Link>
+        <Link href="/features">Features</Link>
         <Link href="/pricing">Pricing</Link>
         <Link href="/about">About</Link>
         <Link href="/blog">Blog</Link>

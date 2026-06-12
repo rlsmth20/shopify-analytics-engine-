@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
+import { MarketingFooter } from "@/components/marketing-footer";
 
 export const metadata = {
   title: "Stocky alternatives for Shopify merchants in 2026 - skubase",
@@ -93,20 +94,7 @@ export default function StockyAlternativesPost() {
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ARTICLE_LD) }} />
 
-      <footer className="marketing-footer">
-        <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span>skubase</span>
-        </div>
-        <div className="marketing-footer-links">
-          <Link href="/">Home</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase</p>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

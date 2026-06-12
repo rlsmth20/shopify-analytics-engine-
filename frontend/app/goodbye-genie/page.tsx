@@ -2,6 +2,7 @@
 
 import { WaitlistForm } from "@/components/waitlist-form";
 import { MarketingNav } from "@/components/marketing-nav";
+import { MarketingFooter } from "@/components/marketing-footer";
 
 export const metadata = {
   title: "Goodbye Genie, hello skubase — skubase",
@@ -77,23 +78,7 @@ export default function GoodbyeGeniePage() {
         <WaitlistForm source="goodbye_genie_footer" ctaLabel="Get early access" />
       </section>
 
-      <footer className="marketing-footer">
-        <div className="marketing-footer-brand">
-          <span className="marketing-brand-mark">sb</span>
-          <span>skubase</span>
-        </div>
-        <div className="marketing-footer-links">
-          <Link href="/">Home</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/about">About</Link>
-          <Link href="/goodbye-stocky">Stocky migration</Link>
-          <Link href="/goodbye-genie">Genie migration</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </div>
-        <p className="marketing-footer-fine">© {new Date().getFullYear()} skubase · Prices locked at renewal</p>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }
