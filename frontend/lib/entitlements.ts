@@ -24,15 +24,45 @@ export type Entitlements = {
   billing_status_error?: string | null;
 };
 
-export async function fetchEntitlements(): Promise<Entitlements> {
-  const response = await authenticatedFetch(`${API_BASE}/billing/entitlements`, {
-    credentials: "include",
-  });
+// Entitlements are fetched by the app shell, gated-feature cards, and several
+// pages on every navigation. Share one request and reuse the result briefly so
+// a single page view doesn't fan out into 2-3 identical API calls.
+const ENTITLEMENTS_TTL_MS = 60_000;
+let cachedEntitlements: { at: number; value: Entitlements } | null = null;
+let inflight: Promise<Entitlements> | null = null;
+
+export function invalidateEntitlementsCache(): void {
+  cachedEntitlements = null;
+  inflight = null;
+}
+
+async function requestEntitlements(fresh: boolean): Promise<Entitlements> {
+  const url = `${API_BASE}/billing/entitlements${fresh ? "?fresh=1" : ""}`;
+  const response = await authenticatedFetch(url, { credentials: "include" });
   const body = await response.json().catch(() => null);
   if (!response.ok || !body) {
     throw new Error(body?.detail || `Entitlements failed with status ${response.status}.`);
   }
   return body as Entitlements;
+}
+
+export async function fetchEntitlements(options?: { fresh?: boolean }): Promise<Entitlements> {
+  const fresh = Boolean(options?.fresh);
+  if (!fresh) {
+    if (cachedEntitlements && Date.now() - cachedEntitlements.at < ENTITLEMENTS_TTL_MS) {
+      return cachedEntitlements.value;
+    }
+    if (inflight) return inflight;
+  }
+  inflight = requestEntitlements(fresh)
+    .then((value) => {
+      cachedEntitlements = { at: Date.now(), value };
+      return value;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
 }
 
 export function entitlementHas(

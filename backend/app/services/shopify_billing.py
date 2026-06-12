@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -17,6 +19,20 @@ from sqlalchemy.orm import Session as DbSession
 from app.db.models import ShopifyConnection, Subscription, User
 
 logger = logging.getLogger(__name__)
+
+# The subscription summary is consulted on nearly every authenticated request
+# (entitlements + access gate), and each live lookup is a Shopify GraphQL
+# round trip. Cache it per shop for a short window; billing actions and the
+# billing page itself bypass/invalidate the cache so plan changes show
+# immediately.
+SUMMARY_CACHE_TTL_SECONDS = int(os.getenv("SHOPIFY_BILLING_CACHE_TTL", "120"))
+_summary_cache: dict[int, tuple[float, dict]] = {}
+_summary_cache_lock = threading.Lock()
+
+
+def invalidate_shopify_billing_cache(shop_id: int) -> None:
+    with _summary_cache_lock:
+        _summary_cache.pop(shop_id, None)
 
 GRAPHQL_VERSION = os.getenv("SHOPIFY_API_VERSION", "2026-04")
 FRONTEND_URL = os.getenv("FRONTEND_URL", os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0]).strip().rstrip("/")
@@ -61,7 +77,12 @@ def has_active_shopify_connection(db: DbSession, *, shop_id: int) -> bool:
     return _connection_for_shop(db, shop_id=shop_id) is not None
 
 
-def current_shopify_subscription_summary(db: DbSession, *, user: User) -> dict:
+def current_shopify_subscription_summary(
+    db: DbSession,
+    *,
+    user: User,
+    use_cache: bool = True,
+) -> dict:
     conn = _connection_for_shop(db, shop_id=user.shop_id)
     if conn is None:
         return {
@@ -69,6 +90,24 @@ def current_shopify_subscription_summary(db: DbSession, *, user: User) -> dict:
             "shopify_installed": False,
         }
 
+    if use_cache:
+        with _summary_cache_lock:
+            cached = _summary_cache.get(user.shop_id)
+        if cached is not None and time.monotonic() - cached[0] < SUMMARY_CACHE_TTL_SECONDS:
+            return dict(cached[1])
+
+    summary = _live_shopify_subscription_summary(db, user=user, conn=conn)
+    with _summary_cache_lock:
+        _summary_cache[user.shop_id] = (time.monotonic(), dict(summary))
+    return summary
+
+
+def _live_shopify_subscription_summary(
+    db: DbSession,
+    *,
+    user: User,
+    conn: ShopifyConnection,
+) -> dict:
     _refresh_token_if_needed(db, conn)
     try:
         active = _fetch_active_subscription(conn)
@@ -171,6 +210,9 @@ def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:
     confirmation_url = result.get("confirmationUrl")
     if not confirmation_url:
         raise RuntimeError("Shopify did not return a billing confirmation URL.")
+    # The merchant is about to approve a plan change on Shopify's page; make
+    # sure the next status read is live, not a pre-change cached snapshot.
+    invalidate_shopify_billing_cache(user.shop_id)
     return str(confirmation_url)
 
 

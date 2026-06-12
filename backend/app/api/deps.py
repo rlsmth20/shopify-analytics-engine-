@@ -157,20 +157,29 @@ def require_active_access(
     if trial_ends > datetime.now(timezone.utc):
         return user  # still in trial
 
+    # Local mirrored subscription first — this gate runs on every protected
+    # request, so the common case (an active subscriber) must not pay a
+    # Shopify round trip. The mirror is refreshed by the entitlements/billing
+    # lookups and by the live fallback below; a paid period that ended more
+    # than 3 days ago is no longer trusted without re-verification.
+    sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
+    if sub is not None and sub.status in ("active", "trialing"):
+        period_end = sub.current_period_end
+        if period_end is not None and period_end.tzinfo is None:
+            period_end = period_end.replace(tzinfo=timezone.utc)
+        if period_end is None or period_end + timedelta(days=3) > datetime.now(timezone.utc):
+            return user
+
     from app.services.shopify_billing import (
         current_shopify_subscription_summary,
         has_active_shopify_connection,
     )
 
+    # Live (short-TTL cached) Shopify check; also refreshes the local mirror.
     if has_active_shopify_connection(db, shop_id=user.shop_id):
         shopify_sub = current_shopify_subscription_summary(db, user=user)
         if shopify_sub.get("status") in ("active", "trialing"):
             return user
-
-    # Check paid subscription. Accept both active and trialing Stripe states.
-    sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
-    if sub is not None and sub.status in ("active", "trialing"):
-        return user
 
     from app.services.billing import reconcile_subscription_from_stripe
 

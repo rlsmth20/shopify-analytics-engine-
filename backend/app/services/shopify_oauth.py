@@ -349,6 +349,12 @@ def persist_connection(
         shop.shopify_domain = shop_domain
     db.commit()
     db.refresh(existing)
+
+    # A fresh install/re-auth changes what Shopify will report — drop any
+    # cached billing snapshot for this shop.
+    from app.services.shopify_billing import invalidate_shopify_billing_cache
+
+    invalidate_shopify_billing_cache(shop_id)
     return existing
 
 

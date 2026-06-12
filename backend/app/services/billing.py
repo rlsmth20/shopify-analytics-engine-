@@ -387,10 +387,21 @@ def verify_webhook_signature(*, payload: bytes, signature_header: str) -> Option
         return None
 
 
-def current_subscription_summary(db: DbSession, *, user: User) -> dict:
-    """Frontend-friendly view of the current user's subscription."""
+def current_subscription_summary(
+    db: DbSession,
+    *,
+    user: User,
+    fresh_shopify: bool = False,
+) -> dict:
+    """Frontend-friendly view of the current user's subscription.
+
+    `fresh_shopify=True` bypasses the short-TTL Shopify cache — used by the
+    billing page so a just-approved plan change shows immediately.
+    """
     if has_active_shopify_connection(db, shop_id=user.shop_id):
-        return current_shopify_subscription_summary(db, user=user)
+        return current_shopify_subscription_summary(
+            db, user=user, use_cache=not fresh_shopify
+        )
 
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
     should_reconcile = (
@@ -427,13 +438,18 @@ def current_subscription_summary(db: DbSession, *, user: User) -> dict:
     }
 
 
-def current_entitlements_summary(db: DbSession, *, user: User) -> dict:
+def current_entitlements_summary(
+    db: DbSession,
+    *,
+    user: User,
+    fresh_shopify: bool = False,
+) -> dict:
     """Canonical billing + entitlement view for frontend feature gates.
 
     Shopify-installed merchants are governed by Shopify Managed Pricing status.
     Direct web users may still use Stripe and direct trial access.
     """
-    raw = current_subscription_summary(db, user=user)
+    raw = current_subscription_summary(db, user=user, fresh_shopify=fresh_shopify)
     is_shopify_installed = bool(raw.get("shopify_installed"))
     status = str(raw.get("status") or "inactive")
     raw_plan = str(raw.get("plan") or "none")

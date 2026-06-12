@@ -50,7 +50,9 @@ export default function BillingPage() {
   useEffect(() => {
     setEmbeddedBilling(isEmbeddedShopifyContext());
     setLoading(true);
-    fetchEntitlements()
+    // fresh: merchants land here right after approving a plan change — show
+    // live status, never a cached snapshot.
+    fetchEntitlements({ fresh: true })
       .then((data) => setSub(data))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));

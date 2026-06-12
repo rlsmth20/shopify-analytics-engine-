@@ -98,6 +98,9 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # Cache CORS preflights (Chrome caps at 2h). Without this every API
+        # call from the app pays an extra OPTIONS round trip every 10 min.
+        max_age=7200,
     )
 
     # auth + admin (always loaded first)

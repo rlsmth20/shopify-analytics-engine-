@@ -85,15 +85,20 @@ def my_subscription(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> dict:
-    return current_subscription_summary(db, user=user)
+    # The billing page is where merchants look right after changing plans —
+    # always show live Shopify status here, never a cached snapshot.
+    return current_subscription_summary(db, user=user, fresh_shopify=True)
 
 
 @router.get("/entitlements")
 def my_entitlements(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
+    fresh: bool = False,
 ) -> dict:
-    return current_entitlements_summary(db, user=user)
+    # `fresh=1` bypasses the short-TTL Shopify billing cache — the billing
+    # page uses it so a just-approved plan change shows immediately.
+    return current_entitlements_summary(db, user=user, fresh_shopify=fresh)
 
 
 @router.post("/shopify/subscribe", response_model=CheckoutResponse)

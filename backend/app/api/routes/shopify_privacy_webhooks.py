@@ -19,7 +19,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from sqlalchemy import select
 
-from app.db.models import ShopifyConnection
+from app.db.models import ShopifyConnection, Subscription
 from app.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -188,13 +188,25 @@ def _mark_shop_connection_redacted(shop_domain: str) -> None:
     normalized = shop_domain.strip().lower()
     if not normalized:
         return
+    from app.services.shopify_billing import invalidate_shopify_billing_cache
+
     with SessionLocal() as session:
         records = session.scalars(
             select(ShopifyConnection).where(ShopifyConnection.shopify_domain == normalized)
         ).all()
         for record in records:
             record.access_token = ""
+            record.refresh_token = None
             record.uninstalled_at = datetime.now(timezone.utc)
+            # Uninstalling ends the Shopify subscription — flip the local
+            # mirror too so the local-first access gate stops granting.
+            sub = session.scalar(
+                select(Subscription).where(Subscription.shop_id == record.shop_id)
+            )
+            if sub is not None and str(sub.stripe_subscription_id or "").startswith("shopify:"):
+                sub.status = "inactive"
+                sub.plan = "none"
+            invalidate_shopify_billing_cache(record.shop_id)
         if records:
             session.commit()
     logger.info(
