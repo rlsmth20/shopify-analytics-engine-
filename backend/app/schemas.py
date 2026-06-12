@@ -10,7 +10,7 @@ UrgencyLevel = Literal["critical", "high", "medium"]
 LeadTimeSource = Literal["sku_override", "vendor", "category", "global_default"]
 ActionDataSource = Literal["db", "mock"]
 DataQualityConfidence = Literal["high", "medium", "low"]
-ShopifySyncStatus = Literal["running", "succeeded", "failed"]
+ShopifySyncStatus = Literal["running", "succeeded", "failed", "partial"]
 AiChatRole = Literal["user", "assistant"]
 AiChatMode = Literal["ai", "local"]
 

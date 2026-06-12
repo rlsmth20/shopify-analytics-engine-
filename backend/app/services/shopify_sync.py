@@ -6,9 +6,11 @@ read the same shape regardless of whether data came from CSV or API.
 """
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -37,6 +39,8 @@ PROTECTED_DATA_HELP = (
     "(Apps -> skubase -> API access -> Protected customer data: select "
     "order-level data only)."
 )
+
+RECONNECT_SCOPE_HELP = "Reconnect Shopify to approve the updated order access scope."
 
 # Shopify retired non-expiring offline tokens in June 2026; stores connected
 # before the cutover hold a token Shopify now rejects with 403 on every call.
@@ -100,12 +104,17 @@ query Orders($cursor: String, $query: String) {
       node {
         id
         createdAt
-        lineItems(first: 50) {
+        displayFinancialStatus
+        displayFulfillmentStatus
+        lineItems(first: 250) {
+          pageInfo { hasNextPage endCursor }
           edges {
             node {
               id
+              title
               sku
               quantity
+              product { id }
               variant { id }
               originalUnitPriceSet { shopMoney { amount } }
             }
@@ -122,10 +131,52 @@ def _shopify_id_to_str(gid: str) -> str:
     return gid.split("/")[-1] if gid else gid
 
 
-def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) -> int:
-    """Pull products + variants + inventory snapshot. Returns count of variants."""
+def _scope_set(scope: str | None) -> set[str]:
+    return {part.strip() for part in re.split(r"[\s,]+", scope or "") if part.strip()}
+
+
+def _sanitize_error_message(message: str) -> str:
+    text = re.sub(r"shp[a-z]_[A-Za-z0-9_]+", "[redacted]", message)
+    text = re.sub(
+        r'("access_token"\s*:\s*")[^"]+',
+        r'\1[redacted]',
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"(access_token=)[^&\s]+",
+        r"\1[redacted]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return text
+
+
+def _http_error_preview(exc: urllib.error.HTTPError) -> str:
+    cached = getattr(exc, "_skubase_body_preview", None)
+    if cached is not None:
+        return str(cached)
+    try:
+        body_preview = exc.read().decode("utf-8", errors="replace")[:500]
+    except Exception:
+        body_preview = "<unavailable>"
+    sanitized = _sanitize_error_message(body_preview)
+    setattr(exc, "_skubase_body_preview", sanitized)
+    return sanitized
+
+
+def _top_skip_reason(skip_reasons: Counter) -> str | None:
+    if not skip_reasons:
+        return None
+    reason, _ = skip_reasons.most_common(1)[0]
+    return str(reason)
+
+
+def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) -> dict:
+    """Pull products + variants + inventory snapshot."""
     cursor = None
-    count = 0
+    products_scanned = 0
+    variants_imported = 0
     while True:
         result = _gql(domain, token, PRODUCTS_QUERY, {"cursor": cursor})
         # Surface GraphQL-level errors so we can see scope / permission failures.
@@ -145,6 +196,7 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
             shopify_product_id = _shopify_id_to_str(node.get("id") or "")
             if not shopify_product_id:
                 continue
+            products_scanned += 1
             vendor = (node.get("vendor") or "").strip() or None
             category = (node.get("productType") or "").strip() or None
             base_name = node.get("title") or "Untitled product"
@@ -226,56 +278,144 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
                     db.add(inv)
                 else:
                     inv.quantity = qty
-                count += 1
+                variants_imported += 1
         db.commit()
         page_info = (((result.get("data") or {}).get("products") or {}).get("pageInfo")) or {}
         if not page_info.get("hasNextPage"):
             break
         cursor = page_info.get("endCursor")
-    return count
+    return {
+        "products_scanned": products_scanned,
+        "variants_imported": variants_imported,
+    }
 
 
-def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days_back: int = 180) -> int:
-    """Pull orders within the last `days_back` days. Returns count of line items."""
+def _resolve_line_item_product_id(
+    li: dict,
+    *,
+    variant_to_product: dict[str, int],
+    shopify_product_to_products: dict[str, list[int]],
+    sku_to_products: dict[str, list[int]],
+) -> tuple[int | None, str | None]:
+    variant = li.get("variant") or {}
+    variant_gid = _shopify_id_to_str(variant.get("id") or "")
+    if variant_gid:
+        product_id = variant_to_product.get(variant_gid)
+        if product_id:
+            return product_id, None
+        return None, "unknown_variant_id"
+
+    product = li.get("product") or {}
+    shopify_product_id = _shopify_id_to_str(product.get("id") or "")
+    sku = (li.get("sku") or "").strip().lower()
+
+    if shopify_product_id:
+        product_candidates = shopify_product_to_products.get(shopify_product_id, [])
+        if len(product_candidates) == 1:
+            return product_candidates[0], None
+        if len(product_candidates) > 1:
+            if sku:
+                sku_candidates = [
+                    product_id
+                    for product_id in sku_to_products.get(sku, [])
+                    if product_id in product_candidates
+                ]
+                if len(sku_candidates) == 1:
+                    return sku_candidates[0], None
+            return None, "ambiguous_product_id_without_variant"
+
+    if sku:
+        sku_candidates = sku_to_products.get(sku, [])
+        if len(sku_candidates) == 1:
+            return sku_candidates[0], None
+        if len(sku_candidates) > 1:
+            return None, "ambiguous_sku_without_variant"
+        return None, "unknown_sku_without_variant"
+
+    if shopify_product_id:
+        return None, "unknown_product_id_without_variant"
+    return None, "missing_variant_product_and_sku"
+
+
+def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days_back: int = 60) -> dict:
+    """Pull recent paid orders. Returns line item import diagnostics."""
     # Shopify's search-query language wants ISO 8601 without microseconds and
     # ideally with a Z suffix (not +00:00). datetime.isoformat() produces
     # the latter, which Shopify silently rejects → zero orders returned.
     since_dt = datetime.now(timezone.utc) - timedelta(days=days_back)
     since = since_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-    query = f"created_at:>={since}"
+    query = f"created_at:>={since} financial_status:paid status:any"
     cursor = None
-    count = 0
+    stats = {
+        "orders_query": query,
+        "orders_scanned": 0,
+        "line_items_scanned": 0,
+        "line_items_with_variant_id": 0,
+        "line_items_with_product_id": 0,
+        "line_items_imported": 0,
+        "line_items_skipped": 0,
+        "line_item_skip_reasons": {},
+        "top_skip_reason": None,
+        "no_eligible_recent_orders_found": False,
+    }
+    skip_reasons: Counter = Counter()
     pages_seen = 0
 
-    # Pre-build a variant -> product_id map for fast joins.
+    # Pre-build lookup maps for line item joins. Customer data is intentionally
+    # not part of forecasting imports.
     variant_to_product: dict[str, int] = {}
+    shopify_product_to_products: dict[str, list[int]] = defaultdict(list)
+    sku_to_products: dict[str, list[int]] = defaultdict(list)
     rows = db.execute(
-        select(Product.id, Product.shopify_variant_id).where(Product.shop_id == shop_id)
+        select(
+            Product.id,
+            Product.shopify_variant_id,
+            Product.shopify_product_id,
+            Product.sku,
+        ).where(Product.shop_id == shop_id)
     ).all()
-    for pid, vid in rows:
+    for pid, vid, shopify_product_id, sku in rows:
         if vid:
             variant_to_product[str(vid)] = int(pid)
+        if shopify_product_id:
+            shopify_product_to_products[str(shopify_product_id)].append(int(pid))
+        normalized_sku = (sku or "").strip().lower()
+        if normalized_sku:
+            sku_to_products[normalized_sku].append(int(pid))
 
     logger.info(
-        "orders ingest start: shop_id=%s since=%s products_indexed=%s",
-        shop_id, since, len(variant_to_product),
+        "Shopify order ingest start: shop_domain=%s request_type=orders_graphql since=%s query=%s products_indexed=%s",
+        domain, since, query, len(variant_to_product),
     )
 
     while True:
-        result = _gql(domain, token, ORDERS_QUERY, {"cursor": cursor, "query": query})
+        try:
+            result = _gql(domain, token, ORDERS_QUERY, {"cursor": cursor, "query": query})
+        except urllib.error.HTTPError as exc:
+            logger.error(
+                "Shopify order API error: shop_domain=%s request_type=orders_graphql status_code=%s message=%s",
+                domain,
+                exc.code,
+                _http_error_preview(exc),
+            )
+            raise
         # Surface GraphQL-level errors (invalid query syntax, bad scope, etc.)
         # so we know WHY orders are missing instead of silently getting zero.
         gql_errors = result.get("errors")
         if gql_errors:
-            logger.error("Shopify orders GraphQL errors: %s", gql_errors)
+            logger.error(
+                "Shopify order GraphQL errors: shop_domain=%s request_type=orders_graphql errors=%s",
+                domain,
+                _sanitize_error_message(str(gql_errors))[:500],
+            )
             raise RuntimeError(f"Shopify orders query failed: {gql_errors}")
         data = result.get("data") or {}
         orders = data.get("orders") or {}
         edges = orders.get("edges") or []
         pages_seen += 1
         logger.info(
-            "orders page %s: edges=%s cursor=%s",
-            pages_seen, len(edges), cursor,
+            "Shopify orders page: shop_domain=%s request_type=orders_graphql page=%s edges=%s cursor=%s",
+            domain, pages_seen, len(edges), cursor,
         )
         for edge in edges:
             order = edge.get("node") or {}
@@ -284,6 +424,7 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
             order_id = _shopify_id_to_str(order.get("id") or "")
             if not order_id:
                 continue
+            stats["orders_scanned"] += 1
             try:
                 created_at_raw = order.get("createdAt") or ""
                 created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
@@ -291,15 +432,43 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                 created_at = datetime.now(timezone.utc)
             line_items = order.get("lineItems") or {}
             li_edges = line_items.get("edges") or []
+            order_counts = Counter()
+            if (line_items.get("pageInfo") or {}).get("hasNextPage"):
+                skip_reasons["line_items_page_truncated"] += 1
+                logger.warning(
+                    "Shopify order has more line items than fetched: shop_domain=%s request_type=orders_graphql order_id=%s fetched_line_items=%s",
+                    domain,
+                    order_id,
+                    len(li_edges),
+                )
             for liedge in li_edges:
                 li = liedge.get("node") or {}
                 if not li:
                     continue
+                stats["line_items_scanned"] += 1
+                order_counts["line_items_scanned"] += 1
                 variant = li.get("variant") or {}
                 variant_gid = _shopify_id_to_str(variant.get("id") or "")
-                product_id = variant_to_product.get(variant_gid)
+                if variant_gid:
+                    stats["line_items_with_variant_id"] += 1
+                    order_counts["line_items_with_variant_id"] += 1
+                product = li.get("product") or {}
+                if _shopify_id_to_str(product.get("id") or ""):
+                    stats["line_items_with_product_id"] += 1
+                    order_counts["line_items_with_product_id"] += 1
+
+                product_id, skip_reason = _resolve_line_item_product_id(
+                    li,
+                    variant_to_product=variant_to_product,
+                    shopify_product_to_products=shopify_product_to_products,
+                    sku_to_products=sku_to_products,
+                )
                 if not product_id:
-                    continue  # Skip line items we can't map to a known product.
+                    reason = skip_reason or "unmapped_line_item"
+                    skip_reasons[reason] += 1
+                    stats["line_items_skipped"] += 1
+                    order_counts["line_items_skipped"] += 1
+                    continue
                 qty = int(li.get("quantity") or 0)
                 price_set = li.get("originalUnitPriceSet") or {}
                 shop_money = price_set.get("shopMoney") or {}
@@ -315,6 +484,9 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                 # shopify_order_id field for now.
                 line_id = _shopify_id_to_str(li.get("id") or "")
                 if not line_id:
+                    skip_reasons["missing_line_item_id"] += 1
+                    stats["line_items_skipped"] += 1
+                    order_counts["line_items_skipped"] += 1
                     continue
                 exists = db.scalar(
                     select(OrderLineItem.id).where(
@@ -323,6 +495,9 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                     )
                 )
                 if exists is not None:
+                    skip_reasons["already_imported"] += 1
+                    stats["line_items_skipped"] += 1
+                    order_counts["line_items_skipped"] += 1
                     continue
 
                 db.add(
@@ -336,13 +511,37 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                         created_at=created_at,
                     )
                 )
-                count += 1
+                stats["line_items_imported"] += 1
+            logger.info(
+                "Shopify order line item mapping: shop_domain=%s request_type=orders_graphql order_id=%s financial_status=%s fulfillment_status=%s line_items=%s with_variant_id=%s with_product_id=%s skipped=%s top_skip_reason=%s",
+                domain,
+                order_id,
+                order.get("displayFinancialStatus"),
+                order.get("displayFulfillmentStatus"),
+                order_counts["line_items_scanned"],
+                order_counts["line_items_with_variant_id"],
+                order_counts["line_items_with_product_id"],
+                order_counts["line_items_skipped"],
+                _top_skip_reason(skip_reasons),
+            )
         db.commit()
         page_info = (((result.get("data") or {}).get("orders") or {}).get("pageInfo")) or {}
         if not page_info.get("hasNextPage"):
             break
         cursor = page_info.get("endCursor")
-    return count
+    stats["line_item_skip_reasons"] = dict(skip_reasons)
+    stats["top_skip_reason"] = _top_skip_reason(skip_reasons)
+    stats["no_eligible_recent_orders_found"] = stats["orders_scanned"] == 0
+    logger.info(
+        "Shopify order ingest complete: shop_domain=%s request_type=orders_graphql orders_scanned=%s line_items_scanned=%s line_items_imported=%s line_items_skipped=%s top_skip_reason=%s",
+        domain,
+        stats["orders_scanned"],
+        stats["line_items_scanned"],
+        stats["line_items_imported"],
+        stats["line_items_skipped"],
+        stats["top_skip_reason"],
+    )
+    return stats
 
 
 def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
@@ -374,9 +573,10 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
 
     started_at = datetime.now(timezone.utc)
     try:
-        products_count = _ingest_products(
+        product_stats = _ingest_products(
             db, shop_id=shop_id, domain=conn.shopify_domain, token=token
         )
+        products_count = int(product_stats.get("variants_imported") or 0)
     except Exception as exc:
         run.status = "failed"
         run.error_message = _friendly_sync_error(exc)[:1000]
@@ -390,13 +590,35 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
     # inventory sync — the app stays useful and the error stays actionable.
     line_items_count = 0
     orders_error: str | None = None
-    try:
-        line_items_count = _ingest_orders(
-            db, shop_id=shop_id, domain=conn.shopify_domain, token=token
+    order_stats = {
+        "orders_query": None,
+        "orders_scanned": 0,
+        "line_items_scanned": 0,
+        "line_items_with_variant_id": 0,
+        "line_items_with_product_id": 0,
+        "line_items_imported": 0,
+        "line_items_skipped": 0,
+        "line_item_skip_reasons": {},
+        "top_skip_reason": None,
+        "no_eligible_recent_orders_found": False,
+    }
+    stored_token_has_read_orders = "read_orders" in _scope_set(conn.scope)
+    token_lacks_read_orders = not stored_token_has_read_orders
+    if token_lacks_read_orders:
+        orders_error = f"{RECONNECT_SCOPE_HELP} Products and inventory still synced."
+        logger.warning(
+            "Shopify order sync skipped: shop_domain=%s request_type=orders_graphql reason=missing_read_orders_scope",
+            conn.shopify_domain,
         )
-    except Exception as exc:
-        orders_error = _friendly_sync_error(exc) + " Products and inventory still synced."
-        logger.exception("Shopify order sync failed for shop_id=%s", shop_id)
+    else:
+        try:
+            order_stats = _ingest_orders(
+                db, shop_id=shop_id, domain=conn.shopify_domain, token=token
+            )
+            line_items_count = int(order_stats.get("line_items_imported") or 0)
+        except Exception as exc:
+            orders_error = _friendly_sync_error(exc) + " Products and inventory still synced."
+            logger.exception("Shopify order sync failed for shop_id=%s", shop_id)
 
     run.products_count = products_count
     run.order_line_items_count = line_items_count
@@ -408,7 +630,21 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
     return {
         "status": run.status,
         "products_count": products_count,
+        "products_scanned": int(product_stats.get("products_scanned") or 0),
+        "variants_imported": products_count,
         "order_line_items_count": line_items_count,
+        "orders_scanned": int(order_stats.get("orders_scanned") or 0),
+        "line_items_scanned": int(order_stats.get("line_items_scanned") or 0),
+        "line_items_imported": int(order_stats.get("line_items_imported") or 0),
+        "line_items_skipped": int(order_stats.get("line_items_skipped") or 0),
+        "line_items_with_variant_id": int(order_stats.get("line_items_with_variant_id") or 0),
+        "line_items_with_product_id": int(order_stats.get("line_items_with_product_id") or 0),
+        "line_item_skip_reasons": order_stats.get("line_item_skip_reasons") or {},
+        "top_skip_reason": order_stats.get("top_skip_reason"),
+        "stored_token_has_read_orders": stored_token_has_read_orders,
+        "token_lacks_read_orders": token_lacks_read_orders,
+        "no_eligible_recent_orders_found": bool(order_stats.get("no_eligible_recent_orders_found")),
+        "orders_query": order_stats.get("orders_query"),
         "orders_error": orders_error,
         "duration_seconds": (run.finished_at - started_at).total_seconds(),
     }
@@ -417,10 +653,7 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
 def _friendly_sync_error(exc: Exception) -> str:
     """Translate raw Shopify failures into something a merchant can act on."""
     if isinstance(exc, urllib.error.HTTPError):
-        try:
-            body_preview = exc.read().decode("utf-8", errors="replace")[:500]
-        except Exception:
-            body_preview = "<unavailable>"
+        body_preview = _http_error_preview(exc)
         logger.error(
             "Shopify HTTP error: code=%s reason=%s body=%s",
             exc.code, exc.reason, body_preview,
@@ -437,7 +670,7 @@ def _friendly_sync_error(exc: Exception) -> str:
         if exc.code == 429:
             return "Shopify rate-limited the sync (429). Try again in a minute."
         return f"Shopify HTTP error: {exc.code} {exc.reason}"
-    message = str(exc)
+    message = _sanitize_error_message(str(exc))
     if "ACCESS_DENIED" in message or "not approved" in message.lower():
         return PROTECTED_DATA_HELP
     return f"Sync failed: {message}"
