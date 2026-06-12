@@ -5,7 +5,7 @@ export type ActionableStatus = "urgent" | "optimize" | "dead";
 export type UrgencyLevel = "critical" | "high" | "medium";
 export type ActionDataSource = "db" | "mock";
 export type DataQualityConfidence = "high" | "medium" | "low";
-export type ShopifySyncStatus = "running" | "succeeded" | "failed" | "partial";
+export type ShopifySyncStatus = "running" | "succeeded" | "failed";
 export type LeadTimeSource =
   | "sku_override"
   | "vendor"

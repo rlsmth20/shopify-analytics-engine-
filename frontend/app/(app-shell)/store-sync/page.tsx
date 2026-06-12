@@ -18,33 +18,6 @@ type Connection = {
   shopify_domain: string | null;
   last_sync_at: string | null;
   scope: string | null;
-  required_scopes?: string[];
-  missing_required_scopes?: string[];
-  has_read_orders?: boolean;
-  reconnect_message?: string | null;
-};
-
-type SyncResult = {
-  status?: string;
-  products_count?: number;
-  products_scanned?: number;
-  variants_imported?: number;
-  order_line_items_count?: number;
-  orders_scanned?: number;
-  line_items_scanned?: number;
-  line_items_imported?: number;
-  line_items_skipped?: number;
-  line_items_with_variant_id?: number;
-  line_items_with_product_id?: number;
-  top_skip_reason?: string | null;
-  skip_reasons?: Record<string, number>;
-  token_lacks_read_orders?: boolean;
-  stored_token_has_read_orders?: boolean;
-  live_token_has_read_orders?: boolean | null;
-  token_scope_check_error?: string | null;
-  no_eligible_recent_orders_found?: boolean;
-  shopify_order_query?: string;
-  orders_error?: string | null;
 };
 
 function formatRelative(iso: string | null): string {
@@ -57,15 +30,6 @@ function formatRelative(iso: string | null): string {
   }
 }
 
-function formatCount(value: number | undefined): string {
-  return (value ?? 0).toLocaleString();
-}
-
-function formatSkipReason(value: string | null | undefined): string {
-  if (!value) return "None";
-  return value.replaceAll("_", " ");
-}
-
 export default function StoreSyncPage() {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [shopInput, setShopInput] = useState("");
@@ -73,7 +37,12 @@ export default function StoreSyncPage() {
   const [installError, setInstallError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    status?: string;
+    products_count?: number;
+    order_line_items_count?: number;
+    orders_error?: string | null;
+  } | null>(null);
 
   async function loadConnection() {
     try {
@@ -141,17 +110,6 @@ export default function StoreSyncPage() {
     }
   }
 
-  const missingOrderScope =
-    connection?.connected === true && connection.has_read_orders === false;
-  const zeroOrderLines =
-    syncResult !== null && (syncResult.order_line_items_count ?? 0) === 0;
-  const ordersOrAccessIssue =
-    zeroOrderLines &&
-    ((syncResult?.orders_scanned ?? 0) > 0 ||
-      (syncResult?.line_items_scanned ?? 0) > 0 ||
-      syncResult?.token_lacks_read_orders ||
-      Boolean(syncResult?.orders_error));
-
   return (
     <div className="page-stack">
       <SectionCard>
@@ -181,16 +139,6 @@ export default function StoreSyncPage() {
               Shopify inventory quantities, prices, products, or orders from
               this screen.
             </div>
-            {missingOrderScope ? (
-              <div className="import-error" role="alert" style={{ marginBottom: "16px" }}>
-                <strong>
-                  {connection.reconnect_message ||
-                    "Reconnect Shopify to approve the updated order access scope."}
-                </strong>{" "}
-                Skubase needs recent Shopify orders to calculate sales velocity,
-                forecasts, and bundle opportunities.
-              </div>
-            ) : null}
             <div className="button-row">
               <button
                 type="button"
@@ -228,68 +176,13 @@ export default function StoreSyncPage() {
               </p>
             ) : null}
             {syncResult ? (
-              <div style={{ marginTop: "16px" }}>
-                <p className="section-copy">
-                  Synced <strong>{formatCount(syncResult.products_count)}</strong>{" "}
-                  product variants and{" "}
-                  <strong>{formatCount(syncResult.order_line_items_count)}</strong>{" "}
-                  order line items.
-                </p>
-                <div className="stats-grid" style={{ marginTop: "14px" }}>
-                  <div className="stat-item">
-                    <span className="stat-label">Products scanned</span>
-                    <strong>{formatCount(syncResult.products_scanned)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Variants imported</span>
-                    <strong>{formatCount(syncResult.variants_imported)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Orders scanned</span>
-                    <strong>{formatCount(syncResult.orders_scanned)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Line items scanned</span>
-                    <strong>{formatCount(syncResult.line_items_scanned)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Line items imported</span>
-                    <strong>{formatCount(syncResult.line_items_imported)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Line items skipped</span>
-                    <strong>{formatCount(syncResult.line_items_skipped)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">With variant ID</span>
-                    <strong>{formatCount(syncResult.line_items_with_variant_id)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">With product ID</span>
-                    <strong>{formatCount(syncResult.line_items_with_product_id)}</strong>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Top skip reason</span>
-                    <strong>{formatSkipReason(syncResult.top_skip_reason)}</strong>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {ordersOrAccessIssue ? (
-              <div className="import-error" role="alert" style={{ marginTop: "12px" }}>
-                <strong>No order line items were imported.</strong> Reconnect
-                Shopify if order access was recently added. Skubase needs recent
-                Shopify orders to calculate sales velocity, forecasts, and bundle
-                opportunities. Orders without customers should still be imported
-                for inventory forecasting.
-              </div>
-            ) : null}
-            {zeroOrderLines && syncResult?.no_eligible_recent_orders_found ? (
-              <div className="sync-safety-note" role="status">
-                <strong>No eligible recent paid orders found.</strong> Skubase
-                needs recent Shopify orders to calculate sales velocity,
-                forecasts, and bundle opportunities.
-              </div>
+              <p className="section-copy" style={{ marginTop: "16px" }}>
+                Synced{" "}
+                <strong>{(syncResult.products_count ?? 0).toLocaleString()}</strong>{" "}
+                product variants and{" "}
+                <strong>{(syncResult.order_line_items_count ?? 0).toLocaleString()}</strong>{" "}
+                order line items.
+              </p>
             ) : null}
             {syncResult?.status === "partial" && syncResult.orders_error ? (
               <div className="import-error" role="alert" style={{ marginTop: "12px" }}>
@@ -302,7 +195,7 @@ export default function StoreSyncPage() {
           <>
             <p className="section-copy">
               Install the skubase app on your Shopify store. We&apos;ll pull
-              products, inventory, and recent paid orders so the
+              products, inventory, and the last 12 months of orders so the
               forecast and action queue can run on real data.
             </p>
             <div className="sync-safety-note" role="status">
