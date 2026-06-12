@@ -152,21 +152,33 @@ def create_session(db: DbSession, *, user_id: int) -> str:
     return raw_token
 
 
+# last_seen_at is bookkeeping, not security — refreshing it on every request
+# costs an extra UPDATE+COMMIT round trip to the DB on every API call.
+_LAST_SEEN_REFRESH = timedelta(minutes=5)
+
+
 def resolve_session(db: DbSession, *, raw_token: str) -> Optional[User]:
-    """Map a cookie value to its User, or None if invalid/expired."""
+    """Map a cookie value to its User, or None if invalid/expired.
+
+    This runs on every authenticated request, so it is built to cost a single
+    DB round trip in the common case: one joined SELECT, and the last_seen_at
+    write only when the stamp is older than five minutes.
+    """
     token_hash = _sha256(raw_token)
-    record = db.scalar(
-        select(SessionModel).where(SessionModel.token_hash == token_hash)
-    )
-    if record is None:
+    row = db.execute(
+        select(SessionModel, User)
+        .join(User, User.id == SessionModel.user_id)
+        .where(SessionModel.token_hash == token_hash)
+    ).first()
+    if row is None:
         return None
+    record, user = row
     if _as_naive_utc(record.expires_at) < _now():
         return None
-    record.last_seen_at = _now()
-    db.commit()
-    user = db.get(User, record.user_id)
-    if user is None:
-        return None
+    last_seen = record.last_seen_at
+    if last_seen is None or _as_naive_utc(last_seen) < _now() - _LAST_SEEN_REFRESH:
+        record.last_seen_at = _now()
+        db.commit()
     return ensure_admin_flag(db, user)
 
 
