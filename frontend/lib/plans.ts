@@ -10,23 +10,19 @@ export type CapabilityKey =
   | "limited_today"
   | "today_basic"
   | "action_queue_basic"
-  | "action_queue_full"
   | "alerts_basic"
   | "alerts_advanced"
   | "forecast"
   | "projected_stock_health"
   | "inventory_health_basic"
-  | "inventory_health_full"
   | "reports_basic"
   | "reports_export"
   | "reorder_pos"
   | "bundle_opportunities"
   | "dead_stock_basic"
-  | "dead_stock_full"
   | "suppliers_basic"
   | "supplier_scorecards"
   | "transfers"
-  | "inventory_rules_basic"
   | "inventory_rules_advanced"
   | "scheduled_reports"
   | "team_controls"
@@ -128,26 +124,20 @@ export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
   },
   action_queue_basic: {
     requiredPlan: "starter",
-    title: "Basic Action Queue",
-    description: "Work through basic stockout, reorder, and dead-stock recommendations.",
+    title: "Action Queue",
+    description: "Work through the full ranked queue with stockout, reorder, and dead-stock recommendations.",
     cta: "Choose Starter",
-  },
-  action_queue_full: {
-    requiredPlan: "growth",
-    title: "Full Action Queue",
-    description: "Work through the full ranked queue with richer action context.",
-    cta: "Upgrade to Growth",
   },
   alerts_basic: {
     requiredPlan: "starter",
-    title: "Basic Alerts & Rules",
-    description: "Monitor stockout risk, dead stock, overstock, forecast risk, and reorder needs.",
+    title: "Alerts & Rules",
+    description: "Monitor stockout risk, dead stock, overstock, forecast risk, and reorder needs through email and Slack.",
     cta: "Choose Starter",
   },
   alerts_advanced: {
     requiredPlan: "growth",
-    title: "Advanced Alerts & Rules",
-    description: "Use configurable rules and alert channels for more targeted inventory monitoring.",
+    title: "Webhook alert channel",
+    description: "Send alert payloads to webhook endpoints for automation tools and internal systems.",
     cta: "Upgrade to Growth",
   },
   inventory_health_basic: {
@@ -155,12 +145,6 @@ export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
     title: "Inventory Health",
     description: "Understand stockout risk, slow movers, cash tied up, and SKU health.",
     cta: "Choose Starter",
-  },
-  inventory_health_full: {
-    requiredPlan: "growth",
-    title: "Full Inventory Health",
-    description: "Review deeper SKU health and planning context.",
-    cta: "Upgrade to Growth",
   },
   reports_basic: {
     requiredPlan: "starter",
@@ -179,12 +163,6 @@ export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
     title: "Dead Stock",
     description: "Find slow-moving inventory and prioritize recovery opportunities.",
     cta: "Choose Starter",
-  },
-  dead_stock_full: {
-    requiredPlan: "growth",
-    title: "Dead Stock Recovery",
-    description: "Use full recovery planning and exports for slow-moving inventory.",
-    cta: "Upgrade to Growth",
   },
   forecast: {
     requiredPlan: "growth",
@@ -215,12 +193,6 @@ export const PLAN_CAPABILITIES: Record<CapabilityKey, PlanCapability> = {
     title: "Supplier Insights",
     description: "Review supplier and lead-time insights when data is available.",
     cta: "Upgrade to Growth",
-  },
-  inventory_rules_basic: {
-    requiredPlan: "starter",
-    title: "Inventory Rules",
-    description: "Edit default lead time and target coverage assumptions.",
-    cta: "Choose Starter",
   },
   inventory_rules_advanced: {
     requiredPlan: "growth",
@@ -268,10 +240,10 @@ export const PRICING_TIERS: PricingTier[] = [
     limit: "Up to 500 active SKUs - 1 location - 3 seats",
     featured: false,
     features: [
-      { label: "Basic inventory alerts and Action Queue", included: true },
-      { label: "Storewide stockout and dead-stock monitoring", included: true },
-      { label: "Automatic email + Slack alerts when enabled rules match", included: true },
-      { label: "Basic alert trigger values for stockout, overstock, and dead-stock rules", included: true },
+      { label: "Full ranked Action Queue with dollar impact", included: true },
+      { label: "Inventory Health and dead-stock liquidation plans", included: true },
+      { label: "Configurable alert rules for stockout, overstock, dead stock, forecast risk, and supplier slip", included: true },
+      { label: "Automatic email + Slack alert delivery", included: true },
       { label: "Reorder recommendations from smart defaults", included: true },
       { label: "Core report previews", included: true },
       { label: "Shopify sync + Stocky and ShipStation CSV imports", included: true },
@@ -292,7 +264,6 @@ export const PRICING_TIERS: PricingTier[] = [
     featured: true,
     features: [
       { label: "Everything in Starter", included: true },
-      { label: "Configurable storewide alert rules for stockout, overstock, dead stock, forecast risk, and supplier slip", included: true },
       { label: "Webhook alert channels", included: true },
       { label: "SMS alerts (planned)", included: false },
       { label: "90-day demand forecasting with stockout probability", included: true },

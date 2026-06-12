@@ -6,6 +6,7 @@ import {
   DEMO_ALERT_CHANNELS,
   DEMO_ALERT_EVENTS,
   DEMO_ALERT_RULES,
+  DEMO_BUYING_CALENDAR,
   DEMO_BUNDLES,
   DEMO_DASHBOARD,
   DEMO_FORECASTS,
@@ -37,6 +38,7 @@ const DEMO_FIXTURES: Record<string, unknown> = {
   "/forecast": DEMO_FORECASTS,
   "/analytics/scorecards": DEMO_SCORECARDS,
   "/reorder/purchase-orders": DEMO_PURCHASE_ORDERS,
+  "/reorder/buying-calendar": DEMO_BUYING_CALENDAR,
   "/reorder": DEMO_REORDER,
   "/suppliers": DEMO_SUPPLIERS,
   "/bundles": DEMO_BUNDLES,
@@ -320,6 +322,45 @@ export type PurchaseOrderDraft = {
   receipts?: PurchaseOrderReceipt[];
 };
 
+export type BuyingCalendarLine = {
+  sku_id: string;
+  name: string;
+  qty: number;
+  unit_cost: number;
+  extended_cost: number;
+  current_on_hand: number | null;
+  reorder_point: number | null;
+  daily_velocity: number | null;
+  lead_time_days: number | null;
+};
+
+export type BuyingCalendarEvent = {
+  event_id: string;
+  vendor: string;
+  source: "recommended" | "saved";
+  status: string;
+  order_by_date: string;
+  expected_arrival_date: string;
+  days_until_order: number;
+  lead_time_days: number;
+  line_count: number;
+  total_units: number;
+  estimated_cost: number;
+  urgency: "due_now" | "this_week" | "future" | "open";
+  rationale: string;
+  lines: BuyingCalendarLine[];
+};
+
+export type BuyingCalendarResponse = {
+  generated_at: string;
+  horizon_days: number;
+  events: BuyingCalendarEvent[];
+  total_estimated_cost: number;
+  due_now_count: number;
+  future_count: number;
+  saved_open_count: number;
+};
+
 export type AuditLogEvent = {
   id: number;
   event_type: string;
@@ -561,6 +602,28 @@ export const fetchPurchaseOrders = (
     typeof shippingCostOrSignal === "number" ? maybeSignal : shippingCostOrSignal;
   return get<{ drafts: PurchaseOrderDraft[]; total_capital_required: number }>(
     `/reorder/purchase-orders?service_level=${serviceLevel}&shipping_cost=${shippingCost}`,
+    signal
+  );
+};
+
+export const fetchBuyingCalendar = (
+  serviceLevel: number,
+  shippingCostOrSignal: number | AbortSignal = 35,
+  horizonDaysOrSignal: number | AbortSignal = 180,
+  maybeSignal?: AbortSignal
+) => {
+  const shippingCost =
+    typeof shippingCostOrSignal === "number" ? shippingCostOrSignal : 35;
+  const horizonDays =
+    typeof horizonDaysOrSignal === "number" ? horizonDaysOrSignal : 180;
+  const signal =
+    typeof shippingCostOrSignal !== "number"
+      ? shippingCostOrSignal
+      : typeof horizonDaysOrSignal !== "number"
+        ? horizonDaysOrSignal
+        : maybeSignal;
+  return get<BuyingCalendarResponse>(
+    `/reorder/buying-calendar?service_level=${serviceLevel}&shipping_cost=${shippingCost}&horizon_days=${horizonDays}`,
     signal
   );
 };

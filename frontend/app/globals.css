@@ -4600,6 +4600,111 @@ code {
   gap: 8px;
 }
 
+.buying-calendar-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.buying-calendar-total {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.buying-calendar-total span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.buying-calendar-total strong {
+  color: var(--ink);
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.buying-calendar-table-wrap {
+  overflow-x: auto;
+}
+
+.buying-calendar-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.buying-calendar-table th,
+.buying-calendar-table td {
+  padding: 11px 12px;
+  text-align: left;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.buying-calendar-table thead th {
+  border-top: 0;
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.buying-calendar-table td {
+  color: var(--ink);
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.buying-calendar-table td span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.buying-calendar-status {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.buying-calendar-status-due_now {
+  background: var(--urgent-soft);
+  color: var(--urgent);
+}
+
+.buying-calendar-status-this_week {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.buying-calendar-status-future {
+  background: var(--accent-blue-soft);
+  color: var(--accent-blue);
+}
+
+.buying-calendar-status-open {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
 .empty-state-compact {
   padding: 16px;
 }

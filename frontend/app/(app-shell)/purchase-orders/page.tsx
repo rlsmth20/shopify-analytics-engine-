@@ -8,11 +8,14 @@ import { BuyListEmailCard } from "@/components/buy-list-email-card";
 import { CashPlanCard } from "@/components/cash-plan-card";
 import { GatedFeature } from "@/components/gated-feature";
 import {
+  fetchBuyingCalendar,
   currency,
   fetchPurchaseOrders,
   receivePurchaseOrder,
   savePurchaseOrder,
   updatePurchaseOrderStatus,
+  type BuyingCalendarEvent,
+  type BuyingCalendarResponse,
   type PurchaseOrderDraft,
   type PurchaseOrderLine,
 } from "@/lib/api-v2";
@@ -59,6 +62,7 @@ export default function PurchaseOrdersPage() {
 
 function PurchaseOrdersContent() {
   const [drafts, setDrafts] = useState<PurchaseOrderDraft[]>([]);
+  const [calendar, setCalendar] = useState<BuyingCalendarResponse | null>(null);
   const [total, setTotal] = useState(0);
   const [serviceLevel, setServiceLevel] = useState(0.95);
   const [shippingCost, setShippingCost] = useState(35);
@@ -79,13 +83,17 @@ function PurchaseOrdersContent() {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetchPurchaseOrders(serviceLevel, shippingCost, controller.signal)
-      .then((r) => {
+    Promise.all([
+      fetchPurchaseOrders(serviceLevel, shippingCost, controller.signal),
+      fetchBuyingCalendar(serviceLevel, shippingCost, 180, controller.signal),
+    ])
+      .then(([r, calendarResponse]) => {
         if (controller.signal.aborted) return;
         const nextDrafts = isDemoMode()
           ? mergeDemoSavedPurchaseOrders(r.drafts)
           : r.drafts;
         setDrafts(nextDrafts);
+        setCalendar(calendarResponse);
         setTotal(sumPoTotals(nextDrafts));
         setOperationError(null);
       })
@@ -103,6 +111,8 @@ function PurchaseOrdersContent() {
   const visibleSavedDrafts = filterPurchaseOrders(savedDrafts, search, quickView);
   const visibleDrafts = filterPurchaseOrders(drafts, search, quickView);
   const supplyPlan = buildSupplyPlan(visibleDrafts);
+  const visibleCalendarEvents = filterBuyingCalendarEvents(calendar?.events ?? [], search);
+  const calendarSummary = buildCalendarSummary(visibleCalendarEvents);
 
   if (error) return <p className="page-error-copy">{error}</p>;
 
@@ -170,18 +180,25 @@ function PurchaseOrdersContent() {
 
       <section className="planning-preview-grid">
         <PlanningCard
-          title="Supply Plan"
-          label="Next 90 days"
-          value={currency(supplyPlan.next90Value)}
-          note={`${supplyPlan.next90Units} recommended units across ${visibleDrafts.length} PO draft${visibleDrafts.length === 1 ? "" : "s"}`}
+          title="Buying Calendar"
+          label={`Next ${calendar?.horizon_days ?? 180} days`}
+          value={currency(calendarSummary.totalCost)}
+          note={`${calendarSummary.futureCount} future planned buy${calendarSummary.futureCount === 1 ? "" : "s"} and ${calendarSummary.dueNowCount} due this week`}
         />
         <PlanningCard
-          title="Replenishment Plan"
-          label="Next 12 months"
-          value={currency(supplyPlan.next12MonthValue)}
-          note="Projected from current reorder draft value; refine after more demand history."
+          title="Current PO Drafts"
+          label="Recommended now"
+          value={currency(supplyPlan.next90Value)}
+          note={`${supplyPlan.next90Units} recommended units across ${visibleDrafts.length} draft${visibleDrafts.length === 1 ? "" : "s"}`}
         />
       </section>
+
+      <BuyingCalendarPanel
+        events={visibleCalendarEvents}
+        loading={loading}
+        horizonDays={calendar?.horizon_days ?? 180}
+        totalCost={calendarSummary.totalCost}
+      />
 
       <section className="po-filter-panel">
         <label className="forecast-search">
@@ -633,11 +650,15 @@ function PurchaseOrdersContent() {
   );
 
   async function refresh() {
-    const r = await fetchPurchaseOrders(serviceLevel, shippingCost);
+    const [r, calendarResponse] = await Promise.all([
+      fetchPurchaseOrders(serviceLevel, shippingCost),
+      fetchBuyingCalendar(serviceLevel, shippingCost, 180),
+    ]);
     const nextDrafts = isDemoMode()
       ? mergeDemoSavedPurchaseOrders(r.drafts)
       : r.drafts;
     setDrafts(nextDrafts);
+    setCalendar(calendarResponse);
     setTotal(sumPoTotals(nextDrafts));
   }
 
@@ -1285,6 +1306,96 @@ function PurchaseOrderEditForm({
   );
 }
 
+function BuyingCalendarPanel({
+  events,
+  loading,
+  horizonDays,
+  totalCost,
+}: {
+  events: BuyingCalendarEvent[];
+  loading: boolean;
+  horizonDays: number;
+  totalCost: number;
+}) {
+  const previewEvents = events.slice(0, 8);
+  return (
+    <section className="buying-calendar-panel">
+      <div className="section-heading">
+        <div>
+          <p className="section-eyebrow">Buying calendar</p>
+          <h2>Future POs by order date</h2>
+          <p className="muted small">
+            Planned buys are projected from reorder-point timing across the next {horizonDays} days.
+            Open saved POs stay visible until they are received or cancelled.
+          </p>
+        </div>
+        <div className="buying-calendar-total">
+          <span>Total planned cost</span>
+          <strong>{currency(totalCost)}</strong>
+        </div>
+      </div>
+      {loading ? (
+        <p className="page-loading">Building buying calendar...</p>
+      ) : previewEvents.length > 0 ? (
+        <div className="buying-calendar-table-wrap">
+          <table className="buying-calendar-table">
+            <thead>
+              <tr>
+                <th>Buy by</th>
+                <th>Supplier</th>
+                <th>Status</th>
+                <th>Arrives</th>
+                <th>Lines</th>
+                <th>Units</th>
+                <th>Cost</th>
+                <th>Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              {previewEvents.map((event) => (
+                <tr key={event.event_id}>
+                  <td>
+                    <strong>{formatCalendarDate(event.order_by_date)}</strong>
+                    <span>{formatOrderTiming(event)}</span>
+                  </td>
+                  <td>{event.vendor}</td>
+                  <td>
+                    <span className={`buying-calendar-status buying-calendar-status-${event.urgency}`}>
+                      {formatCalendarStatus(event)}
+                    </span>
+                    <span>{event.source === "saved" ? formatPoStatus(event.status as PurchaseOrderDraft["status"]) : "planned"}</span>
+                  </td>
+                  <td>{formatCalendarDate(event.expected_arrival_date)}</td>
+                  <td>
+                    <strong>{event.line_count}</strong>
+                    <span>{formatCalendarLinePreview(event)}</span>
+                  </td>
+                  <td>{event.total_units}</td>
+                  <td>{currency(event.estimated_cost)}</td>
+                  <td>{event.rationale}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="empty-state empty-state-compact">
+          <p className="empty-state-title">No planned buys in this horizon</p>
+          <p className="empty-state-copy">
+            SKUs with demand are still above their reorder point for the selected window.
+          </p>
+        </div>
+      )}
+      {!loading && events.length > previewEvents.length ? (
+        <p className="muted small">
+          Showing the next {previewEvents.length} calendar events. Use search to narrow by supplier,
+          product, or SKU.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function PlanningCard({
   title,
   label,
@@ -1339,6 +1450,74 @@ function filterPurchaseOrders(
     }
     return true;
   });
+}
+
+function filterBuyingCalendarEvents(
+  events: BuyingCalendarEvent[],
+  search: string,
+): BuyingCalendarEvent[] {
+  const needle = search.trim().toLowerCase();
+  if (!needle) return events;
+  return events.filter((event) =>
+    [
+      event.vendor,
+      event.status,
+      event.rationale,
+      ...event.lines.flatMap((line) => [line.name, line.sku_id]),
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(needle)
+  );
+}
+
+function buildCalendarSummary(events: BuyingCalendarEvent[]): {
+  totalCost: number;
+  dueNowCount: number;
+  futureCount: number;
+} {
+  return {
+    totalCost: roundCurrency(events.reduce((sum, event) => sum + event.estimated_cost, 0)),
+    dueNowCount: events.filter((event) => event.urgency === "due_now" || event.urgency === "this_week").length,
+    futureCount: events.filter((event) => event.urgency === "future").length,
+  };
+}
+
+function formatCalendarDate(value: string): string {
+  const parsed = parseDateOnly(value);
+  if (!parsed) return "Date unavailable";
+  return parsed.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatOrderTiming(event: BuyingCalendarEvent): string {
+  if (event.urgency === "open") {
+    if (event.days_until_order < 0) {
+      const daysAgo = Math.abs(event.days_until_order);
+      return `Ordered ${daysAgo} day${daysAgo === 1 ? "" : "s"} ago`;
+    }
+    return "Open PO";
+  }
+  if (event.days_until_order <= 0) return "Order now";
+  if (event.days_until_order === 1) return "Tomorrow";
+  return `${event.days_until_order} days out`;
+}
+
+function formatCalendarStatus(event: BuyingCalendarEvent): string {
+  if (event.urgency === "open") return "Open PO";
+  if (event.urgency === "due_now") return "Due now";
+  if (event.urgency === "this_week") return "This week";
+  return "Future";
+}
+
+function formatCalendarLinePreview(event: BuyingCalendarEvent): string {
+  const names = event.lines.slice(0, 2).map((line) => line.name);
+  if (event.lines.length > 2) {
+    names.push(`+${event.lines.length - 2} more`);
+  }
+  return names.join(", ");
 }
 
 function buildSupplyPlan(drafts: PurchaseOrderDraft[]): {

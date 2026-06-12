@@ -326,6 +326,45 @@ class PurchaseOrderDraftsResponse(ApiModel):
     total_capital_required: float
 
 
+class BuyingCalendarLine(ApiModel):
+    sku_id: str
+    name: str
+    qty: int
+    unit_cost: float
+    extended_cost: float
+    current_on_hand: int | None = None
+    reorder_point: float | None = None
+    daily_velocity: float | None = None
+    lead_time_days: int | None = None
+
+
+class BuyingCalendarEvent(ApiModel):
+    event_id: str
+    vendor: str
+    source: Literal["recommended", "saved"]
+    status: str
+    order_by_date: str
+    expected_arrival_date: str
+    days_until_order: int
+    lead_time_days: int
+    line_count: int
+    total_units: int
+    estimated_cost: float
+    urgency: Literal["due_now", "this_week", "future", "open"]
+    rationale: str
+    lines: list[BuyingCalendarLine]
+
+
+class BuyingCalendarResponse(ApiModel):
+    generated_at: datetime
+    horizon_days: int
+    events: list[BuyingCalendarEvent]
+    total_estimated_cost: float
+    due_now_count: int
+    future_count: int
+    saved_open_count: int
+
+
 class SavePurchaseOrderRequest(ApiModel):
     draft: PurchaseOrderDraft
 

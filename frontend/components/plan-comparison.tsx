@@ -92,8 +92,8 @@ export function PlanComparison() {
         </table>
       </div>
       <p className="plan-matrix-footnote">
-        Basic = core version included; the full version unlocks on the next tier up. Every plan
-        starts with a 14-day free trial.
+        Basic = report previews only; Growth unlocks filtering and Excel exports. Planned marks
+        features not shipped yet. Every plan starts with a 14-day free trial.
       </p>
     </section>
   );

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,6 +8,7 @@ from app.api.deps import require_plan_feature
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import (
+    BuyingCalendarResponse,
     CashPlanResponse,
     CashPlanVendor,
     PurchaseOrderDraftsResponse,
@@ -15,6 +17,7 @@ from app.schemas_v2 import (
     ReorderFeedResponse,
     SavePurchaseOrderRequest,
 )
+from app.services.buying_calendar import build_buying_calendar_events
 from app.services.purchase_orders import build_purchase_order_drafts
 from app.services.purchase_order_records import (
     list_saved_purchase_orders,
@@ -76,6 +79,45 @@ def list_reorder_suggestions(
         suggestions=suggestions,
         total_extended_cost=round(sum(s.landed_extended_cost for s in suggestions), 2),
         vendor_totals=totals,
+    )
+
+
+@router.get("/buying-calendar", response_model=BuyingCalendarResponse)
+def read_buying_calendar(
+    user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
+    db: Annotated[DbSession, Depends(get_db_session)],
+    service_level: float = Query(0.95, ge=0.80, le=0.999),
+    shipping_cost: float = Query(35.0, ge=0.0, le=10000.0),
+    horizon_days: int = Query(180, ge=30, le=365),
+) -> BuyingCalendarResponse:
+    skus = load_skus_for_shop(db, user.shop_id)
+    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    if settings is None:
+        settings = build_default_shop_settings()
+    histories = load_daily_history_for_shop_skus(
+        db,
+        user.shop_id,
+        [sku.sku_id for sku in skus],
+        90,
+    )
+    saved = list_saved_purchase_orders(db, user.shop_id)
+    events = build_buying_calendar_events(
+        skus,
+        lambda sku_id: histories.get(sku_id, []),
+        lead_time_config=settings.to_lead_time_config(),
+        saved_purchase_orders=saved,
+        service_level=service_level,
+        order_cost=shipping_cost,
+        horizon_days=horizon_days,
+    )
+    return BuyingCalendarResponse(
+        generated_at=datetime.now(timezone.utc),
+        horizon_days=horizon_days,
+        events=events,
+        total_estimated_cost=round(sum(event.estimated_cost for event in events), 2),
+        due_now_count=sum(1 for event in events if event.urgency in {"due_now", "this_week"}),
+        future_count=sum(1 for event in events if event.urgency == "future"),
+        saved_open_count=sum(1 for event in events if event.source == "saved"),
     )
 
 
