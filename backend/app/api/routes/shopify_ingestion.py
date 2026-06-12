@@ -16,8 +16,11 @@ from app.services.shopify_oauth import (
     get_or_create_embedded_user_for_shop,
     is_configured,
     issue_oauth_state,
+    missing_required_scopes,
     normalize_shop_domain,
     persist_connection,
+    READ_ORDERS_RECONNECT_MESSAGE,
+    REQUIRED_SCOPES,
     verify_callback_hmac,
 )
 
@@ -130,12 +133,23 @@ def my_connection(
             "shopify_domain": None,
             "last_sync_at": None,
             "scope": None,
+            "required_scopes": list(REQUIRED_SCOPES),
+            "missing_required_scopes": list(REQUIRED_SCOPES),
+            "has_read_orders": False,
+            "reconnect_message": READ_ORDERS_RECONNECT_MESSAGE,
         }
+    missing = missing_required_scopes(conn.scope)
     return {
         "connected": True,
         "shopify_domain": conn.shopify_domain,
         "last_sync_at": conn.last_sync_at.isoformat() if conn.last_sync_at else None,
         "scope": conn.scope,
+        "required_scopes": list(REQUIRED_SCOPES),
+        "missing_required_scopes": missing,
+        "has_read_orders": "read_orders" not in missing,
+        "reconnect_message": READ_ORDERS_RECONNECT_MESSAGE
+        if "read_orders" in missing
+        else None,
     }
 
 

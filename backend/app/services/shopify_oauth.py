@@ -31,7 +31,11 @@ from app.db.models import Shop, ShopifyConnection, User
 logger = logging.getLogger(__name__)
 
 
-SCOPES = "read_products,read_inventory,read_orders,read_locations"
+REQUIRED_SCOPES = ("read_products", "read_inventory", "read_orders", "read_locations")
+SCOPES = ",".join(REQUIRED_SCOPES)
+READ_ORDERS_RECONNECT_MESSAGE = (
+    "Reconnect Shopify to approve the updated order access scope."
+)
 
 FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 
@@ -64,6 +68,15 @@ class OAuthStateResolution:
 
 def is_configured() -> bool:
     return bool(os.getenv("SHOPIFY_CLIENT_ID") and os.getenv("SHOPIFY_CLIENT_SECRET"))
+
+
+def parse_shopify_scopes(scope: str | None) -> set[str]:
+    return {item.strip() for item in (scope or "").split(",") if item.strip()}
+
+
+def missing_required_scopes(scope: str | None) -> list[str]:
+    granted = parse_shopify_scopes(scope)
+    return [scope_name for scope_name in REQUIRED_SCOPES if scope_name not in granted]
 
 
 def normalize_shop_domain(shop: str) -> Optional[str]:
@@ -349,6 +362,13 @@ def persist_connection(
         shop.shopify_domain = shop_domain
     db.commit()
     db.refresh(existing)
+    missing = missing_required_scopes(existing.scope)
+    logger.info(
+        "shopify_oauth_connection_saved shop=%s has_read_orders=%s missing_scopes=%s",
+        shop_domain,
+        "read_orders" not in missing,
+        missing,
+    )
     return existing
 
 

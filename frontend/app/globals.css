@@ -821,6 +821,12 @@ code {
   color: var(--success);
 }
 
+.status-partial {
+  background: #fff7ed;
+  border-color: rgba(234, 88, 12, 0.18);
+  color: #9a3412;
+}
+
 .status-failed {
   background: var(--critical-soft);
   border-color: rgba(217, 45, 32, 0.16);

@@ -80,6 +80,9 @@ export function buildSyncRunSummary(syncRun: ShopifySyncRun): string {
   if (syncRun.status === "failed") {
     return "The most recent Shopify ingest failed";
   }
+  if (syncRun.status === "partial") {
+    return "The most recent Shopify ingest partially succeeded";
+  }
 
   return "The most recent Shopify ingest succeeded";
 }
@@ -119,6 +122,9 @@ export function summarizeSyncStatus(
   }
   if (latestRun.status === "failed") {
     return "Failed";
+  }
+  if (latestRun.status === "partial") {
+    return "Partial";
   }
 
   return "Succeeded";
