@@ -69,6 +69,7 @@ def current_shopify_subscription_summary(db: DbSession, *, user: User) -> dict:
             "shopify_installed": False,
         }
 
+    _refresh_token_if_needed(db, conn)
     try:
         active = _fetch_active_subscription(conn)
     except ShopifyBillingAuthError:
@@ -137,6 +138,7 @@ def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:
         raise RuntimeError("No active Shopify connection for this workspace.")
     if plan not in SHOPIFY_PLAN_AMOUNTS:
         raise RuntimeError(f"Unknown Shopify billing plan '{plan}'.")
+    _refresh_token_if_needed(db, conn)
 
     return_url = _return_url(conn.shopify_domain)
     variables = {
@@ -180,6 +182,13 @@ def _is_partner_development_shop(conn: ShopifyConnection) -> bool:
         return False
     plan = (((payload.get("data") or {}).get("shop") or {}).get("plan")) or {}
     return bool(plan.get("partnerDevelopment"))
+
+
+def _refresh_token_if_needed(db: DbSession, conn: ShopifyConnection) -> None:
+    """Renew the expiring access token in place before talking to Shopify."""
+    from app.services.shopify_oauth import ensure_fresh_access_token
+
+    ensure_fresh_access_token(db, conn)
 
 
 def _connection_for_shop(db: DbSession, *, shop_id: int) -> ShopifyConnection | None:

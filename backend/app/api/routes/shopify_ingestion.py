@@ -96,8 +96,7 @@ def callback(
         db,
         shop_id=user.shop_id,
         shop_domain=shop_domain,
-        access_token=payload["access_token"],
-        scope=payload.get("scope", ""),
+        token_payload=payload,
     )
 
     # Send the merchant back into the embedded app when OAuth started from

@@ -203,6 +203,10 @@ def exchange_code_for_token(*, shop_domain: str, code: str) -> Optional[dict]:
         "client_id": api_key,
         "client_secret": api_secret,
         "code": code,
+        # Shopify no longer accepts non-expiring offline tokens on the Admin
+        # API. expiring=1 yields a ~1h access token plus a 90-day refresh
+        # token (rotated on every refresh by ensure_fresh_access_token).
+        "expiring": "1",
     }).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -223,13 +227,103 @@ def exchange_code_for_token(*, shop_domain: str, code: str) -> Optional[dict]:
         return None
 
 
+def _expiry_from_seconds(seconds: object) -> datetime | None:
+    try:
+        ttl = int(seconds)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if ttl <= 0:
+        return None
+    return datetime.now(timezone.utc) + timedelta(seconds=ttl)
+
+
+def apply_token_payload(conn: ShopifyConnection, payload: dict) -> None:
+    """Copy token fields from a Shopify token-grant response onto the row.
+
+    Used for both the initial code exchange and refresh-token grants. Shopify
+    rotates the refresh token on every refresh, so keep the old one only if
+    the response omits it.
+    """
+    conn.access_token = payload["access_token"]
+    conn.access_token_expires_at = _expiry_from_seconds(payload.get("expires_in"))
+    new_refresh = payload.get("refresh_token")
+    if new_refresh:
+        conn.refresh_token = str(new_refresh)
+        conn.refresh_token_expires_at = _expiry_from_seconds(
+            payload.get("refresh_token_expires_in")
+        )
+
+
+def ensure_fresh_access_token(db: DbSession, conn: ShopifyConnection) -> str:
+    """Return a usable access token, refreshing via the refresh token if needed.
+
+    Legacy connections (no expiry recorded) are returned as-is — Shopify will
+    reject them with 403 and the caller's error message tells the merchant to
+    reconnect, which mints an expiring token pair.
+    """
+    if conn.access_token_expires_at is None or not conn.refresh_token:
+        return conn.access_token
+
+    expires_at = conn.access_token_expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at - datetime.now(timezone.utc) > timedelta(seconds=120):
+        return conn.access_token
+
+    api_key = os.getenv("SHOPIFY_CLIENT_ID", "")
+    api_secret = os.getenv("SHOPIFY_CLIENT_SECRET", "")
+    if not api_key or not api_secret:
+        return conn.access_token
+
+    url = f"https://{conn.shopify_domain}/admin/oauth/access_token"
+    body = urlencode({
+        "client_id": api_key,
+        "client_secret": api_secret,
+        "grant_type": "refresh_token",
+        "refresh_token": conn.refresh_token,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            import json as _json
+            payload = _json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:300]
+        except Exception:
+            detail = "<unavailable>"
+        logger.error(
+            "Shopify token refresh failed for %s: %s %s body=%s",
+            conn.shopify_domain, exc.code, exc.reason, detail,
+        )
+        return conn.access_token
+    except Exception:
+        logger.exception("Shopify token refresh failed for %s", conn.shopify_domain)
+        return conn.access_token
+
+    if not payload.get("access_token"):
+        logger.error(
+            "Shopify token refresh for %s returned no access_token", conn.shopify_domain
+        )
+        return conn.access_token
+
+    apply_token_payload(conn, payload)
+    db.commit()
+    logger.info("Refreshed Shopify access token for %s", conn.shopify_domain)
+    return conn.access_token
+
+
 def persist_connection(
     db: DbSession,
     *,
     shop_id: int,
     shop_domain: str,
-    access_token: str,
-    scope: str,
+    token_payload: dict,
 ) -> ShopifyConnection:
     """Insert or update the ShopifyConnection row for a workspace shop."""
     existing = db.scalar(
@@ -239,15 +333,15 @@ def persist_connection(
         existing = ShopifyConnection(
             shop_id=shop_id,
             shopify_domain=shop_domain,
-            access_token=access_token,
-            scope=scope,
+            access_token=token_payload["access_token"],
+            scope=str(token_payload.get("scope") or ""),
         )
         db.add(existing)
     else:
         existing.shopify_domain = shop_domain
-        existing.access_token = access_token
-        existing.scope = scope
+        existing.scope = str(token_payload.get("scope") or "")
         existing.uninstalled_at = None
+    apply_token_payload(existing, token_payload)
     # Update the Shop's domain to match the merchant's actual domain so the
     # placeholder synthetic domain gets replaced once they connect.
     shop = db.get(Shop, shop_id)

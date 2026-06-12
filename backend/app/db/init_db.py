@@ -182,6 +182,18 @@ def run_safe_migrations() -> None:
                     "CREATE INDEX IF NOT EXISTS ix_report_schedule_records_shop_id "
                     "ON report_schedule_records (shop_id)"
                 ))
+                conn.execute(text(
+                    "ALTER TABLE shopify_connections ADD COLUMN IF NOT EXISTS "
+                    "access_token_expires_at TIMESTAMP WITH TIME ZONE"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE shopify_connections ADD COLUMN IF NOT EXISTS "
+                    "refresh_token VARCHAR(500)"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE shopify_connections ADD COLUMN IF NOT EXISTS "
+                    "refresh_token_expires_at TIMESTAMP WITH TIME ZONE"
+                ))
             else:
                 # SQLite: check column existence via PRAGMA before adding.
                 result = conn.execute(text("PRAGMA table_info(purchase_orders)"))
@@ -298,6 +310,18 @@ def run_safe_migrations() -> None:
                     "CREATE INDEX IF NOT EXISTS ix_report_schedule_records_shop_id "
                     "ON report_schedule_records (shop_id)"
                 ))
+                result = conn.execute(text("PRAGMA table_info(shopify_connections)"))
+                connection_columns = {row[1] for row in result}
+                sqlite_connection_columns = {
+                    "access_token_expires_at": "TIMESTAMP",
+                    "refresh_token": "VARCHAR(500)",
+                    "refresh_token_expires_at": "TIMESTAMP",
+                }
+                for column_name, column_type in sqlite_connection_columns.items():
+                    if column_name not in connection_columns:
+                        conn.execute(text(
+                            f"ALTER TABLE shopify_connections ADD COLUMN {column_name} {column_type}"
+                        ))
             conn.commit()
         except Exception:
             logger.exception("Safe migration failed (non-fatal if column already exists)")

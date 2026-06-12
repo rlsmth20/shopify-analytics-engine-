@@ -35,7 +35,15 @@ PROTECTED_DATA_HELP = (
     "Shopify denied access to order data (403). The app needs 'Protected "
     "customer data' access approved in the Shopify Partner Dashboard "
     "(Apps -> skubase -> API access -> Protected customer data: select "
-    "order-level data only). Products and inventory still synced."
+    "order-level data only)."
+)
+
+# Shopify retired non-expiring offline tokens in June 2026; stores connected
+# before the cutover hold a token Shopify now rejects with 403 on every call.
+LEGACY_TOKEN_HELP = (
+    "Shopify retired this store's old-style access token (403). Click "
+    "Reconnect to re-authorize skubase - the new connection uses Shopify's "
+    "expiring tokens and renews itself automatically."
 )
 
 
@@ -358,10 +366,16 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
     db.commit()
     db.refresh(run)
 
+    # Access tokens expire after ~1h; renew through the refresh token before
+    # the sync so a long-lived connection keeps working unattended.
+    from app.services.shopify_oauth import ensure_fresh_access_token
+
+    token = ensure_fresh_access_token(db, conn)
+
     started_at = datetime.now(timezone.utc)
     try:
         products_count = _ingest_products(
-            db, shop_id=shop_id, domain=conn.shopify_domain, token=conn.access_token
+            db, shop_id=shop_id, domain=conn.shopify_domain, token=token
         )
     except Exception as exc:
         run.status = "failed"
@@ -378,10 +392,10 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
     orders_error: str | None = None
     try:
         line_items_count = _ingest_orders(
-            db, shop_id=shop_id, domain=conn.shopify_domain, token=conn.access_token
+            db, shop_id=shop_id, domain=conn.shopify_domain, token=token
         )
     except Exception as exc:
-        orders_error = _friendly_sync_error(exc)
+        orders_error = _friendly_sync_error(exc) + " Products and inventory still synced."
         logger.exception("Shopify order sync failed for shop_id=%s", shop_id)
 
     run.products_count = products_count
@@ -412,6 +426,8 @@ def _friendly_sync_error(exc: Exception) -> str:
             exc.code, exc.reason, body_preview,
         )
         if exc.code == 403:
+            if "non-expiring access tokens" in body_preview.lower():
+                return LEGACY_TOKEN_HELP
             return PROTECTED_DATA_HELP
         if exc.code == 401:
             return (
