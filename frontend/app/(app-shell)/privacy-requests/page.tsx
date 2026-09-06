@@ -64,8 +64,8 @@ export default function PrivacyRequestsPage() {
         {error ? <p className="auth-error" role="alert">{error}</p> : null}
         {loading ? <p role="status">Loading requests…</p> : items.length === 0 && !error ? <p className="section-copy">No customer data requests have been received for this store.</p> : null}
         {!loading && items.length > 0 ? (
-          <div className="table-wrapper">
-            <table>
+          <div className="lead-time-table-wrap">
+            <table className="lead-time-table">
               <thead><tr><th scope="col">Request</th><th scope="col">Received</th><th scope="col">Requested orders</th><th scope="col">Export</th></tr></thead>
               <tbody>{items.map((item) => (
                 <tr key={item.id}>

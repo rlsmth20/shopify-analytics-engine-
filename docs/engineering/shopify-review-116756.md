@@ -86,7 +86,7 @@ From `backend/`, install test dependencies with
 python -m unittest discover -s tests -v
 ```
 
-52 tests passed, using synthetic credentials, mocked Shopify responses, and
+57 tests passed, using synthetic credentials, mocked Shopify responses, and
 isolated in-memory SQLite. Coverage includes fresh install, reinstall, expiry,
 parallel first requests, failed grants, callback workspace isolation, malformed
 tokens, staff privileges, nested pagination, repeat-sync idempotence, throttling,
@@ -145,6 +145,15 @@ access exports, delayed-webhook reinstall protection, and nine privacy tests.
 Settings tolerate blocked local storage. Signup and configuration no longer ask
 merchants to enter a Shopify domain. Privacy disclosures now describe actual
 retained order fields, hosting, billing, email, and optional AI processors.
+The retired Stripe webhook now rejects unsigned requests even if Stripe
+configuration is missing; five regression tests cover real signature validation
+and protection against unauthorized subscription activation.
+
+Commit `5d7cc9a` deployed successfully to Vercel and Railway. The live privacy
+page returns HTTP 200 and includes the updated processor and access-request
+disclosures. The billing signature repair is included in the subsequent commit.
+Both production customer-access list and individual-download endpoints return
+HTTP 401 without authentication.
 
 ## Deployment notes and remaining verification
 

@@ -1,8 +1,8 @@
 """Stripe billing — Checkout sessions, webhook handlers, Customer Portal.
 
-Designed to fail closed: if STRIPE_SECRET_KEY isn't set, all billing routes
-return 503 with a clear message. The webhook handler verifies signatures
-when STRIPE_WEBHOOK_SECRET is configured.
+Billing actions require Stripe configuration. Webhook events are accepted
+only after SDK verification with STRIPE_WEBHOOK_SECRET; missing configuration
+never enables unsigned events, including in development.
 """
 from __future__ import annotations
 
@@ -370,16 +370,14 @@ def handle_webhook_event(db: DbSession, *, event: dict) -> None:
 
 def verify_webhook_signature(*, payload: bytes, signature_header: str) -> Optional[dict]:
     """Verify the Stripe-Signature header. Returns the event dict or None."""
-    secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    secret = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+    if not secret or not signature_header:
+        logger.warning("Stripe webhook rejected: signing secret or signature missing")
+        return None
     stripe = _stripe()
-    if stripe is None or not secret:
-        # In dev / when secret isn't set, accept the payload as-is for testing.
-        # Production should always have STRIPE_WEBHOOK_SECRET set.
-        try:
-            import json
-            return json.loads(payload.decode("utf-8"))
-        except Exception:
-            return None
+    if stripe is None:
+        logger.warning("Stripe webhook rejected: Stripe SDK is not configured")
+        return None
     try:
         return stripe.Webhook.construct_event(payload, signature_header, secret)
     except Exception as exc:
