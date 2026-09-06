@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
       <article className="blog-article">
         <p className="blog-article-meta">
-          <time dateTime="2026-04-25">Last updated: April 25, 2026</time>
+          <time dateTime="2026-09-06">Last updated: September 6, 2026</time>
         </p>
         <h1 className="blog-article-title">Privacy Policy</h1>
         <p className="blog-article-lead">
@@ -33,11 +33,18 @@ export default function PrivacyPage() {
         <h2 className="blog-article-h2">What we collect</h2>
         <p>
           When you start a free trial or create an account we collect:
-          your email address, optional Shopify domain, and the source page you
+          your email address and the source page you
           signed up from. When you connect a Shopify store we collect: product
-          catalog, inventory levels, vendor records, and order history
+          catalog, inventory levels, vendor names, and order line-item history
           necessary to compute reorder recommendations. When you upload a
           ShipStation or Stocky CSV, we ingest only the rows in that file.
+        </p>
+        <p>
+          Shopify order imports retain order and line-item identifiers, product
+          references, quantities, prices, and order dates. They do not request
+          customer names, customer email addresses, phone numbers, or delivery
+          addresses. We also store your app account and Shopify connection details
+          to authenticate access to your workspace.
         </p>
         <p>
           Server logs include standard request metadata (IP, user agent,
@@ -63,18 +70,27 @@ export default function PrivacyPage() {
         <ul className="blog-article-ul">
           <li><strong>Vercel</strong> — frontend hosting, analytics, speed insights.</li>
           <li><strong>Railway</strong> — backend hosting and managed PostgreSQL.</li>
-          <li><strong>Shopify</strong> — source of catalog, inventory, and order data when you connect a store.</li>
-          <li><strong>Resend</strong> — transactional email delivery (magic-link sign-in).</li>
-          <li><strong>Stripe</strong> — payment processing for paid subscriptions.</li>
+          <li><strong>Shopify</strong> — store data, embedded authentication, and billing for Shopify app subscriptions.</li>
+          <li><strong>Resend</strong> — sign-in, support, and configured notification email delivery.</li>
+          <li><strong>OpenAI</strong> — when AI responses are enabled, Ask Skubase sends your question, recent conversation, store domain, and relevant inventory metrics to generate an answer. Shopify customer profiles are not included in this context.</li>
+          <li><strong>Stripe</strong> — servicing legacy subscriptions created before Shopify billing was adopted; new app subscriptions use Shopify billing.</li>
         </ul>
 
         <h2 className="blog-article-h2">Retention and deletion</h2>
         <p>
           You can delete your account and associated data at any time by
           emailing <a href="mailto:hello@skubase.io">hello@skubase.io</a>.
-          We will purge your data from production within 30 days. Backups
-          are encrypted and rotated within 90 days. Aggregated, anonymized
+          We will purge your data from production within 30 days. Aggregated, anonymized
           metrics may be retained for service operation.
+        </p>
+        <p>
+          Shopify privacy requests are processed for the store that issued them.
+          Customer redaction removes matching retained order records; shop redaction
+          removes the uninstalled workspace and its associated production records.
+          Customer access requests are available to the merchant under Privacy Requests
+          in the app. Uninstalling revokes access immediately; Shopify sends the shop
+          redaction request separately. Delayed requests for an earlier installation
+          do not erase a subsequently reinstalled workspace.
         </p>
 
         <h2 className="blog-article-h2">Your rights</h2>
@@ -90,17 +106,19 @@ export default function PrivacyPage() {
         <h2 className="blog-article-h2">Cookies and storage</h2>
         <p>
           We use the minimum browser storage required to operate the
-          service: a small amount of localStorage to remember your shop
-          domain on the dashboard, and standard session cookies once
-          authentication is in place. We do not use third-party advertising
+          service. Embedded Shopify access uses short-lived Shopify session tokens
+          and does not require third-party cookies. Browser storage can remember
+          interface preferences; standalone website sign-in uses a session cookie.
+          We do not use third-party advertising
           cookies.
         </p>
 
         <h2 className="blog-article-h2">Security</h2>
         <p>
-          Data in transit is encrypted via TLS. Database snapshots are
-          encrypted at rest. Shopify access tokens are stored encrypted.
-          Internal access is limited to a small founder team and logged.
+          Data in transit is encrypted via TLS. Shopify connection tokens are kept
+          on the backend and are not sent to the browser. Access to store records
+          is scoped to the authenticated workspace. Contact us for further details
+          about hosting safeguards and data retention.
         </p>
 
         <h2 className="blog-article-h2">Changes</h2>

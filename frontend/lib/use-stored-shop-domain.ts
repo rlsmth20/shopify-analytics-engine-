@@ -9,9 +9,12 @@ export function useStoredShopDomain() {
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
-    const storedValue = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
-    if (storedValue) {
-      setShopifyDomain(storedValue);
+    try {
+      const storedValue = window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
+      if (storedValue) setShopifyDomain(storedValue);
+    } catch {
+      // Storage is optional in embedded/incognito sessions. The settings API
+      // resolves the authenticated workspace even without a remembered domain.
     }
     setHasHydrated(true);
   }, []);
@@ -21,13 +24,16 @@ export function useStoredShopDomain() {
       return;
     }
 
-    const normalizedDomain = shopifyDomain.trim();
-    if (!normalizedDomain) {
-      window.localStorage.removeItem(SHOPIFY_DOMAIN_STORAGE_KEY);
-      return;
+    try {
+      const normalizedDomain = shopifyDomain.trim();
+      if (!normalizedDomain) {
+        window.localStorage.removeItem(SHOPIFY_DOMAIN_STORAGE_KEY);
+        return;
+      }
+      window.localStorage.setItem(SHOPIFY_DOMAIN_STORAGE_KEY, normalizedDomain);
+    } catch {
+      // A blocked preference write must not prevent loading or saving rules.
     }
-
-    window.localStorage.setItem(SHOPIFY_DOMAIN_STORAGE_KEY, normalizedDomain);
   }, [hasHydrated, shopifyDomain]);
 
   return {

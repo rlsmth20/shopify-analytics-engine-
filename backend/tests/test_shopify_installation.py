@@ -86,6 +86,7 @@ class InstallationTests(unittest.TestCase):
         with self.sessions() as db:
             conn = db.scalar(select(ShopifyConnection))
             conn.access_token = ""
+            conn.installed_at = datetime.now(timezone.utc) - timedelta(days=10)
             conn.uninstalled_at = datetime.now(timezone.utc)
             db.commit()
         result = self.me()
@@ -95,6 +96,18 @@ class InstallationTests(unittest.TestCase):
         with self.sessions() as db:
             self.assertEqual(db.scalar(select(func.count()).select_from(Shop)), 1)
             self.assertIsNone(db.scalar(select(ShopifyConnection)).uninstalled_at)
+            installed_at = db.scalar(select(ShopifyConnection)).installed_at.replace(tzinfo=timezone.utc)
+            self.assertLess(datetime.now(timezone.utc) - installed_at, timedelta(minutes=1))
+
+    def test_refresh_preserves_installation_timestamp(self):
+        self.me()
+        with self.sessions() as db:
+            conn = db.scalar(select(ShopifyConnection))
+            original = datetime.now(timezone.utc) - timedelta(days=10)
+            conn.installed_at = original
+            db.commit()
+            persist_connection(db, shop_id=conn.shop_id, shop_domain=DOMAIN, token_payload=GRANT.copy())
+            self.assertEqual(conn.installed_at.replace(tzinfo=None), original.replace(tzinfo=None))
 
     def test_expired_api_token_renews_from_current_shopify_session(self):
         self.me()

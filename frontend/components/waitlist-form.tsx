@@ -21,7 +21,6 @@ export function WaitlistForm({
   className = "",
 }: Props) {
   const [email, setEmail] = useState("");
-  const [domain, setDomain] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -40,7 +39,6 @@ export function WaitlistForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
-          shopify_domain: domain.trim() || null,
         }),
       });
       const body = await res.json().catch(() => null);
@@ -49,7 +47,6 @@ export function WaitlistForm({
       }
       setSuccess(true);
       setEmail("");
-      setDomain("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -83,15 +80,6 @@ export function WaitlistForm({
           disabled={submitting}
           required
           aria-label="Email"
-        />
-        <input
-          type="text"
-          className="input-control waitlist-input"
-          placeholder="yourshop.myshopify.com (optional)"
-          value={domain}
-          onChange={(e) => setDomain(e.target.value)}
-          disabled={submitting}
-          aria-label="Shopify domain"
         />
         <button
           type="submit"

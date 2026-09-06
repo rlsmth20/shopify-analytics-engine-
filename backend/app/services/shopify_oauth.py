@@ -418,6 +418,8 @@ def persist_connection(
     else:
         existing.shopify_domain = shop_domain
         existing.scope = str(token_payload.get("scope") or "")
+        if existing.uninstalled_at is not None:
+            existing.installed_at = datetime.now(timezone.utc)
         existing.uninstalled_at = None
     apply_token_payload(existing, token_payload)
     # Update the Shop's domain to match the merchant's actual domain so the

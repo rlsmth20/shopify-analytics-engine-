@@ -39,8 +39,8 @@ export function SyncStatusCard({
   if (!status) {
     return (
       <EmptyState
-        title="No store selected"
-        description="Add a Shopify domain on the Store Sync page to track the latest ingestion run."
+        title="No store connected"
+        description="Open Store Sync to connect through Shopify and view the latest sync."
       />
     );
   }

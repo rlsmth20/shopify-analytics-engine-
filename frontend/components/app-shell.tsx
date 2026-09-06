@@ -42,12 +42,18 @@ const navigationItems: NavItem[] = [
   { href: "/lead-time-settings", label: "Inventory Rules", section: "Settings", icon: "IR", minTier: "growth" },
   { href: "/billing", label: "Billing", section: "Settings", icon: "BL" },
   { href: "/account", label: "Account", section: "Settings", icon: "AC" },
+  { href: "/privacy-requests", label: "Privacy Requests", section: "Settings", icon: "PR" },
   { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "CF" }
 ];
 
 type PageMeta = { eyebrow: string; title: string; description: string };
 
 const pageMeta: Record<string, PageMeta> = {
+  "/privacy-requests": {
+    eyebrow: "Settings",
+    title: "Privacy requests",
+    description: "Review customer data requests sent by Shopify and export the matching retained records."
+  },
   "/dashboard": {
     eyebrow: "Command",
     title: "Dashboard",

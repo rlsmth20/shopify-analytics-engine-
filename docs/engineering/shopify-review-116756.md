@@ -86,7 +86,7 @@ From `backend/`, install test dependencies with
 python -m unittest discover -s tests -v
 ```
 
-42 tests passed, using synthetic credentials, mocked Shopify responses, and
+52 tests passed, using synthetic credentials, mocked Shopify responses, and
 isolated in-memory SQLite. Coverage includes fresh install, reinstall, expiry,
 parallel first requests, failed grants, callback workspace isolation, malformed
 tokens, staff privileges, nested pagination, repeat-sync idempotence, throttling,
@@ -132,10 +132,19 @@ Repeating the deployed sync at 13:53:29 returned the same 26 scanned / 19 eligib
 variants, seven exclusions, zero eligible orders, and no further retired inventory.
 
 A one-item developer draft was prepared to verify a current paid order. Automatic
-approval review blocked marking the $749.95 development draft as paid; the
-specific authorization request is pending. No payment status, charge, invoice,
-or customer message was issued. Do not treat the automated paid-order tests as a
-completed live paid-order check or this pass as Shopify approval.
+approval review initially blocked marking the $749.95 development draft as paid.
+The user subsequently authorized completing the test and submission. The old
+browser connection then stopped responding; the replacement browser currently
+requires Shopify Partners login. The live paid-order test and resubmission remain
+pending that login. No charge, invoice, or customer message was issued. Do not
+treat automated paid-order tests as a completed live paid-order check or Shopify
+approval.
+
+The final code review added transactional privacy deletion, merchant-only customer
+access exports, delayed-webhook reinstall protection, and nine privacy tests.
+Settings tolerate blocked local storage. Signup and configuration no longer ask
+merchants to enter a Shopify domain. Privacy disclosures now describe actual
+retained order fields, hosting, billing, email, and optional AI processors.
 
 ## Deployment notes and remaining verification
 
@@ -166,8 +175,9 @@ Before resubmission, use a development store to verify:
 
 - Move large syncs to durable background jobs with progress, cancellation, and
   resumable checkpoints. Sync is still synchronous and can exceed host limits.
-- Review privacy webhook data deletion and retention end to end; clearing a
-  connection token alone does not establish that all requested data was removed.
+- Verify privacy webhook registration and provider backup retention. Production
+  database deletion and export handling are implemented and tested; backup
+  schedules remain an operational check.
 - Carry store currency through API responses and formatting. Existing money
   displays use USD; non-USD stores need consistent currency-aware reporting.
 - Reconcile order edits, cancellations and refunds. Existing imported line IDs

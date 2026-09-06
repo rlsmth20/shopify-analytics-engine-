@@ -127,14 +127,8 @@ function LeadTimeSettingsContent() {
     [categoryMap, defaultLeadTimeDays, skuMap, supplierMap, syncedSkus]
   );
 
-  async function loadSettings(domain: string, options?: { requireDomain?: boolean }) {
+  async function loadSettings(domain: string) {
     const targetDomain = domain.trim() || "current-shop";
-    if (!targetDomain) {
-      if (options?.requireDomain) {
-        setSettingsError("Enter a Shopify domain first.");
-      }
-      return;
-    }
 
     setIsLoadingSettings(true);
     setSettingsError(null);
@@ -190,7 +184,7 @@ function LeadTimeSettingsContent() {
   }
 
   async function handleLoadSettings() {
-    await loadSettings(shopifyDomain, { requireDomain: true });
+    await loadSettings(shopifyDomain);
   }
 
   async function handleSaveSettings(event: FormEvent<HTMLFormElement>) {
@@ -348,16 +342,11 @@ function LeadTimeSettingsContent() {
         </div>
 
         <div className="settings-scope-row">
-          <label className="field-label field-label-grow">
-            <span>Shopify domain</span>
-            <input
-              className="input-control"
-              type="text"
-              placeholder="store-name.myshopify.com"
-              value={shopifyDomain}
-              onChange={(event) => setShopifyDomain(event.target.value)}
-            />
-          </label>
+          <div className="field-label field-label-grow">
+            <span>Connected workspace</span>
+            <p className="section-copy">{shopifyDomain || "Your authenticated workspace"}</p>
+            <Link href="/store-sync">Manage Shopify connection</Link>
+          </div>
 
           <button
             type="button"
