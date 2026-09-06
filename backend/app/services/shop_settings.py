@@ -64,8 +64,8 @@ def get_shop_settings(shopify_domain: str) -> ResolvedShopSettings:
         settings = session.scalar(
             select(ShopSettings).where(ShopSettings.shop_id == shop.id)
         )
-        vendor_lead_times = _load_vendor_lead_times_by_shop(session).get(shop.id, {})
-        category_lead_times = _load_category_lead_times_by_shop(session).get(
+        vendor_lead_times = _load_vendor_lead_times_by_shop(session, shop_id=shop.id).get(shop.id, {})
+        category_lead_times = _load_category_lead_times_by_shop(session, shop_id=shop.id).get(
             shop.id, {}
         )
         return _build_resolved_shop_settings(
@@ -122,17 +122,19 @@ def upsert_shop_settings(
         return _build_resolved_shop_settings(
             shop,
             settings,
-            _load_vendor_lead_times_by_shop(session).get(shop.id, {}),
-            _load_category_lead_times_by_shop(session).get(shop.id, {}),
+            _load_vendor_lead_times_by_shop(session, shop_id=shop.id).get(shop.id, {}),
+            _load_category_lead_times_by_shop(session, shop_id=shop.id).get(shop.id, {}),
         )
 
 
-def load_effective_shop_settings_map(session) -> dict[int, ResolvedShopSettings]:
-    vendor_lead_times_by_shop = _load_vendor_lead_times_by_shop(session)
-    category_lead_times_by_shop = _load_category_lead_times_by_shop(session)
-    rows = session.execute(
-        select(Shop, ShopSettings).outerjoin(ShopSettings, ShopSettings.shop_id == Shop.id)
-    ).all()
+def load_effective_shop_settings_map(session, *, shop_id: int | None = None) -> dict[int, ResolvedShopSettings]:
+    """Load one request's shop settings, or all shops for batch processing."""
+    vendor_lead_times_by_shop = _load_vendor_lead_times_by_shop(session, shop_id=shop_id)
+    category_lead_times_by_shop = _load_category_lead_times_by_shop(session, shop_id=shop_id)
+    query = select(Shop, ShopSettings).outerjoin(ShopSettings, ShopSettings.shop_id == Shop.id)
+    if shop_id is not None:
+        query = query.where(Shop.id == shop_id)
+    rows = session.execute(query).all()
     return {
         shop.id: _build_resolved_shop_settings(
             shop,
@@ -456,24 +458,22 @@ def _build_resolved_shop_settings(
     )
 
 
-def _load_vendor_lead_times_by_shop(session) -> dict[int, dict[str, int]]:
-    rows = session.execute(
-        select(VendorLeadTime.shop_id, VendorLeadTime.vendor, VendorLeadTime.lead_time_days)
-    ).all()
+def _load_vendor_lead_times_by_shop(session, *, shop_id: int | None = None) -> dict[int, dict[str, int]]:
+    query = select(VendorLeadTime.shop_id, VendorLeadTime.vendor, VendorLeadTime.lead_time_days)
+    if shop_id is not None:
+        query = query.where(VendorLeadTime.shop_id == shop_id)
+    rows = session.execute(query).all()
     lead_times_by_shop: dict[int, dict[str, int]] = {}
     for shop_id, vendor, lead_time_days in rows:
         lead_times_by_shop.setdefault(shop_id, {})[vendor] = int(lead_time_days)
     return lead_times_by_shop
 
 
-def _load_category_lead_times_by_shop(session) -> dict[int, dict[str, int]]:
-    rows = session.execute(
-        select(
-            CategoryLeadTime.shop_id,
-            CategoryLeadTime.category,
-            CategoryLeadTime.lead_time_days,
-        )
-    ).all()
+def _load_category_lead_times_by_shop(session, *, shop_id: int | None = None) -> dict[int, dict[str, int]]:
+    query = select(CategoryLeadTime.shop_id, CategoryLeadTime.category, CategoryLeadTime.lead_time_days)
+    if shop_id is not None:
+        query = query.where(CategoryLeadTime.shop_id == shop_id)
+    rows = session.execute(query).all()
     lead_times_by_shop: dict[int, dict[str, int]] = {}
     for shop_id, category, lead_time_days in rows:
         lead_times_by_shop.setdefault(shop_id, {})[category] = int(lead_time_days)

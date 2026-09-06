@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { isDemoActive } from "@/lib/shopify-embedded";
 
 import { useEffect, useMemo, useState } from "react";
@@ -219,12 +221,12 @@ function TransfersContent() {
         title="Transfer recommendations require location-level inventory"
         actions={
           <div className="button-row">
-            <a className="button button-secondary" href="/store-sync">
+            <Link className="button button-secondary" href="/store-sync">
               Check Shopify sync
-            </a>
-            <a className="button button-ghost" href="/reports">
+            </Link>
+            <Link className="button button-ghost" href="/reports">
               Use reports instead
-            </a>
+            </Link>
           </div>
         }
       >
@@ -291,9 +293,9 @@ function TransfersContent() {
             >
               Export styled Excel
             </button>
-            <a className="button button-secondary" href="/reports">
+            <Link className="button button-secondary" href="/reports">
               Open stockout report
-            </a>
+            </Link>
           </div>
         </div>
         <div className="report-control-panel">
@@ -372,9 +374,9 @@ function TransferDetails({ row, onReviewed }: { row: TransferRow; onReviewed: ()
         >
           {row.status === "Reviewed" ? "Reviewed" : "Mark reviewed"}
         </button>
-        <a className="button button-ghost button-sm" href="/purchase-orders">
+        <Link className="button button-ghost button-sm" href="/purchase-orders">
           Open reorder plan
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { isDemoActive } from "@/lib/shopify-embedded";
 
 import { useEffect, useMemo, useState } from "react";
@@ -436,9 +438,9 @@ export default function ReportsPage() {
                 Preview report
               </button>
             ) : (
-              <a className="button button-secondary" href={report.href}>
+              <Link className="button button-secondary" href={report.href}>
                 {report.cta}
-              </a>
+              </Link>
             )}
           </article>
         ))}
@@ -451,9 +453,9 @@ export default function ReportsPage() {
           badge={isDemo ? <ReportStatusBadge tone="demo">Sample data</ReportStatusBadge> : undefined}
           actions={
             <>
-              <a className="button button-secondary" href={cta.href}>
+              <Link className="button button-secondary" href={cta.href}>
                 {cta.label}
-              </a>
+              </Link>
               {canExport ? (
                 <button
                   type="button"
@@ -463,14 +465,14 @@ export default function ReportsPage() {
                 >
                   Export filtered Excel
                 </button>
+              ) : entitlementsLoaded ? (
+                <Link className="button button-primary" href="/billing">
+                  Upgrade to Growth to export
+                </Link>
               ) : (
-                <a
-                  className={`button button-primary${!entitlementsLoaded ? " button-disabled" : ""}`}
-                  href={entitlementsLoaded ? "/billing" : undefined}
-                  aria-disabled={!entitlementsLoaded}
-                >
-                  {entitlementsLoaded ? "Upgrade to Growth to export" : "Loading plan access..."}
-                </a>
+                <button type="button" className="button button-primary button-disabled" disabled>
+                  Loading plan access...
+                </button>
               )}
             </>
           }
@@ -480,7 +482,7 @@ export default function ReportsPage() {
           <ReportEmptyState
             title="Report data unavailable"
             description={error}
-            actions={<a className="button button-secondary" href="/store-sync">Check store sync</a>}
+            actions={<Link className="button button-secondary" href="/store-sync">Check store sync</Link>}
           />
         ) : (
           <>
@@ -850,9 +852,9 @@ function ReportRowDetails({
           </p>
           <p className="report-detail-copy">{summaryReason}</p>
         </div>
-        <a className="button button-secondary button-sm" href={cta.href}>
+        <Link className="button button-secondary button-sm" href={cta.href}>
           {cta.label}
-        </a>
+        </Link>
       </div>
       <ProjectedStockHealth
         productName={row.product}

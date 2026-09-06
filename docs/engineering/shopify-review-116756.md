@@ -86,7 +86,7 @@ From `backend/`, install test dependencies with
 python -m unittest discover -s tests -v
 ```
 
-57 tests passed, using synthetic credentials, mocked Shopify responses, and
+61 tests passed, using synthetic credentials, mocked Shopify responses, and
 isolated in-memory SQLite. Coverage includes fresh install, reinstall, expiry,
 parallel first requests, failed grants, callback workspace isolation, malformed
 tokens, staff privileges, nested pagination, repeat-sync idempotence, throttling,
@@ -135,8 +135,16 @@ A one-item developer draft was prepared to verify a current paid order. Automati
 approval review initially blocked marking the $749.95 development draft as paid.
 The user subsequently authorized completing the test and submission. The old
 browser connection then stopped responding; the replacement browser currently
-requires Shopify Partners login. The live paid-order test and resubmission remain
-pending that login. No charge, invoice, or customer message was issued. Do not
+required Shopify Partners login. The user's existing signed-in Chrome window
+was subsequently reached with the installed Computer Use plugin. Shopify's
+automated checks had expired after 30 days; a new run was started on the App
+Store review page. The listing check displayed "Error checking app listing. You
+can submit for review without it." Other preliminary configuration and embedded
+checks displayed as complete. Before the fresh paid-order test, Computer Use
+stopped because it could not confidently determine Chrome's current URL to
+enforce policy. No further browser input was issued in that turn. The new checks'
+completion, live paid-order test, and resubmission are still unverified.
+No charge, invoice, or customer message was issued. Do not
 treat automated paid-order tests as a completed live paid-order check or Shopify
 approval.
 

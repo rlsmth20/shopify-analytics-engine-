@@ -44,7 +44,7 @@ The original 2.1.1 blocker is covered separately in [review 116756 verification]
 
 Privacy endpoints are registered in the app TOML using `compliance_topics`; current deployed configuration must also be checked in Shopify. Invalid signatures are rejected and customer/shop requests now perform actual scoped work. See [privacy webhook behavior](../shopify-privacy-webhooks.md).
 
-Validation: 57 backend tests and 25 frontend tests pass; type checking and production build pass. The additional five billing tests prove that absent Stripe configuration cannot bypass webhook signatures or activate a subscription. The production privacy list and individual export endpoints both reject anonymous access with HTTP 401. Final deployed billing changes, Shopify automated checks, and final submission status must still be verified. The replacement Shopify browser currently requires the user's login.
+Validation: 61 backend tests and 25 frontend tests pass; type checking and production build pass. Five billing tests prove that absent Stripe configuration cannot bypass webhook signatures or activate a subscription. Four performance tests protect equivalent dashboard results and scoped settings queries. The production privacy list and individual export endpoints both reject anonymous access with HTTP 401. Both frontend and backend deployment statuses for the billing security commit `ebc892a` succeeded. The user's signed-in Chrome submission tab was reached and automated checks restarted; completion and final submission remain unverified after Computer Use stopped because the current browser URL could not be determined confidently.
 
 ## Resources
 

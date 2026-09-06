@@ -34,7 +34,7 @@ def build_buy_list(db: DbSession, *, shop_id: int) -> tuple[list[ReorderSuggesti
     skus = load_skus_for_shop(db, shop_id)
     if not skus:
         return [], 0.0, {}
-    settings = load_effective_shop_settings_map(db).get(shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=shop_id).get(shop_id)
     if settings is None:
         settings = build_default_shop_settings()
     histories = load_daily_history_for_shop_skus(db, shop_id, [sku.sku_id for sku in skus], 90)

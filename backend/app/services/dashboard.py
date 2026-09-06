@@ -136,13 +136,16 @@ def build_dashboard(
     ]
 
     # Cash at risk by vendor
+    # Preserve the first-match SKU behavior without scanning the entire
+    # catalog twice for every action (quadratic for large assortments).
+    vendor_by_sku: dict[str, str] = {}
+    for sku in skus:
+        vendor_by_sku.setdefault(sku.sku_id, sku.vendor)
     cash_by_vendor: dict[str, float] = {}
     for a in actions:
         if a.status in ("optimize", "dead"):
-            cash_by_vendor[_vendor_for_sku(a.sku_id, skus)] = (
-                cash_by_vendor.get(_vendor_for_sku(a.sku_id, skus), 0)
-                + getattr(a, "cash_tied_up", 0)
-            )
+            vendor = vendor_by_sku.get(a.sku_id, "Unknown")
+            cash_by_vendor[vendor] = cash_by_vendor.get(vendor, 0) + getattr(a, "cash_tied_up", 0)
     cash_by_vendor_series = sorted(
         [DashboardSeriesPoint(label=v, value=round(c, 0)) for v, c in cash_by_vendor.items()],
         key=lambda p: p.value,
@@ -190,13 +193,6 @@ def build_dashboard(
         alert_counts_by_severity=alert_counts,
         generated_at=datetime.now(timezone.utc),
     )
-
-
-def _vendor_for_sku(sku_id: str, skus) -> str:
-    for sku in skus:
-        if sku.sku_id == sku_id:
-            return sku.vendor
-    return "Unknown"
 
 
 def _empty_dashboard() -> DashboardResponse:

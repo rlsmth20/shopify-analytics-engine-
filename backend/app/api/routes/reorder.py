@@ -52,7 +52,7 @@ def list_reorder_suggestions(
             total_extended_cost=0.0,
             vendor_totals={},
         )
-    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=user.shop_id).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
     histories = load_daily_history_for_shop_skus(
@@ -91,7 +91,7 @@ def read_buying_calendar(
     horizon_days: int = Query(180, ge=30, le=365),
 ) -> BuyingCalendarResponse:
     skus = load_skus_for_shop(db, user.shop_id)
-    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=user.shop_id).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
     histories = load_daily_history_for_shop_skus(
@@ -145,7 +145,7 @@ def read_cash_plan(
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
         return empty
-    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=user.shop_id).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
     histories = load_daily_history_for_shop_skus(
@@ -223,7 +223,7 @@ def list_po_drafts(
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
         return PurchaseOrderDraftsResponse(drafts=[], total_capital_required=0.0)
-    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=user.shop_id).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
     histories = load_daily_history_for_shop_skus(

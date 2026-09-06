@@ -43,7 +43,7 @@ def read_dashboard(
     def recent_revenue(days: int) -> list[tuple[int, float]]:
         return load_recent_daily_revenue_for_shop(db, user.shop_id, days)
 
-    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=user.shop_id).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
 

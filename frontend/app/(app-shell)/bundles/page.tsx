@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { isDemoActive } from "@/lib/shopify-embedded";
 
 import { useEffect, useMemo, useState } from "react";
@@ -298,7 +300,7 @@ function BundlesContent() {
             <ReportEmptyState
               title="Bundle recommendations require order-line history"
               description="Skubase needs enough completed orders to find products that are frequently bought together."
-              actions={<a className="button button-secondary" href="/store-sync">Check store sync</a>}
+              actions={<Link className="button button-secondary" href="/store-sync">Check store sync</Link>}
             />
           ) : (
             <ReportTable

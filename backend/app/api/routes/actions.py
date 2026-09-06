@@ -30,7 +30,7 @@ def _build_action_feed(
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
         return ActionFeedResponse(data_source="db", actions=[])
-    settings = load_effective_shop_settings_map(db).get(user.shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=user.shop_id).get(user.shop_id)
     if settings is None:
         settings = build_default_shop_settings()
     actions = build_inventory_actions(skus, lead_time_config=settings.to_lead_time_config())

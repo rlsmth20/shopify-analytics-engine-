@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
@@ -130,35 +132,35 @@ export default function DashboardPage() {
             You can also import a Stocky or ShipStation export.
           </p>
           <div className="dashboard-empty-steps">
-            <a href="/store-sync" className="dashboard-empty-step">
+            <Link href="/store-sync" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">1</span>
               <div><p className="dashboard-empty-step-title">Sync your Shopify store</p><p className="dashboard-empty-step-body">Your store connects when you open skubase in Shopify. Run the first sync to load inventory and orders.</p></div>
               <span aria-hidden>→</span>
-            </a>
-            <a href="/import-stocky" className="dashboard-empty-step">
+            </Link>
+            <Link href="/import-stocky" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">2</span>
               <div>
                 <p className="dashboard-empty-step-title">Import Stocky CSV</p>
                 <p className="dashboard-empty-step-body">Export Inventory On Hand from Stocky — maps in one step.</p>
               </div>
               <span aria-hidden>→</span>
-            </a>
-            <a href="/import-shipstation" className="dashboard-empty-step">
+            </Link>
+            <Link href="/import-shipstation" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">3</span>
               <div>
                 <p className="dashboard-empty-step-title">Import ShipStation CSV</p>
                 <p className="dashboard-empty-step-body">Drop in your ShipStation shipment export to seed velocity data.</p>
               </div>
               <span aria-hidden>→</span>
-            </a>
-            <a href="/lead-time-settings" className="dashboard-empty-step">
+            </Link>
+            <Link href="/lead-time-settings" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">4</span>
               <div>
                 <p className="dashboard-empty-step-title">Set lead times</p>
                 <p className="dashboard-empty-step-body">Global default + supplier overrides - drives every reorder calculation.</p>
               </div>
               <span aria-hidden>→</span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -216,19 +218,19 @@ export default function DashboardPage() {
               Work these in order to see how Skubase turns inventory data into a focused weekly plan.
             </p>
           </div>
-          <a className="button button-secondary" href="/actions">
+          <Link className="button button-secondary" href="/actions">
             Open action queue
-          </a>
+          </Link>
         </div>
         <div className="action-path-grid">
           {ACTION_PATH_STEPS.map((item) => (
-            <a key={item.step} href={item.href} className="action-path-step">
+            <Link key={item.step} href={item.href} className="action-path-step">
               <span className="today-step">{item.step}</span>
               <span>
                 <strong>{item.title}</strong>
                 <small>{item.body}</small>
               </span>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
@@ -247,9 +249,9 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="button-row">
-              <a className="button button-primary" href="/stocky-migration">
+              <Link className="button button-primary" href="/stocky-migration">
                 Open checklist
-              </a>
+              </Link>
               <button
                 type="button"
                 className="button button-ghost"
@@ -266,7 +268,7 @@ export default function DashboardPage() {
             {ONBOARDING_STEPS.map((step) => {
               const complete = completedOnboardingSteps.includes(step.id);
               return (
-                <a key={step.id} className="signal-item" href={step.href}>
+                <Link key={step.id} className="signal-item" href={step.href}>
                   <div>
                     <p className="signal-title">{step.label}</p>
                     <p className="muted small">
@@ -276,7 +278,7 @@ export default function DashboardPage() {
                   <span className={`po-status po-status-${complete ? "received" : "ready"}`}>
                     {complete ? "done" : "next"}
                   </span>
-                </a>
+                </Link>
               );
             })}
           </div>
@@ -444,7 +446,7 @@ function TodayRow({
   href: string;
 }) {
   return (
-    <a className="today-row" href={href}>
+    <Link className="today-row" href={href}>
       <span className="today-step">{step}</span>
       <div>
         <p className="today-title">{title}</p>
@@ -453,6 +455,6 @@ function TodayRow({
       <span className="today-arrow" aria-hidden>
         →
       </span>
-    </a>
+    </Link>
   );
 }

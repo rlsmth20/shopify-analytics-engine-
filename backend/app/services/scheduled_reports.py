@@ -39,7 +39,7 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
     skus = load_skus_for_shop(db, shop_id)
     if not skus:
         return None
-    settings = load_effective_shop_settings_map(db).get(shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=shop_id).get(shop_id)
     if settings is None:
         settings = build_default_shop_settings()
     lead_config = settings.to_lead_time_config()

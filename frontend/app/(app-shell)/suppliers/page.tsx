@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
@@ -45,12 +47,12 @@ function SuppliersContent() {
         title="Supplier scorecards need purchase order receipt history"
         actions={
           <>
-            <a className="button button-secondary" href="/purchase-orders">
+            <Link className="button button-secondary" href="/purchase-orders">
               Open purchase orders
-            </a>
-            <a className="button button-ghost" href="/lead-time-settings">
+            </Link>
+            <Link className="button button-ghost" href="/lead-time-settings">
               Set lead times
-            </a>
+            </Link>
           </>
         }
       >

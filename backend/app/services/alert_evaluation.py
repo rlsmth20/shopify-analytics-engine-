@@ -78,7 +78,7 @@ def build_evaluation_context(db: DbSession, shop_id: int) -> EvaluationContext |
     if not skus:
         return None
 
-    settings = load_effective_shop_settings_map(db).get(shop_id)
+    settings = load_effective_shop_settings_map(db, shop_id=shop_id).get(shop_id)
     if settings is None:
         settings = build_default_shop_settings()
 
