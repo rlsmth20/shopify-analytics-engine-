@@ -14,6 +14,8 @@ to confirm that this was the exact exception in the recording.
 The repairs were deployed to Vercel and Railway on September 6, 2026, through
 commits `c925fcf` and `7c8449f`. Both deployment checks succeeded. They have not
 been submitted to Shopify.
+The subsequent inventory-trust, support, and pricing pass was deployed as
+`359dfa5`; Vercel and Railway both reported success. No migration was required.
 This document records a targeted repair and product improvement pass, not a
 completed audit of every App Store requirement.
 
@@ -117,6 +119,17 @@ repeated OAuth. The canonical existing workspace and subscription were retained.
 Two manual syncs completed at 13:31:29 and 13:32:13 local time on September 6:
 17 products, 26 variants, and zero eligible orders. Shopify's newest existing
 orders were June 12, outside the 60-day access window, explaining the empty result.
+
+After deploying `359dfa5`, a live sync completed at 13:50:17 with 17 products,
+26 scanned variants, 19 eligible planning variants, seven excluded variants and
+zero eligible orders. The receipt confirms outdated inventory was retired. The
+dashboard now contains 19 current variants instead of 76 combined old/current
+rows, and the Action Queue contains only current catalog products. Older retained
+orders still support stale-stock signals for those products. The live pricing
+toggle shows $24.67/$84.17/$169.17 equivalents with $296/$1,010/$2,030 billed
+yearly. A bounded production error-log check returned no matching errors.
+Repeating the deployed sync at 13:53:29 returned the same 26 scanned / 19 eligible
+variants, seven exclusions, zero eligible orders, and no further retired inventory.
 
 A one-item developer draft was prepared to verify a current paid order. Automatic
 approval review blocked marking the $749.95 development draft as paid; the
