@@ -246,7 +246,8 @@ function loadAppBridgeScript(): Promise<void> {
     const script = document.createElement("script");
     script.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
     script.dataset.skubaseAppBridge = "true";
-    script.async = true;
+    // Shopify's CDN loader rejects async/defer, even for recovery loads.
+    script.async = false;
     script.onload = () => {
       script.dataset.loaded = "true";
       resolve();

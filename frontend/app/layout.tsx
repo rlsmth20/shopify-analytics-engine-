@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Script from "next/script";
 
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -88,7 +87,8 @@ export default async function RootLayout({
         {embedded ? (
           <>
             <meta name="shopify-api-key" content={process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "2df2104b538d6705dcb0fdce43d0a0b9"} />
-            <Script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" strategy="beforeInteractive" />
+            {/* App Bridge rejects async/defer, including Next's beforeInteractive loader. */}
+            <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" />
           </>
         ) : null}
       </head>

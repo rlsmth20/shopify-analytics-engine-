@@ -58,6 +58,18 @@ test("embedded requests use Shopify tokens and never website cookies", async () 
   assert.equal(calls[0].init.credentials, "omit");
 });
 
+test("App Bridge recovery uses the synchronous CDN script required by Shopify", async () => {
+  const { api, scripts, window } = fixture({ idToken: null });
+  const token = api.getShopifySessionToken();
+  assert.equal(scripts.length, 1);
+  assert.equal(scripts[0].src, "https://cdn.shopify.com/shopifycloud/app-bridge.js");
+  assert.equal(scripts[0].async, false);
+  assert.notEqual(scripts[0].defer, true);
+  window.shopify = { idToken: async () => "recovered-token" };
+  scripts[0].onload();
+  assert.equal(await token, "recovered-token");
+});
+
 test("website authentication retains its cookie contract", async () => {
   const { api, calls } = fixture({ embedded: false });
   await api.authenticatedFetch("https://api.example.test/auth/me");
