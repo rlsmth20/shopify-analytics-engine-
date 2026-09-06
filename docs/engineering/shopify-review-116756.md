@@ -13,11 +13,20 @@ to confirm that this was the exact exception in the recording.
 
 The repairs were deployed to Vercel and Railway on September 6, 2026, through
 commits `c925fcf` and `7c8449f`. Both deployment checks succeeded. They have not
-been submitted to Shopify.
+been approved by Shopify; the tested release was resubmitted on September 6 as
+recorded below.
 The subsequent inventory-trust, support, and pricing pass was deployed as
 `359dfa5`; Vercel and Railway both reported success. No migration was required.
 This document records a targeted repair and product improvement pass, not a
 completed audit of every App Store requirement.
+
+Code release `105bcf2` is deployed successfully to Vercel and Railway and matched
+GitHub `main` at release verification. Shopify's common-error checks passed;
+embedded checks and AI self-review completed. A fresh paid development order
+imported successfully, repeat sync confirmed no duplicate order line, and the
+dashboard/action display reflected the new sale. Shopify accepted the fixes at
+approximately 15:37 Pacific on September 6, 2026. Status is **Submitted**, awaiting
+reviewer assignment; this is not App Store approval.
 
 ## Installation and sync repairs
 
@@ -131,22 +140,38 @@ yearly. A bounded production error-log check returned no matching errors.
 Repeating the deployed sync at 13:53:29 returned the same 26 scanned / 19 eligible
 variants, seven exclusions, zero eligible orders, and no further retired inventory.
 
-A one-item developer draft was prepared to verify a current paid order. Automatic
-approval review initially blocked marking the $749.95 development draft as paid.
-The user subsequently authorized completing the test and submission. The old
-browser connection then stopped responding; the replacement browser currently
-required Shopify Partners login. The user's existing signed-in Chrome window
-was subsequently reached with the installed Computer Use plugin. Shopify's
-automated checks had expired after 30 days; a new run was started on the App
-Store review page. The listing check displayed "Error checking app listing. You
-can submit for review without it." Other preliminary configuration and embedded
-checks displayed as complete. Before the fresh paid-order test, Computer Use
-stopped because it could not confidently determine Chrome's current URL to
-enforce policy. No further browser input was issued in that turn. The new checks'
-completion, live paid-order test, and resubmission are still unverified.
-No charge, invoice, or customer message was issued. Do not
-treat automated paid-order tests as a completed live paid-order check or Shopify
-approval.
+The authorized fresh paid-order test is now complete on the development
+store. Draft #D14 (`1325054951702`) became manual paid order #1409
+(`7516982673686`), created September 6 at 18:28 in the store's displayed time.
+It contains one Liquid Snowboard, quantity 1, for $749.95, and remains unfulfilled.
+No customer was attached, no email or invoice was sent, and no card was charged.
+This is an order-import fixture, not an app-subscription billing lifecycle test.
+
+After reloading the deployed `105bcf2` app successfully, the first live sync
+completed at 15:30:36 local time on September 6. Its receipt showed 17 products,
+26 scanned variants, 19 eligible planning variants, seven excluded variants,
+one scanned order, and one order line: one newly imported, zero already imported,
+and zero unmatched. Repeat sync at 15:31:17 Pacific returned the same 17 products,
+26 variants, 19 planning variants and seven exclusions. It scanned one order and
+one line, reporting zero newly imported lines, one already imported line, zero
+unmatched items and no errors. This verifies live paid-order repeat-sync
+idempotence.
+
+The live Action Queue then displayed the Liquid Snowboard as an optimize item
+with 1,440 days of cover. The dashboard generated September 6 at 3:36:18 PM
+displayed 30-day revenue of $750 (the rounded $749.95 sale), with Liquid Snowboard
+also shown as a $750 top revenue mover. It contained 19 SKUs: zero urgent, one
+optimize, 17 dead and one healthy. The revenue chart had 30 observations and no
+display error. Exact current stock was not directly observed in this check.
+
+Shopify Partners reported Passed for the automated common-error checks, completed
+embedded checks and AI self-review, and enabled Submit fixes. At approximately
+15:37 Pacific on September 6, submission succeeded: Partners displayed
+**Submitted**, "We're assigning a reviewer to your submission", and
+"Success! We received your submission". The first attempt returned a temporary
+"Unexpected error"; refreshing and retrying succeeded. Review correspondence is
+directed to `support@skubase.io`. No reviewer-note entry form appeared, so the
+prepared reviewer notes were not sent. The app is awaiting review, not approved.
 
 The final code review added transactional privacy deletion, merchant-only customer
 access exports, delayed-webhook reinstall protection, and nine privacy tests.
@@ -176,7 +201,7 @@ allow for the increased server rendering load. A later split into independent
 marketing and embedded root layouts can recover marketing prerendering. Verify
 App Bridge initialization and Shopify's script detection in the deployed iframe.
 
-Before resubmission, use a development store to verify:
+Retain this development-store regression checklist for future releases:
 
 1. Fresh managed install reaches the embedded dashboard without repeated OAuth.
 2. Sync imports known products, variants, orders, and line items; a second sync

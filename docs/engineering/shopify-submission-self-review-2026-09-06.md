@@ -1,6 +1,7 @@
 # Shopify submission self-review — September 6, 2026
 
-App: SKUbase. Paused review reference: 116756.
+App: SKUbase. Review reference: 116756. Current status: **Submitted**, awaiting
+reviewer assignment as of approximately 15:37 Pacific on September 6, 2026.
 
 Evaluated the live [Shopify code-review requirements](https://shopify.dev/docs/apps/launch/app-store-review/app-store-ai-self-review-requirements), fetched on September 6, 2026. Each applicable requirement was evaluated separately against current configuration, frontend, backend, and available production evidence.
 
@@ -40,11 +41,15 @@ This is the subset Shopify identifies as checkable from source code. It is not S
 
 ## Submission evidence and remaining browser work
 
-The original 2.1.1 blocker is covered separately in [review 116756 verification](shopify-review-116756.md): the repaired embedded app passed live uninstall/reinstall and repeat catalog sync. The test store returned 17 products, 26 variants, 19 eligible planning variants, and seven exclusions. Its old orders were outside the 60-day window. A fresh paid development order still needs completion and first/repeat sync verification.
+The original 2.1.1 blocker is covered separately in [review 116756 verification](shopify-review-116756.md): the repaired embedded app passed live uninstall/reinstall and repeat catalog sync. The test store returned 17 products, 26 variants, 19 eligible planning variants, and seven exclusions. Its old orders were outside the 60-day window. Fresh manual paid development order #1409 (`7516982673686`), created from draft #D14, now provides one current Liquid Snowboard order line. The first live sync at 15:30:36 local time on September 6 scanned that order and imported its one line with zero unmatched items. Repeat sync at 15:31:17 Pacific scanned the same one order and line, added zero new lines, identified one already imported line, and completed with zero unmatched items and no errors. Catalog counts remained 17 products, 26 variants, 19 planning variants and seven exclusions. No customer, invoice, email, or card charge was involved. This order fixture does not verify app-subscription charge approval or plan changes.
+
+The resulting live dashboard, generated September 6 at 3:36:18 PM, displayed the $749.95 sale rounded to $750 in 30-day revenue and the Liquid Snowboard top-mover entry. Its 19 SKUs were classified as zero urgent, one optimize, 17 dead and one healthy. The revenue chart showed 30 observations without errors, and the Action Queue displayed Liquid Snowboard as an optimize item with 1,440 days of cover. Current stock quantity was not directly verified. Installation, fresh paid-order import, repeat-sync idempotence, and dashboard/action display are now verified. The fixes were subsequently submitted successfully.
 
 Privacy endpoints are registered in the app TOML using `compliance_topics`; current deployed configuration must also be checked in Shopify. Invalid signatures are rejected and customer/shop requests now perform actual scoped work. See [privacy webhook behavior](../shopify-privacy-webhooks.md).
 
-Validation: 61 backend tests and 25 frontend tests pass; type checking and production build pass. Five billing tests prove that absent Stripe configuration cannot bypass webhook signatures or activate a subscription. Four performance tests protect equivalent dashboard results and scoped settings queries. The production privacy list and individual export endpoints both reject anonymous access with HTTP 401. Both frontend and backend deployment statuses for the billing security commit `ebc892a` succeeded. The user's signed-in Chrome submission tab was reached and automated checks restarted; completion and final submission remain unverified after Computer Use stopped because the current browser URL could not be determined confidently.
+Validation: 61 backend tests and 25 frontend tests pass; type checking and production build pass. Five billing tests prove that absent Stripe configuration cannot bypass webhook signatures or activate a subscription. Four performance tests protect equivalent dashboard results and scoped settings queries. The production privacy list and individual export endpoints both reject anonymous access with HTTP 401. Both frontend and backend deployment statuses for code release `105bcf2` succeeded; local HEAD and GitHub `main` matched that release at verification. The deployed app reloaded successfully for the fresh order test. Shopify's automated common-error checks passed, and embedded checks and AI self-review completed.
+
+Submission succeeded at approximately 15:37 Pacific on September 6. Shopify Partners displayed **Submitted**, "We're assigning a reviewer to your submission", and "Success! We received your submission". A temporary error on the first attempt cleared after refreshing and retrying. Correspondence is directed to `support@skubase.io`. No reviewer-note form appeared, so the prepared notes were not sent. The app is awaiting review; neither submission nor automated checks constitute App Store approval. The four needs-review items above remain documented limitations of this self-review.
 
 ## Resources
 
