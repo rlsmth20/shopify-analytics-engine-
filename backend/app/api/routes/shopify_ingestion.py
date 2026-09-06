@@ -1,11 +1,11 @@
 """Shopify integration — OAuth install/callback + manual sync trigger."""
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.deps import get_optional_user, require_active_access
+from app.api.deps import get_optional_user, get_current_user, require_active_access
 from app.db.models import User
 from app.db.session import get_db_session
 from app.services.shopify_oauth import (
@@ -18,6 +18,7 @@ from app.services.shopify_oauth import (
     issue_oauth_state,
     normalize_shop_domain,
     persist_connection,
+    shopify_connection_lock,
     verify_callback_hmac,
 )
 
@@ -27,10 +28,12 @@ router = APIRouter(prefix="/integrations/shopify", tags=["shopify"])
 
 @router.get("/install", response_model=None)
 def install(
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
     user: Annotated[Optional[User], Depends(get_optional_user)],
     shop: str = Query(..., description="The merchant's myshopify domain (e.g. yourshop.myshopify.com)."),
     host: str | None = Query(default=None, description="Shopify App Bridge host param, when available."),
+    response_format: Literal["json"] | None = Query(default=None, alias="format"),
 ) -> dict | RedirectResponse:
     """Start Shopify OAuth.
 
@@ -52,9 +55,12 @@ def install(
         url = build_install_url(shop_domain=shop_domain, state=state)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    if user is None:
+    if response_format == "json" or "application/json" in request.headers.get("accept", ""):
+        return {"authorize_url": url}
+    # Document navigation always redirects, even with a website login cookie.
+    if request.headers.get("sec-fetch-mode") == "navigate" or user is None:
         return RedirectResponse(url=url, status_code=302)
-    return {"authorize_url": url}
+    return {"authorize_url": url}  # Legacy authenticated fetch contract.
 
 
 @router.get("/callback")
@@ -80,41 +86,26 @@ def callback(
     if resolved.shop_domain != shop_domain:
         raise HTTPException(status_code=400, detail="Shop domain mismatch.")
 
-    user = (
-        db.get(User, resolved.user_id)
-        if resolved.user_id is not None
-        else get_or_create_embedded_user_for_shop(db, shop_domain=shop_domain)
-    )
-    if user is None:
-        raise HTTPException(status_code=400, detail="User not found.")
-
-    payload = exchange_code_for_token(shop_domain=shop_domain, code=code)
-    if payload is None or "access_token" not in payload:
-        raise HTTPException(status_code=400, detail="Could not exchange code for token.")
-
-    persist_connection(
-        db,
-        shop_id=user.shop_id,
-        shop_domain=shop_domain,
-        token_payload=payload,
-    )
-
-    # Send the merchant back into the embedded app when OAuth started from
-    # Shopify Admin. Direct Skubase users still land on Store Sync.
-    if resolved.user_id is None:
-        return RedirectResponse(
-            url=embedded_admin_redirect_url(shop_domain=shop_domain, host=resolved.host),
-            status_code=302,
+    with shopify_connection_lock(db, shop_domain):
+        payload = exchange_code_for_token(shop_domain=shop_domain, code=code)
+        if payload is None or not payload.get("access_token"):
+            raise HTTPException(status_code=400, detail="Could not exchange code for token.")
+        user = get_or_create_embedded_user_for_shop(db, shop_domain=shop_domain, commit=False)
+        persist_connection(
+            db, shop_id=user.shop_id, shop_domain=shop_domain,
+            token_payload=payload, commit=False,
         )
+        db.commit()
 
-    import os
-    frontend = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
-    return RedirectResponse(url=f"{frontend}/store-sync?connected=1", status_code=302)
+    return RedirectResponse(
+        url=embedded_admin_redirect_url(shop_domain=shop_domain, host=resolved.host),
+        status_code=302,
+    )
 
 
 @router.get("/connection")
 def my_connection(
-    user: Annotated[User, Depends(require_active_access)],
+    user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> dict:
     """Return whether the current user's shop has an active Shopify connection."""
@@ -124,7 +115,7 @@ def my_connection(
     conn = db.scalar(
         select(ShopifyConnection).where(ShopifyConnection.shop_id == user.shop_id)
     )
-    if conn is None or conn.uninstalled_at is not None:
+    if conn is None or not conn.access_token or conn.uninstalled_at is not None:
         return {
             "connected": False,
             "shopify_domain": None,

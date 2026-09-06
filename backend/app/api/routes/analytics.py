@@ -1,4 +1,5 @@
 from typing import Annotated
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session as DbSession
@@ -69,7 +70,9 @@ def read_inventory_value_history(
     latest_retail = points[-1]["retail_value"] if points else 0.0
     change_30d = None
     if len(points) > 1:
-        baseline = points[max(0, len(points) - 31)]["cost_value"]
+        baseline_date = (date.fromisoformat(points[-1]["date"]) - timedelta(days=30)).isoformat()
+        baseline_point = next((point for point in reversed(points) if point["date"] <= baseline_date), None)
+        baseline = baseline_point["cost_value"] if baseline_point else 0
         if baseline > 0:
             change_30d = round((latest_cost - baseline) / baseline * 100, 1)
     return InventoryValueHistoryResponse(

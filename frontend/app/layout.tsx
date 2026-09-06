@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import Script from "next/script";
 
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -76,11 +78,20 @@ const SOFTWARE_APP_LD = {
   publisher: { "@type": "Organization", name: "skubase", url: SITE_URL },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const embedded = (await headers()).get("x-skubase-embedded") === "1";
   return (
     <html lang="en">
+      <head>
+        {embedded ? (
+          <>
+            <meta name="shopify-api-key" content={process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "2df2104b538d6705dcb0fdce43d0a0b9"} />
+            <Script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" strategy="beforeInteractive" />
+          </>
+        ) : null}
+      </head>
       <body>
         <Suspense fallback={null}>
           <EmbeddedShopifyBootstrap />

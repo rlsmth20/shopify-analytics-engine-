@@ -71,19 +71,29 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
   const [isEmbedded, setIsEmbedded] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [needsInstall, setNeedsInstall] = useState(false);
 
   async function refresh() {
+    setLoading(true);
+    setAuthError(null);
+    setNeedsInstall(false);
     try {
       const res = await authenticatedFetch(`${API_BASE}/auth/me`, {
         credentials: "include",
+        signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setNeedsInstall(res.status === 401 && body?.detail === "Shopify app is not installed for this shop.");
+        setAuthError("We couldn't verify your Shopify connection. Please try again.");
         setUser(null);
         return;
       }
       const data = (await res.json()) as AuthUser;
       setUser(data);
     } catch {
+      setAuthError("We couldn't reach Shopify or skubase. Please try again.");
       setUser(null);
     } finally {
       setLoading(false);
@@ -129,10 +139,17 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     // The *sticky* demo flag is different: a real session beats it —
     // otherwise one "View demo" click leaves signed-in merchants looking at
     // sample data for the rest of the browser session.
-    authenticatedFetch(`${API_BASE}/auth/me`, { credentials: "include" })
+    let cancelled = false;
+    const controller = new AbortController();
+    authenticatedFetch(`${API_BASE}/auth/me`, {
+      credentials: "include",
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+    })
       .then(async (res) => {
+        if (cancelled) return;
         if (res.ok) {
           const data = (await res.json()) as AuthUser;
+          if (cancelled) return;
           setUser(data);
           setIsDemo(false);
           try {
@@ -141,8 +158,11 @@ export function AuthGuard({ children }: { children: ReactNode }) {
             // ignore
           }
         } else if (embedded) {
+          const body = await res.json().catch(() => null);
+          if (cancelled) return;
           setUser(null);
-          redirectToShopifyInstall();
+          setNeedsInstall(res.status === 401 && body?.detail === "Shopify app is not installed for this shop.");
+          setAuthError("We couldn't verify your Shopify connection. Please try again.");
         } else if (demo) {
           setUser(DEMO_USER);
           setIsDemo(true);
@@ -151,9 +171,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         }
       })
       .catch(() => {
+        if (cancelled) return;
         if (embedded) {
           setUser(null);
-          redirectToShopifyInstall();
+          setAuthError("We couldn't reach Shopify or skubase. Please try again.");
         } else if (demo) {
           setUser(DEMO_USER);
           setIsDemo(true);
@@ -161,7 +182,11 @@ export function AuthGuard({ children }: { children: ReactNode }) {
           setUser(null);
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -183,6 +208,27 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   if (user === null) {
+    if (isEmbedded) {
+      return (
+        <div className="auth-loading">
+          <p className="auth-loading-text" role="alert">
+            {authError || "Please reopen skubase from Shopify Admin."}
+          </p>
+          <div className="button-row">
+            <button type="button" className="button button-primary" onClick={() => void refresh()}>
+              Try again
+            </button>
+            {needsInstall ? (
+              <button type="button" className="button button-ghost" onClick={() => {
+                if (!redirectToShopifyInstall()) setAuthError("Reopen skubase from your Shopify Admin to finish connecting.");
+              }}>
+                Connect Shopify
+              </button>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 

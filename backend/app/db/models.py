@@ -586,9 +586,8 @@ class ShopifyConnection(Base):
     shopify_domain: Mapped[str] = mapped_column(String(255), index=True)
     access_token: Mapped[str] = mapped_column(String(500))
     scope: Mapped[str] = mapped_column(String(500), default="")
-    # Shopify retired non-expiring offline tokens (June 2026): access tokens
-    # now live ~1 hour and are renewed with the 90-day refresh token. NULL
-    # expiry means a legacy token that Shopify will reject — reconnect needed.
+    # Renewable offline tokens expire on the schedule returned by Shopify.
+    # NULL expiry identifies older connections, upgraded on embedded auth.
     access_token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

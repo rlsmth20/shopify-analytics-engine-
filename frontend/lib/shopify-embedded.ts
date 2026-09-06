@@ -5,6 +5,15 @@ const API_BASE = APP_API_BASE_URL;
 const SHOPIFY_CLIENT_ID =
   process.env.NEXT_PUBLIC_SHOPIFY_CLIENT_ID || "2df2104b538d6705dcb0fdce43d0a0b9";
 const EMBEDDED_CONTEXT_KEY = "skubase_shopify_embedded_context";
+const AUTH_TIMEOUT_MS = 15_000;
+let appBridgeLoading: Promise<void> | null = null;
+
+function withAuthTimeout<T>(operation: Promise<T>, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), AUTH_TIMEOUT_MS);
+    operation.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
 
 type EmbeddedContext = {
   shop: string;
@@ -89,16 +98,15 @@ export async function getShopifySessionToken(): Promise<string | null> {
   const context = getEmbeddedShopifyContext();
   if (!context) return null;
   await ensureShopifyAppBridge();
-  try {
-    const token = (await window.shopify?.idToken?.()) || null;
-    debugEmbedded("session token fetch complete", { hasToken: Boolean(token) });
-    return token;
-  } catch (error) {
-    debugEmbedded("session token fetch failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
+  if (!window.shopify?.idToken) {
+    throw new Error("Shopify authentication is unavailable. Reopen skubase from Shopify Admin.");
   }
+  const token = await withAuthTimeout(
+    window.shopify.idToken(),
+    "Shopify authentication took too long. Please try again.",
+  );
+  if (!token) throw new Error("Shopify did not return a session. Please try again.");
+  return token;
 }
 
 export async function authHeaders(headers?: HeadersInit): Promise<Headers> {
@@ -117,11 +125,20 @@ export async function authenticatedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
-  return fetch(input, {
+  const embedded = getEmbeddedShopifyContext() !== null;
+  const request = {
     ...init,
     headers: await authHeaders(init.headers),
-    credentials: init.credentials ?? "include",
-  });
+    credentials: embedded ? "omit" as const : init.credentials ?? "include",
+  };
+  const response = await fetch(input, request);
+  // Only retry the read-only authentication handshake. No sync or other write
+  // is replayed automatically, and a second rejection is surfaced to the UI.
+  if (embedded && String(input).endsWith("/auth/me") && response.status === 401 &&
+      response.headers.get("X-Shopify-Retry-Invalid-Session-Request") === "1") {
+    return fetch(input, { ...request, headers: await authHeaders(init.headers) });
+  }
+  return response;
 }
 
 export function redirectTopLevel(url: string): void {
@@ -138,20 +155,45 @@ export function redirectTopLevel(url: string): void {
   window.location.href = url;
 }
 
+export async function reconnectShopify(shopDomain?: string): Promise<void> {
+  const context = getEmbeddedShopifyContext();
+  const shop = shopDomain || context?.shop;
+  if (!shop) throw new Error("Reopen skubase from your Shopify Admin to connect this store.");
+  const params = new URLSearchParams({ shop, format: "json" });
+  if (context?.host) params.set("host", context.host);
+  // Request JSON using the authenticated flow; navigating directly to this
+  // endpoint can show raw JSON when the browser has a website session cookie.
+  const response = await authenticatedFetch(`${API_BASE}/integrations/shopify/install?${params}`, {
+    signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || typeof body?.authorize_url !== "string") {
+    throw new Error(typeof body?.detail === "string" ? body.detail : "Could not reconnect Shopify. Please try again.");
+  }
+  redirectTopLevel(body.authorize_url);
+}
+
 export function redirectToShopifyInstall(): boolean {
   const context = getEmbeddedShopifyContext();
   if (!context?.shop) return false;
   const params = new URLSearchParams({ shop: context.shop });
   if (context.host) params.set("host", context.host);
-  const installUrl = `${API_BASE}/integrations/shopify/install?${params}`;
-  redirectTopLevel(installUrl);
+  redirectTopLevel(`${API_BASE}/integrations/shopify/install?${params}`);
   return true;
 }
 
 async function ensureShopifyAppBridge(): Promise<void> {
   if (typeof window === "undefined" || window.shopify?.idToken) return;
   ensureApiKeyMeta();
-  await loadAppBridgeScript();
+  if (!appBridgeLoading) {
+    appBridgeLoading = withAuthTimeout(loadAppBridgeScript(), "Could not load Shopify authentication. Please try again.")
+      .catch((error) => {
+        document.querySelector('script[src="https://cdn.shopify.com/shopifycloud/app-bridge.js"]')?.remove();
+        appBridgeLoading = null;
+        throw error;
+      });
+  }
+  await appBridgeLoading;
   debugEmbedded("Shopify App Bridge script ready", {
     hasIdToken: Boolean(window.shopify?.idToken),
   });
@@ -203,6 +245,7 @@ function loadAppBridgeScript(): Promise<void> {
 
     const script = document.createElement("script");
     script.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
+    script.dataset.skubaseAppBridge = "true";
     script.async = true;
     script.onload = () => {
       script.dataset.loaded = "true";

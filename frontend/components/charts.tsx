@@ -3,9 +3,9 @@
 // Lightweight, dependency-free SVG charts — keeps the bundle small and lets us
 // style everything via CSS variables so the charts match the rest of the app.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
-type SeriesPoint = { label: string; value: number };
+type SeriesPoint = { label: string; value: number; x?: number };
 
 // ---------------------------------------------------------------------------
 // Sparkline — compact trendline for KPI cards
@@ -49,16 +49,21 @@ export function AreaLineChart({
   points,
   height = 220,
   yFormatter = (v: number) => v.toFixed(0),
+  label = "Trend",
+  showDataTable = false,
 }: {
   points: SeriesPoint[];
   height?: number;
   yFormatter?: (v: number) => string;
+  label?: string;
+  showDataTable?: boolean;
 }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   if (points.length === 0) {
     return <ChartEmpty height={height} />;
   }
   const width = 640;
-  const padding = { top: 16, right: 16, bottom: 28, left: 48 };
+  const padding = { top: 16, right: 16, bottom: 28, left: 80 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -68,8 +73,12 @@ export function AreaLineChart({
   const range = max - min || 1;
 
   const xStep = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
+  const dated = points.every((point) => point.x !== undefined && Number.isFinite(point.x));
+  const startX = points[0].x ?? 0;
+  const endX = points[points.length - 1].x ?? 0;
   const coords = points.map((p, i) => ({
-    x: padding.left + i * xStep,
+    x: points.length === 1 ? padding.left + chartWidth / 2 :
+      padding.left + (dated && endX > startX ? ((p.x! - startX) / (endX - startX)) * chartWidth : i * xStep),
     y: padding.top + chartHeight - ((p.value - min) / range) * chartHeight,
     label: p.label,
     value: p.value,
@@ -83,14 +92,33 @@ export function AreaLineChart({
   // Y ticks
   const ticks = 4;
   const yTicks = Array.from({ length: ticks + 1 }, (_, i) => min + (range * i) / ticks);
+  const active = activeIndex === null ? null : coords[Math.min(activeIndex, coords.length - 1)];
 
   return (
+    <div className="interactive-chart">
     <svg
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       className="chart chart-area"
       role="img"
+      aria-label={`${label}. ${points.length} observations. Use left and right arrow keys to explore values.`}
+      tabIndex={0}
+      onFocus={() => setActiveIndex(points.length - 1)}
+      onKeyDown={(event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        setActiveIndex((previous) => event.key === "Home" ? 0 : event.key === "End" ? points.length - 1 :
+          Math.max(0, Math.min(points.length - 1, (previous ?? points.length - 1) + (event.key === "ArrowLeft" ? -1 : 1))));
+      }}
+      onPointerMove={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * width;
+        let closest = 0;
+        coords.forEach((point, index) => { if (Math.abs(point.x - x) < Math.abs(coords[closest].x - x)) closest = index; });
+        setActiveIndex(closest);
+      }}
     >
+      <title>{label}</title>
       {yTicks.map((t, i) => {
         const y = padding.top + chartHeight - ((t - min) / range) * chartHeight;
         return (
@@ -111,6 +139,10 @@ export function AreaLineChart({
 
       <path d={areaPath} className="chart-area-fill" />
       <path d={linePath} className="chart-area-line" fill="none" strokeWidth={2.5} />
+      {active ? <g>
+        <line x1={active.x} x2={active.x} y1={padding.top} y2={padding.top + chartHeight} className="chart-crosshair" />
+        <circle cx={active.x} cy={active.y} r={5} className="chart-area-dot" />
+      </g> : null}
 
       {coords.length <= 40 &&
         coords.map((c, i) => (
@@ -138,6 +170,16 @@ export function AreaLineChart({
         </>
       )}
     </svg>
+    <p className="chart-readout" aria-live="polite">
+      {active ? <><strong>{active.label}</strong><span>{yFormatter(active.value)}</span></> : "Hover, touch, or use arrow keys to inspect a value."}
+    </p>
+    {showDataTable ? <details className="chart-data-table">
+      <summary>View chart data</summary>
+      <div className="table-scroll"><table><caption>{label}</caption><thead><tr><th scope="col">Date</th><th scope="col">Value</th></tr></thead><tbody>
+        {points.map((point, index) => <tr key={`${point.label}-${index}`}><td>{point.label}</td><td>{yFormatter(point.value)}</td></tr>)}
+      </tbody></table></div>
+    </details> : null}
+    </div>
   );
 }
 

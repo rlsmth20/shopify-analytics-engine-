@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -34,18 +35,16 @@ GRAPHQL_VERSION = os.getenv("SHOPIFY_API_VERSION", "2026-04")
 # "Protected customer data" gate: the app must be approved for order-level
 # data in the Partner Dashboard (Apps -> skubase -> API access).
 PROTECTED_DATA_HELP = (
-    "Shopify denied access to order data (403). The app needs 'Protected "
-    "customer data' access approved in the Shopify Partner Dashboard "
-    "(Apps -> skubase -> API access -> Protected customer data: select "
-    "order-level data only)."
+    "Shopify has not granted access to order history. Contact skubase support "
+    "so we can check the app's order-data permissions."
 )
 
 RECONNECT_SCOPE_HELP = "Reconnect Shopify to approve the updated order access scope."
 
-# Shopify retired non-expiring offline tokens in June 2026; stores connected
-# before the cutover hold a token Shopify now rejects with 403 on every call.
+# New public apps require expiring offline tokens. Detect Shopify's explicit
+# rejection rather than attributing every permission error to token expiry.
 LEGACY_TOKEN_HELP = (
-    "Shopify retired this store's old-style access token (403). Click "
+    "Shopify no longer accepts this store's access token. Click "
     "Reconnect to re-authorize skubase - the new connection uses Shopify's "
     "expiring tokens and renews itself automatically."
 )
@@ -64,13 +63,35 @@ def _gql(domain: str, token: str, query: str, variables: Optional[dict] = None) 
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429 or attempt == 3:
+                raise
+            try:
+                delay = float(exc.headers.get("Retry-After", "2"))
+            except (ValueError, TypeError):
+                delay = 2
+            time.sleep(max(1, min(delay, 10)))
+            continue
+        errors = result.get("errors") or []
+        if not errors or any((error.get("extensions") or {}).get("code") != "THROTTLED" for error in errors):
+            return result
+        if attempt == 3:
+            return result
+        cost = (result.get("extensions") or {}).get("cost") or {}
+        throttle = cost.get("throttleStatus") or {}
+        missing = max(0, (cost.get("requestedQueryCost") or 100) - (throttle.get("currentlyAvailable") or 0))
+        rate = max(1, throttle.get("restoreRate") or 50)
+        time.sleep(min(10, max(1, missing / rate)))
+    raise RuntimeError("Shopify rate-limited the sync. Try again shortly.")
 
 
 PRODUCTS_QUERY = """
 query Products($cursor: String) {
-  products(first: 100, after: $cursor) {
+  products(first: 10, after: $cursor) {
     pageInfo { hasNextPage endCursor }
     edges {
       node {
@@ -78,7 +99,8 @@ query Products($cursor: String) {
         title
         vendor
         productType
-        variants(first: 50) {
+        variants(first: 20) {
+          pageInfo { hasNextPage endCursor }
           edges {
             node {
               id
@@ -98,7 +120,7 @@ query Products($cursor: String) {
 
 ORDERS_QUERY = """
 query Orders($cursor: String, $query: String) {
-  orders(first: 100, after: $cursor, query: $query) {
+  orders(first: 5, after: $cursor, query: $query) {
     pageInfo { hasNextPage endCursor }
     edges {
       node {
@@ -106,7 +128,7 @@ query Orders($cursor: String, $query: String) {
         createdAt
         displayFinancialStatus
         displayFulfillmentStatus
-        lineItems(first: 250) {
+        lineItems(first: 20) {
           pageInfo { hasNextPage endCursor }
           edges {
             node {
@@ -125,6 +147,56 @@ query Orders($cursor: String, $query: String) {
   }
 }
 """
+
+PRODUCT_VARIANTS_QUERY = """
+query ProductVariants($id: ID!, $cursor: String) {
+  product(id: $id) {
+    variants(first: 100, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      edges { node {
+        id sku title price inventoryQuantity
+        inventoryItem { unitCost { amount } }
+      } }
+    }
+  }
+}
+"""
+
+ORDER_LINE_ITEMS_QUERY = """
+query OrderLineItems($id: ID!, $cursor: String) {
+  order(id: $id) {
+    lineItems(first: 100, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      edges { node {
+        id title sku quantity
+        product { id }
+        variant { id }
+        originalUnitPriceSet { shopMoney { amount } }
+      } }
+    }
+  }
+}
+"""
+
+
+def _all_child_edges(domain: str, token: str, parent_id: str, connection: dict,
+                     query: str, parent_field: str, child_field: str) -> list:
+    """Fetch every nested page without silently truncating variants/order lines."""
+    edges = list(connection.get("edges") or [])
+    seen = set()
+    while (connection.get("pageInfo") or {}).get("hasNextPage"):
+        cursor = (connection.get("pageInfo") or {}).get("endCursor")
+        if not cursor or cursor in seen:
+            raise RuntimeError("Shopify returned an invalid pagination cursor. Please retry the sync.")
+        seen.add(cursor)
+        result = _gql(domain, token, query, {"id": parent_id, "cursor": cursor})
+        if result.get("errors"):
+            raise RuntimeError(f"Shopify {child_field} query failed: {result['errors']}")
+        connection = ((result.get("data") or {}).get(parent_field) or {}).get(child_field)
+        if not isinstance(connection, dict):
+            raise RuntimeError(f"Shopify did not return {child_field}. Please retry the sync.")
+        edges.extend(connection.get("edges") or [])
+    return edges
 
 
 def _shopify_id_to_str(gid: str) -> str:
@@ -201,7 +273,8 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
             category = (node.get("productType") or "").strip() or None
             base_name = node.get("title") or "Untitled product"
             variants = node.get("variants") or {}
-            v_edges = variants.get("edges") or []
+            v_edges = _all_child_edges(domain, token, node["id"], variants,
+                                       PRODUCT_VARIANTS_QUERY, "product", "variants")
             for vedge in v_edges:
                 v = vedge.get("node") or {}
                 if not v:
@@ -431,16 +504,9 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
             except Exception:
                 created_at = datetime.now(timezone.utc)
             line_items = order.get("lineItems") or {}
-            li_edges = line_items.get("edges") or []
+            li_edges = _all_child_edges(domain, token, order["id"], line_items,
+                                        ORDER_LINE_ITEMS_QUERY, "order", "lineItems")
             order_counts = Counter()
-            if (line_items.get("pageInfo") or {}).get("hasNextPage"):
-                skip_reasons["line_items_page_truncated"] += 1
-                logger.warning(
-                    "Shopify order has more line items than fetched: shop_domain=%s request_type=orders_graphql order_id=%s fetched_line_items=%s",
-                    domain,
-                    order_id,
-                    len(li_edges),
-                )
             for liedge in li_edges:
                 li = liedge.get("node") or {}
                 if not li:
@@ -571,13 +637,14 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
 
     token = ensure_fresh_access_token(db, conn)
 
-    started_at = datetime.now(timezone.utc)
+    started_at = time.monotonic()
     try:
         product_stats = _ingest_products(
             db, shop_id=shop_id, domain=conn.shopify_domain, token=token
         )
         products_count = int(product_stats.get("variants_imported") or 0)
     except Exception as exc:
+        db.rollback()
         run.status = "failed"
         run.error_message = _friendly_sync_error(exc)[:1000]
         run.finished_at = datetime.now(timezone.utc)
@@ -617,6 +684,7 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
             )
             line_items_count = int(order_stats.get("line_items_imported") or 0)
         except Exception as exc:
+            db.rollback()
             orders_error = _friendly_sync_error(exc) + " Products and inventory still synced."
             logger.exception("Shopify order sync failed for shop_id=%s", shop_id)
 
@@ -646,7 +714,7 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
         "no_eligible_recent_orders_found": bool(order_stats.get("no_eligible_recent_orders_found")),
         "orders_query": order_stats.get("orders_query"),
         "orders_error": orders_error,
-        "duration_seconds": (run.finished_at - started_at).total_seconds(),
+        "duration_seconds": time.monotonic() - started_at,
     }
 
 

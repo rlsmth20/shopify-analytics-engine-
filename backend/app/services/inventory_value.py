@@ -8,7 +8,7 @@ accrues history from the day a shop first syncs.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -82,11 +82,16 @@ def capture_all_inventory_snapshots() -> int:
 
 
 def inventory_value_history(db: DbSession, *, shop_id: int, days: int = 90) -> list[dict]:
+    days = max(1, min(days, 365))
+    today = datetime.now(timezone.utc).date()
+    cutoff = (today - timedelta(days=days - 1)).isoformat()
     rows = db.scalars(
         select(InventoryValueSnapshot)
-        .where(InventoryValueSnapshot.shop_id == shop_id)
+        .where(InventoryValueSnapshot.shop_id == shop_id,
+               InventoryValueSnapshot.snapshot_date >= cutoff,
+               InventoryValueSnapshot.snapshot_date <= today.isoformat())
         .order_by(InventoryValueSnapshot.snapshot_date.desc())
-        .limit(max(1, min(days, 365)))
+        .limit(days)
     ).all()
     rows.reverse()
     return [

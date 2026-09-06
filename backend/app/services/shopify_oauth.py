@@ -15,6 +15,9 @@ import hmac as hmac_module
 import logging
 import os
 import secrets
+import re
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -23,12 +26,39 @@ from urllib.parse import urlencode
 import urllib.error
 import urllib.request
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session as DbSession
 
 from app.db.models import Shop, ShopifyConnection, User
 
 logger = logging.getLogger(__name__)
+_connection_locks = [threading.RLock() for _ in range(64)]
+
+
+class ShopifyTokenExchangeError(RuntimeError):
+    """Shopify could not establish an API connection; safe to show to merchants."""
+
+
+class ShopifyTokenExchangeRejected(ShopifyTokenExchangeError):
+    """The current ID token was rejected; the browser should get a fresh one."""
+
+
+@contextmanager
+def shopify_connection_lock(db: DbSession, shop_domain: str):
+    """Serialize grants/refreshes, including across PostgreSQL app workers.
+
+    Callers commit or roll back before leaving this context. The transaction
+    advisory lock protects first installation, where no Shop row exists yet.
+    """
+    key = int.from_bytes(hashlib.sha256(shop_domain.encode()).digest()[:8], "big", signed=True)
+    with _connection_locks[key % len(_connection_locks)]:
+        if db.get_bind().dialect.name == "postgresql":
+            db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+        try:
+            yield
+        except Exception:
+            db.rollback()
+            raise
 
 
 SCOPES = "read_products,read_inventory,read_orders,read_locations"
@@ -74,10 +104,10 @@ def normalize_shop_domain(shop: str) -> Optional[str]:
     if s.endswith(".myshopify.com"):
         # Validate the prefix is a slug.
         slug = s[: -len(".myshopify.com")]
-        if slug and all(c.isalnum() or c == "-" for c in slug):
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", slug):
             return s
         return None
-    if s and all(c.isalnum() or c == "-" for c in s):
+    if re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", s):
         return f"{s}.myshopify.com"
     return None
 
@@ -203,8 +233,8 @@ def exchange_code_for_token(*, shop_domain: str, code: str) -> Optional[dict]:
         "client_id": api_key,
         "client_secret": api_secret,
         "code": code,
-        # Shopify no longer accepts non-expiring offline tokens on the Admin
-        # API. expiring=1 yields a ~1h access token plus a 90-day refresh
+        # Public apps should request renewable offline tokens. expiring=1
+        # yields a ~1h access token plus a 90-day refresh
         # token (rotated on every refresh by ensure_fresh_access_token).
         "expiring": "1",
     }).encode("utf-8")
@@ -254,7 +284,53 @@ def apply_token_payload(conn: ShopifyConnection, payload: dict) -> None:
         )
 
 
+def exchange_session_token(*, shop_domain: str, session_token: str) -> dict:
+    """Exchange an already-verified App Bridge ID token for an offline grant."""
+    if not is_configured():
+        raise ShopifyTokenExchangeError("Shopify authentication is not configured. Please contact support.")
+    if normalize_shop_domain(shop_domain) != shop_domain:
+        raise ShopifyTokenExchangeRejected("Invalid Shopify shop.")
+    body = urlencode({
+        "client_id": os.environ["SHOPIFY_CLIENT_ID"],
+        "client_secret": os.environ["SHOPIFY_CLIENT_SECRET"],
+        "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+        "subject_token": session_token,
+        "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
+        "requested_token_type": "urn:shopify:params:oauth:token-type:offline-access-token",
+        "expiring": "1",
+    }).encode()
+    req = urllib.request.Request(
+        f"https://{shop_domain}/admin/oauth/access_token", data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST",
+    )
+    try:
+        import json
+        with urllib.request.urlopen(req, timeout=10) as response:
+            payload = json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        # Never log grant bodies: they contain app secrets and session tokens.
+        logger.warning("shopify_session_exchange_failed shop=%s status=%s", shop_domain, exc.code)
+        if exc.code in (400, 401):
+            raise ShopifyTokenExchangeRejected("Shopify could not verify this session. Please try again.") from exc
+        raise ShopifyTokenExchangeError("Shopify could not connect your store. Please try again shortly.") from exc
+    except (OSError, ValueError) as exc:
+        raise ShopifyTokenExchangeError("Could not reach Shopify to connect your store. Please try again.") from exc
+    if not isinstance(payload, dict) or not isinstance(payload.get("access_token"), str) or not payload["access_token"]:
+        raise ShopifyTokenExchangeError("Shopify returned an incomplete connection. Please try again.")
+    if _expiry_from_seconds(payload.get("expires_in")) is None or not payload.get("refresh_token"):
+        raise ShopifyTokenExchangeError("Shopify did not return a renewable connection. Please try again.")
+    return payload
+
+
 def ensure_fresh_access_token(db: DbSession, conn: ShopifyConnection) -> str:
+    with shopify_connection_lock(db, conn.shopify_domain):
+        db.refresh(conn)
+        token = _refresh_access_token(db, conn)
+        db.commit()
+        return token
+
+
+def _refresh_access_token(db: DbSession, conn: ShopifyConnection) -> str:
     """Return a usable access token, refreshing via the refresh token if needed.
 
     Legacy connections (no expiry recorded) are returned as-is — Shopify will
@@ -293,13 +369,9 @@ def ensure_fresh_access_token(db: DbSession, conn: ShopifyConnection) -> str:
             import json as _json
             payload = _json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        try:
-            detail = exc.read().decode("utf-8", errors="replace")[:300]
-        except Exception:
-            detail = "<unavailable>"
         logger.error(
-            "Shopify token refresh failed for %s: %s %s body=%s",
-            conn.shopify_domain, exc.code, exc.reason, detail,
+            "Shopify token refresh failed for %s: status=%s",
+            conn.shopify_domain, exc.code,
         )
         return conn.access_token
     except Exception:
@@ -324,8 +396,14 @@ def persist_connection(
     shop_id: int,
     shop_domain: str,
     token_payload: dict,
+    commit: bool = True,
 ) -> ShopifyConnection:
     """Insert or update the ShopifyConnection row for a workspace shop."""
+    # The verified Shopify shop owns the connection. A separate website-login
+    # workspace must never be renamed over an existing installed store.
+    canonical = db.scalar(select(Shop).where(Shop.shopify_domain == shop_domain))
+    if canonical is not None:
+        shop_id = canonical.id
     existing = db.scalar(
         select(ShopifyConnection).where(ShopifyConnection.shop_id == shop_id)
     )
@@ -347,8 +425,11 @@ def persist_connection(
     shop = db.get(Shop, shop_id)
     if shop is not None:
         shop.shopify_domain = shop_domain
-    db.commit()
-    db.refresh(existing)
+    if commit:
+        db.commit()
+        db.refresh(existing)
+    else:
+        db.flush()
 
     # A fresh install/re-auth changes what Shopify will report — drop any
     # cached billing snapshot for this shop.
@@ -358,7 +439,7 @@ def persist_connection(
     return existing
 
 
-def get_or_create_embedded_user_for_shop(db: DbSession, *, shop_domain: str) -> User:
+def get_or_create_embedded_user_for_shop(db: DbSession, *, shop_domain: str, commit: bool = True) -> User:
     """Provision a Skubase user/workspace for Shopify-originated installs."""
     from app.services.auth import TRIAL_TTL, _now
 
@@ -383,8 +464,11 @@ def get_or_create_embedded_user_for_shop(db: DbSession, *, shop_domain: str) -> 
         user.last_login_at = _now()
         if user.trial_ends_at is None:
             user.trial_ends_at = _now() + TRIAL_TTL
-    db.commit()
-    db.refresh(user)
+    if commit:
+        db.commit()
+        db.refresh(user)
+    else:
+        db.flush()
     return user
 
 

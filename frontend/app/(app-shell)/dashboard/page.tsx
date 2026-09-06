@@ -64,6 +64,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
   const [completedOnboardingSteps, setCompletedOnboardingSteps] = useState<string[]>([]);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
@@ -75,10 +76,10 @@ export default function DashboardPage() {
         setData(res);
         setError(null);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
+      .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e)); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, []);
+  }, [refreshAttempt]);
 
   useEffect(() => {
     try {
@@ -102,6 +103,7 @@ export default function DashboardPage() {
       <div className="page-error">
         <p className="page-error-title">Could not load dashboard</p>
         <p className="page-error-copy">{error}</p>
+        <button type="button" className="button button-primary" onClick={() => setRefreshAttempt((previous) => previous + 1)} disabled={loading}>{loading ? "Retrying…" : "Try again"}</button>
       </div>
     );
   }
@@ -123,13 +125,18 @@ export default function DashboardPage() {
           <p className="dashboard-empty-eyebrow">Welcome to skubase</p>
           <h2 className="dashboard-empty-title">No data in your workspace yet.</h2>
           <p className="dashboard-empty-copy">
-            Import your Stocky or ShipStation export and skubase will rank
-            every SKU by what to do today — urgent, optimize, dead. Most
-            merchants see their first ranked action in under ten minutes.
+            Sync your Shopify inventory and recent orders to see stockout risks,
+            reorder recommendations, and cash tied up in slow-moving products.
+            You can also import a Stocky or ShipStation export.
           </p>
           <div className="dashboard-empty-steps">
-            <a href="/import-stocky" className="dashboard-empty-step">
+            <a href="/store-sync" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">1</span>
+              <div><p className="dashboard-empty-step-title">Sync your Shopify store</p><p className="dashboard-empty-step-body">Your store connects when you open skubase in Shopify. Run the first sync to load inventory and orders.</p></div>
+              <span aria-hidden>→</span>
+            </a>
+            <a href="/import-stocky" className="dashboard-empty-step">
+              <span className="dashboard-empty-step-num">2</span>
               <div>
                 <p className="dashboard-empty-step-title">Import Stocky CSV</p>
                 <p className="dashboard-empty-step-body">Export Inventory On Hand from Stocky — maps in one step.</p>
@@ -137,18 +144,10 @@ export default function DashboardPage() {
               <span aria-hidden>→</span>
             </a>
             <a href="/import-shipstation" className="dashboard-empty-step">
-              <span className="dashboard-empty-step-num">2</span>
+              <span className="dashboard-empty-step-num">3</span>
               <div>
                 <p className="dashboard-empty-step-title">Import ShipStation CSV</p>
                 <p className="dashboard-empty-step-body">Drop in your ShipStation shipment export to seed velocity data.</p>
-              </div>
-              <span aria-hidden>→</span>
-            </a>
-            <a href="/store-sync" className="dashboard-empty-step">
-              <span className="dashboard-empty-step-num">3</span>
-              <div>
-                <p className="dashboard-empty-step-title">Connect your Shopify store</p>
-                <p className="dashboard-empty-step-body">Pull live inventory, orders, and variants directly from Shopify.</p>
               </div>
               <span aria-hidden>→</span>
             </a>

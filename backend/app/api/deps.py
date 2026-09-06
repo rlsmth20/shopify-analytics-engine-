@@ -12,6 +12,7 @@ from app.db.models import Subscription, User
 from app.db.session import get_db_session
 from app.services.auth import SESSION_COOKIE_NAME, resolve_session
 from app.services.plan_entitlements import FeatureKey, plan_allows_feature
+from app.services.shopify_oauth import ShopifyTokenExchangeError, ShopifyTokenExchangeRejected
 from app.services.shopify_session_tokens import (
     ShopifySessionTokenError,
     resolve_user_from_shopify_session_token,
@@ -36,7 +37,7 @@ def get_current_user(
         bearer_failure: HTTPException | None = None
         try:
             user = resolve_user_from_shopify_session_token(db, bearer)
-        except ShopifySessionTokenError as exc:
+        except (ShopifySessionTokenError, ShopifyTokenExchangeRejected) as exc:
             logger.info(
                 "auth_me_failed reason=invalid_shopify_session_token origin=%s error=%s",
                 request.headers.get("origin"),
@@ -45,8 +46,11 @@ def get_current_user(
             bearer_failure = HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Shopify session token.",
+                headers={"X-Shopify-Retry-Invalid-Session-Request": "1"},
             )
             user = None
+        except ShopifyTokenExchangeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         if user is not None:
             return user
         if bearer_failure is None:
@@ -58,11 +62,9 @@ def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Shopify app is not installed for this shop.",
             )
-        # A bad bearer must not lock out a browser session that also carries a
-        # valid cookie (e.g. stale App Bridge token alongside a magic-link
-        # session). Fall through to cookie auth; raise only if that is absent.
-        if not session_token:
-            raise bearer_failure
+        # A Shopify request must never resolve to another shop through a
+        # website cookie. The browser can retry with a fresh ID token.
+        raise bearer_failure
 
     if not session_token:
         logger.info(
@@ -95,12 +97,11 @@ def get_optional_user(
     bearer = _bearer_token(request)
     if bearer:
         try:
-            user = resolve_user_from_shopify_session_token(db, bearer)
-        except ShopifySessionTokenError:
-            user = None
-        if user is not None:
-            return user
-        # Fall through to cookie auth, mirroring get_current_user.
+            return get_current_user(request, db, session_token=None)
+        except HTTPException as exc:
+            if exc.status_code != 401:
+                raise
+            return None
     if not session_token:
         return None
     return resolve_session(db, raw_token=session_token)

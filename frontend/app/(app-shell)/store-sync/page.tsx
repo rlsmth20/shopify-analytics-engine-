@@ -8,7 +8,7 @@ import { SectionCard } from "@/components/section-card";
 import {
   authenticatedFetch,
   getEmbeddedShopifyContext,
-  redirectTopLevel,
+  reconnectShopify,
 } from "@/lib/shopify-embedded";
 
 const API_BASE = APP_API_BASE_URL;
@@ -49,7 +49,9 @@ function formatRelative(iso: string | null): string {
 
 export default function StoreSyncPage() {
   const [connection, setConnection] = useState<Connection | null>(null);
-  const [shopInput, setShopInput] = useState("");
+  const [connectionLoading, setConnectionLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [embeddedShop, setEmbeddedShop] = useState<string | null>(null);
   const [installLoading, setInstallLoading] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -67,49 +69,30 @@ export default function StoreSyncPage() {
   );
 
   async function loadConnection() {
+    setConnectionLoading(true);
+    setConnectionError(null);
     try {
       const res = await authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, {
         credentials: "include",
+        signal: AbortSignal.timeout(15_000),
       });
-      if (!res.ok) return;
-      setConnection(await res.json());
-    } catch {
-      // best-effort
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(typeof body?.detail === "string" ? body.detail : `Could not check your Shopify connection (${res.status}).`);
+      }
+      if (typeof body?.connected !== "boolean") throw new Error("Could not read your Shopify connection. Please try again.");
+      setConnection(body);
+    } catch (error) {
+      setConnectionError(error instanceof Error ? error.message : "Could not load your Shopify connection.");
+    } finally {
+      setConnectionLoading(false);
     }
   }
 
   useEffect(() => {
+    setEmbeddedShop(getEmbeddedShopifyContext()?.shop || null);
     void loadConnection();
   }, []);
-
-  async function handleInstall(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setInstallError(null);
-    if (!shopInput.trim()) {
-      setInstallError("Enter your myshopify.com domain.");
-      return;
-    }
-    setInstallLoading(true);
-    try {
-      const embedded = getEmbeddedShopifyContext();
-      const params = new URLSearchParams({ shop: shopInput.trim() });
-      if (embedded?.host) params.set("host", embedded.host);
-      const res = await authenticatedFetch(`${API_BASE}/integrations/shopify/install?${params}`, {
-        credentials: "include",
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setInstallError(body?.detail || `Install failed (${res.status}).`);
-        return;
-      }
-      if (body?.authorize_url) {
-        // Shopify's OAuth page refuses to render inside the app iframe.
-        redirectTopLevel(body.authorize_url);
-      }
-    } finally {
-      setInstallLoading(false);
-    }
-  }
 
   async function handleSyncNow() {
     setSyncError(null);
@@ -127,8 +110,23 @@ export default function StoreSyncPage() {
       }
       setSyncResult(body);
       void loadConnection();
+    } catch {
+      setSyncError("The connection was interrupted before sync could be confirmed. Check the last sync time, then try again.");
+      void loadConnection();
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleReconnect() {
+    setInstallError(null);
+    setInstallLoading(true);
+    try {
+      await reconnectShopify(connection?.shopify_domain || undefined);
+    } catch (error) {
+      setInstallError(error instanceof Error ? error.message : "Could not reconnect Shopify. Please try again.");
+    } finally {
+      setInstallLoading(false);
     }
   }
 
@@ -139,17 +137,25 @@ export default function StoreSyncPage() {
           <div>
             <p className="section-eyebrow">Shopify connection</p>
             <h2 className="section-title">
-              {connection?.connected ? "Connected" : "Connect your Shopify store"}
+              {connectionLoading ? "Checking Shopify connection…" : connectionError ? "Connection unavailable" : connection?.connected ? "Connected" : "Connect your Shopify store"}
             </h2>
           </div>
-          {connection?.connected ? (
+          {connectionLoading || connectionError ? null : connection?.connected ? (
             <span className="status-badge status-succeeded">Active</span>
           ) : (
             <span className="status-badge status-failed">Not connected</span>
           )}
         </div>
 
-        {connection?.connected ? (
+        {connectionLoading ? (
+          <p className="section-copy" role="status">Loading your Shopify connection…</p>
+        ) : connectionError ? (
+          <div>
+            <p className="auth-error" role="alert">{connectionError}</p>
+            <button type="button" className="button button-primary" onClick={() => void loadConnection()}>Try again</button>
+            <Link href="/billing" className="button button-ghost">View billing</Link>
+          </div>
+        ) : connection?.connected ? (
           <>
             <p className="section-copy">
               Connected to <strong>{connection.shopify_domain}</strong>. Last
@@ -173,25 +179,13 @@ export default function StoreSyncPage() {
               <button
                 type="button"
                 className="button button-ghost"
-                onClick={async () => {
-                  const domain = connection?.shopify_domain || "";
-                  if (!domain) return;
-                  const embedded = getEmbeddedShopifyContext();
-                  const params = new URLSearchParams({ shop: domain });
-                  if (embedded?.host) params.set("host", embedded.host);
-                  const res = await authenticatedFetch(
-                    `${API_BASE}/integrations/shopify/install?${params}`,
-                    { credentials: "include" }
-                  );
-                  const body = await res.json().catch(() => null);
-                  if (body?.authorize_url) {
-                    redirectTopLevel(body.authorize_url);
-                  }
-                }}
+                onClick={() => void handleReconnect()}
+                disabled={installLoading || syncing}
               >
-                Reconnect
+                {installLoading ? "Connecting…" : "Reconnect"}
               </button>
             </div>
+            {installError ? <p className="auth-error" role="alert">{installError}</p> : null}
             {syncError ? (
               <p className="auth-error" style={{ marginTop: "16px" }}>
                 {syncError}
@@ -266,27 +260,15 @@ export default function StoreSyncPage() {
               read-only for planning. Any future write-back flow should require
               a preview and explicit approval before touching Shopify stock.
             </div>
-            <form onSubmit={handleInstall} className="auth-form" style={{ maxWidth: "440px" }}>
-              <label className="auth-field">
-                <span className="auth-field-label">Your myshopify.com domain</span>
-                <input
-                  type="text"
-                  className="auth-input"
-                  placeholder="yourshop.myshopify.com"
-                  value={shopInput}
-                  onChange={(e) => setShopInput(e.target.value)}
-                  disabled={installLoading}
-                />
-              </label>
-              {installError ? <p className="auth-error">{installError}</p> : null}
-              <button
-                type="submit"
-                className="button button-primary"
-                disabled={installLoading}
-              >
-                {installLoading ? "Redirecting…" : "Connect Shopify"}
+            <p className="section-copy">Open skubase from the Apps section of your Shopify Admin. Your store connects automatically when the app opens.</p>
+            {embeddedShop ? (
+              <button type="button" className="button button-primary" disabled={installLoading} onClick={() => void handleReconnect()}>
+                {installLoading ? "Connecting…" : "Reconnect this store"}
               </button>
-            </form>
+            ) : (
+              <a className="button button-primary" href="https://admin.shopify.com" target="_top">Open Shopify Admin</a>
+            )}
+            {installError ? <p className="auth-error" role="alert">{installError}</p> : null}
           </>
         )}
       </SectionCard>

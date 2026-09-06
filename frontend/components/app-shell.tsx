@@ -202,9 +202,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setEmbedded(isEmbeddedShopifyContext());
     const urlShop = new URLSearchParams(window.location.search).get("shop");
-    const storedDomain = urlShop || window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
-    if (urlShop) window.localStorage.setItem(SHOPIFY_DOMAIN_STORAGE_KEY, urlShop);
-    setShopifyDomain(storedDomain || "");
+    let storedDomain = urlShop;
+    try {
+      storedDomain ||= window.localStorage.getItem(SHOPIFY_DOMAIN_STORAGE_KEY);
+      if (urlShop) window.localStorage.setItem(SHOPIFY_DOMAIN_STORAGE_KEY, urlShop);
+    } catch {
+      // Storage can be blocked inside Shopify; the authenticated connection
+      // remains the source of truth for the store displayed below.
+    }
+    setShopifyDomain((previous) => storedDomain || previous || "");
     setStoreLoaded(true);
   }, [pathname]);
 
@@ -244,8 +250,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       credentials: "include",
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((conn: { connected?: boolean; last_sync_at?: string | null } | null) => {
+      .then((conn: { connected?: boolean; shopify_domain?: string | null; last_sync_at?: string | null } | null) => {
         if (cancelled || !conn) return;
+        if (conn.connected && conn.shopify_domain) setShopifyDomain(conn.shopify_domain);
         setSyncConnected(Boolean(conn.connected));
         setLastSyncAt(conn.last_sync_at ?? null);
       })
