@@ -77,8 +77,8 @@ def _calculate_metrics(
 
     reorder_point = daily_velocity * lead_time_days_used + safety_stock_units
     stockout_risk = daily_velocity > 0 and sku.inventory < target_inventory_units
-    overstock_risk = days_of_inventory > 75
-    dead_stock = sku.days_since_last_sale > 45
+    overstock_risk = sku.inventory > 0 and days_of_inventory > 75
+    dead_stock = sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale > 45
     profit_per_unit = max(sku.price - sku.cost, 0.0)
 
     return InventoryMetrics(
@@ -140,7 +140,16 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
         "lead_time_source": metrics.lead_time_source,
         "target_coverage_days": metrics.target_coverage_days,
         "priority_score": _calculate_priority_score(metrics, status),
+        "sales_history_complete": metrics.sku.sales_history_complete,
+        "data_quality_confidence": "high" if metrics.sku.sales_history_complete else "low",
+        "data_quality_warnings": metrics.sku.sales_history_warnings,
     }
+    if not metrics.sku.sales_history_complete and status == "optimize":
+        # The existing optimize contract carries a monitoring task. It must not
+        # imply measured excess units, trapped cash, or a purchasing target.
+        base_payload.update(target_inventory_units=0, reorder_point_units=0,
+                            safety_stock_units=0, priority_score=10.0)
+        return OptimizeInventoryAction(**base_payload, excess_units=0, cash_tied_up=0.0)
 
     if status == "urgent":
         days_until_stockout = round(metrics.days_of_inventory, 1)
@@ -169,6 +178,12 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
 
 
 def _determine_status(metrics: InventoryMetrics) -> Classification:
+    if not metrics.sku.sales_history_complete:
+        # Recorded demand can still justify a low-confidence stockout warning.
+        # Missing coverage cannot justify markdowns, liquidation, or reduced buys.
+        if metrics.stockout_risk:
+            return "urgent"
+        return "optimize" if metrics.sku.inventory > 0 else "healthy"
     if metrics.dead_stock:
         return "dead"
     if metrics.stockout_risk:
@@ -181,6 +196,8 @@ def _determine_status(metrics: InventoryMetrics) -> Classification:
 def _build_recommended_action(
     metrics: InventoryMetrics, status: Classification
 ) -> str:
+    if not metrics.sku.sales_history_complete and status == "optimize":
+        return "Monitor sales and verify order-history coverage before changing purchasing or clearing stock."
     if status == "urgent":
         target_units = math.ceil(metrics.target_inventory_units)
         reorder_quantity = max(target_units - metrics.sku.inventory, 0)
@@ -213,6 +230,8 @@ def _build_recommended_action(
 
 
 def _build_explanation(metrics: InventoryMetrics, status: Classification) -> str:
+    if not metrics.sku.sales_history_complete and status == "optimize":
+        return "Imported sales history is insufficient to classify this inventory as stale or excess."
     if status == "urgent":
         target_units = math.ceil(metrics.target_inventory_units)
         units_short = max(target_units - metrics.sku.inventory, 0)

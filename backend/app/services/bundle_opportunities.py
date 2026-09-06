@@ -186,7 +186,7 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
     skus = load_skus_for_shop(db, shop_id)
     dead = [
         sku for sku in skus
-        if sku.inventory > 0 and sku.days_since_last_sale >= DEAD_STOCK_DAYS
+        if sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= DEAD_STOCK_DAYS
     ]
     anchors = sorted(
         (

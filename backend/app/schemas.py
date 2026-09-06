@@ -142,6 +142,7 @@ class BaseInventoryAction(ApiModel):
     lead_time_source: LeadTimeSource
     target_coverage_days: int
     priority_score: float
+    sales_history_complete: bool = True
     data_quality_confidence: DataQualityConfidence = "high"
     data_quality_warnings: list[str] = Field(default_factory=list)
 
@@ -218,3 +219,8 @@ class SkuDetail(ApiModel):
     last_7_day_sales: int
     days_since_last_sale: int
     sku_lead_time_days: int | None = None
+    sales_history_complete: bool = Field(
+        default=True,
+        description="Whether available order history supports stale/excess-stock conclusions; legacy inputs default to known history.",
+    )
+    sales_history_warnings: list[str] = Field(default_factory=list)

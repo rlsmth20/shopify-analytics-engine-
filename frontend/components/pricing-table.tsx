@@ -26,14 +26,14 @@ export function PricingTable() {
           className={`pricing-toggle-button${cycle === "annual" ? " pricing-toggle-active" : ""}`}
           onClick={() => setCycle("annual")}
         >
-          Annual <span className="pricing-toggle-badge">Save 15%</span>
+          Annual <span className="pricing-toggle-badge">Save about 15%</span>
         </button>
       </div>
 
       <section className="pricing-grid">
         {PRICING_TIERS.map((tier) => {
           const variant = cycle === "monthly" ? tier.monthly : tier.annual;
-          const cadence = cycle === "monthly" ? "/mo" : "/mo (billed annually)";
+          const cadence = cycle === "monthly" ? "/mo" : "/mo equivalent";
 
           return (
             <article
@@ -41,7 +41,7 @@ export function PricingTable() {
               className={`pricing-card${tier.featured ? " pricing-card-featured" : ""}`}
             >
               {tier.featured ? (
-                <p className="pricing-card-ribbon">Most merchants pick this</p>
+                <p className="pricing-card-ribbon">For reorder planning</p>
               ) : null}
               <h2 className="pricing-card-name">{tier.name}</h2>
               <p className="pricing-card-pitch">{tier.pitch}</p>

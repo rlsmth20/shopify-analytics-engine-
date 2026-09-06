@@ -47,9 +47,9 @@ export function PlanComparison() {
       <p className="marketing-section-kicker">Compare plans</p>
       <h2 className="marketing-section-title">Exactly what each plan includes.</h2>
       <p className="marketing-section-sub">
-        Generated from the same feature catalog as the{" "}
-        <Link href="/features">features page</Link> — if it&apos;s listed here, it&apos;s live
-        (anything still in progress is marked planned).
+        Compare available tools and their data requirements. See the{" "}
+        <Link href="/features">feature details</Link> for how each tool works.
+        Features still in progress are marked planned.
       </p>
       <div className="plan-matrix-wrapper">
         <table className="plan-matrix">

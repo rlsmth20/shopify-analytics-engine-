@@ -25,10 +25,11 @@ def _today_utc() -> str:
 
 
 def capture_inventory_value_snapshot(db: DbSession, *, shop_id: int) -> InventoryValueSnapshot | None:
-    """Upsert today's snapshot for one shop. Returns None for empty catalogs.
+    """Upsert today's value, including zero after a previously captured catalog empties.
 
     Re-running on the same day refreshes the row, so the stored value reflects
-    the last capture of the day.
+    the last capture of the day. A shop with no inventory or prior snapshot still
+    returns None rather than inventing history before its first inventory capture.
     """
     row = db.execute(
         select(
@@ -43,7 +44,13 @@ def capture_inventory_value_snapshot(db: DbSession, *, shop_id: int) -> Inventor
     total_units = int(row[0] or 0)
     sku_count = int(row[1] or 0)
     if sku_count == 0:
-        return None
+        previous_snapshot_id = db.scalar(
+            select(InventoryValueSnapshot.id)
+            .where(InventoryValueSnapshot.shop_id == shop_id)
+            .limit(1)
+        )
+        if previous_snapshot_id is None:
+            return None
 
     today = _today_utc()
     snapshot = db.scalar(
@@ -64,12 +71,14 @@ def capture_inventory_value_snapshot(db: DbSession, *, shop_id: int) -> Inventor
 
 
 def capture_all_inventory_snapshots() -> int:
-    """Capture today's snapshot for every shop that has inventory rows."""
+    """Capture shops with current inventory or history, including newly empty shops."""
     captured = 0
     with SessionLocal() as db:
         shop_ids = [
             int(shop_id)
-            for shop_id in db.scalars(select(Inventory.shop_id).distinct()).all()
+            for shop_id in db.scalars(
+                select(Inventory.shop_id).union(select(InventoryValueSnapshot.shop_id))
+            ).all()
         ]
         for shop_id in shop_ids:
             try:

@@ -1,4 +1,5 @@
 import type { InventoryAction } from "@/lib/api";
+import { isHistoryReviewAction } from "@/lib/action-quality";
 import { ProjectedStockHealth } from "@/components/projected-stock-health";
 import {
   confidenceLabel,
@@ -14,7 +15,8 @@ export function ActionCard({
 }: {
   action: InventoryAction;
 }) {
-  const daysLeft = firstFinite(
+  const historyReview = isHistoryReviewAction(action);
+  const daysLeft = historyReview ? null : firstFinite(
     action.status === "urgent" ? action.days_until_stockout : null,
     action.days_of_inventory
   );
@@ -22,7 +24,7 @@ export function ActionCard({
     action.status === "urgent" && isFiniteNumber(action.target_inventory_units) && isFiniteNumber(action.current_on_hand)
       ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
       : null;
-  const cashAtRisk = action.status === "urgent" ? action.estimated_profit_impact : action.cash_tied_up;
+  const cashAtRisk = historyReview ? null : action.status === "urgent" ? action.estimated_profit_impact : action.cash_tied_up;
   const calculationDetails = technicalExplanation(action.explanation) ? action.explanation : null;
   const explanation = plainEnglishExplanation(action, daysLeft);
   const stockHealthStatus =
@@ -41,7 +43,7 @@ export function ActionCard({
       <div className="action-card-top">
         <div className="action-card-badges">
           <span className={`pill pill-${action.status}`}>
-            {statusLabel[action.status]}
+            {historyReview ? "Review history" : statusLabel[action.status]}
           </span>
           {action.status === "urgent" ? (
             <span className={`pill pill-urgency-${action.urgency_level}`}>
@@ -102,7 +104,12 @@ export function ActionCard({
         </div>
       </div>
 
-      <ProjectedStockHealth
+      {historyReview ? (
+        <div className="quality-block">
+          <p className="quality-label">More sales history needed</p>
+          <p>{action.data_quality_warnings[0] || "Sync order history before making a purchasing or clearance decision."}</p>
+        </div>
+      ) : <ProjectedStockHealth
         productName={action.name}
         sku={action.sku_id}
         currentStock={action.current_on_hand}
@@ -120,7 +127,7 @@ export function ActionCard({
         dataQualityNote={action.data_quality_warnings[0]}
         compact
         hideMetricGrid
-      />
+      />}
 
       <details className="action-advanced-details">
         <summary>Advanced details</summary>
@@ -146,14 +153,14 @@ export function ActionCard({
         <dl className="action-metadata">
           <Meta label="Current stock" value={formatNumber(action.current_on_hand)} />
           <Meta label="Daily velocity" value={formatVelocity(action.daily_velocity)} />
-          <Meta label="Reorder point" value={formatNumber(action.reorder_point_units)} />
-          <Meta label="Safety stock" value={formatNumber(action.safety_stock_units)} />
-          <Meta label="Target units" value={formatNumber(action.target_inventory_units)} />
+          <Meta label="Reorder point" value={historyReview ? "Needs sales history" : formatNumber(action.reorder_point_units)} />
+          <Meta label="Safety stock" value={historyReview ? "Needs sales history" : formatNumber(action.safety_stock_units)} />
+          <Meta label="Target units" value={historyReview ? "Needs sales history" : formatNumber(action.target_inventory_units)} />
           <Meta label="Lead time source" value={leadTimeSourceLabel[action.lead_time_source]} />
           {action.status === "urgent" ? (
             <Meta label="Stockout risk estimate" value={riskTextFromExplanation(action.explanation)} />
           ) : (
-            <Meta label="Excess units" value={formatNumber(action.excess_units)} />
+            <Meta label="Excess units" value={historyReview ? "Not established" : formatNumber(action.excess_units)} />
           )}
           {calculationDetails ? (
             <div className="action-metadata-wide">

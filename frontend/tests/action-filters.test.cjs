@@ -15,6 +15,7 @@ function load(file) {
   return exports;
 }
 const { filterInventoryActions, readActionFilters, DEFAULT_ACTION_FILTERS: defaults } = load(path.join(root, "lib/action-filters.ts"));
+const { isHistoryReviewAction } = load(path.join(root, "lib/action-quality.ts"));
 const actions = [
   { sku_id: "blue-1", name: "Blue Shirt", status: "urgent", data_quality_confidence: "high", days_until_stockout: 3, days_of_inventory: 3, priority_score: 20, estimated_profit_impact: 400 },
   { sku_id: "blue-2", name: "Blue Jacket", status: "urgent", data_quality_confidence: "low", days_until_stockout: 12, days_of_inventory: 12, priority_score: 90, estimated_profit_impact: 200 },
@@ -43,4 +44,10 @@ test("chart links restore valid filters and reject invalid enum values", () => {
 });
 test("unmatched searches return an empty result", () => {
   assert.equal(filterInventoryActions(actions, { ...defaults, query: "unmatched" }).length, 0);
+});
+test("insufficient history is distinct from established excess and urgent stockout risk", () => {
+  assert.equal(isHistoryReviewAction({ status: "optimize", sales_history_complete: false }), true);
+  assert.equal(isHistoryReviewAction({ status: "optimize", sales_history_complete: true }), false);
+  assert.equal(isHistoryReviewAction({ status: "optimize" }), false);
+  assert.equal(isHistoryReviewAction({ status: "urgent", sales_history_complete: false }), false);
 });

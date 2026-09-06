@@ -11,7 +11,9 @@ already installed Shopify domain from a separate website workspace attempted to
 assign the same unique domain to a second Shop. Production logs are still needed
 to confirm that this was the exact exception in the recording.
 
-These changes are local. They have not been deployed or submitted to Shopify.
+The repairs were deployed to Vercel and Railway on September 6, 2026, through
+commits `c925fcf` and `7c8449f`. Both deployment checks succeeded. They have not
+been submitted to Shopify.
 This document records a targeted repair and product improvement pass, not a
 completed audit of every App Store requirement.
 
@@ -32,7 +34,7 @@ completed audit of every App Store requirement.
 - Embedded requests omit website cookies. Authentication errors show recovery
   controls instead of automatically restarting OAuth. Only the read-only
   `/auth/me` request receives one fresh-token retry when instructed by the API.
-- App Bridge uses a conditional `beforeInteractive` script, shared loading,
+- App Bridge uses a conditional synchronous CDN script, shared loading,
   bounded waits, and recoverable loading failures. Store Sync distinguishes
   loading, connection errors, disconnection, and sync errors.
 - Shopify queries use smaller initial pages and exhaust nested variant and order
@@ -54,6 +56,24 @@ completed audit of every App Store requirement.
   longer imply a positive value. Dashboard and connection errors offer retries.
 - Sample history is explicitly labeled, never substitutes for failed live data,
   and remains consistent when changing the selected period.
+- Complete catalog traversal reconciles planning inventory with active, tracked,
+  non-gift-card Shopify variants. Deleted, archived, draft, untracked, prior CSV,
+  and superseded location inventory is retired only after every product page is
+  validated. Product and order history is retained; other shops are unaffected.
+- Sync receipts distinguish eligible planning inventory, newly imported order
+  lines, already imported lines, unmatched items, and incomplete order history.
+  A valid empty 60-day paid-order window does not tell the merchant to reconnect.
+  Invalid order roots/cursor loops fail; order pages commit only after traversal.
+- Unknown or insufficient sales history yields a low-confidence monitoring task,
+  never liquidation, excess-cash claims, or an overstock alert. Cards and reports
+  explain missing history instead of presenting the legacy 999-day sentinel as
+  measured cover. Existing demand can still produce a low-confidence reorder
+  warning. A prior inventory snapshot becomes zero when the catalog empties.
+- Support requests require an actual reply email and acknowledge success only
+  after the provider accepts delivery. Synthetic Shopify login identities are
+  not prefilled as mailboxes. All automated email tests mock delivery.
+- Annual pricing equivalents, feature limits, comparison prices and Stocky
+  retirement/migration copy are corrected. Billing amounts are unchanged.
 
 ## Verification performed
 
@@ -64,7 +84,7 @@ From `backend/`, install test dependencies with
 python -m unittest discover -s tests -v
 ```
 
-17 tests passed, using synthetic credentials, mocked Shopify responses, and
+42 tests passed, using synthetic credentials, mocked Shopify responses, and
 isolated in-memory SQLite. Coverage includes fresh install, reinstall, expiry,
 parallel first requests, failed grants, callback workspace isolation, malformed
 tokens, staff privileges, nested pagination, repeat-sync idempotence, throttling,
@@ -78,7 +98,7 @@ npm run typecheck
 npm run build
 ```
 
-15 frontend tests, type checking, and the production build passed. All four sync
+25 frontend tests, type checking, and the production build passed. All four sync
 GraphQL queries passed Shopify plugin validation against its bundled 2026-04
 Admin schema. Browser checks of the local production build confirmed chart
 period/measure controls, consistent latest values, the data table, exposure
@@ -86,8 +106,23 @@ navigation, and stockout filtering. No warnings or errors were captured in the
 final analytics browser check. Earlier error-path checks confirmed connection
 failures present recovery controls.
 
-These checks do not exercise Shopify's live authorization, production PostgreSQL
-locking, hosting timeouts, or the App Store automated checks.
+The initial live test reproduced a blocked accounts.shopify.com iframe on the
+old deployment. The first repaired deployment exposed App Bridge's rejection of
+Next's asynchronous beforeInteractive loader. Commit `7c8449f` replaces it with
+a native synchronous CDN script and makes the recovery loader synchronous too.
+A production HTML check confirms it is the first blocking external script and
+does not appear on the public pricing page. Live uninstall/reinstall on the
+development store `skubase_test` then reached the embedded dashboard without
+repeated OAuth. The canonical existing workspace and subscription were retained.
+Two manual syncs completed at 13:31:29 and 13:32:13 local time on September 6:
+17 products, 26 variants, and zero eligible orders. Shopify's newest existing
+orders were June 12, outside the 60-day access window, explaining the empty result.
+
+A one-item developer draft was prepared to verify a current paid order. Automatic
+approval review blocked marking the $749.95 development draft as paid; the
+specific authorization request is pending. No payment status, charge, invoice,
+or customer message was issued. Do not treat the automated paid-order tests as a
+completed live paid-order check or this pass as Shopify approval.
 
 ## Deployment notes and remaining verification
 
@@ -122,6 +157,18 @@ Before resubmission, use a development store to verify:
   connection token alone does not establish that all requested data was removed.
 - Carry store currency through API responses and formatting. Existing money
   displays use USD; non-USD stores need consistent currency-aware reporting.
+- Reconcile order edits, cancellations and refunds. Existing imported line IDs
+  currently skip updates, so a corrected quantity can leave stale demand history.
+- Verify saved purchase orders and partial receiving end to end. They already
+  exist; harden duplicate/over-quantity receipts, confirm open-order netting, and
+  replace the supplier observation loader's assumed 14-day lead-time baseline.
+
+The sales-history guard is intentionally conservative and uses no new database
+field: at least 30 days since a recorded positive sale, plus a successful Shopify
+sync no older than two days when sync metadata exists. It is a warning heuristic,
+not proof of uninterrupted coverage or product age. Established CSV history with
+no Shopify sync metadata retains prior behavior. Durable coverage windows and
+historical stockout observations are still needed for richer forecasting.
 
 References: [Shopify token exchange](https://shopify.dev/docs/apps/build/authentication-authorization/implement-token-exchange),
 [access tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens),

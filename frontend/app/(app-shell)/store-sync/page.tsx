@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { SectionCard } from "@/components/section-card";
+import { getSyncNotice, isSyncResult, unmatchedSyncItems, type SyncResult } from "@/lib/sync-summary";
 import {
   authenticatedFetch,
   getEmbeddedShopifyContext,
@@ -18,23 +19,6 @@ type Connection = {
   shopify_domain: string | null;
   last_sync_at: string | null;
   scope: string | null;
-};
-
-type SyncResult = {
-  status?: string;
-  products_count?: number;
-  products_scanned?: number;
-  variants_imported?: number;
-  order_line_items_count?: number;
-  orders_scanned?: number;
-  line_items_scanned?: number;
-  line_items_imported?: number;
-  line_items_skipped?: number;
-  top_skip_reason?: string | null;
-  stored_token_has_read_orders?: boolean;
-  token_lacks_read_orders?: boolean;
-  no_eligible_recent_orders_found?: boolean;
-  orders_error?: string | null;
 };
 
 function formatRelative(iso: string | null): string {
@@ -58,15 +42,7 @@ export default function StoreSyncPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
-  const shouldExplainZeroOrderItems = Boolean(
-    syncResult &&
-      (syncResult.order_line_items_count ?? 0) === 0 &&
-      ((syncResult.orders_scanned ?? 0) > 0 ||
-        (syncResult.line_items_scanned ?? 0) > 0 ||
-        syncResult.token_lacks_read_orders ||
-        syncResult.no_eligible_recent_orders_found ||
-        syncResult.orders_error)
-  );
+  const syncNotice = syncResult ? getSyncNotice(syncResult) : null;
 
   async function loadConnection() {
     setConnectionLoading(true);
@@ -105,7 +81,12 @@ export default function StoreSyncPage() {
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        setSyncError(body?.detail || `Sync failed (${res.status}).`);
+        setSyncError(typeof body?.detail === "string" ? body.detail : `Sync failed (${res.status}).`);
+        return;
+      }
+      if (!isSyncResult(body)) {
+        setSyncError("Shopify's sync result could not be confirmed. Check the last sync time, then try again.");
+        void loadConnection();
         return;
       }
       setSyncResult(body);
@@ -193,13 +174,21 @@ export default function StoreSyncPage() {
             ) : null}
             {syncResult ? (
               <div className="sync-safety-note" role="status" style={{ marginTop: "16px" }}>
+                <strong>{syncResult.status === "partial" ? "Inventory refreshed; order import incomplete" : "Sync complete"}</strong>
                 <p className="section-copy" style={{ margin: 0 }}>
                   Synced{" "}
                   <strong>{(syncResult.variants_imported ?? syncResult.products_count ?? 0).toLocaleString()}</strong>{" "}
                   product variants and{" "}
                   <strong>{(syncResult.order_line_items_count ?? 0).toLocaleString()}</strong>{" "}
-                  order line items.
+                  new order line items.
                 </p>
+                {typeof syncResult.inventory_variants_active === "number" ? (
+                  <p className="section-copy" style={{ margin: "8px 0 0" }}>
+                    <strong>{syncResult.inventory_variants_active.toLocaleString()}</strong> active, stock-tracked variants included in inventory planning.
+                    {(syncResult.inventory_variants_excluded ?? 0) > 0 ? ` ${syncResult.inventory_variants_excluded!.toLocaleString()} draft, archived, gift card, or untracked variants excluded.` : ""}
+                    {(syncResult.inventory_rows_retired ?? 0) > 0 ? " Outdated inventory records were removed from current totals; product and order history is retained." : ""}
+                  </p>
+                ) : null}
                 <p className="section-copy" style={{ margin: "8px 0 0" }}>
                   Products scanned:{" "}
                   <strong>{(syncResult.products_scanned ?? 0).toLocaleString()}</strong>.
@@ -207,44 +196,30 @@ export default function StoreSyncPage() {
                   <strong>{(syncResult.orders_scanned ?? 0).toLocaleString()}</strong>.
                   Line items scanned:{" "}
                   <strong>{(syncResult.line_items_scanned ?? 0).toLocaleString()}</strong>.
-                  Line items skipped:{" "}
-                  <strong>{(syncResult.line_items_skipped ?? 0).toLocaleString()}</strong>.
+                  Already imported:{" "}
+                  <strong>{(syncResult.line_item_skip_reasons?.already_imported ?? 0).toLocaleString()}</strong>.
+                  Unmatched items:{" "}
+                  <strong>{unmatchedSyncItems(syncResult).toLocaleString()}</strong>.
                 </p>
-                {syncResult.top_skip_reason ? (
+                {syncResult.top_skip_reason && syncResult.top_skip_reason !== "already_imported" ? (
                   <p className="section-copy" style={{ margin: "8px 0 0" }}>
                     Top skip reason: <strong>{syncResult.top_skip_reason}</strong>.
                   </p>
                 ) : null}
-                {syncResult.token_lacks_read_orders ? (
-                  <p className="section-copy" style={{ margin: "8px 0 0" }}>
-                    Reconnect Shopify to approve the updated order access scope.
-                  </p>
-                ) : null}
-                {syncResult.no_eligible_recent_orders_found ? (
-                  <p className="section-copy" style={{ margin: "8px 0 0" }}>
-                    No eligible recent paid orders were found in the Shopify order access window.
-                  </p>
-                ) : null}
               </div>
             ) : null}
-            {shouldExplainZeroOrderItems ? (
-              <div className="import-error" role="alert" style={{ marginTop: "12px" }}>
-                <strong>No order line items were imported.</strong>{" "}
-                Reconnect Shopify if order access was recently added.
+            {syncNotice ? (
+              <div className={syncNotice.warning ? "import-error" : "sync-safety-note"} role={syncNotice.warning ? "alert" : "status"} style={{ marginTop: "12px" }}>
+                <strong>{syncNotice.title}</strong>
                 <p className="section-copy" style={{ margin: "8px 0 0" }}>
-                  Skubase needs recent Shopify orders to calculate sales velocity,
-                  forecasts, and bundle opportunities.
-                </p>
-                <p className="section-copy" style={{ margin: "8px 0 0" }}>
-                  Orders without customers should still be imported for inventory
-                  forecasting.
+                  {syncNotice.message}
                 </p>
               </div>
             ) : null}
-            {syncResult?.status === "partial" && syncResult.orders_error ? (
-              <div className="import-error" role="alert" style={{ marginTop: "12px" }}>
-                <strong>Products synced, but order history did not.</strong>{" "}
-                {syncResult.orders_error}
+            {syncResult ? (
+              <div className="button-row" style={{ marginTop: "16px" }}>
+                <Link href="/analytics" className="button button-ghost">Review inventory</Link>
+                <Link href="/actions" className="button button-ghost">Review actions</Link>
               </div>
             ) : null}
           </>

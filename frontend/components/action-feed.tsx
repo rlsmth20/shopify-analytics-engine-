@@ -174,7 +174,7 @@ export function ActionFeed({
           />
           <ActionSection
             title="Optimize"
-            description="Inventory tying up working capital beyond the target coverage."
+            description="Review coverage and data gaps before changing purchasing or clearing stock."
             actions={visibleGroups.optimize}
           />
           <ActionSection

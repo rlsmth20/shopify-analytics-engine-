@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
+import { contactResponseError, isShopifyIdentityEmail } from "@/lib/contact";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 
 const API_BASE = APP_API_BASE_URL;
@@ -22,7 +23,9 @@ export default function FeedbackPage() {
   const { user } = useAuth();
 
   const [name, setName] = useState("");
-  const [email, setEmail] = useState(user.id !== 0 ? user.email : "");
+  const [email, setEmail] = useState(
+    user.id !== 0 && !isShopifyIdentityEmail(user.email) ? user.email : "",
+  );
   const [type, setType] = useState<ContactType>("general");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,20 +35,22 @@ export default function FeedbackPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (isShopifyIdentityEmail(email)) {
+      setError("Enter an email address where you can receive a reply.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await authenticatedFetch(`${API_BASE}/contact/submit`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, type, message }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), type, message }),
       });
       const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError(
-          body?.detail ||
-            `Something went wrong (${res.status}). Try emailing hello@skubase.io directly.`
-        );
+      const submissionError = contactResponseError(res.ok, body);
+      if (submissionError) {
+        setError(submissionError);
         return;
       }
       setSent(true);
@@ -72,11 +77,11 @@ export default function FeedbackPage() {
               className="section-copy"
               style={{ fontSize: "18px", fontWeight: 600, marginBottom: "8px" }}
             >
-              Got it. We'll get back to you soon.
+              Your message has been sent to support.
             </p>
             <p className="section-copy">
-              You'll hear back at <strong>{email}</strong> within one business day.
-              For urgent issues you can also reach us directly at{" "}
+              We will use <strong>{email.trim()}</strong> to reply.
+              You can also reach us directly at{" "}
               <a href="mailto:hello@skubase.io" style={{ color: "inherit" }}>
                 hello@skubase.io
               </a>
@@ -110,16 +115,19 @@ export default function FeedbackPage() {
             </label>
 
             <label className="auth-field">
-              <span className="auth-field-label">Email</span>
+              <span className="auth-field-label">Reply email</span>
               <input
                 type="email"
                 className="auth-input"
                 placeholder="you@yourstore.com"
+                autoComplete="email"
+                maxLength={320}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
               />
+              <span className="section-copy">Use an inbox you can access so support can reply.</span>
             </label>
 
             <label className="auth-field">
@@ -156,7 +164,7 @@ export default function FeedbackPage() {
               />
             </label>
 
-            {error ? <p className="auth-error">{error}</p> : null}
+            {error ? <p className="auth-error" role="alert">{error}</p> : null}
 
             <button type="submit" className="button button-primary" disabled={loading}>
               {loading ? "Sending..." : "Send message"}

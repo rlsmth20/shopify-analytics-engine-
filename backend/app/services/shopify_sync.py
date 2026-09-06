@@ -99,6 +99,8 @@ query Products($cursor: String) {
         title
         vendor
         productType
+        status
+        isGiftCard
         variants(first: 20) {
           pageInfo { hasNextPage endCursor }
           edges {
@@ -107,7 +109,7 @@ query Products($cursor: String) {
               sku
               title
               price
-              inventoryItem { unitCost { amount } }
+              inventoryItem { tracked unitCost { amount } }
               inventoryQuantity
             }
           }
@@ -155,7 +157,7 @@ query ProductVariants($id: ID!, $cursor: String) {
       pageInfo { hasNextPage endCursor }
       edges { node {
         id sku title price inventoryQuantity
-        inventoryItem { unitCost { amount } }
+        inventoryItem { tracked unitCost { amount } }
       } }
     }
   }
@@ -179,10 +181,37 @@ query OrderLineItems($id: ID!, $cursor: String) {
 """
 
 
+def _validated_connection(connection: object, field: str) -> dict:
+    """Reject incomplete responses before treating a catalog traversal as complete."""
+    if not isinstance(connection, dict):
+        raise RuntimeError(f"Shopify did not return {field}. Please retry the sync.")
+    edges = connection.get("edges")
+    page_info = connection.get("pageInfo")
+    if (
+        not isinstance(edges, list)
+        or not isinstance(page_info, dict)
+        or not isinstance(page_info.get("hasNextPage"), bool)
+        or any(
+            not isinstance(edge, dict)
+            or not isinstance(edge.get("node"), dict)
+            or not isinstance(edge["node"].get("id"), str)
+            or not edge["node"]["id"]
+            for edge in edges
+        )
+    ):
+        raise RuntimeError(f"Shopify returned incomplete {field}. Please retry the sync.")
+    if page_info["hasNextPage"] and (
+        not isinstance(page_info.get("endCursor"), str) or not page_info["endCursor"]
+    ):
+        raise RuntimeError("Shopify returned an invalid pagination cursor. Please retry the sync.")
+    return connection
+
+
 def _all_child_edges(domain: str, token: str, parent_id: str, connection: dict,
                      query: str, parent_field: str, child_field: str) -> list:
     """Fetch every nested page without silently truncating variants/order lines."""
-    edges = list(connection.get("edges") or [])
+    connection = _validated_connection(connection, child_field)
+    edges = list(connection["edges"])
     seen = set()
     while (connection.get("pageInfo") or {}).get("hasNextPage"):
         cursor = (connection.get("pageInfo") or {}).get("endCursor")
@@ -193,9 +222,8 @@ def _all_child_edges(domain: str, token: str, parent_id: str, connection: dict,
         if result.get("errors"):
             raise RuntimeError(f"Shopify {child_field} query failed: {result['errors']}")
         connection = ((result.get("data") or {}).get(parent_field) or {}).get(child_field)
-        if not isinstance(connection, dict):
-            raise RuntimeError(f"Shopify did not return {child_field}. Please retry the sync.")
-        edges.extend(connection.get("edges") or [])
+        connection = _validated_connection(connection, child_field)
+        edges.extend(connection["edges"])
     return edges
 
 
@@ -245,10 +273,17 @@ def _top_skip_reason(skip_reasons: Counter) -> str | None:
 
 
 def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) -> dict:
-    """Pull products + variants + inventory snapshot."""
+    """Pull the catalog and atomically replace the shop's planning inventory.
+
+    Shopify becomes the authoritative inventory source after a complete traversal,
+    retiring prior CSV/location rows as well as deleted or ineligible variants.
+    Product metadata and order history remain available for historical reporting.
+    """
     cursor = None
+    seen_cursors: set[str] = set()
     products_scanned = 0
     variants_imported = 0
+    inventory_snapshot: dict[int, int] = {}
     while True:
         result = _gql(domain, token, PRODUCTS_QUERY, {"cursor": cursor})
         # Surface GraphQL-level errors so we can see scope / permission failures.
@@ -259,8 +294,8 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
         # Use `or {}` after every .get() because Shopify's GraphQL can return
         # explicit nulls that dict.get() does NOT replace with its default.
         data = result.get("data") or {}
-        products = data.get("products") or {}
-        edges = products.get("edges") or []
+        products = _validated_connection(data.get("products"), "products")
+        edges = products["edges"]
         for edge in edges:
             node = edge.get("node") or {}
             if not node:
@@ -272,6 +307,8 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
             vendor = (node.get("vendor") or "").strip() or None
             category = (node.get("productType") or "").strip() or None
             base_name = node.get("title") or "Untitled product"
+            if not isinstance(node.get("status"), str) or not isinstance(node.get("isGiftCard"), bool):
+                raise RuntimeError("Shopify did not return product inventory eligibility. Please retry the sync.")
             variants = node.get("variants") or {}
             v_edges = _all_child_edges(domain, token, node["id"], variants,
                                        PRODUCT_VARIANTS_QUERY, "product", "variants")
@@ -298,7 +335,13 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
                     cost = Decimal(str(cost_amount)) if cost_amount is not None else None
                 except Exception:
                     cost = None
-                qty = int(v.get("inventoryQuantity") or 0)
+                tracked = (v.get("inventoryItem") or {}).get("tracked")
+                if not isinstance(tracked, bool):
+                    raise RuntimeError("Shopify did not return inventory tracking status. Please retry the sync.")
+                inventory_eligible = node["status"] == "ACTIVE" and not node["isGiftCard"] and tracked
+                qty = v.get("inventoryQuantity")
+                if inventory_eligible and (not isinstance(qty, int) or isinstance(qty, bool)):
+                    raise RuntimeError("Shopify did not return a tracked inventory quantity. Please retry the sync.")
 
                 product = db.scalar(
                     select(Product).where(
@@ -332,34 +375,44 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
                     if cost is not None:
                         product.cost = cost
 
-                # Inventory: store an aggregate row per variant. Multi-location
-                # split lands when we wire InventoryLevel per location below.
-                inv = db.scalar(
-                    select(Inventory).where(
-                        Inventory.shop_id == shop_id,
-                        Inventory.product_id == product.id,
-                        Inventory.shopify_location_id == "aggregate",
-                    )
-                )
-                if inv is None:
-                    inv = Inventory(
-                        shop_id=shop_id,
-                        product_id=product.id,
-                        shopify_location_id="aggregate",
-                        quantity=qty,
-                    )
-                    db.add(inv)
-                else:
-                    inv.quantity = qty
+                if inventory_eligible:
+                    inventory_snapshot[product.id] = qty
                 variants_imported += 1
-        db.commit()
-        page_info = (((result.get("data") or {}).get("products") or {}).get("pageInfo")) or {}
-        if not page_info.get("hasNextPage"):
+        page_info = products["pageInfo"]
+        if not page_info["hasNextPage"]:
             break
-        cursor = page_info.get("endCursor")
+        cursor = page_info["endCursor"]
+        if cursor in seen_cursors:
+            raise RuntimeError("Shopify returned an invalid pagination cursor. Please retry the sync.")
+        seen_cursors.add(cursor)
+
+    # Reconcile only after every page is validated. A failed traversal leaves the
+    # previous inventory intact, and the caller rolls back uncommitted metadata.
+    existing_inventory = db.scalars(
+        select(Inventory).where(Inventory.shop_id == shop_id)
+    ).all()
+    retained_aggregates: dict[int, Inventory] = {}
+    inventory_rows_retired = 0
+    for inv in existing_inventory:
+        if inv.product_id in inventory_snapshot and inv.shopify_location_id == "aggregate":
+            retained_aggregates[inv.product_id] = inv
+        else:
+            db.delete(inv)
+            inventory_rows_retired += 1
+    for product_id, quantity in inventory_snapshot.items():
+        inv = retained_aggregates.get(product_id)
+        if inv is None:
+            db.add(Inventory(shop_id=shop_id, product_id=product_id,
+                             shopify_location_id="aggregate", quantity=quantity))
+        else:
+            inv.quantity = quantity
+    db.commit()
     return {
         "products_scanned": products_scanned,
         "variants_imported": variants_imported,
+        "inventory_variants_active": len(inventory_snapshot),
+        "inventory_variants_excluded": variants_imported - len(inventory_snapshot),
+        "inventory_rows_retired": inventory_rows_retired,
     }
 
 
@@ -419,6 +472,7 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
     since = since_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     query = f"created_at:>={since} financial_status:paid status:any"
     cursor = None
+    seen_cursors: set[str] = set()
     stats = {
         "orders_query": query,
         "orders_scanned": 0,
@@ -483,8 +537,8 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
             )
             raise RuntimeError(f"Shopify orders query failed: {gql_errors}")
         data = result.get("data") or {}
-        orders = data.get("orders") or {}
-        edges = orders.get("edges") or []
+        orders = _validated_connection(data.get("orders"), "orders")
+        edges = orders["edges"]
         pages_seen += 1
         logger.info(
             "Shopify orders page: shop_domain=%s request_type=orders_graphql page=%s edges=%s cursor=%s",
@@ -590,11 +644,15 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                 order_counts["line_items_skipped"],
                 _top_skip_reason(skip_reasons),
             )
-        db.commit()
-        page_info = (((result.get("data") or {}).get("orders") or {}).get("pageInfo")) or {}
-        if not page_info.get("hasNextPage"):
+        page_info = orders["pageInfo"]
+        if not page_info["hasNextPage"]:
             break
-        cursor = page_info.get("endCursor")
+        cursor = page_info["endCursor"]
+        if cursor in seen_cursors:
+            raise RuntimeError("Shopify returned an invalid pagination cursor. Please retry the sync.")
+        seen_cursors.add(cursor)
+    # Demand history becomes visible only after the entire traversal succeeds.
+    db.commit()
     stats["line_item_skip_reasons"] = dict(skip_reasons)
     stats["top_skip_reason"] = _top_skip_reason(skip_reasons)
     stats["no_eligible_recent_orders_found"] = stats["orders_scanned"] == 0
@@ -700,6 +758,9 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
         "products_count": products_count,
         "products_scanned": int(product_stats.get("products_scanned") or 0),
         "variants_imported": products_count,
+        "inventory_variants_active": int(product_stats.get("inventory_variants_active") or 0),
+        "inventory_variants_excluded": int(product_stats.get("inventory_variants_excluded") or 0),
+        "inventory_rows_retired": int(product_stats.get("inventory_rows_retired") or 0),
         "order_line_items_count": line_items_count,
         "orders_scanned": int(order_stats.get("orders_scanned") or 0),
         "line_items_scanned": int(order_stats.get("line_items_scanned") or 0),

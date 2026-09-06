@@ -67,7 +67,7 @@ export default function AccountPage() {
             <div className="signal-item">
               <div>
                 <p className="signal-title">Role</p>
-                <p className="signal-copy">Admin</p>
+                <p className="signal-copy">Support administrator</p>
               </div>
             </div>
           ) : null}
@@ -170,17 +170,15 @@ export default function AccountPage() {
         <div className="section-heading">
           <div>
             <p className="section-eyebrow">Workspace access</p>
-            <h2 className="section-title section-title-small">Admin/member roles</h2>
+            <h2 className="section-title section-title-small">Workspace assistance</h2>
           </div>
           <span className="status-badge status-succeeded">
-            {user.is_admin ? "Admin" : "Member"}
+            Support-assisted
           </span>
         </div>
         <p className="section-copy">
-          Skubase uses workspace roles to separate admin access from day-to-day
-          inventory work. Admin users can manage invites and support-level
-          workspace changes; members can use the inventory workflows for their
-          connected shop.
+          Contact support to request a change to your workspace or account access.
+          Self-service team invitations and role management are planned.
         </p>
         <div className="button-row">
           <a className="button button-ghost" href="mailto:hello@skubase.io">

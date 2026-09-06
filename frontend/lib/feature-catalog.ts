@@ -221,7 +221,7 @@ export const FEATURE_CATALOG: CatalogGroup[] = [
     key: "scale",
     title: "Operate at scale",
     tagline:
-      "Multi-location, supplier accountability, and team controls for operations that outgrew one warehouse and one buyer.",
+      "Supplier accountability and planning support for larger catalogs and growing teams.",
     features: [
       {
         name: "Supplier insights",
@@ -243,25 +243,26 @@ export const FEATURE_CATALOG: CatalogGroup[] = [
         scale: true,
       },
       {
-        name: "Multi-location transfers",
+        name: "Transfer planning",
         description:
-          "Rebalancing recommendations that move stock from where it sits to where it sells, with units-to-move totals and a styled export.",
-        detail: "Needs location-level Shopify inventory.",
+          "Review suggested stock moves and export a transfer plan when location-level inventory is available. Transfers are carried out separately in your inventory system.",
+        detail: "Current Shopify sync imports aggregate stock only, so it does not yet populate location-level transfer recommendations. Planning does not change Shopify inventory.",
         demoHref: "/transfers?demo=1",
         starter: false,
         growth: false,
         scale: true,
       },
       {
-        name: "Team controls",
-        description: "Admin roles and audit history for teams where more than one person touches the buy plan.",
+        name: "Self-service team roles",
+        description: "Manage team invitations and workspace roles in the app.",
+        detail: "Planned. Workspace changes currently go through support.",
         starter: false,
         growth: false,
-        scale: true,
+        scale: "planned",
       },
       {
         name: "Priority support",
-        description: "Same-business-day responses, plus onboarding concierge for larger catalogs.",
+        description: "Help with onboarding and inventory planning for larger catalogs.",
         starter: false,
         growth: false,
         scale: true,
@@ -278,7 +279,7 @@ export const FEATURE_CATALOG: CatalogGroup[] = [
   },
   {
     key: "connect",
-    title: "Connect your data in minutes",
+    title: "Connect your store data",
     tagline:
       "Shopify-first with a read-only sync — and CSV paths that work even before you connect a store.",
     features: [
@@ -286,6 +287,7 @@ export const FEATURE_CATALOG: CatalogGroup[] = [
         name: "Shopify sync",
         description:
           "Read-only sync of products, inventory, and order history. skubase never writes to your store — it cannot change quantities, prices, or orders.",
+        detail: "Current inventory sync provides total stock per SKU, without a location breakdown.",
         demoHref: "/store-sync?demo=1",
         starter: true,
         growth: true,
@@ -294,7 +296,8 @@ export const FEATURE_CATALOG: CatalogGroup[] = [
       {
         name: "Stocky CSV import",
         description:
-          "Bring your Stocky catalog across in one upload — the migration checklist walks the whole move.",
+          "Upload a Stocky product CSV to bring supported catalog fields and stock quantities into your planning workspace.",
+        detail: "Catalog import only; purchase-order history and transfer workflows are not migrated.",
         demoHref: "/stocky-migration?demo=1",
         starter: true,
         growth: true,

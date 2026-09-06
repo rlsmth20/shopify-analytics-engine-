@@ -4,12 +4,12 @@ import { MarketingFooter } from "@/components/marketing-footer";
 
 export const metadata = {
   title: "Inventory Planner alternatives in 2026 - skubase",
-  description: "Inventory Planner was acquired by Sage in 2021. Prices tripled for many accounts. Here are the best alternatives for Shopify merchants today.",
+  description: "Compare Inventory Planner alternatives for Shopify merchants, with current pricing sources and clear distinctions between inventory planning and operations.",
   alternates: { canonical: "/blog/inventory-planner-alternative" },
   keywords: ["Inventory Planner alternative", "Inventory Planner Sage", "Shopify forecasting tool"],
   openGraph: {
     title: "Inventory Planner alternatives in 2026",
-    description: "Prices tripled post-Sage acquisition. Here are the honest alternatives.",
+    description: "Compare pricing, inventory planning, and operational workflows for Shopify merchants.",
     url: "/blog/inventory-planner-alternative",
     type: "article",
   },
@@ -20,6 +20,7 @@ const ARTICLE_LD = {
   "@type": "Article",
   headline: "Inventory Planner alternatives in 2026",
   datePublished: "2026-04-29",
+  dateModified: "2026-09-06",
   author: { "@type": "Organization", name: "skubase" },
 };
 
@@ -30,85 +31,89 @@ export default function InventoryPlannerAlternativePage() {
 
       <article className="blog-article">
         <p className="blog-article-meta">
-          <time dateTime="2026-04-29">April 29, 2026</time> - 9 min read - Comparison
+          Published <time dateTime="2026-04-29">April 29, 2026</time> - Updated <time dateTime="2026-09-06">September 6, 2026</time> - Comparison
         </p>
         <h1 className="blog-article-title">Inventory Planner alternatives in 2026</h1>
         <p className="blog-article-lead">
-          Inventory Planner was the best Shopify forecasting tool for a long time. Then Sage acquired it in 2021.
-          Reviews since then are a consistent story: prices up 2-3x, support slower, roadmap quiet. This post
-          covers what to use instead - honestly, including cases where Inventory Planner is still the right call.
+          Choosing an Inventory Planner alternative starts with the work you need to do: forecast demand,
+          review replenishment, or manage purchasing and fulfillment. This comparison covers those differences
+          and the pricing details to check before switching.
+        </p>
+        <p className="blog-article-meta">
+          Prices and product availability checked September 6, 2026. Prices shown below are USD for monthly billing;
+          follow the linked pricing pages for current tiers and terms.
         </p>
 
-        <h2 className="blog-article-h2">What happened after the Sage acquisition</h2>
+        <h2 className="blog-article-h2">Inventory Planner&apos;s ownership history</h2>
         <p>
-          Inventory Planner was founded in 2012, grew to thousands of Shopify and multi-channel merchants, and was
-          acquired by Sage Group in 2021. Sage is a large UK accounting software company; Inventory Planner was
-          their move into supply chain planning. Post-acquisition behavior followed a pattern common in B2B SaaS
-          roll-ups: annual price increases, support routed through a larger org, and a roadmap that slowed as
-          engineers were absorbed into Sage&apos;s wider engineering priorities.
+          Brightpearl acquired Inventory Planner in 2021, according to <a href="https://www.brightpearl.com/brightpearl-history">Brightpearl&apos;s company history</a>.
+          Sage then acquired Brightpearl in January 2022; <a href="https://www.sage.com/en-sg/news/press-releases/2022/01/sage-completes-acquisition-of-brightpearl-to-support-a-thriving-online-retail-sector/">Sage&apos;s completion announcement</a> is dated January 18, 2022.
         </p>
         <p>
-          The tool itself - the forecasting math, the replenishment logic - didn&apos;t get worse. The reviews
-          that turned negative are mostly about pricing and support, not accuracy. That distinction matters when
-          picking an alternative.
+          For a switching decision, compare your actual renewal quote, support arrangements, and required workflows.
+          Ownership history alone does not establish whether a product meets your needs.
         </p>
 
-        <h2 className="blog-article-h2">What Inventory Planner still does well</h2>
+        <h2 className="blog-article-h2">When Inventory Planner may still fit</h2>
         <p>
-          Before the alternatives: if you have a large, established account with custom forecasting rules baked
-          in and a dedicated CSM, switching costs are real. The tool&apos;s demand sensing, seasonal
-          decomposition, and multi-location handling are genuinely good. The case for staying is strong if
-          your account pricing hasn&apos;t jumped and you have a relationship with a support contact who knows
-          your setup.
+          Inventory Planner lists multi-location planning, replenishment, buying budgets, and integrations with
+          sales channels and inventory systems. Its <a href="https://www.inventory-planner.com/pricing/">pricing page</a> requests
+          a quote based on the volume of inventory managed and includes unlimited users.
         </p>
         <p>
-          The case for leaving is pricing you didn&apos;t agree to, a support queue instead of a person, and
-          a roadmap that doesn&apos;t match what you actually need.
+          If your team already relies on those workflows, include the time needed to recreate rules, validate
+          recommendations, and train staff when comparing the cost of staying with the cost of switching.
         </p>
 
         <h2 className="blog-article-h2">The alternatives</h2>
 
-        <h3 className="blog-article-h3">skubase - built for the gap Inventory Planner left</h3>
+        <h3 className="blog-article-h3">skubase - inventory planning for Shopify</h3>
         <p>
-          skubase ships the same forecasting math (Holt double-exponential smoothing with weekly seasonality)
-          plus three things Inventory Planner never got to: supplier scorecards, dead-stock action plans, and
-          a ranked daily action queue. Pricing is published - $49, $99, $199/mo - with a written commitment
-          that your plan price doesn&apos;t increase at renewal. No POS Pro requirement, no minimum contract.
+          skubase helps you review forecasts, stockout risk, and a ranked daily action queue, with supplier
+          scorecards and dead-stock recommendations available by plan. <Link href="/pricing">Monthly plans are $29, $99, and $199</Link>,
+          with the price-lock commitment described in our <Link href="/terms">terms</Link>.
         </p>
         <p>
-          The migration path from Inventory Planner is a CSV export of your product catalog plus your vendor
-          list. Our importer maps both in one step.
+          skubase is read-only with respect to your Shopify store: it helps you plan, but does not send purchase
+          orders to suppliers, execute transfers, or change store inventory. Shopify sync brings in aggregate
+          inventory totals. Use Shopify or your operations system to carry out approved actions.
+        </p>
+        <p>
+          Connect Shopify or use a supported CSV import to bring data into skubase. Keep Inventory Planner exports
+          for reference and check the destination&apos;s supported fields before importing; a product catalog import
+          does not recreate your vendor records, purchase-order history, or forecasting rules.
         </p>
 
         <h3 className="blog-article-h3">Prediko</h3>
         <p>
-          Prediko is a Shopify-first AI forecasting tool, started in 2021. The forecasting UI is good -
-          clean, visual, fast. Pricing is $119-$599/mo. It&apos;s Shopify-only (no Amazon, Walmart native
-          writes), which is fine if that&apos;s your channel mix. Multi-location support was added in 2024.
-          Supplier management is basic - contacts and lead times, not scorecards. Good tool if Shopify-only
-          and you want visual-first.
+          Prediko lists demand forecasting, purchase-order management, and multiple stores and locations.
+          Its <a href="https://www.prediko.io/pricing">monthly pricing starts at $49</a> for stores with less than
+          $100,000 in revenue over the last 12 months. Pricing uses total annual revenue recorded in Shopify,
+          including online stores, POS, wholesale, and connected sales channels; higher revenue tiers cost more.
+          Review its listed integrations against your own channel and warehouse setup.
         </p>
 
         <h3 className="blog-article-h3">Linnworks</h3>
         <p>
-          Linnworks is an operations platform - channel sync, order routing, inventory. Its forecasting
-          module exists but is not the primary product. The right pick if you sell on 4+ channels and
-          need a single operations hub; probably over-engineered if you need forecasting for a
-          Shopify-primary business.
+          Linnworks covers inventory sync, order routing, purchasing, warehouse workflows, and forecasting.
+          Its <a href="https://www.linnworks.com/pricing?region=GB">pricing page</a> describes order-volume-based
+          quotes, add-on modules, and onboarding costs. Consider it when your evaluation includes how orders
+          and stock move through the business as well as what to reorder.
         </p>
 
         <h3 className="blog-article-h3">Brightpearl (Sage)</h3>
         <p>
-          Brightpearl is also now Sage-owned. If pricing and acquisition trajectory are the reason you&apos;re
-          leaving Inventory Planner, evaluating another Sage product has the same risk profile.
+          Brightpearl is a broader retail operations option within Sage, covering workflows such as order,
+          inventory, and purchasing management. Review its <a href="https://www.brightpearl.com/pricing">current
+          offering and custom pricing</a> if you are considering a wider operations change. Ask which capabilities
+          and implementation services are included in your quote.
         </p>
 
         <h3 className="blog-article-h3">Spreadsheets</h3>
         <p>
-          Honest inclusion: a well-built Google Sheet with a six-month trailing average and a safety-stock
-          buffer column beats most tools for merchants with under 100 SKUs and predictable demand. It
-          fails at scale (slow, error-prone), misses seasonality, and doesn&apos;t score suppliers - but
-          it&apos;s free and you control it. <Link href="/blog/why-six-month-moving-average-overstocks-you">We wrote about where it breaks</Link>.
+          A spreadsheet can be a practical option for a small catalog with predictable demand and someone
+          responsible for keeping it current. Account for the time spent refreshing data and reviewing formulas.
+          A simple trailing average can miss changing demand; <Link href="/blog/why-six-month-moving-average-overstocks-you">our moving-average guide</Link> explains the tradeoffs.
         </p>
 
         <h2 className="blog-article-h2">How to decide</h2>
@@ -117,33 +122,31 @@ export default function InventoryPlannerAlternativePage() {
         </p>
         <ol className="blog-article-ol">
           <li>
-            <strong>How many channels?</strong> Shopify-only → skubase or Prediko. Multi-channel with
-            order routing → Linnworks or a channel-sync tool plus a forecasting layer.
+            <strong>Which work must the tool perform?</strong> Separate forecasting and recommendations from
+            sending purchase orders, receiving stock, and routing orders. Test each workflow you need.
           </li>
           <li>
-            <strong>What&apos;s the pain?</strong> Forecasting accuracy → skubase or Prediko.
-            Pricing opacity → skubase (price-locked published tiers). Support degradation →
-            any founder-led independent.
+            <strong>What drives the total cost?</strong> Compare the same billing cadence, your applicable revenue
+            or volume tier, required add-ons, onboarding, and renewal terms.
           </li>
           <li>
-            <strong>How many SKUs?</strong> Under 500 SKUs and simple demand → spreadsheet or Sumtracker.
-            500-10,000 SKUs with seasonal variation → skubase or Prediko. Over 10,000 with complex
-            multi-location → Inventory Planner or Cin7 may still be right despite the cost.
+            <strong>Does it fit your data?</strong> Validate your sales channels, location detail, SKU limits,
+            supplier information, and available sales history using representative products.
           </li>
         </ol>
 
         <h2 className="blog-article-h2">Migration checklist</h2>
         <ol className="blog-article-ol">
-          <li>Export your product catalog, vendors, and lead times from Inventory Planner before canceling.</li>
+          <li>Save the catalog, supplier information, lead times, and historical records you need before canceling; confirm which exports are available.</li>
           <li>Document your current reorder rules - service levels, buffer days, supplier minimums.</li>
-          <li>Run your new tool in parallel for 4-6 weeks before cutting over. Compare recommended quantities on a sample of fast movers.</li>
-          <li>Validate that seasonal SKUs are getting the right uplift before your first peak season in the new tool.</li>
+          <li>Test a sample import and check counts, field mappings, and any records that must be retained separately.</li>
+          <li>Compare recommended quantities for fast movers and seasonal products over a representative replenishment cycle before relying on the new tool.</li>
         </ol>
 
         <h2 className="blog-article-h2">If you want to try skubase</h2>
         <p>
-          14-day free trial, no credit card required. The demo is also live - see your data in under ten minutes
-          with a ShipStation export or Shopify connection.
+          Explore the live demo with sample data, then review the plan limits and data connections for your store.
+          Every plan includes a 14-day free trial; no credit card is required to start.
         </p>
 
         <div className="blog-article-cta">

@@ -392,7 +392,7 @@ def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key, al
 def _overstock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
-        if action.status != "optimize":
+        if action.status != "optimize" or not action.sales_history_complete:
             continue
         if not _rule_matches(rule, sku_id=action.sku_id, product_name=action.name):
             continue

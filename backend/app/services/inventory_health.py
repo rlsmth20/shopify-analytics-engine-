@@ -28,7 +28,7 @@ def build_inventory_health(
     dead_stock_cash = sum(
         _inventory_cost(sku)
         for sku in skus
-        if sku.inventory > 0 and sku.days_since_last_sale >= 90
+        if sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= 90
     )
     stockout_revenue_risk = sum(
         _stockout_revenue_risk(sku, forecast_by_sku.get(sku.sku_id))
@@ -141,10 +141,12 @@ def _average_days_of_cover(skus: list[SkuDetail]) -> float:
 
 
 def _health_bucket(sku: SkuDetail, forecast: ForecastResult | None) -> str:
-    if sku.inventory > 0 and sku.days_since_last_sale >= 90:
+    if sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= 90:
         return "dead"
     if forecast is not None and forecast.stockout_probability_30d >= 0.6:
         return "stockout"
+    if not sku.sales_history_complete:
+        return "no_signal"
     velocity = sku.last_30_day_sales / 30
     if velocity <= 0:
         return "no_signal"
@@ -157,7 +159,8 @@ def _top_cash_trapped(skus: list[SkuDetail]) -> list[InventoryHealthSku]:
     candidates = [
         sku
         for sku in skus
-        if sku.inventory > 0 and (sku.days_since_last_sale >= 60 or _days_of_cover(sku) >= 120)
+        if sku.sales_history_complete and sku.inventory > 0
+        and (sku.days_since_last_sale >= 60 or _days_of_cover(sku) >= 120)
     ]
     candidates.sort(key=_inventory_cost, reverse=True)
     return [

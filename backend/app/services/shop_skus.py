@@ -18,11 +18,13 @@ from typing import List
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Inventory, OrderLineItem, Product
+from app.db.models import Inventory, OrderLineItem, Product, ShopifySyncRun
 from app.schemas import SkuDetail
 from app.services.transfers import LocationStock
 
 DEFAULT_COST_RATIO = Decimal("0.40")
+MIN_OBSERVED_HISTORY_DAYS = 30
+MAX_ORDER_SYNC_AGE = timedelta(days=2)
 
 
 def _now_naive_utc() -> datetime:
@@ -88,9 +90,12 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
                 ),
                 0,
             ).label("sales_7d"),
+            func.min(OrderLineItem.created_at).label("first_sale_at"),
             func.max(OrderLineItem.created_at).label("last_sale_at"),
         )
-        .where(OrderLineItem.shop_id == shop_id)
+        .where(OrderLineItem.shop_id == shop_id,
+               OrderLineItem.quantity > 0,
+               OrderLineItem.created_at <= now)
         .group_by(OrderLineItem.product_id)
     ).all()
 
@@ -98,10 +103,17 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
         row.product_id: {
             "sales_30d": int(row.sales_30d or 0),
             "sales_7d": int(row.sales_7d or 0),
+            "first_sale_at": row.first_sale_at,
             "last_sale_at": row.last_sale_at,
         }
         for row in sales_rows
     }
+    latest_finished_sync = db.scalar(
+        select(ShopifySyncRun)
+        .where(ShopifySyncRun.shop_id == shop_id, ShopifySyncRun.status != "running")
+        .order_by(ShopifySyncRun.id.desc())
+        .limit(1)
+    )
 
     skus: list[SkuDetail] = []
     for p in products:
@@ -111,12 +123,15 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
         sales = sales_by_product.get(p.id, {})
         last_sale = sales.get("last_sale_at")
         if last_sale is None:
-            days_since = 999  # Treat "never sold" as very stale.
+            # Retain the legacy numeric sentinel, but never treat it as proof of
+            # age: sales_history_complete gates stale-stock recommendations.
+            days_since = 999
         else:
             ls = last_sale.replace(tzinfo=None) if last_sale.tzinfo is not None else last_sale
             days_since = max(0, (now - ls).days)
 
         sku_id = (p.sku or _slugify(p.name, p.variant_name, str(p.id)))[:128]
+        history_warnings = _sales_history_warnings(sales.get("first_sale_at"), now, latest_finished_sync)
 
         skus.append(
             SkuDetail(
@@ -131,10 +146,37 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
                 last_7_day_sales=sales.get("sales_7d", 0),
                 days_since_last_sale=days_since,
                 sku_lead_time_days=p.sku_lead_time_days,
+                sales_history_complete=not history_warnings,
+                sales_history_warnings=history_warnings,
             )
         )
 
     return skus
+
+
+def _sales_history_warnings(first_sale: datetime | None, now: datetime,
+                            latest_sync: ShopifySyncRun | None) -> list[str]:
+    """Use observed history conservatively without requiring sync metadata for CSVs.
+
+    A first sale is evidence of observation, not product age. Missing or less than
+    30 days of observed sales cannot justify excess/dead-stock conclusions. A
+    completed Shopify sync also needs to be successful and no more than two days
+    old. Established imported history with no Shopify run keeps its prior behavior.
+    """
+    warnings: list[str] = []
+    if first_sale is None:
+        warnings.append("No sales are recorded for this SKU; missing order history does not establish that stock is stale.")
+    else:
+        first_sale = first_sale.replace(tzinfo=None)
+        history_days = max(0, (now - first_sale).days)
+        if history_days < MIN_OBSERVED_HISTORY_DAYS:
+            warnings.append(f"Only {history_days} days since the first recorded sale; demand estimates use limited history.")
+    if latest_sync is not None:
+        if latest_sync.status != "succeeded" or latest_sync.finished_at is None:
+            warnings.append("The latest Shopify sync did not complete successfully; verify order-history coverage.")
+        elif now - latest_sync.finished_at.replace(tzinfo=None) > MAX_ORDER_SYNC_AGE:
+            warnings.append("Shopify order history has not been refreshed in more than two days; sync before clearing stock.")
+    return warnings
 
 
 def _resolve_unit_cost(product: Product) -> float:

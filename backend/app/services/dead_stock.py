@@ -23,6 +23,8 @@ def build_liquidation_plan(skus: list[SkuDetail]) -> list[LiquidationSuggestion]
     suggestions: list[LiquidationSuggestion] = []
 
     for sku in skus:
+        if not sku.sales_history_complete:
+            continue
         if sku.days_since_last_sale < DEAD_STOCK_THRESHOLD_DAYS:
             continue
         if sku.inventory <= 0:

@@ -145,6 +145,7 @@ type BaseInventoryAction = {
   priority_score: number;
   data_quality_confidence: DataQualityConfidence;
   data_quality_warnings: string[];
+  sales_history_complete?: boolean;
 };
 
 export type UrgentInventoryAction = BaseInventoryAction & {

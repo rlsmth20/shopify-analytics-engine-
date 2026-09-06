@@ -18,28 +18,27 @@ export const metadata = {
   },
 };
 
+const faqs = [
+  { q: "Do you raise prices at renewal?", a: "Your monthly or annual subscription rate is locked for as long as you maintain the subscription on the same plan. The terms of service describe the commitment and exceptions for external fees and taxes." },
+  { q: "What happens if I exceed my SKU or location limit?", a: "Plan limits are listed above. If your catalog, locations, or team grows beyond your plan, contact us to review the right fit. We do not silently auto-upgrade your plan." },
+  { q: "Is there a free tier?", a: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." },
+  { q: "Do alerts send automatically?", a: "Yes. Enabled alert rules are evaluated automatically and delivered through the channels you configure and enable. You can also preview an evaluation before sending." },
+  { q: "Which alert channels are included?", a: "Starter includes email and Slack alert channels. Growth and Scale add webhook channels. Channels must be configured before notifications are delivered. SMS alerts are planned and are not currently available." },
+  { q: "What does setup involve?", a: "Connect Shopify, complete the initial sync, then review your inventory signals and reorder assumptions. Setup time depends on your catalog size and available data. The free sample snapshot shows the kind of output you can review before connecting a store." },
+  { q: "Can I pay annually?", a: "Yes. Annual plans save about 15% compared with twelve monthly payments. The monthly equivalent is rounded to the nearest cent; the displayed annual total is billed once per year. The same price-lock terms apply." },
+  { q: "Which plan fits my workflow?", a: "Starter covers ranked inventory actions, stock alerts, and dead-stock guidance. Growth adds demand forecasts, purchase-order planning, and Excel exports. Scale adds scheduled reports and supplier scorecards, which require purchase-order receipt history." },
+  { q: "Does SKUbase execute inventory changes in Shopify?", a: "SKUbase provides read-only Shopify analysis and planning. Purchase-order drafts, receipt records, and transfer recommendations do not change stock in Shopify. The current sync imports total stock per SKU without a location breakdown, so it does not yet populate location-level transfer recommendations." },
+];
+
 const FAQ_LD = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
-  mainEntity: [
-    { "@type": "Question", name: "Do you raise prices at renewal?", acceptedAnswer: { "@type": "Answer", text: "No. Every plan has a written price-lock clause in the terms of service: we will not raise the monthly or annual rate on a plan you are already subscribed to." } },
-    { "@type": "Question", name: "Is there a free tier?", acceptedAnswer: { "@type": "Answer", text: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." } },
-    { "@type": "Question", name: "Does Skubase include inventory alerts?", acceptedAnswer: { "@type": "Answer", text: "Yes. Skubase includes configurable alert rules for stockout risk, dead stock, overstock, forecast risk, and supplier slip. Email and Slack are included on Starter; webhook channels are included on Growth and Scale. SMS alerts are planned." } },
-    { "@type": "Question", name: "How long does setup take?", acceptedAnswer: { "@type": "Answer", text: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." } },
-    { "@type": "Question", name: "Can I pay annually?", acceptedAnswer: { "@type": "Answer", text: "Yes - pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." } },
-  ],
+  mainEntity: faqs.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
 };
-
-const faqs = [
-  { q: "Do you raise prices at renewal?", a: "No. Every plan has a written price-lock clause in the terms of service: we will not raise the monthly or annual rate on a plan you are already subscribed to for as long as you maintain the subscription." },
-  { q: "What happens if I exceed my SKU or location limit?", a: "We notify you by email, the app shows a soft banner, and you get thirty days to decide whether to upgrade or prune. We will never silently auto-upgrade your plan." },
-  { q: "Is there a free tier?", a: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." },
-  { q: "Do alerts send automatically?", a: "Yes. Enabled alert rules are evaluated automatically and delivered through enabled channels with real targets. You can also preview an evaluation before sending." },
-  { q: "Which alert channels are included?", a: "Starter includes email and Slack alert channels. Growth and Scale add webhook channels. SMS alerts are planned - they'll land on Growth and Scale when they ship. Channels must be configured before notifications are delivered." },
-  { q: "How long does setup take?", a: "Most merchants see their first ranked action in under ten minutes. We do not require a paid implementation partner." },
-  { q: "Can I pay annually?", a: "Yes - pay annually and save 15%. Annual customers also get a contractual price lock on the annual rate." },
-  { q: "How do you compare to Stocky / Inventory Planner / Cin7?", a: "Compared with Stocky we add real forecasting, supplier scorecards, and dead-stock plans. Compared with Inventory Planner we publish our price and commit to not raising it. Compared with Cin7 we publish our price and do not require a 6-month implementation." }
-];
 
 export default function PricingPage() {
   return (
@@ -49,9 +48,9 @@ export default function PricingPage() {
 
       <section className="marketing-hero">
         <p className="marketing-eyebrow">Pricing</p>
-        <h1 className="marketing-hero-title">Three tiers. Published. Locked.</h1>
+        <h1 className="marketing-hero-title">Clear plans for your next inventory decision.</h1>
         <p className="marketing-hero-sub">
-          We publish our prices on this page because the rest of the market hides them behind a sales call &mdash; and raises them at renewal. We commit in writing that renewals do not raise the rate on your plan.
+          Start with ranked stock risks and alerts. Add forecasting, purchase plans, and reports as your workflow grows. Every plan has published pricing and a written price-lock commitment.
         </p>
         <div className="marketing-hero-ctas">
           <Link href="/inventory-risk-snapshot" className="button button-secondary button-lg">
@@ -61,6 +60,11 @@ export default function PricingPage() {
       </section>
 
       <PricingTable />
+
+      <p className="plan-matrix-footnote">
+        Prices are in USD. Annual plans show a rounded monthly equivalent and the total billed yearly.
+        Shopify sync is read-only and currently imports total stock per SKU, without a location breakdown.
+      </p>
 
       <PlanComparison />
 
@@ -77,7 +81,7 @@ export default function PricingPage() {
           </article>
           <article className="faq-card">
             <h3 className="faq-card-q">Automatic delivery</h3>
-            <p className="faq-card-a">Enabled rules are checked automatically and delivered through configured channels with real targets.</p>
+            <p className="faq-card-a">Enabled rules are checked automatically and sent to the email, Slack, or webhook destinations you configure.</p>
           </article>
           <article className="faq-card">
             <h3 className="faq-card-q">Action-first follow-up</h3>
@@ -91,17 +95,17 @@ export default function PricingPage() {
           <p className="pricing-lock-kicker">The skubase price-lock pledge</p>
           <h2 className="pricing-lock-title">Your rate will not go up at renewal.</h2>
           <p className="pricing-lock-body">
-            We built this product because the inventory market is full of tools whose prices triple at renewal after an acquisition. Inventory Planner users reported roughly a 3&times; price hike after Sage. Linnworks users reported a 681% hike after a PE rollup. We are not doing that to you.
+            Plan your software budget alongside your inventory budget. Your monthly or annual subscription rate stays locked while you maintain the same plan.
           </p>
           <p className="pricing-lock-body">
-            The specific commitment, which appears in the <Link href="/terms">terms of service</Link>: once you start a subscription at a published price, that price does not increase for as long as you maintain the subscription.
+            The <Link href="/terms">terms of service</Link> set out the price-lock commitment, including exceptions for externally mandated fees and taxes. Plan limits and a change of plan are separate from that commitment.
           </p>
         </div>
       </section>
 
       <section className="marketing-section">
         <p className="marketing-section-kicker">FAQ</p>
-        <h2 className="marketing-section-title">The questions we hear the most.</h2>
+        <h2 className="marketing-section-title">Before you choose a plan.</h2>
         <div className="faq-grid">
           {faqs.map((f) => (
             <article key={f.q} className="faq-card">

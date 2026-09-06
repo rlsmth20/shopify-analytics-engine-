@@ -18,6 +18,7 @@ import {
 } from "@/components/reports/report-components";
 import { ProjectedStockHealth } from "@/components/projected-stock-health";
 import { fetchInventoryActions, type InventoryAction } from "@/lib/api";
+import { isHistoryReviewAction } from "@/lib/action-quality";
 import { getActionImpactValue, statusLabel } from "@/lib/app-helpers";
 import {
   currency,
@@ -696,7 +697,7 @@ function buildReportRows(data: LoadedData | null): Record<ReportKind, ReportRow[
   );
 
   const deadStockRows = data.actions
-    .filter((action) => action.status === "dead" || action.status === "optimize")
+    .filter((action) => (action.status === "dead" || action.status === "optimize") && !isHistoryReviewAction(action))
     .map((action) =>
       actionToRow(action, scoreBySku.get(action.sku_id), forecastBySku.get(action.sku_id)),
     );
@@ -1055,14 +1056,15 @@ function actionToRow(
   forecast: ForecastResult | undefined,
 ): ReportRow {
   const isUrgent = action.status === "urgent";
-  const daysLeft = isUrgent ? action.days_until_stockout : action.days_of_inventory;
+  const historyReview = isHistoryReviewAction(action);
+  const daysLeft = historyReview ? null : isUrgent ? action.days_until_stockout : action.days_of_inventory;
   const dailyVelocity = action.daily_velocity || score?.avg_daily_units || null;
   const recommendedQty = isUrgent
     ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
     : null;
   const riskLevel = calculateRiskLevel(daysLeft, action.lead_time_days_used);
   const status =
-    action.status === "dead"
+    historyReview ? "Review" : action.status === "dead"
       ? "Dead stock"
       : action.status === "optimize"
         ? action.days_of_inventory >= 75
@@ -1076,7 +1078,7 @@ function actionToRow(
     daysLeft,
     leadTime: action.lead_time_days_used,
     status,
-    cashImpact: getActionImpactValue(action),
+    cashImpact: historyReview ? null : getActionImpactValue(action),
   });
 
   return {
@@ -1086,13 +1088,13 @@ function actionToRow(
     vendor: score?.vendor ?? "Unknown",
     category: score?.category ?? "Unassigned",
     priority: action.priority_score,
-    actionType: statusLabel[action.status],
+    actionType: historyReview ? "Review history" : statusLabel[action.status],
     currentStock: action.current_on_hand,
     daysLeft,
-    daysInventory: action.days_of_inventory,
+    daysInventory: historyReview ? null : action.days_of_inventory,
     leadTime: action.lead_time_days_used,
     recommendedQty,
-    cashImpact: getActionImpactValue(action),
+    cashImpact: historyReview ? null : getActionImpactValue(action),
     reason,
     recommendedAction: action.recommended_action,
     rawReason,
@@ -1106,11 +1108,11 @@ function actionToRow(
       : action.status === "dead" || action.status === "optimize"
         ? action.cash_tied_up
         : null,
-    daysSinceLastSale: inferDaysSinceLastSale(action),
+    daysSinceLastSale: historyReview ? null : inferDaysSinceLastSale(action),
     status,
     targetCoverage: action.target_coverage_days,
     estimatedCost: null,
-    orderDeadline: isUrgent ? dateFromNow(Math.max(daysLeft - action.lead_time_days_used, 0)) : "Review",
+    orderDeadline: isUrgent && daysLeft !== null ? dateFromNow(Math.max(daysLeft - action.lead_time_days_used, 0)) : "Review",
   };
 }
 
