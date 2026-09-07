@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select, update
 
 from . import discovery, funnel, learning, messaging
+from .service_replies import answer_request, current_request
 from .model_router import call_model
 from .models import Contact, Evidence, Experiment, Memory, Message, SkillRevision, Usage, Work
 from .policy import GrowthError, Policy, REPLY_CLASSES
@@ -49,11 +50,18 @@ def schedule(factory):
         if os.getenv("GROWTH_INBOUND_ENABLED") == "true":
             enqueue(db, f"inbox:{int(now // 300)}", "inbox", priority=100)
         enqueue(db, f"review:{int(now // 86400)}", "daily_review", priority=60)
+        if os.getenv("SHOPIFY_PARTNER_API_TOKEN"):
+            enqueue(db, f"payments:{int(now // 3600)}", "payments", priority=65)
         # Two decision-directed searches per six hours, no follow-on research fanout.
         if os.getenv("GROWTH_DISCOVERY_ENABLED", "true") == "true":
             since = datetime.fromtimestamp(now - 30 * 86400, timezone.utc).date().isoformat()
-            for query in (f"inventory reorder after:{since} order:latest", f"Stocky alternative after:{since} order:latest"):
-                enqueue(db, f"discover:{digest(query)}:{int(now // 21600)}", "discover",
+            focus = get_memory(db, "strategic", "strategy").get("discovery_focus", "merchant_pain")
+            queries = {"merchant_pain": ('"our" "inventory"', '"my" "reorder"'),
+                       "cash_exposure": ('"dead stock"', '"excess inventory"'),
+                       "stocky_migration": ('"Stocky" "need"', '"Stocky" "our store"')}.get(focus, ('"our" "inventory"', '"my" "reorder"'))
+            for index, terms in enumerate(queries):
+                query = f"{terms} after:{since} order:latest"
+                enqueue(db, f"discover-slot:{int(now // 21600)}:{index}", "discover",
                         {"query": query, "decision": "Which recent merchant question warrants a useful Skubase health-check offer?"}, priority=10)
         # Supersede overdue periodic wakes; downtime is not a debt of research/model calls.
         for kind, horizon in (("observe", 600), ("inbox", 600), ("daily_review", 86400), ("discover", 21600)):
@@ -72,11 +80,16 @@ def opportunity(factory, work):
         contact = db.get(Contact, work.payload["contact_id"])
         if not contact or contact.suppressed:
             return {"decision": "do_not_contact", "reason": "missing or suppressed contact"}
-        if not contact.email or contact.contact_basis == "research_only":
+        if not contact.email or not current_request(db, contact.id):
             record(db, f"contact-gap:{contact.id}", "CONTACT_RESEARCH_NEEDED", contact.id,
                    {"decision": "Verify a legitimate business contact path before offering a health check", "source": contact.source,
                     "reason": "Public participation does not authorize private contact or posting"})
             db.commit()
+            if work.payload.get("evidence_id"):
+                with factory() as queue_db:
+                    enqueue(queue_db, "contact-research:" + str(work.payload["evidence_id"]), "research_contact",
+                            {"contact_id": contact.id, "evidence_id": work.payload["evidence_id"]}, priority=35)
+                    queue_db.commit()
             return {"decision": "research_contact_path", "source": contact.source}
         experiment = learning.ensure_experiment(db)
         messages = db.scalar(select(func.count()).select_from(Message).where(Message.experiment_id == experiment.id,
@@ -115,11 +128,15 @@ def reply(factory, work, model=call_model):
             contact.suppressed = True
         if message.experiment_id:
             learning.evaluate(db, message.experiment_id)
-        if classification in learning.POSITIVE and contact.qualification.get("qualified") and not contact.suppressed:
+        event = db.get(Evidence, work.payload.get("evidence_id"))
+        service = answer_request(db, contact, event, raw, parent=message) if event and classification in learning.POSITIVE else None
+        if service:
+            next_action = "Answer the requested service question using verified product knowledge"
+        elif classification in learning.POSITIVE and contact.qualification.get("qualified") and not contact.suppressed:
             # One relevant assistance reply; further substantive questions become owner obligations.
             followups = db.scalar(select(func.count()).select_from(Message).where(Message.contact_id == contact.id,
                                   Message.direction == "out", Message.reply_to_id.is_not(None))) or 0
-            if followups == 0 and classification == "SUBSTANTIVE_POSITIVE":
+            if followups == 0 and classification == "SUBSTANTIVE_POSITIVE" and current_request(db, contact.id):
                 response, _ = insert_once_message(db, message, contact)
                 enqueue(db, "send:" + response.id, "send", {"message_id": response.id}, priority=95)
                 next_action = "Send requested health-check setup help"
@@ -140,13 +157,30 @@ def reply(factory, work, model=call_model):
 
 def insert_once_message(db, original, contact):
     from .store import insert_once
-    return insert_once(db, Message, key="assistance:" + contact.id, contact_id=contact.id,
+    from .service_replies import permit, current_request
+    request = current_request(db, contact.id)
+    if not request:
+        raise GrowthError("A positive reply alone does not authorize promotional follow-up")
+    message, fresh = insert_once(db, Message, key="assistance:" + contact.id, contact_id=contact.id,
         experiment_id=original.experiment_id, direction="out", reply_to_id=original.id,
         subject="Re: Your Shopify inventory health check",
-        body="Thanks for your interest. I'm Skubase's automated assistant. You can connect your store at https://skubase.io/store-sync for read-only inventory analysis. Please don't email customer data, passwords or tokens. Would you like help with the connection step?\n\nSkubase | info@skubase.io\nReply 'no thanks' to stop these messages.")
+        body="I'm Skubase's automated assistant. To continue the inventory check you requested, connect your store at https://skubase.io/store-sync and start an import for read-only analysis. Please don't email customer data, passwords or tokens. Reply with the step if you encounter a connection error.\n\nSkubase | info@skubase.io\nReply 'stop' to stop automated responses.")
+    if fresh:
+        permit(db, message, request, "health_check", ["backend/app/api/routes/inventory_risk_snapshot.py"])
+    return message, fresh
 
 
 def daily_review(factory, work, model=call_model):
+    if os.getenv("GROWTH_REVIEW_MODE") == "codex":
+        from .executive import export_packet
+        with factory() as db:
+            packet = export_packet(db)
+            if packet.get("already_reviewed"):
+                return packet
+            remember(db, "working", "executive", {**get_memory(db, "working", "executive"),
+                     "mode": "codex", "pending_day": packet["day"]})
+            db.commit()
+        return {"awaiting_codex_executive": True, "day": packet["day"], "api_spend_usd": 0}
     with factory() as db:
         skill = active_skill(db, "daily_review")
         evidence = context(db, limit=12)
@@ -205,8 +239,13 @@ def handle(factory, work, *, provider=messaging.resend_request, fetch=discovery.
         return reply(factory, work, model=model)
     if work.kind == "discover":
         return discovery.discover(factory, **work.payload, fetch=fetch)
+    if work.kind == "research_contact":
+        return discovery.research_contact(factory, work, fetch=fetch)
     if work.kind == "daily_review":
         return daily_review(factory, work, model=model)
+    if work.kind == "payments":
+        from .shopify_payments import reconcile_payments
+        return reconcile_payments(factory)
     with factory() as db:
         require_lease(db, work)
         if work.kind == "observe":
@@ -242,7 +281,7 @@ def run_once(factory, *, schedule_wakes=True, **adapters):
         return False
     with factory() as db:
         remember(db, "working", "activity", {"activity": work.kind, "last_wake": time.time(), "work_id": work.id,
-                 "model": "gpt-6-astra" if work.kind == "daily_review" else None, "health": "working"})
+                 "model": "gpt-6-astra" if work.kind == "daily_review" and os.getenv("GROWTH_REVIEW_MODE") != "codex" else None, "health": "working"})
         db.commit()
     stopped = threading.Event()
     def beat():
@@ -252,12 +291,6 @@ def run_once(factory, *, schedule_wakes=True, **adapters):
     thread = threading.Thread(target=beat, daemon=True)
     thread.start()
     try:
-        with factory() as db:
-            hold = get_memory(db, "working", "acquisition_hold")
-            if hold and work.kind == "send":
-                message = db.get(Message, work.payload["message_id"])
-                if message and not message.reply_to_id:
-                    raise GrowthError("Acquisition paused for downstream product review")
         result = handle(factory, work, **adapters)
         finish(factory, work, result=result)
     except GrowthError as exc:

@@ -42,34 +42,10 @@ def resend_request(path, *, data=None, key=None):
 
 
 def draft_first_contact(db, contact, experiment, variant):
+    from .service_replies import draft_requested_check
     if contact.suppressed or not contact.qualification.get("qualified"):
         raise GrowthError("Contact declined or is not qualified")
-    facts = [f for f in contact.facts if f.get("verified") is True and f.get("source") and 5 <= len(f.get("text", "")) <= 180]
-    if not facts:
-        raise GrowthError("No verified personalization fact")
-    fact = facts[0]["text"].replace("\n", " ").replace("\r", " ")
-    # Affiliation is explicit. Quotation preserves what is actually known.
-    problem = "cash tied up in slow-moving stock" if variant == "cash" else "what to reorder before stock runs out"
-    body = (f"Hi,\n\nI'm Skubase's automated growth assistant. Your public information says: “{fact}”.\n\n"
-            f"If {problem} is on your mind, Skubase offers a free Shopify Inventory Health Check "
-            "to help identify reorder priorities and excess-stock risks from data you choose to share.\n\n"
-            "Would a free check be useful for your store?\n\nSkubase | https://skubase.io\n"
-            "Reply 'no thanks' and I won't follow up.")
-    if contact.contact_basis == "requested_health_check":
-        body = ("Hi,\n\nI'm Skubase's automated assistant. You requested a free inventory health check. "
-                "You can start by connecting your Shopify store to Skubase; its initial analysis is read-only. "
-                "Please do not email customer data, passwords or access tokens.\n\n"
-                "Would you like help getting your store connected?\n\nSkubase | https://skubase.io/store-sync\n"
-                "Reply 'no thanks' to stop these messages.")
-    skill = active_skill(db, "email_outreach")
-    message, fresh = insert_once(db, Message, key="first-contact:" + contact.id,
-        contact_id=contact.id, experiment_id=experiment.id, direction="out", variant=variant,
-        subject="Your Shopify inventory health check", body=body, skill_version=skill.version)
-    if fresh:
-        record(db, f"draft:{message.id}", "EMAIL_DRAFTED", contact.id,
-               {"message_id": message.id, "experiment_id": experiment.id, "variant": variant,
-                "fact_sources": [f["source"] for f in facts], "skill_version": skill.version})
-    return message
+    return draft_requested_check(db, contact, experiment, variant)
 
 
 def send(factory, work, *, policy=None, provider=resend_request):
@@ -90,10 +66,10 @@ def send(factory, work, *, policy=None, provider=resend_request):
         contact = db.get(Contact, message.contact_id)
         if not contact or contact.suppressed or contact.status in ("declined", "unsubscribed", "delivery_failure"):
             raise GrowthError("Contact is suppressed")
-        if not contact.email or contact.contact_basis not in ("public_business_contact", "requested_health_check", "requested_reply"):
-            raise GrowthError("No verified legitimate business contact basis")
-        if not contact.qualification.get("qualified"):
-            raise GrowthError("Contact is not qualified")
+        if not contact.email:
+            raise GrowthError("Recipient address missing")
+        from .service_replies import validate_permit
+        authority = validate_permit(db, message, contact)
         # Shared lock serializes caps and suppression with concurrent sends.
         db.execute(update(Contact).where(Contact.id == contact.id).values(status=Contact.status))
         db.refresh(contact)
@@ -111,12 +87,12 @@ def send(factory, work, *, policy=None, provider=resend_request):
             parent = db.get(Message, message.reply_to_id)
             if not parent or parent.classification not in ("SUBSTANTIVE_POSITIVE", "QUESTION", "SUBSTANTIVE_NEUTRAL"):
                 raise GrowthError("Follow-up requires substantive engagement")
-        else:
+        elif authority.data["scope"] == "health_check":
             prior = db.scalar(select(Message.id).where(Message.contact_id == contact.id,
                               Message.direction == "out", Message.id != message.id, Message.sent_at.is_not(None)))
             if prior:
                 raise GrowthError("First-contact deduplication blocked a repeat")
-        body = message.body + "\n" + policy.postal_address
+        body = message.body
         payload = {"from": "Skubase <" + policy.sender + ">", "to": [contact.email], "reply_to": policy.sender,
                    "subject": message.subject, "text": body,
                    "headers": {"X-Skubase-Message": message.id},
@@ -150,8 +126,9 @@ def send(factory, work, *, policy=None, provider=resend_request):
         record(db, f"receipt:{message_id}", "EMAIL_SENT", message.contact_id,
                {"message_id": message_id, "provider_id": result["id"], "experiment_id": message.experiment_id}, source="resend")
         # Silence is observed after a seven-day window, never auto-chased.
-        enqueue(db, f"evaluate:{message.experiment_id}:{message_id}", "evaluate", {"experiment_id": message.experiment_id},
-                priority=30, due_at=time.time() + 7 * 86400)
+        if message.experiment_id:
+            enqueue(db, f"evaluate:{message.experiment_id}:{message_id}", "evaluate", {"experiment_id": message.experiment_id},
+                    priority=30, due_at=time.time() + 7 * 86400)
         db.commit()
     return {"provider_id": result["id"]}
 

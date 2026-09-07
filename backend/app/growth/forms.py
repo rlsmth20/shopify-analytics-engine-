@@ -23,7 +23,15 @@ def observe_contact_form(*, email, contact_type, message, receipt_id, factory=Se
             key = digest([email.lower(), contact_type, message, int(time.time() // 86400)])
             event = record(db, "form:" + key, "CONTACT_FORM_RECEIVED", contact.id,
                            {"type": contact_type, "message": message, "provider_receipt": receipt_id}, source="skubase_contact_form")
-            record(db, "form-obligation:" + key, "OWNER_ATTENTION", contact.id,
+            from .service_replies import answer_request
+            from .policy import classify_reply
+            classification = classify_reply(message)
+            if classification in {"UNSUBSCRIBE", "SUBSTANTIVE_NEGATIVE"}:
+                contact.suppressed = True
+                contact.status = "unsubscribed" if classification == "UNSUBSCRIBE" else "declined"
+            automated = answer_request(db, contact, event, message) if classification not in {"UNSUBSCRIBE", "SUBSTANTIVE_NEGATIVE", "AUTOMATED", "DELIVERY_FAILURE"} else None
+            if not automated:
+                record(db, "form-obligation:" + key, "OWNER_ATTENTION", contact.id,
                    {"priority": "high" if contact_type in ("billing", "bug") else "normal",
                     "reason": "Answer a contact form request; this is not marketing consent", "evidence_id": event.id})
             db.commit()

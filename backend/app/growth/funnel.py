@@ -111,6 +111,9 @@ def reconcile(db, batch_size=200):
         signature = digest([row.id, row.status, row.plan, at])
         previous = get_memory(db, "working", f"subscription-status:{row.id}")
         ended = row.status in ("canceled", "cancelled", "inactive")
+        economic = get_memory(db, "economics", f"shop:{row.shop_id}")
+        if economic and ended:
+            remember(db, "economics", f"shop:{row.shop_id}", {**economic, "active": False, "monthly_recurring_usd": 0})
         if not ended or previous.get("status") in ("active", "trialing"):
             kind = "CANCELLATION" if ended else "SUBSCRIPTION_STARTED"
             product_event(db, kind, row.shop_id, f"subscription:{signature}",

@@ -19,7 +19,10 @@ type Snapshot = {
   economics: { mrr: number | null; customers: number | null; model_api_spend: number; unresolved_cost_reservations: number;
     acquisition_spend: number; advertising_spend: number; cac: number | null; limitations: string };
   agent: { activity: string; next_action: string; last_wake: number; model: string | null; health: string; paused: boolean; daily_budget_usd: number;
+    executive?: { last_review?: number; mode?: string };
+    capabilities?: { requested_service_email: boolean; community_posting: boolean; payment_receipts: boolean; executive_review: string };
     errors: { id: string; kind: string; error: string; at: number }[] };
+  review_queue?: { id: number; kind: string; at: number; data: { reason?: string; body?: string; destination?: string; observation?: string; recommended_action?: string } }[];
   recent_actions: { id: number; kind: string; at: number; source: string }[];
 };
 
@@ -82,6 +85,12 @@ export default function GrowthPage() {
         <p>{data.strategy.bottleneck.recommended_action}</p></div>
         <div className={styles.health}><span className={styles.dot} />{label(data.agent.health || "not started")}<small>Last wake {time(data.agent.last_wake)}</small><small>Model: {data.agent.model || "No model running"}</small></div>
       </section>
+      {data.agent.capabilities && <section className={styles.card}><h2>Operating channels</h2><p>
+        Requested-service email: {data.agent.capabilities.requested_service_email ? "Active at info@skubase.io" : "Disabled"}. Public opportunity research: active.
+        Community posting: {data.agent.capabilities.community_posting ? "Active" : "Business identity and channel rules still needed"}.
+        Payment receipt integration: {data.agent.capabilities.payment_receipts ? "Configured" : "Awaiting read-only Shopify Partner access"}.
+      </p><p className={styles.muted}>Daily executive review: {data.agent.capabilities.executive_review}. Last completed {time(data.agent.executive?.last_review || 0)}.
+        Codex reviews use the existing subscription allowance; they do not make paid API calls. Promotional email and advertising are disabled.</p></section>}
       <section className={styles.section}><h2>Today</h2><div className={styles.metrics}>{Object.entries(data.today).map(([key, value]) => <Metric key={key} name={label(key)} value={value} />)}</div></section>
       <div className={styles.columns}>
         <section className={styles.card}><h2>From interest to value</h2><p className={styles.muted}>Distinct identities at each stage. Client activity cannot verify payment.</p>
@@ -109,7 +118,12 @@ export default function GrowthPage() {
         <Metric name="MRR" value={money(data.economics.mrr)} /><Metric name="Verified paying customers" value={data.economics.customers ?? "Unknown"} /><Metric name="Model / API spend" value={money(data.economics.model_api_spend)} />
         <Metric name="Unresolved reservations" value={money(data.economics.unresolved_cost_reservations)} /><Metric name="Acquisition spend" value={money(data.economics.acquisition_spend)} /><Metric name="CAC" value={money(data.economics.cac)} />
       </div><p className={styles.muted}>{data.economics.limitations} Runtime ceiling: {money(data.agent.daily_budget_usd)}/day.</p></section>
-      <div className={styles.columns}><section className={styles.card}><h2>Needs attention</h2>{data.agent.errors.length ? data.agent.errors.map(e => <article key={e.id} className={styles.item}><h3>{label(e.kind)}</h3><p>{e.error}</p><small>{time(e.at)}</small></article>) : <p>No current execution errors.</p>}</section>
+      <div className={styles.columns}><section className={styles.card}><h2>Needs attention</h2>{data.agent.errors.length ? data.agent.errors.map(e => <article key={e.id} className={styles.item}><h3>{label(e.kind)}</h3><p>{e.error}</p><small>{time(e.at)}</small></article>) : <p>No current execution errors.</p>}
+        {data.review_queue?.map(item => <article key={item.id} className={styles.item}><h3>{label(item.kind)}</h3><p>{item.data.reason || item.data.observation || item.data.body}</p>
+          {item.data.recommended_action && <p>{item.data.recommended_action}</p>}
+          {item.data.destination?.startsWith("https://") && <a href={item.data.destination} target="_blank" rel="noreferrer">Review the original conversation</a>}
+          <small>{time(item.at)} · evidence {item.id}</small></article>)}
+      </section>
       <section className={styles.card}><h2>Recent activity</h2>{data.recent_actions.map(a => <div key={a.id} className={styles.activity}><span>{label(a.kind)}</span><small>{time(a.at)}</small></div>)}</section></div>
       <footer className={styles.footer}>{data.mission.qualified_definition} Refreshes every 30 seconds while visible.</footer>
     </>}

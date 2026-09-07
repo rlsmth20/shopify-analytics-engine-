@@ -1,0 +1,12 @@
+{
+  "requested_service": {
+    "purpose": "Fulfill a real inventory-check request or a narrowly matched Skubase support question.",
+    "inputs": ["recent request evidence", "suppression state", "verified product knowledge", "service scope"],
+    "tools": ["evidence_read", "draft", "send_email"],
+    "process": ["Verify a recent request", "Identify the automated Skubase assistant", "Answer only the requested service need", "Do not add promotion", "Bind the exact body to the request and source knowledge", "Check suppression and daily cap immediately before dispatch", "Retain provider receipt"],
+    "output": "One source-grounded service response and its durable dispatch record.",
+    "success_signal": "The requester completes the connection or resolves the requested service question.",
+    "failure_conditions": ["No service request", "Stale request", "Uncertain knowledge match", "Body changed after authorization", "Opt out", "Provider ambiguity"],
+    "cost_expectation": "Deterministic templates, zero model tokens; five total service emails per day by default. No postal address is collected."
+  }
+}

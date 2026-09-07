@@ -45,8 +45,6 @@ class Policy:
         if (not self.email_enabled or address != self.sender or
                 not re.fullmatch(r"[a-z0-9._+-]+@skubase\.io", address)):
             raise GrowthError("Configure the approved dedicated @skubase.io mailbox", "configuration")
-        if not self.postal_address:
-            raise GrowthError("Configure Skubase's business postal address for outreach", "configuration")
         if not os.getenv("GROWTH_RESEND_API_KEY"):
             raise GrowthError("Dedicated growth Resend integration is not configured", "configuration")
         if os.getenv("GROWTH_INBOUND_ENABLED") != "true":
@@ -82,7 +80,7 @@ REPLY_CLASSES = {"SUBSTANTIVE_POSITIVE", "SUBSTANTIVE_NEUTRAL", "SUBSTANTIVE_NEG
 def classify_reply(text, headers=None):
     headers = {k.lower(): str(v).lower() for k, v in (headers or {}).items()}
     lower = text.lower().split("\non ")[0].split("\n>")[0][:4000]
-    if any(t in lower for t in ("unsubscribe", "remove me", "stop emailing", "do not contact", "don't contact")):
+    if lower.strip() == "stop" or any(t in lower for t in ("unsubscribe", "remove me", "stop emailing", "do not contact", "don't contact")):
         return "UNSUBSCRIBE"
     if any(t in lower for t in ("delivery failed", "undeliverable", "mailbox not found")):
         return "DELIVERY_FAILURE"

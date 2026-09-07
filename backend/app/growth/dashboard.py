@@ -1,4 +1,5 @@
 import time
+import os
 
 from sqlalchemy import func, select
 
@@ -63,10 +64,18 @@ def dashboard(db):
                       "trial_to_paid": None,
                       "limitations": "Attribution and collected payments must be verified before interpreting CAC. MRR/LTV remain unknown until billing amounts and retention are observed."},
         "agent": {**activity, "next_action": next_work.kind if next_work else "await_scheduled_wake",
+                  "executive": get_memory(db, "working", "executive"),
+                  "capabilities": {"requested_service_email": Policy.from_env().email_enabled,
+                     "promotional_email": False, "public_research": True, "community_posting": False,
+                     "payment_receipts": bool(os.getenv("SHOPIFY_PARTNER_API_TOKEN")),
+                     "executive_review": os.getenv("GROWTH_REVIEW_MODE", "api")},
                   "next_due": next_work.due_at if next_work else None, "queue_ready": count(Work, Work.status == "ready"),
                   "errors": [{"id": w.id, "kind": w.kind, "error": w.error, "at": w.updated_at} for w in errors],
                   "paused": get_memory(db, "working", "control").get("paused", False),
                   "daily_budget_usd": Policy.from_env().daily_usd, "paid_ads_allowed": False},
+        "review_queue": [{"id": e.id, "kind": e.kind, "at": e.occurred_at, "source": e.source, "data": e.data}
+                         for e in db.scalars(select(Evidence).where(Evidence.kind.in_(["OWNER_ATTENTION", "COMMUNITY_RESPONSE_DRAFTED", "PRODUCT_FEEDBACK"]))
+                         .order_by(Evidence.id.desc()).limit(12)) if e.kind != "PRODUCT_FEEDBACK" or get_memory(db, "working", "acquisition_hold")],
         "recent_actions": [{"id": e.id, "kind": e.kind, "at": e.occurred_at, "source": e.source, "data": e.data} for e in db.scalars(
             select(Evidence).where(Evidence.kind != "MEMORY_REVISION").order_by(Evidence.id.desc()).limit(20))],
     }

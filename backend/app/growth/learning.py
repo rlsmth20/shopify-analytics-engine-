@@ -13,15 +13,20 @@ POSITIVE = {"SUBSTANTIVE_POSITIVE", "QUESTION", "SUBSTANTIVE_NEUTRAL"}
 
 def ensure_experiment(db):
     active = db.scalar(select(Experiment).where(Experiment.status == "active", Experiment.key.like("health-check-%")).order_by(Experiment.started_at).limit(1))
-    if active:
+    if active and active.specification.get("channel") != "requested_health_check":
+        active.status = "inconclusive"
+        active.result = {**active.result, "interpretation": "Stopped: Resend cannot carry unsolicited outreach. Preserve this cohort; requested-service fulfillment is a separate experiment."}
+        record(db, "retired-channel:" + active.id, "EXPERIMENT_STOPPED", active.id, active.result)
+        db.flush()
+    elif active:
         return active
     cycle = db.scalar(select(Experiment).where(Experiment.key.like("health-check-%")).order_by(Experiment.started_at.desc()).limit(1))
     index = int(cycle.specification.get("cycle", 0)) + 1 if cycle else 1
     allocation = get_memory(db, "strategic", "strategy").get("cash_allocation", .5)
     spec = {"cycle": index, "hypothesis": "Cash-exposure versus reorder-priority framing of a free Shopify Inventory Health Check changes qualified engagement.",
-            "channel": "targeted_business_email", "target_customer": "Shopify operators with verified inventory pain; ICP remains provisional",
+            "channel": "requested_health_check", "target_customer": "Shopify operators who explicitly requested an inventory check; ICP remains provisional",
             "message_positioning": {"cash": "cash tied up in slow-moving stock", "reorder": "what to reorder before stock runs out"},
-            "action": "One concise, fact-grounded email per qualified contact",
+            "action": "Fulfill each requested check with one concise setup message; never cold outreach through Resend",
             "primary_metric": "distinct qualified stores connected", "secondary_metrics": ["substantive responses", "signup", "activation", "payment"],
             "cost": {"advertising_usd": 0, "model_api_usd": "ledger", "human_minutes": None},
             "stop_condition": "14 days or 20 first contacts; stop early for complaints or downstream friction",
@@ -56,6 +61,8 @@ def evaluate(db, experiment_id):
     stats = {v: {"sent": 0, "mature": 0, "mature_engaged": 0, "engaged": 0, "connected": 0, "negative": 0, "censored": 0, "evidence_ids": [], "contradictions": []} for v in ("cash", "reorder")}
     now = time.time()
     for message in outgoing:
+        if message.variant not in stats:
+            continue  # Support answers are obligations, not experimental assignments.
         s = stats[message.variant]
         s["sent"] += 1
         replies = by_contact.get(message.contact_id, [])
@@ -107,26 +114,46 @@ def evaluate(db, experiment_id):
         experiment.result = result
         event = record(db, f"experiment-result:{experiment.id}:{digest(result)}", "EXPERIMENT_EVALUATED", experiment.id, result, epistemic="INFERENCE")
         for variant, s in stats.items():
-            remember(db, "beliefs", "response:" + variant, {"type": "BELIEF", "claim": f"{variant.title()} framing may attract qualified inventory conversations.",
+            remember(db, "experiment_beliefs", experiment.id + ":" + variant, {"type": "BELIEF", "claim": f"{variant.title()} framing may attract qualified inventory conversations.",
                      "supporting_evidence": s["evidence_ids"], "contradictory_evidence": s["contradictions"],
                      "confidence": s["response_probability_estimate"], "confidence_meaning": "posterior response rate, not certainty in causal superiority",
                      "credible_interval_95": s["credible_interval_95"], "sample_size": s["mature"],
                      "source_experiments": [experiment.id], "last_updated": now, "evaluation_evidence_id": event.id})
+            cohorts = [m.value for m in db.scalars(select(Memory).where(Memory.namespace == "experiment_beliefs", Memory.key.like("%:" + variant)))]
+            support = sorted({i for c in cohorts for i in c["supporting_evidence"]})
+            against = sorted({i for c in cohorts for i in c["contradictory_evidence"]})
+            remember(db, "beliefs", "response:" + variant, {"type": "BELIEF",
+                "claim": f"{variant.title()} framing may help requested inventory checks progress; separate cohorts remain available.",
+                "supporting_evidence": support, "contradictory_evidence": against,
+                "confidence": s["response_probability_estimate"], "credible_interval_95": s["credible_interval_95"],
+                "confidence_meaning": "Latest cohort posterior response rate; not pooled causal certainty",
+                "sample_size": sum(c["sample_size"] for c in cohorts), "latest_cohort_sample_size": s["mature"],
+                "source_experiments": sorted({i for c in cohorts for i in c["source_experiments"]}),
+                "last_updated": now, "evaluation_evidence_id": event.id})
         # A leading signal can cautiously influence *future* behavior without claiming victory.
         strategy = get_memory(db, "strategic", "strategy")
-        if len(outgoing) >= 2 and stats["cash"]["engaged"] != stats["reorder"]["engaged"]:
+        if min(s["sent"] for s in stats.values()) >= 1 and stats["cash"]["sent"] == stats["reorder"]["sent"] and stats["cash"]["engaged"] != stats["reorder"]["engaged"]:
             favored = "cash" if stats["cash"]["engaged"] > stats["reorder"]["engaged"] else "reorder"
             strategy = {**strategy, "next_experiment_framing": favored, "learning_evidence_id": event.id,
                         "cash_allocation": .6 if favored == "cash" else .4,
                         "positioning_confidence": "provisional; response evidence only"}
             remember(db, "strategic", "strategy", strategy)
         # Preserve empirical characteristics, with explicit unknown conversions.
+        remember(db, "skill_performance", "requested_service:" + experiment.id,
+                 {"experiment_id": experiment.id, "skill": "requested_service", "sent": len(outgoing),
+                  "engaged": sum(s["engaged"] for s in stats.values()), "connected": qualified,
+                  "failures": sum(s["negative"] for s in stats.values()), "evaluation_evidence_id": event.id,
+                  "interpretation": "Observed cohort outcomes; do not infer that the skill caused conversion."})
         for message in outgoing:
             contact = db.get(Contact, message.contact_id)
             if contact:
+                observed = {e.kind for e in db.scalars(select(Evidence).where(Evidence.subject == f"shop:{contact.shop_id}"))} if contact.shop_id else set()
                 remember(db, "customer", contact.id, {"characteristics": contact.characteristics,
                     "response": any(r.classification in POSITIVE for r in by_contact.get(contact.id, [])),
-                    "shop_id": contact.shop_id, "payment": None, "retention": None, "experiment_id": experiment.id})
+                    "shop_id": contact.shop_id, "signup": "SIGNUP" in observed, "connection": "SHOPIFY_CONNECTION" in observed,
+                    "activation": "INVENTORY_ANALYSIS_VIEWED" in observed,
+                    "payment": True if "SUBSCRIPTION_PURCHASED" in observed else None,
+                    "retention": False if "CANCELLATION" in observed else None, "experiment_id": experiment.id})
     if now >= experiment.stop_at or len(outgoing) >= experiment.specification["max_contacts"]:
         experiment.status = outcome
     return result

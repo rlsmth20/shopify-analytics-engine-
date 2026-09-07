@@ -42,7 +42,7 @@ class GrowthTests(unittest.TestCase):
         Base.metadata.create_all(self.dbengine)
         self.factory = sessionmaker(self.dbengine, expire_on_commit=False, autoflush=False)
         self.env = patch.dict(os.environ, {"GROWTH_MAILBOX": "info@skubase.io", "GROWTH_EMAIL_ENABLED": "true",
-            "GROWTH_RESEND_API_KEY": "fixture", "GROWTH_INBOUND_ENABLED": "true", "GROWTH_POSTAL_ADDRESS": "Fixture business address",
+            "GROWTH_RESEND_API_KEY": "fixture", "GROWTH_INBOUND_ENABLED": "true", "GROWTH_POSTAL_ADDRESS": "",
             "GROWTH_DAILY_USD": "0", "GROWTH_MODEL_ENABLED": "false", "GROWTH_DISCOVERY_ENABLED": "false"})
         self.env.start()
         engine.bootstrap(self.factory)
@@ -59,15 +59,17 @@ class GrowthTests(unittest.TestCase):
             contact = db.get(Contact, event.subject)
             contact.email = f"merchant-{number}@example.test"
             contact.organization = "Fixture Merchant"
-            contact.contact_basis = "public_business_contact"
+            contact.contact_basis = "requested_health_check"
             contact.facts = [{"text": "We sell physical apparel in our Shopify store", "source": contact.source, "verified": True}]
             contact.characteristics = {"industry": "apparel", "products": "150"}
+            record(db, "requested-check:" + contact.id, "ACCESS_REQUESTED", contact.id,
+                   {"verified": True, "issue": "Overstock / dead stock"}, source="skubase_form")
             db.commit()
             return contact.id
 
     def dispatch_all(self, provider):
         for _ in range(12):
-            if not engine.run_once(self.factory, schedule_wakes=False, provider=provider):
+            if not engine.run_once(self.factory, schedule_wakes=False, provider=provider, fetch=lambda url: {}):
                 break
 
     def test_full_persistent_loop_changes_future_behavior_and_keeps_raw_evidence(self):
@@ -104,6 +106,95 @@ class GrowthTests(unittest.TestCase):
             self.assertEqual(dashboard(db)["mission"]["qualified_users"], 0)
             # Prior intent is not represented as an acquired customer.
         self.assertEqual(len(calls), len(set(calls)))
+
+    def test_service_email_needs_no_address_but_rejects_promotion_and_tampering(self):
+        from app.growth.service_replies import draft_requested_check
+        contact_id = self.contact(71)
+        with self.factory() as db:
+            contact = db.get(Contact, contact_id)
+            message = draft_requested_check(db, contact, learning.ensure_experiment(db), "cash")
+            message.body += " Buy now before prices increase."
+            enqueue(db, "tampered", "send", {"message_id": message.id}, priority=999)
+            db.commit()
+        calls = []
+        engine.run_once(self.factory, schedule_wakes=False, provider=lambda *a, **kw: calls.append(kw))
+        self.assertFalse(calls)
+        with self.factory() as db:
+            self.assertEqual(db.scalar(select(Work).where(Work.key == "tampered")).status, "blocked")
+            stranger = Contact(identity="cold", source="https://example.test", email="cold@example.test",
+                               qualification={"qualified": True}, contact_basis="public_business_contact")
+            db.add(stranger); db.flush()
+            with self.assertRaises(GrowthError):
+                draft_requested_check(db, stranger, learning.ensure_experiment(db), "cash")
+
+    def test_service_question_dedup_and_stop_through_contact_form(self):
+        from app.growth.forms import observe_contact_form
+        with patch.dict(os.environ, {"GROWTH_ENABLED": "true"}):
+            for _ in range(2):
+                observe_contact_form(email="support@example.test", contact_type="question", message="How do I connect my Shopify store to Skubase?", receipt_id="fixture", factory=self.factory)
+        calls = []
+        self.dispatch_all(lambda *a, **kw: (calls.append(kw) or {"id": "service-receipt"}))
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("postal", calls[0]["data"]["text"].lower())
+        with patch.dict(os.environ, {"GROWTH_ENABLED": "true"}):
+            observe_contact_form(email="support@example.test", contact_type="question", message="stop", receipt_id="fixture2", factory=self.factory)
+        with self.factory() as db:
+            self.assertTrue(db.scalar(select(Contact).where(Contact.email == "support@example.test")).suppressed)
+            self.assertEqual(db.scalar(select(func.count()).select_from(Message)), 1)
+
+    def test_daily_codex_review_is_bounded_cited_idempotent_and_changes_next_action(self):
+        from app.growth.executive import export_packet, import_review, REVIEW_FIELDS
+        with self.factory() as db:
+            packet = export_packet(db)
+            review = {k: "Keep the health-check offer provisional." for k in REVIEW_FIELDS}
+            review.update(day=packet["day"], next_action="evaluate", evidence_ids=[packet["evidence"][0]["id"]])
+            with self.assertRaises(ValueError):
+                import_review(db, {**review, "evidence_ids": [999999]})
+            result = import_review(db, review, model="gpt-6-astra")
+            self.assertTrue(import_review(db, review)["already_recorded"])
+            self.assertEqual(get_memory(db, "strategic", "strategy")["executive_evidence_id"], result["evidence_id"])
+            self.assertEqual(db.scalar(select(Usage).where(Usage.category == "codex_subscription")).estimated_usd, None)
+            self.assertEqual(db.scalar(select(func.count()).select_from(Usage)), 1)
+            self.assertTrue(db.scalar(select(Work.id).where(Work.kind == "evaluate")))
+
+    def test_deeper_research_cap_applies_to_all_entry_points_and_exact_post(self):
+        from app.growth.discovery import research_contact
+        with self.factory() as db:
+            for n in range(3):
+                event = ingest_opportunity(db, url=f"https://community.shopify.com/t/topic/{9000+n}/2", text="Need reorder help", author="merchant", published_at=time.time())
+                enqueue(db, f"review-research:{n}", "research_contact", {"evidence_id": event.id}, priority=999)
+            db.commit()
+        fetched = []
+        def fetch(url):
+            fetched.append(url)
+            return {"post_stream": {"posts": [{"username": "merchant", "post_number": 1, "cooked": "Our app solves reorder problems"},
+                {"username": "merchant", "post_number": 2, "cooked": "My store needs help with reorder planning."}]}}
+        for _ in range(3):
+            item = claim(self.factory)
+            finish(self.factory, item, result=research_contact(self.factory, item, fetch=fetch))
+        self.assertEqual(len(fetched), 2)
+        with self.factory() as db:
+            researched = list(db.scalars(select(Evidence).where(Evidence.kind == "PROSPECT_RESEARCHED")))
+            self.assertEqual(len(researched), 2)
+            self.assertTrue(all(e.data["qualification"]["qualified"] for e in researched))
+
+    def test_verified_partner_receipt_deduplicates_and_never_invents_mrr(self):
+        from app.growth.shopify_payments import ingest_sale
+        app_id = "gid://partners/App/123"
+        with self.factory() as db:
+            shop = Shop(shopify_domain="paid-fixture.myshopify.com"); db.add(shop); db.flush()
+            db.add(User(email="paid@example.test", shop_id=shop.id, is_admin=False))
+            db.add(Subscription(shop_id=shop.id, status="active", plan="growth_monthly")); db.flush()
+            item = {"__typename": "AppSubscriptionSale", "app": {"id": app_id}, "id": "sale:1", "chargeId": "charge:1",
+                    "createdAt": datetime.now(timezone.utc).isoformat(), "shop": {"myshopifyDomain": "https://paid-fixture.myshopify.com"},
+                    "grossAmount": {"amount": "19.00", "currencyCode": "USD"}, "billingInterval": "EVERY_30_DAYS"}
+            self.assertFalse(ingest_sale(db, {**item, "grossAmount": {"amount": "0"}}, app_id))
+            self.assertFalse(ingest_sale(db, item, "another-app"))
+            self.assertTrue(ingest_sale(db, item, app_id)); self.assertTrue(ingest_sale(db, item, app_id)); db.commit()
+            self.assertEqual(dashboard(db)["funnel"]["SUBSCRIPTION_PURCHASED"], 1)
+            self.assertEqual(db.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind == "SUBSCRIPTION_PURCHASED")), 1)
+            self.assertIsNone(dashboard(db)["economics"]["mrr"])
+            self.assertEqual(dashboard(db)["economics"]["customers"], 1)
 
     def test_single_claim_concurrent_workers_and_stale_lease_fence(self):
         with self.factory() as db:
