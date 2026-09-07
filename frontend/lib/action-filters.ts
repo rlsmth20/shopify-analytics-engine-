@@ -22,7 +22,7 @@ export function filterInventoryActions(actions: InventoryAction[], filters: Acti
     (filters.confidence === "all" || action.data_quality_confidence === filters.confidence) &&
     (filters.stockoutDays === "all" || (action.status === "urgent" && Number.isFinite(action.days_until_stockout) && action.days_until_stockout <= Number(filters.stockoutDays)))
   ).sort((a, b) => {
-    const primary = filters.sort === "impact" ? getActionImpactValue(b) - getActionImpactValue(a)
+    const primary = filters.sort === "impact" ? (getActionImpactValue(b) ?? Number.NEGATIVE_INFINITY) - (getActionImpactValue(a) ?? Number.NEGATIVE_INFINITY)
       : filters.sort === "coverage" ? coverageForSort(a) - coverageForSort(b)
       : b.priority_score - a.priority_score;
     return primary || b.priority_score - a.priority_score || a.sku_id.localeCompare(b.sku_id);

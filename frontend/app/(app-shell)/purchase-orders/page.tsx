@@ -20,6 +20,12 @@ import {
   type PurchaseOrderLine,
 } from "@/lib/api-v2";
 import { exportBuyPlanReport, exportPurchaseOrderReport } from "@/lib/report-export";
+import { financialTotal, financialValue } from "@/lib/financial-values";
+import {
+  editableUnitCost, normalizeEditableLine, parseMoney, parseWholeNumber,
+  previewEditablePoTotals, purchaseOrderCostsKnown, roundCurrency, sumPoTotals,
+  type EditablePoDraft, type EditablePoLine,
+} from "@/lib/purchase-order-finance";
 
 const SERVICE_LEVELS = [0.9, 0.95, 0.975, 0.99];
 const SERVICE_LEVEL_COPY: Record<number, string> = {
@@ -32,20 +38,6 @@ const DEMO_PO_STORAGE_KEY = "skubase_demo_saved_purchase_orders";
 type ReceiptDraftLine = { qty: string; cost: string };
 type ReceiptDraft = { receivedAt: string; lines: Record<string, ReceiptDraftLine> };
 type ReceiptDrafts = Record<string, ReceiptDraft>;
-type EditablePoLine = {
-  sku_id: string;
-  name: string;
-  qty: string;
-  unit_cost: string;
-  received_qty: number;
-};
-type EditablePoDraft = {
-  vendor: string;
-  expected_arrival_date: string;
-  shipping_cost: string;
-  rationale: string;
-  lines: EditablePoLine[];
-};
 type EditablePoDrafts = Record<string, EditablePoDraft>;
 
 export default function PurchaseOrdersPage() {
@@ -63,7 +55,7 @@ export default function PurchaseOrdersPage() {
 function PurchaseOrdersContent() {
   const [drafts, setDrafts] = useState<PurchaseOrderDraft[]>([]);
   const [calendar, setCalendar] = useState<BuyingCalendarResponse | null>(null);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState<number | null>(null);
   const [serviceLevel, setServiceLevel] = useState(0.95);
   const [shippingCost, setShippingCost] = useState(35);
   const [search, setSearch] = useState("");
@@ -146,6 +138,7 @@ function PurchaseOrdersContent() {
         <div className="po-total">
           <p className="muted small">Total capital required, incl. shipping</p>
           <p className="po-total-value">{currency(total)}</p>
+          {total === null && !loading ? <p className="muted small">Add missing supplier unit costs to calculate the complete total.</p> : null}
           <button
             type="button"
             className="button button-secondary"
@@ -182,13 +175,13 @@ function PurchaseOrdersContent() {
         <PlanningCard
           title="Buying Calendar"
           label={`Next ${calendar?.horizon_days ?? 180} days`}
-          value={currency(calendarSummary.totalCost)}
+          value={currency(calendar ? calendarSummary.totalCost : null)}
           note={`${calendarSummary.futureCount} future planned buy${calendarSummary.futureCount === 1 ? "" : "s"} and ${calendarSummary.dueNowCount} due this week`}
         />
         <PlanningCard
           title="Current PO Drafts"
           label="Recommended now"
-          value={currency(supplyPlan.next90Value)}
+          value={currency(loading ? null : supplyPlan.next90Value)}
           note={`${supplyPlan.next90Units} recommended units across ${visibleDrafts.length} draft${visibleDrafts.length === 1 ? "" : "s"}`}
         />
       </section>
@@ -197,7 +190,7 @@ function PurchaseOrdersContent() {
         events={visibleCalendarEvents}
         loading={loading}
         horizonDays={calendar?.horizon_days ?? 180}
-        totalCost={calendarSummary.totalCost}
+        totalCost={calendar ? calendarSummary.totalCost : null}
       />
 
       <section className="po-filter-panel">
@@ -289,7 +282,7 @@ function PurchaseOrdersContent() {
                         <span>{latestReceipt ? `Last ${latestReceipt}` : "No receipt dates"}</span>
                       </td>
                       <td>{po.expected_arrival_date}</td>
-                      <td>{currency(po.total_cost)}</td>
+                      <td>{currency(financialValue(po, "total_cost", po.total_cost))}</td>
                       <td>
                         <div className="po-ledger-actions">
                           <button
@@ -345,33 +338,40 @@ function PurchaseOrdersContent() {
         {visibleDrafts.map((po) => {
           const remainingUnits = remainingPurchaseOrderUnits(po);
           const canReceiveUnits = remainingUnits > 0;
+          const costsKnown = purchaseOrderCostsKnown(po);
+          const detailsId = `po-details-${encodeURIComponent(po.po_id)}`;
           return (
           <div key={po.po_id} className="po-card">
-            <div
+            <button
+              type="button"
               className="po-card-head"
+              aria-label={`Purchase order ${po.po_id} from ${po.vendor}`}
+              aria-expanded={expanded === po.po_id}
+              aria-controls={detailsId}
               onClick={() => setExpanded(expanded === po.po_id ? null : po.po_id)}
             >
-              <div>
-                <p className="po-card-vendor">{po.vendor}</p>
-                <p className="po-card-meta">
+              <span>
+                <span className="po-card-vendor">{po.vendor}</span>
+                <span className="po-card-meta">
                   {po.po_id} · {po.lines.length} line
                   {po.lines.length === 1 ? "" : "s"} · arrives ~
                   {po.expected_arrival_date}
-                </p>
-              </div>
-              <div className="po-card-cost">
-                <p className="po-card-total">{currency(po.total_cost)}</p>
-                <p className="po-card-meta">
-                  {currency(po.subtotal_cost)} items + {currency(po.shipping_cost)} shipping
-                </p>
+                </span>
+              </span>
+              <span className="po-card-cost">
+                <span className="po-card-total">{currency(financialValue(po, "total_cost", po.total_cost))}</span>
+                <span className="po-card-meta">
+                  {currency(financialValue(po, "subtotal_cost", po.subtotal_cost))} items + {currency(po.shipping_cost)} shipping
+                </span>
                 <span className={`po-status po-status-${po.status}`}>
                   {formatPoStatus(po.status)}
                 </span>
                 <span className={`po-source po-source-${po.source ?? "recommended"}`}>
                   {isSavedPurchaseOrder(po) ? "Saved record" : "Recommendation"}
                 </span>
-              </div>
-            </div>
+              </span>
+            </button>
+            <div id={detailsId} hidden={expanded !== po.po_id}>
             {expanded === po.po_id ? (
               <div className="po-card-body">
                 {editingPo === po.po_id ? (
@@ -389,6 +389,7 @@ function PurchaseOrdersContent() {
                 ) : (
                   <>
                     <p className="po-rationale">{po.rationale}</p>
+                    {!costsKnown ? <p className="muted small">Supplier unit costs are missing. Edit this PO and enter the actual costs before saving, approving, or recording a shipment.</p> : null}
                     <table className="po-table">
                       <thead>
                         <tr>
@@ -410,16 +411,16 @@ function PurchaseOrdersContent() {
                             <td>
                               {line.received_qty ?? 0} / {line.qty}
                             </td>
-                            <td>{currency(line.unit_cost)}</td>
-                            <td>{currency(line.extended_cost)}</td>
+                            <td>{currency(financialValue(line, "unit_cost", line.unit_cost))}</td>
+                            <td>{currency(financialValue(line, "extended_cost", line.extended_cost))}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     <div className="po-cost-breakdown">
-                      <span>Subtotal {currency(po.subtotal_cost)}</span>
+                      <span>Subtotal {currency(financialValue(po, "subtotal_cost", po.subtotal_cost))}</span>
                       <span>Shipping {currency(po.shipping_cost)}</span>
-                      <strong>Total {currency(po.total_cost)}</strong>
+                      <strong>Total {currency(financialValue(po, "total_cost", po.total_cost))}</strong>
                     </div>
                     {po.receipts?.length ? (
                       <div className="po-receipt-history">
@@ -487,15 +488,15 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-primary"
                     onClick={() => void saveDraft(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !costsKnown}
                   >
-                    {busyPo === po.po_id ? "Saving..." : "Save draft"}
+                    {busyPo === po.po_id ? "Saving..." : costsKnown ? "Save draft" : "Add unit costs first"}
                   </button>
                   <button
                     type="button"
                     className="button button-secondary"
                     onClick={() => void markStatus(po, "approved")}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || po.status === "approved"}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || po.status === "approved" || !costsKnown}
                   >
                     {busyPo === po.po_id ? "Approving..." : "Approve PO"}
                   </button>
@@ -504,17 +505,26 @@ function PurchaseOrdersContent() {
                     className="button button-primary"
                     onClick={() => {
                       sendPurchaseOrderToVendor(po);
-                      void markStatus(po, "sent");
+                      setOperationNotice(`Email draft opened for ${po.po_id}. After sending it, use Mark as sent to update the PO.`);
                     }}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !costsKnown}
                   >
-                    {busyPo === po.po_id ? "Opening vendor email draft..." : "Open vendor email draft"}
+                    Open vendor email draft
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() => void markStatus(po, "sent")}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !costsKnown || ["sent", "partially_received", "received", "cancelled"].includes(po.status)}
+                    title="Use after you have sent the purchase order to the supplier."
+                  >
+                    Mark as sent
                   </button>
                   <button
                     type="button"
                     className="button button-ghost"
                     onClick={() => startPartialReceipt(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || !costsKnown}
                     title={!canReceiveUnits ? "All units on this PO have already been received." : undefined}
                   >
                     Receive partial
@@ -523,7 +533,7 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-ghost"
                     onClick={() => void receiveAll(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || !costsKnown}
                     title={!canReceiveUnits ? "All units on this PO have already been received." : undefined}
                   >
                     {busyPo === po.po_id ? "Receiving..." : "Receive all"}
@@ -576,7 +586,7 @@ function PurchaseOrdersContent() {
                           const remainingQty = remainingLineQuantity(line);
                           const draftLine = receiptDrafts[po.po_id]?.lines[line.sku_id] ?? {
                             qty: String(remainingQty),
-                            cost: line.unit_cost.toFixed(2),
+                            cost: editableUnitCost(line),
                           };
                           const safeDraftQty = clampReceiptInput(draftLine.qty, remainingQty);
                           return (
@@ -641,6 +651,7 @@ function PurchaseOrdersContent() {
                 ) : null}
               </div>
             ) : null}
+            </div>
           </div>
         );
         })}
@@ -663,6 +674,7 @@ function PurchaseOrdersContent() {
   }
 
   async function saveDraft(po: PurchaseOrderDraft): Promise<boolean> {
+    if (!requireRecordedCosts(po)) return false;
     setBusyPo(po.po_id);
     setOperationError(null);
     setOperationNotice(null);
@@ -697,6 +709,7 @@ function PurchaseOrdersContent() {
   }
 
   async function markStatus(po: PurchaseOrderDraft, status: PurchaseOrderDraft["status"]) {
+    if (!requireRecordedCosts(po)) return;
     setBusyPo(po.po_id);
     setOperationError(null);
     setOperationNotice(null);
@@ -708,7 +721,7 @@ function PurchaseOrdersContent() {
       upsertDraft(nextPo);
       setOperationNotice(
         status === "sent"
-          ? `Email draft opened for ${po.po_id}.`
+          ? `Purchase order ${po.po_id} marked as sent to the supplier.`
           : `Purchase order ${po.po_id} marked ${formatPoStatus(status).toLowerCase()}.`
       );
       if (!isDemoMode()) await refresh();
@@ -720,6 +733,7 @@ function PurchaseOrdersContent() {
   }
 
   function startPartialReceipt(po: PurchaseOrderDraft) {
+    if (!requireRecordedCosts(po)) return;
     if (remainingPurchaseOrderUnits(po) <= 0) {
       setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
       setOperationError(null);
@@ -737,7 +751,7 @@ function PurchaseOrdersContent() {
           lines: Object.fromEntries(
             po.lines.map((line) => [
               line.sku_id,
-              { qty: String(remainingLineQuantity(line)), cost: line.unit_cost.toFixed(2) },
+              { qty: String(remainingLineQuantity(line)), cost: editableUnitCost(line) },
             ])
           ),
         },
@@ -752,6 +766,15 @@ function PurchaseOrdersContent() {
       ...current,
       [po.po_id]: current[po.po_id] ?? toEditablePoDraft(po),
     }));
+  }
+
+  function requireRecordedCosts(po: PurchaseOrderDraft): boolean {
+    if (purchaseOrderCostsKnown(po)) return true;
+    setOperationError("Enter an actual unit cost for every PO line before continuing.");
+    setOperationNotice(null);
+    setExpanded(po.po_id);
+    startEditingPo(po);
+    return false;
   }
 
   function cancelEditingPo(poId: string) {
@@ -805,7 +828,7 @@ function PurchaseOrdersContent() {
               sku_id: "",
               name: "",
               qty: "1",
-              unit_cost: "0.00",
+              unit_cost: "",
               received_qty: 0,
             },
           ],
@@ -853,8 +876,13 @@ function PurchaseOrdersContent() {
       .map((line) => normalizeEditableLine(line))
       .filter((line): line is PurchaseOrderLine => Boolean(line));
 
-    if (lines.length === 0) {
-      setOperationError("Add at least one valid PO line before saving.");
+    if (lines.length === 0 || lines.length !== draft.lines.length) {
+      setOperationError("Every line needs a SKU, product, whole quantity of at least one (and no less than received), and an actual non-negative unit cost. Enter 0 only when the item has no cost.");
+      return null;
+    }
+
+    if (new Set(lines.map((line) => line.sku_id)).size !== lines.length) {
+      setOperationError("Each SKU may appear only once. Combine its quantities before saving.");
       return null;
     }
 
@@ -868,6 +896,8 @@ function PurchaseOrdersContent() {
       subtotal_cost: roundCurrency(subtotal),
       shipping_cost: shipping,
       total_cost: roundCurrency(subtotal + shipping),
+      financial_values_known: true,
+      financial_values: { subtotal_cost: roundCurrency(subtotal), total_cost: roundCurrency(subtotal + shipping) },
     };
   }
 
@@ -911,6 +941,7 @@ function PurchaseOrdersContent() {
   }
 
   async function recordPartialReceipt(po: PurchaseOrderDraft) {
+    if (!requireRecordedCosts(po)) return;
     const draft = receiptDrafts[po.po_id];
     const receivedAt = receiptDateToIso(draft?.receivedAt ?? todayInputDate());
     if (remainingPurchaseOrderUnits(po) <= 0) {
@@ -923,16 +954,14 @@ function PurchaseOrdersContent() {
       .map((line) => {
         const receiptLine = draft?.lines[line.sku_id];
         const receivedQty = Number(receiptLine?.qty ?? 0);
-        const receivedUnitCost = Number(receiptLine?.cost ?? line.unit_cost);
+        const receivedUnitCost = parseMoney(receiptLine?.cost ?? editableUnitCost(line));
         const remainingQty = remainingLineQuantity(line);
         return {
           sku_id: line.sku_id,
           received_qty: Number.isFinite(receivedQty)
             ? Math.min(Math.max(Math.round(receivedQty), 0), remainingQty)
             : 0,
-          received_unit_cost: Number.isFinite(receivedUnitCost)
-            ? receivedUnitCost
-            : line.unit_cost,
+          received_unit_cost: receivedUnitCost,
         };
       })
       .filter((line) => line.received_qty > 0);
@@ -940,6 +969,12 @@ function PurchaseOrdersContent() {
     if (lines.length === 0) {
       setOperationNotice(null);
       setOperationError("Enter a quantity for at least one SKU with units still remaining.");
+      return;
+    }
+
+    if (lines.some((line) => line.received_unit_cost === null)) {
+      setOperationNotice(null);
+      setOperationError("Enter the actual unit cost for each received item. Use 0 only for items with no cost.");
       return;
     }
 
@@ -965,6 +1000,7 @@ function PurchaseOrdersContent() {
   }
 
   async function receiveAll(po: PurchaseOrderDraft) {
+    if (!requireRecordedCosts(po)) return;
     setBusyPo(po.po_id);
     setOperationError(null);
     setOperationNotice(null);
@@ -973,7 +1009,7 @@ function PurchaseOrdersContent() {
       const lines = po.lines.map((line) => ({
         sku_id: line.sku_id,
         received_qty: remainingLineQuantity(line),
-        received_unit_cost: line.unit_cost,
+        received_unit_cost: financialValue(line, "unit_cost", line.unit_cost),
       })).filter((line) => line.received_qty > 0);
       if (lines.length === 0) {
         setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
@@ -1218,7 +1254,7 @@ function PurchaseOrderEditForm({
             const qty = parseWholeNumber(line.qty);
             const unitCost = parseMoney(line.unit_cost);
             const extended =
-              qty === null || unitCost === null ? 0 : roundCurrency(qty * unitCost);
+              qty === null || unitCost === null ? null : roundCurrency(qty * unitCost);
             const minQty = line.received_qty ?? 0;
             return (
               <div className="po-edit-line-row" key={`${po.po_id}-${index}`}>
@@ -1257,6 +1293,8 @@ function PurchaseOrderEditForm({
                     min="0"
                     step="0.01"
                     value={line.unit_cost}
+                    placeholder="Enter actual cost"
+                    required
                     onChange={(event) => onLineUpdate(index, { unit_cost: event.target.value })}
                   />
                 </label>
@@ -1315,7 +1353,7 @@ function BuyingCalendarPanel({
   events: BuyingCalendarEvent[];
   loading: boolean;
   horizonDays: number;
-  totalCost: number;
+  totalCost: number | null;
 }) {
   const previewEvents = events.slice(0, 8);
   return (
@@ -1371,7 +1409,7 @@ function BuyingCalendarPanel({
                     <span>{formatCalendarLinePreview(event)}</span>
                   </td>
                   <td>{event.total_units}</td>
-                  <td>{currency(event.estimated_cost)}</td>
+                  <td>{currency(financialValue(event, "estimated_cost", event.estimated_cost))}</td>
                   <td>{event.rationale}</td>
                 </tr>
               ))}
@@ -1446,7 +1484,8 @@ function filterPurchaseOrders(
       return po.lines.length > 0;
     }
     if (quickView === "high-value") {
-      return po.total_cost >= 3000;
+      const value = financialValue(po, "total_cost", po.total_cost);
+      return value !== null && value >= 3000;
     }
     return true;
   });
@@ -1472,12 +1511,12 @@ function filterBuyingCalendarEvents(
 }
 
 function buildCalendarSummary(events: BuyingCalendarEvent[]): {
-  totalCost: number;
+  totalCost: number | null;
   dueNowCount: number;
   futureCount: number;
 } {
   return {
-    totalCost: roundCurrency(events.reduce((sum, event) => sum + event.estimated_cost, 0)),
+    totalCost: financialTotal(events.map((event) => financialValue(event, "estimated_cost", event.estimated_cost))),
     dueNowCount: events.filter((event) => event.urgency === "due_now" || event.urgency === "this_week").length,
     futureCount: events.filter((event) => event.urgency === "future").length,
   };
@@ -1522,18 +1561,16 @@ function formatCalendarLinePreview(event: BuyingCalendarEvent): string {
 
 function buildSupplyPlan(drafts: PurchaseOrderDraft[]): {
   next90Units: number;
-  next90Value: number;
-  next12MonthValue: number;
+  next90Value: number | null;
 } {
   const next90Units = drafts.reduce(
     (sum, po) => sum + po.lines.reduce((lineSum, line) => lineSum + line.qty, 0),
     0,
   );
-  const next90Value = drafts.reduce((sum, po) => sum + po.total_cost, 0);
+  const next90Value = sumPoTotals(drafts);
   return {
     next90Units,
-    next90Value: roundCurrency(next90Value),
-    next12MonthValue: roundCurrency(next90Value * 4),
+    next90Value,
   };
 }
 
@@ -1547,7 +1584,7 @@ function toEditablePoDraft(po: PurchaseOrderDraft): EditablePoDraft {
       sku_id: line.sku_id,
       name: line.name,
       qty: String(line.qty),
-      unit_cost: line.unit_cost.toFixed(2),
+      unit_cost: editableUnitCost(line),
       received_qty: line.received_qty ?? 0,
     })),
   };
@@ -1561,65 +1598,6 @@ function emptyEditablePoDraft(): EditablePoDraft {
     rationale: "",
     lines: [],
   };
-}
-
-function normalizeEditableLine(line: EditablePoLine): PurchaseOrderLine | null {
-  const skuId = line.sku_id.trim();
-  const name = line.name.trim();
-  const qty = parseWholeNumber(line.qty);
-  const unitCost = parseMoney(line.unit_cost);
-  const alreadyReceived = Math.max(Math.round(line.received_qty ?? 0), 0);
-
-  if (!skuId || !name || qty === null || unitCost === null) return null;
-
-  const safeQty = Math.max(qty, alreadyReceived, 1);
-  return {
-    sku_id: skuId,
-    name,
-    qty: safeQty,
-    unit_cost: unitCost,
-    extended_cost: roundCurrency(safeQty * unitCost),
-    received_qty: Math.min(alreadyReceived, safeQty),
-  };
-}
-
-function previewEditablePoTotals(draft: EditablePoDraft): {
-  subtotal: number;
-  shipping: number;
-  total: number;
-} {
-  const subtotal = draft.lines.reduce((sum, line) => {
-    const qty = parseWholeNumber(line.qty);
-    const unitCost = parseMoney(line.unit_cost);
-    if (qty === null || unitCost === null) return sum;
-    return sum + qty * unitCost;
-  }, 0);
-  const shipping = parseMoney(draft.shipping_cost) ?? 0;
-  return {
-    subtotal: roundCurrency(subtotal),
-    shipping,
-    total: roundCurrency(subtotal + shipping),
-  };
-}
-
-function parseWholeNumber(value: string): number | null {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return Math.round(parsed);
-}
-
-function parseMoney(value: string): number | null {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return roundCurrency(parsed);
-}
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-function sumPoTotals(drafts: PurchaseOrderDraft[]): number {
-  return roundCurrency(drafts.reduce((sum, po) => sum + po.total_cost, 0));
 }
 
 type ReceiptLinePayload = {
@@ -1700,15 +1678,15 @@ function sendPurchaseOrderToVendor(po: PurchaseOrderDraft): void {
       `Purchase order ${po.po_id}`,
       `Supplier: ${po.vendor}`,
       `Expected arrival: ${po.expected_arrival_date}`,
-      `Subtotal: ${currency(po.subtotal_cost)}`,
+      `Subtotal: ${currency(financialValue(po, "subtotal_cost", po.subtotal_cost))}`,
       `Shipping/freight: ${currency(po.shipping_cost)}`,
-      `Total: ${currency(po.total_cost)}`,
+      `Total: ${currency(financialValue(po, "total_cost", po.total_cost))}`,
       "",
       "Lines:",
       ...po.lines.map(
         (line) =>
-          `- ${line.name}: ${line.qty} units @ ${currency(line.unit_cost)} = ${currency(
-            line.extended_cost
+          `- ${line.name}: ${line.qty} units @ ${currency(financialValue(line, "unit_cost", line.unit_cost))} = ${currency(
+            financialValue(line, "extended_cost", line.extended_cost)
           )}`
       ),
       "",

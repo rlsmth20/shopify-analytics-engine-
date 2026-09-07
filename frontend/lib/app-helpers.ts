@@ -11,6 +11,7 @@ import type {
   VendorLeadTimeEntry
 } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { financialValue } from "@/lib/financial-values";
 
 export const SHOPIFY_DOMAIN_STORAGE_KEY = "shopify_domain";
 
@@ -88,12 +89,12 @@ export function formatSyncTimestamp(value: string): string {
   return dateTimeFormatter.format(new Date(value));
 }
 
-export function getActionImpactValue(action: InventoryAction): number {
+export function getActionImpactValue(action: InventoryAction): number | null {
   if (action.status === "urgent") {
-    return action.estimated_profit_impact;
+    return financialValue(action, "estimated_profit_impact", action.estimated_profit_impact);
   }
 
-  return action.cash_tied_up;
+  return financialValue(action, "cash_tied_up", action.cash_tied_up);
 }
 
 export function summarizeDataSource(

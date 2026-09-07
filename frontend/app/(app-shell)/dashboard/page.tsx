@@ -20,6 +20,7 @@ import {
   type DashboardSeriesPoint,
 } from "@/lib/api-v2";
 import { dashboardKpiNote, formatDashboardMoney, formatForecastVariance, labelRevenueDays } from "@/lib/dashboard-presentation";
+import { knownPointValue } from "@/lib/financial-values";
 import styles from "./dashboard.module.css";
 
 const ONBOARDING_STORAGE_KEY = "skubase_stocky_migration_steps";
@@ -175,6 +176,11 @@ export default function DashboardPage() {
   }
 
   const revenueDays = labelRevenueDays(data.revenue_trend_30d, data.generated_at);
+  const knownSupplierCapital = data.cash_at_risk_by_vendor.flatMap((point) => {
+    const value = knownPointValue(point);
+    return value === null ? [] : [{ ...point, value }];
+  });
+  const suppliersMissingCosts = data.cash_at_risk_by_vendor.length - knownSupplierCapital.length;
 
   return (
     <div className={`dashboard ${styles.dashboard}`}>
@@ -184,15 +190,15 @@ export default function DashboardPage() {
             <p className="kpi-label">{kpi.label}</p>
             <div className="kpi-value-row">
               <p className="kpi-value">
-                {kpi.unit === "currency"
-                  ? currency(kpi.value)
+                {knownPointValue(kpi) === null ? "Unknown" : kpi.unit === "currency"
+                  ? currency(knownPointValue(kpi))
                   : kpi.unit === "percent"
                   ? `${kpi.value.toFixed(1)}%`
                   : kpi.unit === "days"
                   ? `${kpi.value.toLocaleString()} days`
                   : kpi.value.toLocaleString()}
               </p>
-              {kpi.delta_pct !== null ? (
+              {knownPointValue(kpi) !== null && kpi.delta_pct !== null ? (
                 <span
                   className={`kpi-delta kpi-delta-${
                     kpi.delta_pct >= 0
@@ -209,7 +215,7 @@ export default function DashboardPage() {
                 </span>
               ) : null}
             </div>
-            <p className={styles.kpiNote}>{dashboardKpiNote(kpi.label)}</p>
+            <p className={styles.kpiNote}>{knownPointValue(kpi) === null ? "Add missing unit costs to calculate this total" : dashboardKpiNote(kpi.label)}</p>
           </div>
         ))}
       </section>
@@ -359,10 +365,11 @@ export default function DashboardPage() {
           accent="warning"
         >
           <HorizontalBarChart
-            points={data.cash_at_risk_by_vendor}
+            points={knownSupplierCapital}
             valueFormatter={currency}
             barClassName="chart-hbar chart-hbar-warning"
           />
+          {suppliersMissingCosts > 0 && <p className={styles.kpiNote}>{suppliersMissingCosts} supplier total{suppliersMissingCosts === 1 ? " is" : "s are"} unknown because unit costs are missing. The chart includes only complete totals.</p>}
           <SeriesTable points={data.cash_at_risk_by_vendor} caption="Capital requiring review by supplier" nameLabel="Supplier" valueLabel="Capital (USD)" formatter={formatDashboardMoney} />
         </ChartPanel>
 
@@ -463,7 +470,7 @@ function SeriesTable({ points, caption, nameLabel, valueLabel, formatter }: {
             {points.map((point, index) => (
               <tr key={`${point.label}-${index}`}>
                 <th scope="row">{point.label}</th>
-                <td>{formatter(point.value)}</td>
+                <td>{knownPointValue(point) === null ? "Unknown" : formatter(knownPointValue(point)!)}</td>
               </tr>
             ))}
           </tbody>

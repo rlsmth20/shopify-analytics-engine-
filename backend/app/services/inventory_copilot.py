@@ -146,9 +146,9 @@ def _format_actions_for_prompt(actions: list[InventoryAction]) -> str:
         ]
         if action.status == "urgent":
             details.append(f"days_until_stockout={action.days_until_stockout:.1f}")
-            details.append(f"profit_at_risk=${action.estimated_profit_impact:,.0f}")
+            details.append(f"profit_at_risk=${action.estimated_profit_impact:,.0f}" if action.financial_values_known else "profit_at_risk=UNKNOWN (missing unit cost)")
         else:
-            details.append(f"cash_tied_up=${action.cash_tied_up:,.0f}")
+            details.append(f"cash_tied_up=${action.cash_tied_up:,.0f}" if action.financial_values_known else "cash_tied_up=UNKNOWN (missing cost or sales coverage)")
             details.append(f"excess_units={action.excess_units}")
         if action.explanation:
             details.append(f"why={action.explanation}")

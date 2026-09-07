@@ -5,6 +5,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from app.schemas import SkuDetail
+from app.services.cost_provenance import cost_known
 from app.schemas_v2 import (
     ForecastResult,
     InventoryHealthBucket,
@@ -44,6 +45,11 @@ def build_inventory_health(
     dead_stock_pct = dead_stock_cash / inventory_cost if inventory_cost > 0 else 0.0
     confidence_pct = high_confidence_count / len(forecasts) if forecasts else 0.0
     avg_days_of_cover = _average_days_of_cover(skus)
+    missing_cost_count = sum(not cost_known(sku) for sku in skus)
+    inventory_known = all(cost_known(sku) for sku in skus if sku.inventory > 0)
+    dead_known = all(sku.sales_history_complete and (cost_known(sku) or sku.days_since_last_sale < 90)
+                     for sku in skus if sku.inventory > 0)
+    margin_known = all(cost_known(sku) for sku in skus if _stockout_revenue_risk(sku, forecast_by_sku.get(sku.sku_id)) > 0)
 
     health_counts = Counter(_health_bucket(sku, forecast_by_sku.get(sku.sku_id)) for sku in skus)
     confidence_counts = Counter(forecast.confidence for forecast in forecasts)
@@ -53,23 +59,30 @@ def build_inventory_health(
             InventoryHealthKpi(
                 label="Inventory cost on hand",
                 value=round(inventory_cost, 0),
+                value_known=inventory_known,
+                known_value=round(inventory_cost, 0) if inventory_known else None,
                 unit="currency",
                 tone="neutral",
-                note=f"{_currency(inventory_retail)} at retail across {sku_count} SKUs.",
+                note=(f"{_currency(inventory_retail)} at retail across {sku_count} SKUs."
+                      if inventory_known else "Unit costs are missing; total inventory cost is unknown."),
             ),
             InventoryHealthKpi(
                 label="Stockout revenue risk",
                 value=round(stockout_revenue_risk, 0),
                 unit="currency",
                 tone="negative" if stockout_revenue_risk > 0 else "positive",
-                note=f"{_currency(stockout_margin_risk)} estimated gross margin exposed.",
+                note=(f"{_currency(stockout_margin_risk)} estimated gross margin exposed."
+                      if margin_known else "Gross margin exposure is unknown because unit costs are missing."),
             ),
             InventoryHealthKpi(
                 label="Dead-stock capital",
                 value=round(dead_stock_cash, 0),
+                value_known=dead_known,
+                known_value=round(dead_stock_cash, 0) if dead_known else None,
                 unit="currency",
                 tone="negative" if dead_stock_cash > 0 else "positive",
-                note=f"{dead_stock_pct * 100:.0f}% of inventory cost is stale 90+ days.",
+                note=(f"{dead_stock_pct * 100:.0f}% of inventory cost is stale 90+ days."
+                      if inventory_known and dead_known else "Complete sales history and unit costs are required to measure stale-stock capital and its share of inventory."),
             ),
             InventoryHealthKpi(
                 label="High-confidence forecasts",
@@ -102,12 +115,14 @@ def build_inventory_health(
         top_stockout_risk=_top_stockout_risk(skus, forecast_by_sku),
         insights=_build_insights(
             stockout_revenue_risk=stockout_revenue_risk,
-            dead_stock_cash=dead_stock_cash,
-            dead_stock_pct=dead_stock_pct,
+            dead_stock_cash=dead_stock_cash if dead_known and inventory_known else 0,
+            dead_stock_pct=dead_stock_pct if dead_known and inventory_known else 0,
             confidence_pct=confidence_pct,
             warning_count=warning_count,
             health_counts=health_counts,
-        ),
+        ) + ([InventoryHealthInsight(title="Add unit costs", severity="info",
+              description="Cost-based profit, capital and purchasing estimates remain unknown until unit costs are recorded.",
+              metric_label="SKUs missing unit cost", metric_value=str(missing_cost_count))] if missing_cost_count else []),
         generated_at=datetime.now(timezone.utc),
     )
 
@@ -159,7 +174,7 @@ def _top_cash_trapped(skus: list[SkuDetail]) -> list[InventoryHealthSku]:
     candidates = [
         sku
         for sku in skus
-        if sku.sales_history_complete and sku.inventory > 0
+        if sku.sales_history_complete and cost_known(sku) and sku.inventory > 0
         and (sku.days_since_last_sale >= 60 or _days_of_cover(sku) >= 120)
     ]
     candidates.sort(key=_inventory_cost, reverse=True)

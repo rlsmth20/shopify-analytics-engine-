@@ -69,6 +69,7 @@ def build_scorecards(
                 avg_daily_units=round(sku.last_30_day_sales / 30, 2),
                 avg_daily_revenue=round(revenue_by_sku[sku.sku_id] / 30, 2),
                 profit_per_unit=round(sku.price - sku.cost, 2),
+                cost_source=sku.cost_source,
                 sell_through_30d=round(
                     sku.last_30_day_sales / max(sku.inventory + sku.last_30_day_sales, 1),
                     3,

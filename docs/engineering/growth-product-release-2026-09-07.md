@@ -28,4 +28,10 @@ After deployment, enroll the new organic experiment using `docs/growth/inventory
 - CSV round trips, formula-safe exports, missing costs, sample detection, planning assumptions, limits, attribution, signed synthetic webhooks, replay, suppression and persistent growth behavior have focused regression coverage.
 - Browser fixtures used isolated SQLite and synthetic merchants. No synthetic replies, connections or payments were inserted into production. No real outreach or provider financial actions were performed by these checks.
 
-Production rollout and live checks will be recorded below after deployment. Preserve the previous immutable release for rollback; no schema downgrade is needed.
+## Production rollout
+
+Commit `711bf8a` was deployed from an immutable archive. Vercel deployment `dpl_FGzonmHdZRkJT5p8GMVLcyur9Ye3` is ready at `www.skubase.io`; Railway deployment `42b79ff0-7130-4fe6-b7bc-d042ae3d9c77` succeeded. API health, public tool and sitemap returned 200; anonymous access to the growth API returned 401. The live tool loaded and ran synthetic sample inputs.
+
+Retained release evidence is `5151`. Requested-service skill version **3** is active, along with browser-service experiment `97b00298aa2b4c58a7443ddfe727c78a`. Organic experiment `inventory-health-check-v1` is enrolled as `e80c93819dd649a380e33a92c4fc3661`. The worker was running and unpaused after deployment, with no active model call, 13 of 20 first-contact slots used, 7 remaining and no unresolved reservations. Newly qualified users remained 0; this release does not claim customer acquisition from simulated checks.
+
+Preserve the previous immutable release for rollback; no schema downgrade is needed. The audited skill workflow can reactivate version 2 if the service revision needs rollback. Preserve all experiment evidence and original message bodies.

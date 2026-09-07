@@ -1,12 +1,15 @@
 "use client";
 
+import { finiteNonnegative, stockCoverageGeometry } from "@/lib/stock-health-state";
+
 export type StockHealthStatus =
   | "Healthy"
   | "Watch"
   | "At risk"
   | "Stockout risk"
   | "Overstock"
-  | "Dead stock";
+  | "Dead stock"
+  | "Review";
 
 type RiskLevel = "Critical" | "High" | "Medium" | "Low" | string;
 
@@ -30,6 +33,7 @@ export type ProjectedStockHealthProps = {
   confidence?: string | null;
   dataQualityNote?: string | null;
   daysSinceLastSale?: number | null;
+  salesHistoryComplete?: boolean;
   compact?: boolean;
   hideMetricGrid?: boolean;
   hideIdentity?: boolean;
@@ -58,6 +62,7 @@ export function ProjectedStockHealth({
   confidence,
   dataQualityNote,
   daysSinceLastSale,
+  salesHistoryComplete,
   compact = false,
   hideMetricGrid = false,
   hideIdentity = false,
@@ -65,8 +70,8 @@ export function ProjectedStockHealth({
   showAdvancedDetails = true,
   context,
 }: ProjectedStockHealthProps) {
-  const coverDays = firstFinite(daysLeft, daysOfInventory);
-  const health = normalizeStatus(
+  const coverDays = salesHistoryComplete === false ? null : firstFinite(daysLeft, daysOfInventory);
+  const health = salesHistoryComplete === false ? "Review" : normalizeStatus(
     status,
     riskLevel,
     currentStock,
@@ -84,10 +89,9 @@ export function ProjectedStockHealth({
     leadTimeDays,
     targetCoverageDays,
     daysSinceLastSale,
+    salesHistoryComplete,
   });
-  const coveragePct = healthBarPercent(coverDays, targetCoverageDays, leadTimeDays);
-  const leadPct = markerPercent(leadTimeDays, targetCoverageDays, coverDays);
-  const targetPct = markerPercent(targetCoverageDays, targetCoverageDays, coverDays);
+  const { fill: coveragePct, lead: leadPct, target: targetPct } = stockCoverageGeometry(coverDays, leadTimeDays, targetCoverageDays);
 
   return (
     <section
@@ -105,15 +109,15 @@ export function ProjectedStockHealth({
         </span>
       </div>
 
-      <div className="stock-health-bar" aria-label="Stock cover compared with lead time and target coverage">
-        <span className="stock-health-fill" style={{ width: `${coveragePct}%` }} />
+      <div className="stock-health-bar" role="img" aria-label={coveragePct === null ? "Stock cover unavailable" : `Estimated stock cover: ${formatNumber(coverDays)} days; compared with lead time and target coverage`}>
+        {coveragePct !== null ? <span className="stock-health-fill" style={{ width: `${coveragePct}%` }} /> : null}
         {leadPct !== null ? <span className="stock-health-marker stock-health-marker-lead" style={{ left: `${leadPct}%` }} /> : null}
         {targetPct !== null ? <span className="stock-health-marker stock-health-marker-target" style={{ left: `${targetPct}%` }} /> : null}
       </div>
       <div className="stock-health-scale">
-        <span>Now</span>
-        <span>{leadTimeDays !== null && isFiniteNumber(leadTimeDays) ? `Lead time ${formatNumber(leadTimeDays)}d` : "Lead time unavailable"}</span>
-        <span>{targetCoverageDays !== null && isFiniteNumber(targetCoverageDays) ? `Target ${formatNumber(targetCoverageDays)}d` : "Target unavailable"}</span>
+        <span>{coveragePct === null ? "Coverage unavailable" : "Now"}</span>
+        <span>{finiteNonnegative(leadTimeDays) ? `Lead time ${formatNumber(leadTimeDays)}d` : "Lead time unavailable"}</span>
+        <span>{finiteNonnegative(targetCoverageDays) ? `Target ${formatNumber(targetCoverageDays)}d` : "Target unavailable"}</span>
       </div>
 
       <p className="stock-health-explanation">{explanation}</p>
@@ -128,8 +132,8 @@ export function ProjectedStockHealth({
             <Detail label="Days left / cover" value={formatDays(coverDays)} />
             <Detail label="Lead time" value={formatDays(leadTimeDays)} />
             <Detail label="Target coverage" value={formatDays(targetCoverageDays)} />
-            <Detail label="Recommended qty" value={formatNumber(recommendedQty)} />
-            <Detail label="Estimated stockout" value={safeText(stockoutDate)} />
+            <Detail label="Recommended qty" value={salesHistoryComplete === false ? "Needs sales history" : formatNumber(recommendedQty)} />
+            <Detail label="Estimated stockout" value={salesHistoryComplete === false ? "Needs sales history" : safeText(stockoutDate)} />
             <Detail label="Inventory value" value={formatMoney(inventoryValue)} />
             <Detail label="Cash impact" value={formatMoney(cashImpact)} />
             <Detail label="Confidence" value={safeText(confidence)} />
@@ -163,12 +167,12 @@ function normalizeStatus(
 ): StockHealthStatus {
   if (status) {
     const normalized = status.toLowerCase();
+    if (["review", "review history", "unknown", "unavailable"].includes(normalized)) return "Review";
     if (normalized.includes("dead")) return "Dead stock";
     if (normalized.includes("overstock")) return "Overstock";
     if (normalized.includes("stockout")) return "Stockout risk";
     if (normalized.includes("at risk")) return "At risk";
     if (normalized.includes("watch")) return "Watch";
-    if (normalized.includes("healthy")) return "Healthy";
   }
 
   if (riskLevel === "Critical") return "Stockout risk";
@@ -176,10 +180,13 @@ function normalizeStatus(
   if (riskLevel === "Medium") return "Watch";
 
   if (isFiniteNumber(currentStock) && currentStock > 0) {
-    if ((isFiniteNumber(dailyVelocity) && dailyVelocity === 0) || (isFiniteNumber(daysSinceLastSale) && daysSinceLastSale >= 90)) {
+    if (isFiniteNumber(daysSinceLastSale) && daysSinceLastSale >= 90) {
       return "Dead stock";
     }
   }
+  if (!finiteNonnegative(coverDays) || !finiteNonnegative(leadTimeDays) || leadTimeDays === 0 ||
+      !finiteNonnegative(targetCoverageDays) || targetCoverageDays === 0 ||
+      !finiteNonnegative(currentStock) || !isFiniteNumber(dailyVelocity) || dailyVelocity <= 0) return "Review";
   if (isFiniteNumber(coverDays) && isFiniteNumber(leadTimeDays)) {
     if (coverDays <= leadTimeDays) return "Stockout risk";
     if (coverDays <= leadTimeDays + 7) return "At risk";
@@ -188,6 +195,7 @@ function normalizeStatus(
   if (isFiniteNumber(coverDays) && isFiniteNumber(targetCoverageDays) && coverDays > targetCoverageDays * 3) {
     return "Overstock";
   }
+  if (status?.toLowerCase().includes("reorder") || status?.toLowerCase().includes("slow mover")) return "Watch";
   return "Healthy";
 }
 
@@ -199,6 +207,7 @@ function buildExplanation({
   leadTimeDays,
   targetCoverageDays,
   daysSinceLastSale,
+  salesHistoryComplete,
 }: {
   health: StockHealthStatus;
   currentStock?: number | null;
@@ -207,7 +216,13 @@ function buildExplanation({
   leadTimeDays?: number | null;
   targetCoverageDays?: number | null;
   daysSinceLastSale?: number | null;
+  salesHistoryComplete?: boolean;
 }): string {
+  if (health === "Review") {
+    return salesHistoryComplete === false
+      ? "Sales history is incomplete. Review the history and planning assumptions before relying on stock cover or purchasing recommendations."
+      : "Stock health needs review. Check sales history, stock cover, lead time and target coverage before acting; sufficient coverage is not established.";
+  }
   if (health === "Dead stock") {
     if (isFiniteNumber(daysSinceLastSale)) {
       return `This SKU has inventory on hand and ${formatNumber(daysSinceLastSale)} days since last sale, so it belongs in dead-stock review.`;
@@ -231,47 +246,30 @@ function buildExplanation({
       ? "Not enough sales velocity to project cover confidently. Review sales history before acting."
       : "Not enough sales history to classify this SKU with confidence.";
   }
-  return "This SKU has enough projected cover beyond lead time and target coverage based on current signals.";
+  if (health === "Healthy" && finiteNonnegative(coverDays) && finiteNonnegative(leadTimeDays) && finiteNonnegative(targetCoverageDays)) {
+    return `Estimated stock cover is ${formatNumber(coverDays)} days against a ${formatNumber(leadTimeDays)}-day lead time and a ${formatNumber(targetCoverageDays)}-day target.${coverDays < targetCoverageDays ? " Cover is below the target; review planned receipts and demand before changing orders." : " Keep monitoring demand and supplier timing."}`;
+  }
+  return "An inventory issue is flagged, but the available measurements do not establish sufficient coverage. Review the underlying history and planning assumptions.";
 }
 
 function firstFinite(...values: Array<number | null | undefined>): number | null {
-  return values.find((value): value is number => isFiniteNumber(value)) ?? null;
-}
-
-function healthBarPercent(
-  coverDays: number | null,
-  targetCoverageDays?: number | null,
-  leadTimeDays?: number | null,
-): number {
-  if (!isFiniteNumber(coverDays)) return 0;
-  const max = Math.max(targetCoverageDays ?? 0, leadTimeDays ?? 0, coverDays, 30);
-  return clamp((coverDays / max) * 100, 4, 100);
-}
-
-function markerPercent(
-  value?: number | null,
-  targetCoverageDays?: number | null,
-  coverDays?: number | null,
-): number | null {
-  if (!isFiniteNumber(value)) return null;
-  const max = Math.max(targetCoverageDays ?? 0, coverDays ?? 0, value, 30);
-  return clamp((value / max) * 100, 4, 98);
+  return values.find((value): value is number => finiteNonnegative(value)) ?? null;
 }
 
 function toneForStatus(status: StockHealthStatus): "healthy" | "watch" | "risk" | "overstock" | "dead" {
   if (status === "Healthy") return "healthy";
-  if (status === "Watch") return "watch";
+  if (status === "Watch" || status === "Review") return "watch";
   if (status === "At risk" || status === "Stockout risk") return "risk";
   if (status === "Overstock") return "overstock";
   return "dead";
 }
 
 function formatVelocity(value?: number | null): string {
-  return isFiniteNumber(value) ? `${formatNumber(value)} / day` : "Not enough sales history";
+  return finiteNonnegative(value) ? `${formatNumber(value)} / day` : "Not enough sales history";
 }
 
 function formatDays(value?: number | null): string {
-  return isFiniteNumber(value) ? `${formatNumber(value)} days` : "Unavailable";
+  return finiteNonnegative(value) ? `${formatNumber(value)} days` : "Unavailable";
 }
 
 function formatNumber(value?: number | null): string {
@@ -291,8 +289,4 @@ function safeText(value?: string | null): string {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
 }

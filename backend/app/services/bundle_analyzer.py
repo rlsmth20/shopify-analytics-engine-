@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from app.schemas import SkuDetail
 from app.schemas_v2 import BundleComponent, BundleHealth
+from app.services.cost_provenance import cost_known
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,7 @@ def analyze_bundles(
                         "One or more components not found in catalog."
                     ],
                     total_component_value_at_risk=0.0,
+                    financial_values_known=False,
                     recommended_action="Map all component SKUs before relying on bundle analytics.",
                 )
             )
@@ -63,12 +65,14 @@ def analyze_bundles(
         # Value at risk = other components that are "stuck" because we can't assemble
         # more bundles than the limiting component allows.
         stuck_capital = 0.0
+        capital_known = True
         status_lines: list[str] = []
         max_bundles_sellable = min(pair[1] for pair in per_component_bundles)
         for comp, per_bundle, sku in per_component_bundles:
             units_used = max_bundles_sellable * comp.qty_per_bundle
             units_stranded = max(sku.inventory - units_used, 0)
             if per_bundle > max_bundles_sellable:
+                capital_known = capital_known and cost_known(sku)
                 stuck_capital += units_stranded * sku.cost
                 status_lines.append(
                     f"{sku.name}: {sku.inventory} on-hand, {units_used} needed, "
@@ -89,9 +93,10 @@ def analyze_bundles(
                 limiting_component_name=limiting_component_sku.name,
                 component_status=status_lines,
                 total_component_value_at_risk=round(stuck_capital, 2),
+                financial_values_known=capital_known,
                 recommended_action=_recommend(
-                    max_bundles_sellable, limiting_component_sku, stuck_capital
-                ),
+                    max_bundles_sellable, limiting_component_sku, stuck_capital if capital_known else 0.0
+                ) + (" Add component unit costs to measure stranded capital." if not capital_known else ""),
             )
         )
 

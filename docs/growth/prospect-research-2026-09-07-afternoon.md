@@ -1,0 +1,37 @@
+# Afternoon merchant prospect research — September 7, 2026
+
+**Research only: zero newly qualified prospects, zero contacts, zero posts, zero send reservations.** Three primary discussion pages were read after targeted public search. The review found no fresh, strong merchant opportunity that justified another Skubase pitch. This is a result from this bounded pass, not a claim that Shopify Community has no suitable merchants.
+
+The existing campaign ledgers and [messaging boundaries](outreach-messaging.md) were checked first. Previously contacted merchants, solved threads, vendor posts and known exclusions were not promoted into a new outreach batch. Advertising and new API spending remain $0. No personal accounts, private contact research, production writes or mailbox actions were used.
+
+## Primary pages screened
+
+| Author and source | Merchant evidence and date | Skubase fit | Decision / qualification confidence |
+| --- | --- | --- | --- |
+| **myfilosophy**, [Replacement for Stocky?](https://community.shopify.com/t/replacement-for-stocky/646221) | July 7, 2026: wants economical purchase orders, ordering by size, year-end stocktakes and inventory reports; rejects a $59 monthly option. July 9: says forecasting is already available in Shopify and was not a Stocky use case; plans to review an alternative. | Reorder priorities partly overlap. Native PO replacement, variant-search workflow and stocktake parity are not established by our capability review. Their explicit lack of forecasting need weakens the health-check offer. | **Defer; low present qualification.** Merchant workflow confidence high, current unresolved demand unknown. Newer thread activity does not establish a renewed merchant request. |
+| **vedasuite**, [What inventory mistake costs Shopify merchants the most money?](https://community.shopify.com/t/what-inventory-mistake-costs-shopify-merchants-the-most-money/664818) | August 11–13, 2026: asks for merchant experiences while explicitly researching operational problems. September 2–7 replies include vendors and general commentary, rather than a new merchant reporting their own purchasing failure. | Skubase can help review stock cover and reorder priorities. It cannot establish physical inventory accuracy from an inaccurate input count; no sync/stocktake remedy is implied. | **Exclude as an acquisition prospect; low merchant qualification.** Confidence high that the original post is research, not a first-person request for an app. Do not turn vendor anecdotes into customer evidence. |
+| **saqlain1**, [What would be my first batch of inventory in India?](https://community.shopify.com/t/what-would-be-my-first-batch-of-inventory-in-india/668518) | August 19, 2026: testing products with Facebook ads before buying stock; asks how to choose the first batch while measuring cash-on-delivery success and balancing small-order unit cost. The visible reply is August 20. | This is a first-batch validation decision with no established sales history in the post. Skubase's sales-based stock-cover/reorder logic does not determine initial demand or COD delivery success. | **Defer; low current product fit.** Purchasing question is explicit, but operating Shopify store, usable history, repeat replenishment and willingness to pay are unknown. Do not propose a fabricated initial order quantity. |
+
+## Rules suitability and drafts
+
+The campaign's retained September 7 review of [Shopify Community guidelines](https://community.shopify.com/guidelines) requires useful, relevant public replies; disclosed affiliation; no repeated generic app pitches, unsolicited private messages or contact details in replies. It also records the platform's discouragement of AI-produced content. Rules were not re-fetched in this three-page research allowance; nothing here authorizes publication.
+
+No outreach draft is offered for these three sources because none meets the current first-contact standard. Sending an app pitch to the researcher, suggesting unsupported functionality, or reviving an old budget discussion solely to fill capacity would lower relevance. The first-batch question could receive general educational help, but it does not presently justify a Skubase acquisition message.
+
+For a future qualified candidate, keep revision 2: clearly identify Skubase as the inventory-planning app, connect one sourced fact to a verified capability, offer collaboration on a missing workflow without promising development, and ask one concrete question or offer a free check. Include: “Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store.” Any new first contact still requires a fresh reservation in the shared rolling-20 ledger immediately before submission.
+
+## Search exclusions retained
+
+Search previews also surfaced the already-contacted VBUstore and akhterkhan threads, the already-excluded Sambelina solved discussion, and posts explicitly announcing or researching competing apps. They were not re-opened for another full review. The earliest detailed source above also names merchants already choosing alternatives; those recommendations do not establish fresh unmet purchasing demand.
+
+## Next decision
+
+Prioritize substantive replies and requested checks, then verify the new browser health-check funnel. Retain the existing outreach cohorts and messages. Do not infer a positioning loss from this sourcing result or increase the send ceiling. A future discovery pass should seek a new first-person merchant statement about actual reorder decisions and usable sales/stock history; recent vendor replies alone should not refresh an old prospect's qualification.
+
+## Product trust evidence retained in the same pass
+
+Two further source reads brought this bounded pass to five of six allowed pages: the existing [Shopify forecasting discussion](https://www.reddit.com/r/InventoryManagement/comments/1uib7tx/looking_for_inventory_forecasting_for_shopify/) and the community rules URL. The latter redirected to a moderator page and did not establish readable public posting rules. No Reddit business identity or posting permission was verified; no post, private message, account creation, or contact reservation followed.
+
+The thread's original merchant, Proper_Ad_6044, describes about 900 SKUs, bestseller stockouts alongside slower-product overbuying, and spreadsheet-based purchasing becoming difficult. Their follow-up asks how to validate forecasts before committing cash, including backtesting, promotions and stockout anomalies. This is one public merchant observation from a thread about two months old, already retained in prior research; reopening it does not create a new lead or a second supporting sample. Vendor claims and later vendor replies do not establish current merchant demand or independently verified competitor capabilities.
+
+**Inference, low confidence:** visible assumptions and reviewable purchasing amounts may matter to merchants worried about bad purchase orders. This supports testing trust and explainability, not declaring a new ICP or an offer winner. Independent code reproduction found missing-cost estimates, duplicate inbound recommendations and incomplete-history labels that warranted fixes on correctness grounds. These fixes are implementation evidence, not customer conversions. Reassess the inference only when a distinct merchant requests, uses or responds to the workflow.

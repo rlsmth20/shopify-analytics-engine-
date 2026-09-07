@@ -4,6 +4,7 @@ import { ProjectedStockHealth } from "@/components/projected-stock-health";
 import {
   confidenceLabel,
   currencyFormatter,
+  getActionImpactValue,
   leadTimeSourceLabel,
   numberFormatter,
   statusLabel,
@@ -24,7 +25,7 @@ export function ActionCard({
     action.status === "urgent" && isFiniteNumber(action.target_inventory_units) && isFiniteNumber(action.current_on_hand)
       ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
       : null;
-  const cashAtRisk = historyReview ? null : action.status === "urgent" ? action.estimated_profit_impact : action.cash_tied_up;
+  const cashAtRisk = historyReview ? null : getActionImpactValue(action);
   const calculationDetails = technicalExplanation(action.explanation) ? action.explanation : null;
   const explanation = plainEnglishExplanation(action, daysLeft);
   const stockHealthStatus =
@@ -202,8 +203,10 @@ function plainEnglishExplanation(action: InventoryAction, daysLeft: number | nul
     }
     return `Current stock covers ${numberFormatter.format(daysLeft)} days against a ${numberFormatter.format(action.lead_time_days_used)}-day lead time. Keep this SKU in reorder review.`;
   }
-  if (action.status === "dead" && isFiniteNumber(action.cash_tied_up)) {
-    return `${formatMoney(action.cash_tied_up)} is tied up in inventory that should be reviewed for recovery.`;
+  if (action.status === "dead") {
+    const impact = getActionImpactValue(action);
+    return impact === null ? "Review this inventory for recovery. Add a recorded unit cost to estimate cash exposure."
+      : `${formatMoney(impact)} is tied up in inventory that should be reviewed for recovery.`;
   }
   if (action.status === "optimize" && isFiniteNumber(action.days_of_inventory) && isFiniteNumber(action.target_coverage_days)) {
     return `Current stock covers ${numberFormatter.format(action.days_of_inventory)} days against a ${numberFormatter.format(action.target_coverage_days)}-day target. Review before placing another order.`;

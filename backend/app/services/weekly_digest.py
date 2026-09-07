@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.db.models import DigestSendLog, ReportScheduleRecord
 from app.db.session import SessionLocal
 from app.schemas_v2 import ReorderSuggestion
-from app.services.reorder_optimizer import build_reorder_suggestions, build_vendor_totals
+from app.services.reorder_optimizer import build_known_vendor_totals, build_reorder_suggestions, build_vendor_totals
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import load_daily_history_for_shop_skus, load_skus_for_shop
 from app.services.transactional_email import send_buy_list_email
@@ -45,7 +45,7 @@ def build_buy_list(db: DbSession, *, shop_id: int) -> tuple[list[ReorderSuggesti
         lead_time_config=settings.to_lead_time_config(),
     )
     suggestions.sort(
-        key=lambda s: (s.expected_stockout_prob, s.landed_extended_cost),
+        key=lambda s: (s.expected_stockout_prob, s.landed_extended_cost if s.financial_values_known else 0),
         reverse=True,
     )
     top = suggestions[:MAX_ITEMS]
@@ -103,14 +103,14 @@ def run_weekly_digests_once(*, force: bool = False) -> int:
                             "name": item.name,
                             "vendor": item.vendor,
                             "qty": item.recommended_order_qty,
-                            "cost": item.landed_extended_cost,
+                            "cost": item.landed_extended_cost if item.financial_values_known else None,
                             "stockout_prob": item.expected_stockout_prob,
                             "lead_time_days": item.lead_time_days,
                         }
                         for item in items
                     ],
-                    total_cost=total,
-                    vendor_totals=vendor_totals,
+                    total_cost=total if all(item.financial_values_known for item in items) else None,
+                    vendor_totals=build_known_vendor_totals(items, vendor_totals),
                 )
                 if delivered:
                     db.add(

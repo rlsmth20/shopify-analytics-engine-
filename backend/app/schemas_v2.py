@@ -7,7 +7,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from app.schemas import CostSource
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +35,44 @@ PurchaseOrderStatus = Literal["draft", "ready", "approved", "sent", "partially_r
 
 class ApiModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class FinancialProjection(ApiModel):
+    """Canonical cost-derived values; legacy numeric fields remain compatible."""
+    financial_values_known: bool = True
+    financial_values: dict[str, float | None] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def canonical_financial_values(self):
+        if getattr(self, "cost_source", "recorded") != "recorded":
+            self.financial_values_known = False
+        fields = {
+            "profit_per_unit", "unit_cost", "extended_cost", "landed_extended_cost", "landed_unit_cost",
+            "freight_share_pct", "total_extended_cost", "subtotal_cost", "total_cost", "estimated_cost",
+            "total_capital_required", "total_estimated_cost", "capital_tied_up", "suggested_markdown_pct",
+            "suggested_price", "projected_recovered_capital", "total_capital_recoverable",
+            "total_component_value_at_risk", "anchor_cost", "dead_cost", "dead_capital_tied_up",
+            "suggested_bundle_price", "bundle_unit_cost", "bundle_margin_pct", "projected_cash_recovered",
+            "dead_stock_capital", "order_now_cost", "deferrable_cost",
+        }
+        self.financial_values = {key: getattr(self, key) if self.financial_values_known else None
+                                 for key in fields if key in type(self).model_fields}
+        return self
+
+
+class CostedProjection(FinancialProjection):
+    cost_source: CostSource = "recorded"
+
+
+class KnownValueProjection(ApiModel):
+    value: float
+    value_known: bool = True
+    known_value: float | None = None
+
+    @model_validator(mode="after")
+    def canonical_known_value(self):
+        self.known_value = self.value if self.value_known else None
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +123,7 @@ class ForecastFeedResponse(ApiModel):
 # ABC / XYZ classification + scorecard
 # ---------------------------------------------------------------------------
 
-class SkuScorecard(ApiModel):
+class SkuScorecard(CostedProjection):
     sku_id: str
     name: str
     vendor: str
@@ -110,9 +149,8 @@ class ScorecardResponse(ApiModel):
     cutoff_b_pct: float = 0.95
 
 
-class InventoryHealthKpi(ApiModel):
+class InventoryHealthKpi(KnownValueProjection):
     label: str
-    value: float
     unit: Literal["currency", "count", "percent", "days"]
     tone: Literal["positive", "negative", "neutral"] = "neutral"
     note: str
@@ -124,11 +162,10 @@ class InventoryHealthBucket(ApiModel):
     tone: Literal["positive", "negative", "neutral"] = "neutral"
 
 
-class InventoryHealthSku(ApiModel):
+class InventoryHealthSku(KnownValueProjection):
     sku_id: str
     name: str
     vendor: str
-    value: float
     note: str
     severity: Literal["critical", "warning", "info"]
 
@@ -155,7 +192,7 @@ class InventoryHealthResponse(ApiModel):
 # Reorder optimizer
 # ---------------------------------------------------------------------------
 
-class ReorderSuggestion(ApiModel):
+class ReorderSuggestion(CostedProjection):
     sku_id: str
     name: str
     vendor: str
@@ -177,11 +214,12 @@ class ReorderSuggestion(ApiModel):
     rationale: str
 
 
-class ReorderFeedResponse(ApiModel):
+class ReorderFeedResponse(FinancialProjection):
     service_level: float
     suggestions: list[ReorderSuggestion]
     total_extended_cost: float
     vendor_totals: dict[str, float]
+    known_vendor_totals: dict[str, float | None] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +252,7 @@ class BundleComponent(ApiModel):
     qty_per_bundle: int
 
 
-class BundleHealth(ApiModel):
+class BundleHealth(FinancialProjection):
     bundle_sku_id: str
     bundle_name: str
     max_bundles_sellable: int
@@ -281,7 +319,7 @@ class TransferRecommendationsResponse(ApiModel):
 # Purchase orders
 # ---------------------------------------------------------------------------
 
-class PurchaseOrderLine(ApiModel):
+class PurchaseOrderLine(CostedProjection):
     sku_id: str
     name: str
     qty: int
@@ -302,7 +340,7 @@ class PurchaseOrderReceipt(ApiModel):
     created_at: datetime
 
 
-class PurchaseOrderDraft(ApiModel):
+class PurchaseOrderDraft(FinancialProjection):
     po_id: str
     vendor: str
     created_at: datetime
@@ -321,12 +359,12 @@ class PurchaseOrderDraft(ApiModel):
     receipts: list[PurchaseOrderReceipt] = Field(default_factory=list)
 
 
-class PurchaseOrderDraftsResponse(ApiModel):
+class PurchaseOrderDraftsResponse(FinancialProjection):
     drafts: list[PurchaseOrderDraft]
     total_capital_required: float
 
 
-class BuyingCalendarLine(ApiModel):
+class BuyingCalendarLine(CostedProjection):
     sku_id: str
     name: str
     qty: int
@@ -338,7 +376,7 @@ class BuyingCalendarLine(ApiModel):
     lead_time_days: int | None = None
 
 
-class BuyingCalendarEvent(ApiModel):
+class BuyingCalendarEvent(FinancialProjection):
     event_id: str
     vendor: str
     source: Literal["recommended", "saved"]
@@ -355,7 +393,7 @@ class BuyingCalendarEvent(ApiModel):
     lines: list[BuyingCalendarLine]
 
 
-class BuyingCalendarResponse(ApiModel):
+class BuyingCalendarResponse(FinancialProjection):
     generated_at: datetime
     horizon_days: int
     events: list[BuyingCalendarEvent]
@@ -425,7 +463,7 @@ class UpsertReportScheduleRequest(ApiModel):
 # Dead stock / liquidation
 # ---------------------------------------------------------------------------
 
-class LiquidationSuggestion(ApiModel):
+class LiquidationSuggestion(CostedProjection):
     sku_id: str
     name: str
     on_hand: int
@@ -438,7 +476,7 @@ class LiquidationSuggestion(ApiModel):
     rationale: str
 
 
-class LiquidationResponse(ApiModel):
+class LiquidationResponse(FinancialProjection):
     total_capital_recoverable: float
     suggestions: list[LiquidationSuggestion]
 
@@ -538,17 +576,15 @@ class TestAlertRequest(ApiModel):
 # Dashboard KPIs
 # ---------------------------------------------------------------------------
 
-class DashboardKpi(ApiModel):
+class DashboardKpi(KnownValueProjection):
     label: str
-    value: float
     unit: Literal["currency", "count", "percent", "days"]
     delta_pct: Optional[float] = None
     tone: Literal["positive", "negative", "neutral"] = "neutral"
 
 
-class DashboardSeriesPoint(ApiModel):
+class DashboardSeriesPoint(KnownValueProjection):
     label: str
-    value: float
 
 
 class DashboardResponse(ApiModel):
@@ -567,7 +603,7 @@ class DashboardResponse(ApiModel):
 # Dead-stock bundle pairings
 # ---------------------------------------------------------------------------
 
-class DeadStockPairing(ApiModel):
+class DeadStockPairing(FinancialProjection):
     """A fast mover paired with a dead-stock SKU to clear it as a bundle."""
 
     id: str
@@ -593,7 +629,7 @@ class DeadStockPairing(ApiModel):
     explanation: str
 
 
-class DeadStockPairingsResponse(ApiModel):
+class DeadStockPairingsResponse(FinancialProjection):
     pairings: list[DeadStockPairing]
     dead_stock_sku_count: int
     dead_stock_capital: float
@@ -603,7 +639,7 @@ class DeadStockPairingsResponse(ApiModel):
 # Open-to-buy cash plan
 # ---------------------------------------------------------------------------
 
-class CashPlanVendor(ApiModel):
+class CashPlanVendor(FinancialProjection):
     vendor: str
     order_now_cost: float
     deferrable_cost: float
@@ -611,7 +647,7 @@ class CashPlanVendor(ApiModel):
     max_lead_time_days: int
 
 
-class CashPlanResponse(ApiModel):
+class CashPlanResponse(FinancialProjection):
     order_now_cost: float
     deferrable_cost: float
     total_cost: float

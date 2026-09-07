@@ -1,4 +1,5 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
+import type { FinancialProvenance } from "@/lib/financial-values";
 import { authenticatedFetch, isDemoActive } from "@/lib/shopify-embedded";
 
 export type ActionableStatus = "urgent" | "optimize" | "dead";
@@ -112,7 +113,7 @@ export type UpdateSkuLeadTimesRequest = {
   items: SkuLeadTimeEntry[];
 };
 
-export type SkuDetail = {
+export type SkuDetail = FinancialProvenance & {
   sku_id: string;
   name: string;
   vendor: string;
@@ -126,7 +127,7 @@ export type SkuDetail = {
   sku_lead_time_days: number | null;
 };
 
-type BaseInventoryAction = {
+type BaseInventoryAction = FinancialProvenance & {
   sku_id: string;
   name: string;
   status: ActionableStatus;

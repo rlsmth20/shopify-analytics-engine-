@@ -10,6 +10,7 @@ UrgencyLevel = Literal["critical", "high", "medium"]
 LeadTimeSource = Literal["sku_override", "vendor", "category", "global_default"]
 ActionDataSource = Literal["db", "mock"]
 DataQualityConfidence = Literal["high", "medium", "low"]
+CostSource = Literal["recorded", "estimated_from_price", "missing"]
 ShopifySyncStatus = Literal["running", "succeeded", "failed", "partial"]
 AiChatRole = Literal["user", "assistant"]
 AiChatMode = Literal["ai", "local"]
@@ -145,6 +146,9 @@ class BaseInventoryAction(ApiModel):
     sales_history_complete: bool = True
     data_quality_confidence: DataQualityConfidence = "high"
     data_quality_warnings: list[str] = Field(default_factory=list)
+    cost_source: CostSource = "recorded"
+    financial_values_known: bool = True
+    financial_values: dict[str, float | None] = Field(default_factory=dict)
 
 
 class UrgentInventoryAction(BaseInventoryAction):
@@ -214,6 +218,7 @@ class SkuDetail(ApiModel):
     category: str
     price: float
     cost: float
+    cost_source: CostSource = "recorded"
     inventory: int
     last_30_day_sales: int
     last_7_day_sales: int

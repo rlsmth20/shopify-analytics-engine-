@@ -1,7 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -17,6 +16,7 @@ from app.schemas import (
     SkuDetail,
 )
 from app.services.inventory_engine import build_inventory_actions
+from app.services.cost_provenance import MISSING_COST_WARNING, unit_cost_details
 from app.services.shop_settings import (
     ResolvedShopSettings,
     build_default_shop_settings,
@@ -27,7 +27,6 @@ from app.services.shop_settings import (
 UNKNOWN_VENDOR = "Unknown Vendor"
 UNKNOWN_CATEGORY = "uncategorized"
 NEVER_SOLD_DAYS = 999
-DEFAULT_COST_RATIO = Decimal("0.40")
 MISSING_SKU_WARNING = "Missing Shopify SKU; using variant ID fallback."
 MISSING_VENDOR_WARNING = "Missing vendor; vendor lead-time overrides unavailable."
 MISSING_CATEGORY_WARNING = (
@@ -303,6 +302,7 @@ def _build_prepared_sku_record(
             category=product.category or UNKNOWN_CATEGORY,
             price=float(product.price),
             cost=_resolve_cost(product),
+            cost_source=unit_cost_details(product)[1],
             inventory=inventory,
             last_30_day_sales=last_30_day_sales,
             last_7_day_sales=last_7_day_sales,
@@ -326,11 +326,7 @@ def _build_product_name(product: Product) -> str:
 
 
 def _resolve_cost(product: Product) -> float:
-    if product.cost is not None:
-        return float(product.cost)
-
-    # Persisted ingest does not store landed cost yet, so use a stable fallback.
-    return float((product.price * DEFAULT_COST_RATIO).quantize(Decimal("0.01")))
+    return unit_cost_details(product)[0]
 
 
 def _calculate_days_since_last_sale(
@@ -344,6 +340,8 @@ def _calculate_days_since_last_sale(
 
 def _build_data_quality_warnings(product: Product) -> tuple[str, ...]:
     warnings: list[str] = []
+    if unit_cost_details(product)[1] != "recorded":
+        warnings.append(MISSING_COST_WARNING)
     if not product.sku:
         warnings.append(MISSING_SKU_WARNING)
     if not product.vendor:
@@ -359,6 +357,7 @@ def _build_data_quality_warnings(product: Product) -> tuple[str, ...]:
 def _determine_data_quality_confidence(
     warnings: tuple[str, ...],
 ) -> DataQualityConfidence:
+    warnings = tuple(warning for warning in warnings if warning != MISSING_COST_WARNING)
     if not warnings:
         return "high"
     if MISSING_PRICE_WARNING in warnings or len(warnings) >= 2:
@@ -399,6 +398,8 @@ def _apply_action_explanations(
 
 
 def _build_action_explanation(action: InventoryAction) -> str:
+    if not action.financial_values_known:
+        return f"{action.recommended_action} Financial impact is unknown until the required cost and sales data are recorded."
     if action.status == "urgent":
         return (
             f"Stockout in {action.days_until_stockout:.1f} days; "

@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from app.config.lead_time import LeadTimeConfig, MOCK_LEAD_TIME_CONFIG
 from app.schemas import SkuDetail
 from app.schemas_v2 import ReorderSuggestion
+from app.services.cost_provenance import cost_known, MISSING_COST_WARNING
 
 
 SERVICE_LEVEL_Z = {
@@ -71,7 +72,8 @@ def build_reorder_suggestions(
         suggestion = _build_suggestion(inputs)
         if suggestion.recommended_order_qty > 0:
             suggestions.append(suggestion)
-    suggestions.sort(key=lambda s: s.landed_extended_cost, reverse=True)
+    suggestions.sort(key=lambda s: (s.financial_values_known,
+                      s.landed_extended_cost if s.financial_values_known else s.expected_stockout_prob), reverse=True)
     return suggestions
 
 
@@ -89,7 +91,7 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
     annual_demand = mean_daily * 365
     unit_cost = max(sku.cost, 0.0)
     holding_cost = unit_cost * inputs.holding_rate
-    if unit_cost <= 0 or holding_cost <= 0 or annual_demand <= 0:
+    if not cost_known(sku) or unit_cost <= 0 or holding_cost <= 0 or annual_demand <= 0:
         eoq = 0
     else:
         eoq = int(math.ceil(math.sqrt((2 * annual_demand * inputs.order_cost) / holding_cost)))
@@ -107,6 +109,7 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
     if (
         reorder_qty > 0
         and not below_reorder_point
+        and cost_known(sku)
         and freight_share > MAX_FREIGHT_SHARE_FOR_TOP_UP
     ):
         reorder_qty = 0
@@ -133,6 +136,7 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
         service_level_target=inputs.service_level,
         expected_stockout_prob=round(stockout_prob, 3),
         unit_cost=round(sku.cost, 2),
+        cost_source=sku.cost_source,
         extended_cost=round(item_cost, 2),
         order_cost=round(inputs.order_cost if reorder_qty > 0 else 0.0, 2),
         landed_extended_cost=round(item_cost + (inputs.order_cost if reorder_qty > 0 else 0.0), 2),
@@ -141,7 +145,8 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
         else 0.0,
         freight_share_pct=round(freight_share * 100, 1),
         lead_time_days=inputs.lead_time_days,
-        rationale=_shipping_rationale(
+        rationale=(f"Order {reorder_qty} units based on demand and lead time. {MISSING_COST_WARNING} "
+                   "EOQ and freight-share comparisons are unavailable." if not cost_known(sku) else _shipping_rationale(
             sku=sku,
             reorder_qty=reorder_qty,
             eoq=eoq,
@@ -151,7 +156,7 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
             order_cost=inputs.order_cost,
             freight_share=freight_share,
             below_reorder_point=below_reorder_point,
-        ),
+        )),
     )
 
 
@@ -249,3 +254,12 @@ def build_vendor_totals(
     for s in suggestions:
         totals[s.vendor] = round(totals.get(s.vendor, 0.0) + s.landed_extended_cost, 2)
     return totals
+
+
+def build_known_vendor_totals(
+    suggestions: list[ReorderSuggestion],
+    totals: dict[str, float] | None = None,
+) -> dict[str, float | None]:
+    unknown_vendors = {item.vendor for item in suggestions if not item.financial_values_known}
+    totals = build_vendor_totals(suggestions) if totals is None else totals
+    return {vendor: None if vendor in unknown_vendors else amount for vendor, amount in totals.items()}

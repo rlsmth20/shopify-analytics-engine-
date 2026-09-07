@@ -23,6 +23,7 @@ from app.services.abc_analysis import build_scorecards
 from app.services.alerts import list_recent_events
 from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.inventory_engine import build_inventory_actions
+from app.services.cost_provenance import cost_known
 
 
 # Type aliases — readability for the function-parameter signatures below.
@@ -58,6 +59,9 @@ def build_dashboard(
 
     revenue_30d = sum(sku.price * sku.last_30_day_sales for sku in skus)
     inventory_value = sum(sku.cost * sku.inventory for sku in skus)
+    inventory_known = all(cost_known(sku) for sku in skus if sku.inventory != 0)
+    cash_known = all(a.financial_values_known for a in optimize + dead)
+    profit_known = all(a.financial_values_known for a in urgent)
 
     kpis = [
         DashboardKpi(
@@ -70,6 +74,8 @@ def build_dashboard(
         DashboardKpi(
             label="Inventory value",
             value=round(inventory_value, 0),
+            value_known=inventory_known,
+            known_value=round(inventory_value, 0) if inventory_known else None,
             unit="currency",
             delta_pct=None,
             tone="positive",
@@ -77,6 +83,8 @@ def build_dashboard(
         DashboardKpi(
             label="Cash tied up",
             value=round(cash_tied_up, 0),
+            value_known=cash_known,
+            known_value=round(cash_tied_up, 0) if cash_known else None,
             unit="currency",
             delta_pct=None,
             tone="negative",
@@ -84,6 +92,8 @@ def build_dashboard(
         DashboardKpi(
             label="Profit at risk",
             value=round(profit_at_risk, 0),
+            value_known=profit_known,
+            known_value=round(profit_at_risk, 0) if profit_known else None,
             unit="currency",
             delta_pct=None,
             tone="negative",
@@ -142,13 +152,18 @@ def build_dashboard(
     for sku in skus:
         vendor_by_sku.setdefault(sku.sku_id, sku.vendor)
     cash_by_vendor: dict[str, float] = {}
+    unknown_vendors: set[str] = set()
     for a in actions:
         if a.status in ("optimize", "dead"):
             vendor = vendor_by_sku.get(a.sku_id, "Unknown")
             cash_by_vendor[vendor] = cash_by_vendor.get(vendor, 0) + getattr(a, "cash_tied_up", 0)
+            if not a.financial_values_known:
+                unknown_vendors.add(vendor)
     cash_by_vendor_series = sorted(
-        [DashboardSeriesPoint(label=v, value=round(c, 0)) for v, c in cash_by_vendor.items()],
-        key=lambda p: p.value,
+        [DashboardSeriesPoint(label=v, value=round(c, 0), value_known=v not in unknown_vendors,
+                              known_value=round(c, 0) if v not in unknown_vendors else None)
+         for v, c in cash_by_vendor.items()],
+        key=lambda p: (p.value_known, p.value if p.value_known else 0),
         reverse=True,
     )[:6]
 

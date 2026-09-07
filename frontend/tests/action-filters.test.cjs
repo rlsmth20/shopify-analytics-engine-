@@ -61,3 +61,10 @@ test("coverage sorting places unknown or insufficient-history coverage after est
   const result = filterInventoryActions([missing, review, actions[0]], { ...defaults, sort: "coverage" });
   assert.equal(result[0].sku_id, "blue-1");
 });
+
+test("unknown estimated cash sorts after recorded zero and never wins impact ranking", () => {
+  const guessed = { ...actions[0], sku_id: "guessed", estimated_profit_impact: 17000, financial_values_known: false };
+  const zero = { ...actions[0], sku_id: "recorded-zero", estimated_profit_impact: 0, cost_source: "recorded" };
+  const result = filterInventoryActions([guessed, zero, actions[0]], { ...defaults, sort: "impact" });
+  assert.equal(result.map(row => row.sku_id).join(","), "blue-1,recorded-zero,guessed");
+});

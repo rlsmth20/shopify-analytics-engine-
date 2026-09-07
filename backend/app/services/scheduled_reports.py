@@ -60,7 +60,7 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
                 action.status.upper(),
                 str(action.current_on_hand),
                 f"{action.days_of_inventory:.0f}d",
-                f"${impact:,.0f}" if impact is not None else "-",
+                f"${impact:,.0f}" if impact is not None and action.financial_values_known else "Unknown",
                 action.recommended_action,
             ])
         return (
@@ -114,15 +114,15 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
                 item.name,
                 str(item.on_hand),
                 "No sales" if item.days_since_last_sale >= 999 else f"{item.days_since_last_sale}d",
-                item.tactic.replace("_", " "),
-                f"${item.capital_tied_up:,.0f}",
-                f"${item.projected_recovered_capital:,.0f}",
+                item.tactic.replace("_", " ") if item.financial_values_known else "Add unit costs",
+                f"${item.capital_tied_up:,.0f}" if item.financial_values_known else "Unknown",
+                f"${item.projected_recovered_capital:,.0f}" if item.financial_values_known else "Unknown",
             ]
             for item in plan
         ]
         return (
             REPORT_TITLES[report_type],
-            f"{len(rows)} dead-stock SKUs with the most capital to recover.",
+            f"{len(rows)} stale SKUs to review; financial recommendations require recorded unit costs.",
             ["Product", "On hand", "Stale", "Tactic", "Capital stuck", "Projected recovery"],
             rows,
             "/liquidation",
@@ -131,7 +131,7 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
     if report_type == "reorder":
         top = sorted(
             suggestions,
-            key=lambda s: (s.expected_stockout_prob, s.landed_extended_cost),
+            key=lambda s: (s.expected_stockout_prob, s.landed_extended_cost if s.financial_values_known else 0),
             reverse=True,
         )[:MAX_ROWS]
         if not top:
@@ -142,7 +142,7 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
                 s.name,
                 s.vendor or "-",
                 str(s.recommended_order_qty),
-                f"${s.landed_extended_cost:,.0f}",
+                f"${s.landed_extended_cost:,.0f}" if s.financial_values_known else "Unknown",
                 f"{s.expected_stockout_prob:.0%}",
                 f"{s.lead_time_days}d",
             ]
@@ -150,7 +150,8 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
         ]
         return (
             REPORT_TITLES[report_type],
-            f"Top {len(rows)} reorders - ${total:,.0f} total cash required.",
+            (f"Top {len(rows)} reorders - ${total:,.0f} total cash required." if all(s.financial_values_known for s in top)
+             else f"Top {len(rows)} reorders. Add missing unit costs to measure total cash required."),
             ["Product", "Vendor", "Order qty", "Cost", "Risk", "Lead time"],
             rows,
             "/purchase-orders",

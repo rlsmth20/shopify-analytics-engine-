@@ -21,7 +21,9 @@ import {
 import { ProjectedStockHealth } from "@/components/projected-stock-health";
 import { fetchInventoryActions, type InventoryAction } from "@/lib/api";
 import { isHistoryReviewAction } from "@/lib/action-quality";
-import { getActionImpactValue, statusLabel } from "@/lib/app-helpers";
+import { statusLabel } from "@/lib/app-helpers";
+import { financialTotal, financialValue } from "@/lib/financial-values";
+import { stockoutRiskLevel, type StockoutRiskLevel } from "@/lib/stock-health-state";
 import {
   currency,
   fetchAuditEvents,
@@ -67,7 +69,8 @@ type ReportRow = {
   recommendedAction: string;
   rawReason?: string | null;
   calculationDetails?: string | null;
-  riskLevel: "Critical" | "High" | "Medium" | "Low";
+  riskLevel: StockoutRiskLevel;
+  salesHistoryComplete?: boolean;
   salesLast30: number | null;
   dailyVelocity: number | null;
   estimatedStockoutDate: string;
@@ -738,8 +741,9 @@ function buildInsight(report: ReportKind, rows: ReportRow[]): string {
     return `${critical} high-priority actions are ranked by urgency, cash impact, and available inventory signals.`;
   }
   if (report === "dead-stock") {
-    const cash = currency(sum(rows, "cashImpact"));
-    return `${cash} is tied up across slow-moving or excess inventory. Start with the largest recovery opportunities.`;
+    const total = financialTotal(rows.map(row => row.cashImpact));
+    return total === null ? "Some inventory costs are unknown. Confirm unit costs before comparing total cash exposure; valid stock quantities remain available below."
+      : `${currency(total)} is tied up across slow-moving or excess inventory. Start with the largest recovery opportunities.`;
   }
   const critical = rows.filter((row) => row.riskLevel === "Critical").length;
   return `${rows.length} SKUs need replenishment attention based on stock on hand, velocity, lead time, and target coverage. ${critical} are critical.`;
@@ -787,11 +791,11 @@ function buildReportTodos(report: ReportKind, rows: ReportRow[]) {
     ];
   }
   if (report === "dead-stock") {
-    const cash = currency(sum(rows, "cashImpact"));
+    const total = financialTotal(rows.map(row => row.cashImpact));
     return [
       {
-        label: `Recover the largest share of ${cash}`,
-        detail: "Start with the rows tying up the most working capital.",
+        label: total === null ? "Confirm missing unit costs" : `Review the largest share of ${currency(total)}`,
+        detail: "Use recorded costs to compare working capital; recovery proceeds are not established.",
         tone: "danger" as const,
       },
       {
@@ -874,6 +878,7 @@ function ReportRowDetails({
         inventoryValue={row.inventoryValue}
         cashImpact={row.cashImpact}
         daysSinceLastSale={row.daysSinceLastSale}
+        salesHistoryComplete={row.salesHistoryComplete}
         compact
         hideMetricGrid
         hideIdentity
@@ -1044,7 +1049,8 @@ function buildWhyThisMatters(report: ReportKind, row: ReportRow): string {
     return "Skubase has enough replenishment signal to keep this SKU in the report, but days-left context is limited.";
   }
   if (report === "dead-stock") {
-    return `${formatMoney(row.cashImpact)} may be tied up in inventory that is slow-moving, stale, or above target coverage.`;
+    return row.cashImpact === null ? "Stock needs review, but cash exposure is unknown until unit costs are available."
+      : `${formatMoney(row.cashImpact)} may be tied up in inventory that is slow-moving, stale, or above target coverage.`;
   }
   if (row.cashImpact !== null) {
     return `This action carries an estimated impact of ${formatMoney(row.cashImpact)}, so it is worth reviewing before lower-priority work.`;
@@ -1060,7 +1066,8 @@ function actionToRow(
   const isUrgent = action.status === "urgent";
   const historyReview = isHistoryReviewAction(action);
   const daysLeft = historyReview ? null : isUrgent ? action.days_until_stockout : action.days_of_inventory;
-  const dailyVelocity = action.daily_velocity || score?.avg_daily_units || null;
+  const dailyVelocity = historyReview ? null : action.daily_velocity ?? score?.avg_daily_units ?? null;
+  const cashImpact = historyReview ? null : actionFinancialImpact(action);
   const recommendedQty = isUrgent
     ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
     : null;
@@ -1080,7 +1087,7 @@ function actionToRow(
     daysLeft,
     leadTime: action.lead_time_days_used,
     status,
-    cashImpact: historyReview ? null : getActionImpactValue(action),
+    cashImpact,
   });
 
   return {
@@ -1096,20 +1103,18 @@ function actionToRow(
     daysInventory: historyReview ? null : action.days_of_inventory,
     leadTime: action.lead_time_days_used,
     recommendedQty,
-    cashImpact: historyReview ? null : getActionImpactValue(action),
+    cashImpact,
     reason,
     recommendedAction: action.recommended_action,
     rawReason,
     calculationDetails: containsTechnicalFormula(rawReason) ? rawReason : null,
     riskLevel,
+    salesHistoryComplete: action.sales_history_complete,
     salesLast30: dailyVelocity === null ? null : Math.round(dailyVelocity * 30),
     dailyVelocity,
     estimatedStockoutDate: isUrgent ? dateFromNow(daysLeft) : "Not in stockout window",
-    inventoryValue: action.current_on_hand && score?.profit_per_unit
-      ? Math.round(action.current_on_hand * score.profit_per_unit)
-      : action.status === "dead" || action.status === "optimize"
-        ? action.cash_tied_up
-        : null,
+    // Profit per unit and excess-stock cash are not an inventory unit cost.
+    inventoryValue: null,
     daysSinceLastSale: historyReview ? null : inferDaysSinceLastSale(action),
     status,
     targetCoverage: action.target_coverage_days,
@@ -1127,7 +1132,8 @@ function forecastToRow(
     action?.daily_velocity || forecast.projected_30_day_demand / 30 || score?.avg_daily_units || null;
   const currentStock = action?.current_on_hand ?? score?.inventory_on_hand ?? null;
   const leadTime = action?.lead_time_days_used ?? 14;
-  const daysLeft =
+  const historyReview = action ? isHistoryReviewAction(action) : false;
+  const daysLeft = historyReview ? null :
     action?.status === "urgent"
       ? action.days_until_stockout
       : currentStock !== null && dailyVelocity
@@ -1139,8 +1145,8 @@ function forecastToRow(
     currentStock,
     daysLeft,
     leadTime,
-    status: riskLevel === "Low" ? "Review" : "Reorder",
-    cashImpact: action ? getActionImpactValue(action) : null,
+    status: riskLevel === "Low" || riskLevel === "Unknown" ? "Review" : "Reorder",
+    cashImpact: action ? actionFinancialImpact(action) : null,
   });
 
   return {
@@ -1159,20 +1165,20 @@ function forecastToRow(
       action?.status === "urgent"
         ? Math.max(Math.round(action.target_inventory_units - action.current_on_hand), 0)
         : null,
-    cashImpact: action ? getActionImpactValue(action) : null,
+    cashImpact: historyReview ? null : action ? actionFinancialImpact(action) : null,
     reason,
     recommendedAction: action?.recommended_action ?? buildStockoutRecommendation(riskLevel),
     rawReason: forecast.explain,
     calculationDetails: containsTechnicalFormula(forecast.explain) ? forecast.explain : null,
     riskLevel,
-    salesLast30: forecast.projected_30_day_demand,
+    salesHistoryComplete: action?.sales_history_complete,
+    // Forecast demand is not observed historical sales.
+    salesLast30: null,
     dailyVelocity,
     estimatedStockoutDate: daysLeft === null ? "Unavailable" : dateFromNow(daysLeft),
-    inventoryValue: currentStock && score?.profit_per_unit
-      ? Math.round(currentStock * score.profit_per_unit)
-      : null,
+    inventoryValue: null,
     daysSinceLastSale: null,
-    status: riskLevel === "Low" ? "Review" : "Reorder",
+    status: riskLevel === "Low" || riskLevel === "Unknown" ? "Review" : "Reorder",
     targetCoverage: action?.target_coverage_days ?? null,
     estimatedCost: null,
     orderDeadline: daysLeft === null ? "Unavailable" : dateFromNow(Math.max(daysLeft - leadTime, 0)),
@@ -1188,13 +1194,16 @@ function reorderToRow(
     score?.avg_daily_units ?? (forecast ? forecast.projected_30_day_demand / 30 : null);
   const daysLeft = dailyVelocity ? suggestion.current_on_hand / dailyVelocity : null;
   const riskLevel = calculateRiskLevel(daysLeft, suggestion.lead_time_days);
+  const estimatedCost = financialValue(suggestion, "landed_extended_cost",
+    suggestion.landed_extended_cost ?? financialValue(suggestion, "extended_cost", suggestion.extended_cost));
+  const unitCost = financialValue(suggestion, "unit_cost", suggestion.unit_cost);
   const reason = buildPlainReportReason({
     rawReason: suggestion.rationale,
     currentStock: suggestion.current_on_hand,
     daysLeft,
     leadTime: suggestion.lead_time_days,
     status: "Reorder",
-    cashImpact: suggestion.landed_extended_cost || suggestion.extended_cost,
+    cashImpact: estimatedCost,
   });
 
   return {
@@ -1210,7 +1219,7 @@ function reorderToRow(
     daysInventory: daysLeft,
     leadTime: suggestion.lead_time_days,
     recommendedQty: suggestion.recommended_order_qty,
-    cashImpact: suggestion.landed_extended_cost || suggestion.extended_cost,
+    cashImpact: estimatedCost,
     reason,
     recommendedAction: suggestion.rationale,
     rawReason: suggestion.rationale,
@@ -1219,11 +1228,11 @@ function reorderToRow(
     salesLast30: dailyVelocity === null ? null : Math.round(dailyVelocity * 30),
     dailyVelocity,
     estimatedStockoutDate: daysLeft === null ? "Unavailable" : dateFromNow(daysLeft),
-    inventoryValue: suggestion.current_on_hand * suggestion.unit_cost,
+    inventoryValue: unitCost === null ? null : suggestion.current_on_hand * unitCost,
     daysSinceLastSale: null,
     status: "Reorder",
     targetCoverage: dailyVelocity ? suggestion.order_up_to / dailyVelocity : null,
-    estimatedCost: suggestion.landed_extended_cost || suggestion.extended_cost,
+    estimatedCost,
     orderDeadline: daysLeft === null ? "Unavailable" : dateFromNow(Math.max(daysLeft - suggestion.lead_time_days, 0)),
   };
 }
@@ -1295,7 +1304,7 @@ function buildMetrics(report: ReportKind, rows: ReportRow[]): ReportMetric[] {
       metric("Critical actions", rows.filter((row) => row.priority >= 80).length, "danger"),
       metric("Reorder actions", rows.filter((row) => row.actionType === "Urgent").length, "warning"),
       metric("Dead-stock actions", rows.filter((row) => row.actionType === "Dead").length, "danger"),
-      metric("Estimated cash impact", currency(sum(rows, "cashImpact")), "positive"),
+      metric("Estimated cash impact", formatMoney(financialTotal(rows.map(row => row.cashImpact))), "neutral"),
     ];
   }
   if (report === "stockout") {
@@ -1310,13 +1319,13 @@ function buildMetrics(report: ReportKind, rows: ReportRow[]): ReportMetric[] {
     return [
       metric("Dead stock SKUs", rows.filter((row) => row.status === "Dead stock").length, "danger"),
       metric("Slow movers", rows.filter((row) => row.status === "Slow mover" || row.status === "Overstock").length, "warning"),
-      metric("Cash tied up", currency(sum(rows, "cashImpact")), "danger"),
-      metric("Suggested recovery", currency(Math.round(sum(rows, "cashImpact") * 0.68)), "positive"),
+      metric("Cash tied up", formatMoney(financialTotal(rows.map(row => row.cashImpact))), "danger"),
+      metric("Rows needing cost review", rows.filter(row => row.cashImpact === null).length, "neutral"),
     ];
   }
   return [
     metric("SKUs to reorder", rows.length, "warning"),
-    metric("Estimated reorder value", currency(sum(rows, "estimatedCost")), "warning"),
+    metric("Estimated reorder value", formatMoney(financialTotal(rows.map(row => row.estimatedCost))), "warning"),
     metric("Critical reorder items", rows.filter((row) => row.riskLevel === "Critical").length, "danger"),
     metric("Suppliers involved", new Set(rows.map((row) => row.vendor)).size, "neutral"),
   ];
@@ -1336,7 +1345,7 @@ function buildFilterConfig(report: ReportKind, rows: ReportRow[]): ReportFilterC
   }
   if (report === "stockout") {
     return [
-      selectFilter("riskLevel", "Risk level", ["Critical", "High", "Medium", "Low"]),
+      selectFilter("riskLevel", "Risk level", ["Critical", "High", "Medium", "Low", "Unknown"]),
       vendor,
       category,
       selectFilter("daysLeftBucket", "Days left", ["0-7 days", "8-14 days", "15-30 days", "31+ days"]),
@@ -1443,7 +1452,7 @@ function currencyColumn(
     key,
     label,
     align: "right",
-    render: (row) => (value(row) === null ? "Unavailable" : currency(value(row) ?? 0)),
+    render: (row) => formatMoney(value(row)),
     sortValue: (row) => value(row) ?? -1,
   };
 }
@@ -1466,6 +1475,7 @@ function badgeColumn(
 function csvValue(key: string, row: ReportRow): string | number {
   const value = row[key as keyof ReportRow];
   if (typeof value === "number") return Number.isFinite(value) ? value : "";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
   return value ?? "";
 }
 
@@ -1489,25 +1499,21 @@ function metric(
   return { label, value, tone };
 }
 
-function sum(rows: ReportRow[], key: keyof ReportRow): number {
-  return rows.reduce((total, row) => {
-    const value = row[key];
-    return total + (typeof value === "number" && Number.isFinite(value) ? value : 0);
-  }, 0);
+function actionFinancialImpact(action: InventoryAction): number | null {
+  return action.status === "urgent"
+    ? financialValue(action, "estimated_profit_impact", action.estimated_profit_impact)
+    : financialValue(action, "cash_tied_up", action.cash_tied_up);
 }
 
 function calculateRiskLevel(
   daysLeft: number | null,
   leadTimeDays: number | null,
 ): ReportRow["riskLevel"] {
-  if (daysLeft === null || leadTimeDays === null) return "Low";
-  if (daysLeft <= leadTimeDays) return "Critical";
-  if (daysLeft <= leadTimeDays + 7) return "High";
-  if (daysLeft <= leadTimeDays + 14) return "Medium";
-  return "Low";
+  return stockoutRiskLevel(daysLeft, leadTimeDays);
 }
 
 function buildStockoutRecommendation(risk: ReportRow["riskLevel"]): string {
+  if (risk === "Unknown") return "Review sales history and lead time before making a reorder decision.";
   if (risk === "Critical") return "Review reorder quantity today.";
   if (risk === "High") return "Add to the next reorder review.";
   if (risk === "Medium") return "Monitor and confirm lead time.";
@@ -1532,7 +1538,7 @@ function formatNumber(value: number | null): string {
 }
 
 function formatMoney(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return "Unavailable";
+  if (value === null || !Number.isFinite(value)) return "Unknown";
   return currency(value);
 }
 
@@ -1619,6 +1625,7 @@ function metricToneToXlsxTone(tone: ReportMetric["tone"]): XlsxTone {
 }
 
 function riskToTone(risk: ReportRow["riskLevel"]): XlsxTone {
+  if (risk === "Unknown") return "neutral";
   if (risk === "Critical") return "danger";
   if (risk === "High") return "warning";
   if (risk === "Medium") return "warning";
@@ -1638,7 +1645,7 @@ function buildReportCharts(
         points: priorityDistribution(rows),
       },
       {
-        title: "Top cash-impact SKUs",
+        title: "Top cash-impact SKUs · known costs",
         points: topByNumber(rows, (row) => row.cashImpact, 8, (n) => currency(n)),
       },
     ];
@@ -1664,7 +1671,7 @@ function buildReportCharts(
         points: statusDistribution(rows),
       },
       {
-        title: "Largest capital stuck",
+        title: "Largest capital exposure · known costs",
         points: topByNumber(rows, (row) => row.cashImpact, 8, (n) => currency(n)).map((point) => ({
           ...point,
           tone: "danger",
@@ -1675,7 +1682,7 @@ function buildReportCharts(
   // reorder
   return [
     {
-      title: "Supplier exposure",
+      title: "Supplier exposure · complete known costs",
       points: vendorExposure(rows),
     },
     {
@@ -1701,7 +1708,7 @@ function priorityDistribution(rows: ReportRow[]): BarPoint[] {
 }
 
 function riskDistribution(rows: ReportRow[]): BarPoint[] {
-  const buckets = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+  const buckets = { Critical: 0, High: 0, Medium: 0, Low: 0, Unknown: 0 };
   rows.forEach((row) => {
     buckets[row.riskLevel] += 1;
   });
@@ -1710,6 +1717,7 @@ function riskDistribution(rows: ReportRow[]): BarPoint[] {
     { label: "High", value: buckets.High, display: String(buckets.High), tone: "warning" },
     { label: "Medium", value: buckets.Medium, display: String(buckets.Medium), tone: "warning" },
     { label: "Low", value: buckets.Low, display: String(buckets.Low), tone: "good" },
+    { label: "Unknown", value: buckets.Unknown, display: String(buckets.Unknown), tone: "neutral" },
   ];
 }
 
@@ -1729,12 +1737,17 @@ function statusDistribution(rows: ReportRow[]): BarPoint[] {
 }
 
 function vendorExposure(rows: ReportRow[]): BarPoint[] {
-  const totals = new Map<string, number>();
+  const values = new Map<string, Array<number | null>>();
   rows.forEach((row) => {
-    const cost = row.estimatedCost ?? row.cashImpact ?? 0;
-    totals.set(row.vendor, (totals.get(row.vendor) ?? 0) + cost);
+    const costs = values.get(row.vendor) ?? [];
+    costs.push(row.estimatedCost ?? row.cashImpact);
+    values.set(row.vendor, costs);
   });
-  return [...totals.entries()]
+  // A supplier with unknown rows must not appear as a complete numeric total.
+  return [...values.entries()].flatMap(([vendor, amounts]): [string, number][] => {
+    const total = financialTotal(amounts);
+    return total === null ? [] : [[vendor, total]];
+  })
     .sort(([, a], [, b]) => b - a)
     .slice(0, 8)
     .map(([label, value]) => ({

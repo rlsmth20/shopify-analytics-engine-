@@ -3,6 +3,7 @@
 import type { InventoryAction } from "@/lib/api";
 import { currency, type LiquidationSuggestion, type PurchaseOrderDraft } from "@/lib/api-v2";
 import { getActionImpactValue, statusLabel } from "@/lib/app-helpers";
+import { financialTotal, financialValue } from "@/lib/financial-values";
 
 // ExcelJS is loaded dynamically only when an export is triggered so the
 // ~800kB library is never bundled into the initial page payload.
@@ -109,18 +110,38 @@ const LIQUIDATION_TACTIC_LABELS: Record<LiquidationSuggestion["tactic"], string>
   donate_write_off: "Write-off",
 };
 
+// Missing amounts do not belong in a numeric ranking as zero-dollar opportunities.
+function knownFinancialPoints<T>(
+  rows: T[],
+  amount: (row: T) => number | null,
+  label: (row: T) => string,
+  limit: number,
+  tone: (row: T, value: number) => Tone = () => "neutral",
+): BarPoint[] {
+  return rows.flatMap((row) => {
+    const value = amount(row);
+    return value === null || !Number.isFinite(value)
+      ? []
+      : [{ label: label(row), value, display: currency(value), tone: tone(row, value) }];
+  }).sort((left, right) => right.value - left.value).slice(0, limit);
+}
+
+function amountAtLeast(value: number | null, threshold: number): boolean {
+  return value !== null && value >= threshold;
+}
+
 // ---------------------------------------------------------------------------
 // Public exports — dedicated report exporters
 // ---------------------------------------------------------------------------
 export async function exportActionsReport(actions: InventoryAction[]): Promise<void> {
   const totals = actions.reduce(
     (summary, action) => {
-      summary.impact += getActionImpactValue(action);
       summary[action.status] += 1;
       return summary;
     },
-    { urgent: 0, optimize: 0, dead: 0, impact: 0 }
+    { urgent: 0, optimize: 0, dead: 0 }
   );
+  const totalImpact = financialTotal(actions.map(getActionImpactValue));
 
   await buildWorkbook({
     title: "Inventory Action Report",
@@ -133,7 +154,7 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
       { label: "Actions", value: String(actions.length), note: "Visible queue" },
       { label: "Urgent", value: String(totals.urgent), tone: "danger" },
       { label: "Optimize", value: String(totals.optimize), tone: "warning" },
-      { label: "Profit / cash impact", value: currency(totals.impact), tone: "good" },
+      { label: "Profit / cash impact", value: currency(totalImpact), tone: totalImpact === null ? "neutral" : "good" },
     ],
     charts: [
       {
@@ -145,20 +166,9 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
         ],
       },
       {
-        title: "Top impact SKUs",
-        points: [...actions]
-          .sort((l, r) => getActionImpactValue(r) - getActionImpactValue(l))
-          .slice(0, 8)
-          .map((action) => ({
-            label: action.name,
-            value: getActionImpactValue(action),
-            display: currency(getActionImpactValue(action)),
-            tone: (action.status === "urgent"
-              ? "danger"
-              : action.status === "optimize"
-                ? "warning"
-                : "neutral") as Tone,
-          })),
+        title: "Top impact SKUs (known amounts only)",
+        points: knownFinancialPoints(actions, getActionImpactValue, (action) => action.name, 8,
+          (action) => action.status === "urgent" ? "danger" : action.status === "optimize" ? "warning" : "neutral"),
       },
     ],
     todos: [
@@ -206,7 +216,7 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
         format: (action) => currency(getActionImpactValue(action)),
         numericValue: (action) => getActionImpactValue(action),
         numFmt: '"$"#,##0',
-        tone: (action) => (getActionImpactValue(action) >= 1000 ? "good" : null),
+        tone: (action) => (amountAtLeast(getActionImpactValue(action), 1000) ? "good" : null),
         summarize: "sum",
       },
       {
@@ -231,11 +241,8 @@ export async function exportActionsReport(actions: InventoryAction[]): Promise<v
 export async function exportLiquidationReport(
   suggestions: LiquidationSuggestion[]
 ): Promise<void> {
-  const capitalTiedUp = suggestions.reduce((sum, item) => sum + item.capital_tied_up, 0);
-  const projectedRecovery = suggestions.reduce(
-    (sum, item) => sum + item.projected_recovered_capital,
-    0
-  );
+  const capitalTiedUp = financialTotal(suggestions.map((item) => financialValue(item, "capital_tied_up", item.capital_tied_up)));
+  const projectedRecovery = financialTotal(suggestions.map((item) => financialValue(item, "projected_recovered_capital", item.projected_recovered_capital)));
   const tacticCounts = suggestions.reduce<Record<string, number>>((counts, item) => {
     const label = LIQUIDATION_TACTIC_LABELS[item.tactic];
     counts[label] = (counts[label] ?? 0) + 1;
@@ -250,11 +257,12 @@ export async function exportLiquidationReport(
     detailSheetName: "Plan",
     kpis: [
       { label: "Dead SKUs", value: String(suggestions.length), tone: "danger" },
-      { label: "Capital stuck", value: currency(capitalTiedUp), tone: "danger" },
-      { label: "Projected recovery", value: currency(projectedRecovery), tone: "good" },
+      { label: "Capital stuck", value: currency(capitalTiedUp), tone: capitalTiedUp === null ? "neutral" : "danger" },
+      { label: "Projected recovery", value: currency(projectedRecovery), tone: projectedRecovery === null ? "neutral" : "good" },
       {
         label: "Recovery rate",
-        value: capitalTiedUp > 0 ? `${((projectedRecovery / capitalTiedUp) * 100).toFixed(0)}%` : "0%",
+        value: capitalTiedUp !== null && capitalTiedUp > 0 && projectedRecovery !== null
+          ? `${((projectedRecovery / capitalTiedUp) * 100).toFixed(0)}%` : "Unknown",
       },
     ],
     charts: [
@@ -272,16 +280,10 @@ export async function exportLiquidationReport(
         })),
       },
       {
-        title: "Largest recovery opportunities",
-        points: [...suggestions]
-          .sort((l, r) => r.projected_recovered_capital - l.projected_recovered_capital)
-          .slice(0, 8)
-          .map((item) => ({
-            label: item.name,
-            value: item.projected_recovered_capital,
-            display: currency(item.projected_recovered_capital),
-            tone: (item.tactic === "donate_write_off" ? "danger" : "good") as Tone,
-          })),
+        title: "Largest recovery opportunities (known amounts only)",
+        points: knownFinancialPoints(suggestions,
+          (item) => financialValue(item, "projected_recovered_capital", item.projected_recovered_capital),
+          (item) => item.name, 8, (item) => item.tactic === "donate_write_off" ? "danger" : "good"),
       },
     ],
     todos: [
@@ -336,13 +338,19 @@ export async function exportLiquidationReport(
         label: "Markdown",
         align: "right",
         width: 12,
-        format: (item) => `${item.suggested_markdown_pct.toFixed(0)}%`,
-        numericValue: (item) => item.suggested_markdown_pct / 100,
+        format: (item) => {
+          const markdown = financialValue(item, "suggested_markdown_pct", item.suggested_markdown_pct);
+          return markdown === null ? "Unknown" : `${markdown.toFixed(0)}%`;
+        },
+        numericValue: (item) => {
+          const markdown = financialValue(item, "suggested_markdown_pct", item.suggested_markdown_pct);
+          return markdown === null ? null : markdown / 100;
+        },
         numFmt: "0%",
         tone: (item) =>
-          item.suggested_markdown_pct >= 50
+          amountAtLeast(financialValue(item, "suggested_markdown_pct", item.suggested_markdown_pct), 50)
             ? "danger"
-            : item.suggested_markdown_pct >= 25
+            : amountAtLeast(financialValue(item, "suggested_markdown_pct", item.suggested_markdown_pct), 25)
               ? "warning"
               : null,
       },
@@ -351,8 +359,8 @@ export async function exportLiquidationReport(
         label: "Suggested price",
         align: "right",
         width: 16,
-        format: (item) => currency(item.suggested_price),
-        numericValue: (item) => item.suggested_price,
+        format: (item) => currency(financialValue(item, "suggested_price", item.suggested_price)),
+        numericValue: (item) => financialValue(item, "suggested_price", item.suggested_price),
         numFmt: '"$"#,##0.00',
       },
       {
@@ -360,10 +368,10 @@ export async function exportLiquidationReport(
         label: "Capital stuck",
         align: "right",
         width: 16,
-        format: (item) => currency(item.capital_tied_up),
-        numericValue: (item) => item.capital_tied_up,
+        format: (item) => currency(financialValue(item, "capital_tied_up", item.capital_tied_up)),
+        numericValue: (item) => financialValue(item, "capital_tied_up", item.capital_tied_up),
         numFmt: '"$"#,##0',
-        tone: () => "danger",
+        tone: (item) => financialValue(item, "capital_tied_up", item.capital_tied_up) === null ? null : "danger",
         summarize: "sum",
       },
       {
@@ -371,10 +379,10 @@ export async function exportLiquidationReport(
         label: "Recovery",
         align: "right",
         width: 16,
-        format: (item) => currency(item.projected_recovered_capital),
-        numericValue: (item) => item.projected_recovered_capital,
+        format: (item) => currency(financialValue(item, "projected_recovered_capital", item.projected_recovered_capital)),
+        numericValue: (item) => financialValue(item, "projected_recovered_capital", item.projected_recovered_capital),
         numFmt: '"$"#,##0',
-        tone: () => "good",
+        tone: (item) => financialValue(item, "projected_recovered_capital", item.projected_recovered_capital) === null ? null : "good",
         summarize: "sum",
       },
     ],
@@ -391,22 +399,16 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
     kpis: [
       { label: "Supplier", value: po.vendor },
       { label: "Lines", value: String(po.lines.length) },
-      { label: "Subtotal", value: currency(po.subtotal_cost), tone: "neutral" },
-      { label: "Shipping", value: currency(po.shipping_cost), tone: "warning" },
-      { label: "Total landed cost", value: currency(po.total_cost), tone: "warning" },
+      { label: "Subtotal", value: currency(financialValue(po, "subtotal_cost", po.subtotal_cost)), tone: "neutral" },
+      { label: "Shipping", value: currency(financialValue(po, "shipping_cost", po.shipping_cost)), tone: "warning" },
+      { label: "Total landed cost", value: currency(financialValue(po, "total_cost", po.total_cost)), tone: "warning" },
     ],
     charts: [
       {
-        title: "Cost by line",
-        points: [...po.lines]
-          .sort((l, r) => r.extended_cost - l.extended_cost)
-          .slice(0, 12)
-          .map((line) => ({
-            label: line.name,
-            value: line.extended_cost,
-            display: currency(line.extended_cost),
-            tone: (line.extended_cost >= 1000 ? "warning" : "neutral") as Tone,
-          })),
+        title: "Cost by line (known amounts only)",
+        points: knownFinancialPoints(po.lines,
+          (line) => financialValue(line, "extended_cost", line.extended_cost),
+          (line) => line.name, 12, (_line, value) => value >= 1000 ? "warning" : "neutral"),
       },
     ],
     todos: [
@@ -433,8 +435,8 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
         label: "Unit cost",
         align: "right",
         width: 14,
-        format: (line) => currency(line.unit_cost),
-        numericValue: (line) => line.unit_cost,
+        format: (line) => currency(financialValue(line, "unit_cost", line.unit_cost)),
+        numericValue: (line) => financialValue(line, "unit_cost", line.unit_cost),
         numFmt: '"$"#,##0.00',
       },
       {
@@ -442,10 +444,10 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
         label: "Extended",
         align: "right",
         width: 16,
-        format: (line) => currency(line.extended_cost),
-        numericValue: (line) => line.extended_cost,
+        format: (line) => currency(financialValue(line, "extended_cost", line.extended_cost)),
+        numericValue: (line) => financialValue(line, "extended_cost", line.extended_cost),
         numFmt: '"$"#,##0.00',
-        tone: (line) => (line.extended_cost >= 1000 ? "warning" : null),
+        tone: (line) => (amountAtLeast(financialValue(line, "extended_cost", line.extended_cost), 1000) ? "warning" : null),
         summarize: "sum",
       },
     ],
@@ -453,7 +455,7 @@ export async function exportPurchaseOrderReport(po: PurchaseOrderDraft): Promise
 }
 
 export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise<void> {
-  const totalCapital = drafts.reduce((sum, po) => sum + po.total_cost, 0);
+  const totalCapital = financialTotal(drafts.map((po) => financialValue(po, "total_cost", po.total_cost)));
   const totalLines = drafts.reduce((sum, po) => sum + po.lines.length, 0);
   const totalUnits = drafts.reduce(
     (sum, po) => sum + po.lines.reduce((lineSum, line) => lineSum + line.qty, 0),
@@ -478,18 +480,11 @@ export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise
     ],
     charts: [
       {
-        title: "Capital by supplier",
-        points: [...drafts]
-          .sort((l, r) => r.total_cost - l.total_cost)
-          .slice(0, 8)
-          .map((po) => ({
-            label: po.vendor,
-            value: po.total_cost,
-            display: currency(po.total_cost),
-            tone: (po.total_cost >= totalCapital / Math.max(drafts.length, 1)
-              ? "warning"
-              : "neutral") as Tone,
-          })),
+        title: "Capital by supplier (complete known costs)",
+        points: knownFinancialPoints(drafts,
+          (po) => financialValue(po, "total_cost", po.total_cost),
+          (po) => po.vendor, 8, (_po, value) => totalCapital !== null && value >= totalCapital / Math.max(drafts.length, 1)
+            ? "warning" : "neutral"),
       },
     ],
     todos: [
@@ -519,8 +514,8 @@ export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise
         label: "Items",
         align: "right",
         width: 14,
-        format: (po) => currency(po.subtotal_cost),
-        numericValue: (po) => po.subtotal_cost,
+        format: (po) => currency(financialValue(po, "subtotal_cost", po.subtotal_cost)),
+        numericValue: (po) => financialValue(po, "subtotal_cost", po.subtotal_cost),
         numFmt: '"$"#,##0',
         summarize: "sum",
       },
@@ -529,8 +524,8 @@ export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise
         label: "Shipping",
         align: "right",
         width: 12,
-        format: (po) => currency(po.shipping_cost),
-        numericValue: (po) => po.shipping_cost,
+        format: (po) => currency(financialValue(po, "shipping_cost", po.shipping_cost)),
+        numericValue: (po) => financialValue(po, "shipping_cost", po.shipping_cost),
         numFmt: '"$"#,##0',
         summarize: "sum",
       },
@@ -539,10 +534,10 @@ export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise
         label: "Total",
         align: "right",
         width: 14,
-        format: (po) => currency(po.total_cost),
-        numericValue: (po) => po.total_cost,
+        format: (po) => currency(financialValue(po, "total_cost", po.total_cost)),
+        numericValue: (po) => financialValue(po, "total_cost", po.total_cost),
         numFmt: '"$"#,##0',
-        tone: (po) => (po.total_cost >= 2500 ? "warning" : null),
+        tone: (po) => (amountAtLeast(financialValue(po, "total_cost", po.total_cost), 2500) ? "warning" : null),
         summarize: "sum",
       },
       { key: "rationale", label: "Rationale", width: 60, format: (po) => po.rationale },
@@ -571,8 +566,8 @@ export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise
             label: "Unit cost",
             align: "right",
             width: 14,
-            format: (line) => currency(line.unit_cost),
-            numericValue: (line) => line.unit_cost,
+            format: (line) => currency(financialValue(line, "unit_cost", line.unit_cost)),
+            numericValue: (line) => financialValue(line, "unit_cost", line.unit_cost),
             numFmt: '"$"#,##0.00',
           },
           {
@@ -580,8 +575,8 @@ export async function exportBuyPlanReport(drafts: PurchaseOrderDraft[]): Promise
             label: "Extended",
             align: "right",
             width: 16,
-            format: (line) => currency(line.extended_cost),
-            numericValue: (line) => line.extended_cost,
+            format: (line) => currency(financialValue(line, "extended_cost", line.extended_cost)),
+            numericValue: (line) => financialValue(line, "extended_cost", line.extended_cost),
             numFmt: '"$"#,##0.00',
             summarize: "sum",
           },
@@ -974,12 +969,9 @@ function buildDetailSheet<T>(
         return;
       }
       if (!summary) return;
-      const total = sheet.rows.reduce((sum, row) => {
-        const value = summary.col.numericValue?.(row);
-        return sum + (value !== null && value !== undefined && Number.isFinite(value) ? value : 0);
-      }, 0);
-      cell.value = total;
-      if (summary.col.numFmt) cell.numFmt = summary.col.numFmt;
+      const total = financialTotal(sheet.rows.map((row) => summary.col.numericValue?.(row) ?? null));
+      cell.value = total === null ? "Unknown" : total;
+      if (total !== null && summary.col.numFmt) cell.numFmt = summary.col.numFmt;
       cell.font = { name: FONT_BASE, bold: true, size: 11, color: { argb: COLOR_BRAND } };
       cell.alignment = { vertical: "middle", horizontal: summary.col.align ?? "right", indent: 1 };
     });

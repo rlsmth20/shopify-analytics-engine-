@@ -37,12 +37,15 @@ def build_purchase_order_drafts(
                 qty=item.recommended_order_qty,
                 unit_cost=item.unit_cost,
                 extended_cost=item.extended_cost,
+                cost_source=item.cost_source,
+                financial_values_known=item.financial_values_known,
             )
             for item in items
         ]
         subtotal = round(sum(line.extended_cost for line in lines), 2)
-        shipping_cost = round(shipping_cost_per_po if subtotal > 0 else 0.0, 2)
+        shipping_cost = round(shipping_cost_per_po if any(line.qty > 0 for line in lines) else 0.0, 2)
         total = round(subtotal + shipping_cost, 2)
+        costs_known = all(item.financial_values_known for item in items)
         lead_time = vendor_lead_times.get(vendor) or max(
             (item.lead_time_days for item in items), default=14
         )
@@ -58,15 +61,17 @@ def build_purchase_order_drafts(
                 subtotal_cost=subtotal,
                 shipping_cost=shipping_cost,
                 total_cost=total,
+                financial_values_known=costs_known,
                 expected_arrival_date=expected_arrival,
                 rationale=(
                     f"Consolidated {len(lines)} SKU"
                     f"{'s' if len(lines) != 1 else ''} from {vendor}. "
                     f"Expected arrival ~{expected_arrival} at current lead time. "
                     f"Includes estimated ${shipping_cost:.0f} shipping/freight."
+                    + (" Add unit costs before approving purchasing costs." if not costs_known else "")
                 ),
             )
         )
 
-    drafts.sort(key=lambda d: d.total_cost, reverse=True)
+    drafts.sort(key=lambda d: (d.financial_values_known, d.total_cost if d.financial_values_known else 0), reverse=True)
     return drafts

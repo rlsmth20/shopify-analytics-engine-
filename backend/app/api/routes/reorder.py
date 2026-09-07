@@ -26,7 +26,7 @@ from app.services.purchase_order_records import (
     update_purchase_order_status,
 )
 from app.services.audit_log import record_audit_event
-from app.services.reorder_optimizer import build_reorder_suggestions, build_vendor_totals
+from app.services.reorder_optimizer import build_known_vendor_totals, build_reorder_suggestions, build_vendor_totals
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
     load_daily_history_for_shop_skus,
@@ -79,6 +79,8 @@ def list_reorder_suggestions(
         suggestions=suggestions,
         total_extended_cost=round(sum(s.landed_extended_cost for s in suggestions), 2),
         vendor_totals=totals,
+        financial_values_known=all(s.financial_values_known for s in suggestions),
+        known_vendor_totals=build_known_vendor_totals(suggestions, totals),
     )
 
 
@@ -115,6 +117,7 @@ def read_buying_calendar(
         horizon_days=horizon_days,
         events=events,
         total_estimated_cost=round(sum(event.estimated_cost for event in events), 2),
+        financial_values_known=all(event.financial_values_known for event in events),
         due_now_count=sum(1 for event in events if event.urgency in {"due_now", "this_week"}),
         future_count=sum(1 for event in events if event.urgency == "future"),
         saved_open_count=sum(1 for event in events if event.source == "saved"),
@@ -171,8 +174,9 @@ def read_cash_plan(
         urgent = s.current_on_hand <= s.reorder_point
         bucket = vendors.setdefault(
             s.vendor or "Unassigned",
-            {"now": 0.0, "later": 0.0, "items": 0, "lead": 0},
+            {"now": 0.0, "later": 0.0, "items": 0, "lead": 0, "known": True},
         )
+        bucket["known"] = bool(bucket["known"]) and s.financial_values_known
         bucket["items"] = int(bucket["items"]) + 1
         bucket["lead"] = max(int(bucket["lead"]), s.lead_time_days)
         if urgent:
@@ -192,10 +196,11 @@ def read_cash_plan(
                 deferrable_cost=round(float(data["later"]), 2),
                 item_count=int(data["items"]),
                 max_lead_time_days=int(data["lead"]),
+                financial_values_known=bool(data["known"]),
             )
             for name, data in vendors.items()
         ),
-        key=lambda row: row.order_now_cost + row.deferrable_cost,
+        key=lambda row: (row.financial_values_known, row.order_now_cost + row.deferrable_cost if row.financial_values_known else row.item_count),
         reverse=True,
     )
     return CashPlanResponse(
@@ -205,7 +210,10 @@ def read_cash_plan(
         order_now_items=order_now_items,
         deferrable_items=deferrable_items,
         vendors=vendor_rows,
+        financial_values_known=all(s.financial_values_known for s in suggestions),
         explanation=(
+            f"{order_now_items} SKU(s) are at or below their reorder point. Add missing unit costs to measure purchasing cash requirements."
+            if not all(s.financial_values_known for s in suggestions) else
             f"{order_now_items} SKU(s) are at or below their reorder point and need "
             f"${order_now_cost:,.0f} this week to avoid stockouts. "
             f"${deferrable_cost:,.0f} more is recommended but deferrable if cash is tight."
@@ -255,6 +263,7 @@ def list_po_drafts(
     return PurchaseOrderDraftsResponse(
         drafts=[*saved, *drafts],
         total_capital_required=round(sum(d.total_cost for d in [*saved, *drafts]), 2),
+        financial_values_known=all(d.financial_values_known for d in [*saved, *drafts]),
     )
 
 
@@ -264,6 +273,8 @@ def save_po_draft(
     user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
+    if not payload.draft.financial_values_known or any(not line.financial_values_known for line in payload.draft.lines):
+        raise HTTPException(status_code=422, detail="Record explicit unit costs for every purchase-order line before saving.")
     saved = save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
     record_audit_event(
         db,

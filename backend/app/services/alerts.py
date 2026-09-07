@@ -374,7 +374,7 @@ def _stockout_events(rule, context, now, deliver_channels, channels_by_key, allo
 def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
-        if action.status != "dead":
+        if action.status != "dead" or not action.financial_values_known:
             continue
         if not _rule_matches(rule, sku_id=action.sku_id, product_name=action.name):
             continue
@@ -404,8 +404,9 @@ def _overstock_events(rule, context, now, deliver_channels, channels_by_key, all
         msg = (
             f"{action.name} has {action.days_of_inventory:.0f} days of cover, "
             f"a {lead_time_days:.0f}-day lead time, and a {target_coverage_days:.0f}-day target. "
-            f"That leaves {extra_cover_days:.0f} extra days of cover and "
-            f"${getattr(action, 'cash_tied_up', 0):,.0f} tied up in excess inventory."
+            f"That leaves {extra_cover_days:.0f} extra days of cover. "
+            + (f"${getattr(action, 'cash_tied_up', 0):,.0f} tied up in excess inventory."
+               if action.financial_values_known else "Add unit costs to measure excess-inventory capital.")
         )
         events.append(_fire(rule, action.sku_id, action.name, msg, now, deliver_channels, channels_by_key, allowed_channels))
     return events

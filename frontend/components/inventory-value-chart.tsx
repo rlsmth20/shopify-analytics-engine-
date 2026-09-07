@@ -11,7 +11,7 @@ import { exportReportRowsCsv } from "@/lib/report-export";
 
 type ValuePoint = { date: string; cost_value: number; retail_value: number; total_units: number };
 type Metric = "cost_value" | "retail_value" | "total_units";
-const METRICS: Record<Metric, string> = { cost_value: "At cost", retail_value: "At retail", total_units: "Units on hand" };
+const METRICS: Record<Metric, string> = { cost_value: "Recorded-cost subtotal", retail_value: "At retail", total_units: "Units on hand" };
 
 export function InventoryValueChart() {
   const [days, setDays] = useState(90);
@@ -70,7 +70,7 @@ export function InventoryValueChart() {
       </label>
       <button type="button" className="button button-secondary" disabled={loading || !!error || points.length === 0} onClick={() => exportReportRowsCsv({
         filename: `skubase-inventory-${days}d${sample ? '-sample' : ''}.csv`, rows: points,
-        columns: [{ label: "Date (UTC)", value: (point) => point.date }, { label: "Cost value", value: (point) => point.cost_value },
+        columns: [{ label: "Date (UTC)", value: (point) => point.date }, { label: "Recorded-cost subtotal (USD)", value: (point) => point.cost_value },
           { label: "Retail value", value: (point) => point.retail_value }, { label: "Units on hand", value: (point) => point.total_units }],
       })}>Export CSV</button>
     </div>
@@ -83,7 +83,7 @@ export function InventoryValueChart() {
           <div><span>Daily snapshots</span><strong>{points.length}</strong></div>
         </div>
         <AreaLineChart key={`${metric}-${days}`} points={points.map((point) => ({ label: point.date, value: point[metric], x: Date.parse(`${point.date}T00:00:00Z`) }))} yFormatter={format} label={`Inventory ${METRICS[metric].toLowerCase()}`} showDataTable />
-        <p className="section-copy">{points[0].date} to {points[points.length - 1].date} · UTC dates. {metric === "retail_value" ? "Retail value is potential selling value, not realized revenue." : metric === "cost_value" ? "Products without a recorded cost contribute zero to this total." : "Includes the on-hand quantities captured in each snapshot."}</p>
+        <p className="section-copy">{points[0].date} to {points[points.length - 1].date} · UTC dates. {metric === "retail_value" ? "Retail value is potential selling value, not realized revenue." : metric === "cost_value" ? "Subtotal includes only recorded costs. Historical snapshots do not retain missing-cost coverage, so this may understate total capital and changes may reflect newly recorded costs." : "Includes the on-hand quantities captured in each snapshot."}</p>
       </>}
   </ChartCard>;
 }

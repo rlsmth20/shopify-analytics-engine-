@@ -28,6 +28,7 @@ import {
   type BundleOpportunity,
 } from "@/lib/api-v2";
 import { exportFormattedReport } from "@/lib/report-export";
+import { financialValue } from "@/lib/financial-values";
 
 type BundleTab = "opportunities" | "mappings" | "requirements";
 type QuickView = "all" | "bundle" | "cross-sell" | "promo" | "high-confidence";
@@ -428,9 +429,9 @@ function BundleMappings({ bundles }: { bundles: BundleHealth[] }) {
               <li key={i}>{line}</li>
             ))}
           </ul>
-          {b.total_component_value_at_risk > 0 ? (
+          {financialValue(b, "total_component_value_at_risk", b.total_component_value_at_risk) === null ? <p className="bundle-risk">Add component unit costs to estimate capital behind this bottleneck.</p> : b.total_component_value_at_risk > 0 ? (
             <p className="bundle-risk">
-              {currency(b.total_component_value_at_risk)} in component inventory is
+              {currency(financialValue(b, "total_component_value_at_risk", b.total_component_value_at_risk))} in component inventory is
               stranded behind this bottleneck.
             </p>
           ) : null}

@@ -6,10 +6,12 @@ import { trackGrowthEvent } from "@/lib/analytics";
 import { ActionFeed } from "@/components/action-feed";
 import { KpiCard } from "@/components/kpi-card";
 import {
-  currencyFormatter,
   summarizeDataSource
 } from "@/lib/app-helpers";
 import { useActionFeed } from "@/lib/use-action-feed";
+import { financialTotal } from "@/lib/financial-values";
+import { getActionImpactValue } from "@/lib/app-helpers";
+import { currency } from "@/lib/api-v2";
 
 export default function ActionsPage() {
   const { actions, dataSource, isLoading, errorMessage, errorStatus } =
@@ -19,12 +21,12 @@ export default function ActionsPage() {
     if (!isLoading && !errorMessage && dataSource === "db" && actions.length > 0) void trackGrowthEvent("KEY_ACTION_VIEWED");
   }, [isLoading, errorMessage, dataSource, actions.length]);
 
-  const urgentProfitAtRisk = actions
+  const urgentProfitAtRisk = financialTotal(actions
     .filter((action) => action.status === "urgent")
-    .reduce((sum, action) => sum + action.estimated_profit_impact, 0);
-  const cashTiedUp = actions
+    .map(getActionImpactValue));
+  const cashTiedUp = financialTotal(actions
     .filter((action) => action.status !== "urgent")
-    .reduce((sum, action) => sum + action.cash_tied_up, 0);
+    .map(getActionImpactValue));
 
   return (
     <div className="page-stack">
@@ -41,16 +43,16 @@ export default function ActionsPage() {
               ? "..."
               : errorMessage
                 ? "—"
-                : currencyFormatter.format(urgentProfitAtRisk)
+                : currency(urgentProfitAtRisk)
           }
-          note="Urgent exposure from the current queue"
+          note={urgentProfitAtRisk === null ? "Add missing unit costs to estimate profit exposure" : "Urgent exposure from the current queue"}
         />
         <KpiCard
           label="Capital tied up"
           value={
-            isLoading ? "..." : errorMessage ? "—" : currencyFormatter.format(cashTiedUp)
+            isLoading ? "..." : errorMessage ? "—" : currency(cashTiedUp)
           }
-          note={dataSource ? summarizeDataSource(dataSource) : "Awaiting feed"}
+          note={cashTiedUp === null ? "Add missing unit costs to estimate total capital" : dataSource ? summarizeDataSource(dataSource) : "Awaiting feed"}
         />
       </div>
 

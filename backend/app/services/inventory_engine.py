@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 
 from app.config.lead_time import LeadTimeConfig, MOCK_LEAD_TIME_CONFIG
+from app.services.cost_provenance import MISSING_COST_WARNING, cost_known, financial_projection
 from app.schemas import (
     Classification,
     DeadInventoryAction,
@@ -142,14 +143,17 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
         "priority_score": _calculate_priority_score(metrics, status),
         "sales_history_complete": metrics.sku.sales_history_complete,
         "data_quality_confidence": "high" if metrics.sku.sales_history_complete else "low",
-        "data_quality_warnings": metrics.sku.sales_history_warnings,
+        "data_quality_warnings": [*metrics.sku.sales_history_warnings,
+                                  *([] if cost_known(metrics.sku) else [MISSING_COST_WARNING])],
+        "cost_source": metrics.sku.cost_source,
     }
     if not metrics.sku.sales_history_complete and status == "optimize":
         # The existing optimize contract carries a monitoring task. It must not
         # imply measured excess units, trapped cash, or a purchasing target.
         base_payload.update(target_inventory_units=0, reorder_point_units=0,
                             safety_stock_units=0, priority_score=10.0)
-        return OptimizeInventoryAction(**base_payload, excess_units=0, cash_tied_up=0.0)
+        return OptimizeInventoryAction(**base_payload, excess_units=0, cash_tied_up=0.0,
+                                       **financial_projection(False, cash_tied_up=0.0))
 
     if status == "urgent":
         days_until_stockout = round(metrics.days_of_inventory, 1)
@@ -158,6 +162,7 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
             urgency_level=_determine_urgency_level(metrics.days_of_inventory),
             days_until_stockout=days_until_stockout,
             estimated_profit_impact=_estimate_profit_impact(metrics),
+            **financial_projection(cost_known(metrics.sku), estimated_profit_impact=_estimate_profit_impact(metrics)),
         )
 
     excess_units = _calculate_excess_units(metrics, status)
@@ -168,12 +173,14 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
             **base_payload,
             excess_units=excess_units,
             cash_tied_up=cash_tied_up,
+            **financial_projection(cost_known(metrics.sku), cash_tied_up=cash_tied_up),
         )
 
     return DeadInventoryAction(
         **base_payload,
         excess_units=excess_units,
         cash_tied_up=cash_tied_up,
+        **financial_projection(cost_known(metrics.sku), cash_tied_up=cash_tied_up),
     )
 
 
@@ -221,6 +228,8 @@ def _build_recommended_action(
 
     if status == "dead":
         excess_units = _calculate_excess_units(metrics, status)
+        if not cost_known(metrics.sku):
+            return f"Review {excess_units} stale units. Add unit costs before choosing a markdown, bundle price, or liquidation plan."
         return (
             f"Pause reorders and clear {excess_units} stale units with a markdown, "
             "bundle, or liquidation plan."
@@ -255,7 +264,7 @@ def _build_explanation(metrics: InventoryMetrics, status: Classification) -> str
 
     return (
         f"No sale has been recorded in {metrics.sku.days_since_last_sale} days, "
-        "so this SKU is tying up capital without recent demand."
+        "so review the stock held without recent demand."
     )
 
 
@@ -330,14 +339,14 @@ def _calculate_priority_score(
             "high": 35.0,
             "medium": 0.0,
         }[urgency_level]
-        profit_factor = metrics.profit_per_unit * 3.0
+        profit_factor = metrics.profit_per_unit * 3.0 if cost_known(metrics.sku) else 0.0
         velocity_factor = metrics.daily_velocity * 24.0
         return round(
             900.0 + timing_factor + urgency_bonus + profit_factor + velocity_factor,
             2,
         )
 
-    cash_tied_up = _calculate_cash_tied_up(metrics, status)
+    cash_tied_up = _calculate_cash_tied_up(metrics, status) if cost_known(metrics.sku) else 0.0
     excess_units = _calculate_excess_units(metrics, status)
 
     # Days of cover above 300 get extra weight so extreme overstock separates clearly.

@@ -22,8 +22,12 @@ import {
   type InventoryHealthSku,
 } from "@/lib/api-v2";
 import { useActionFeed } from "@/lib/use-action-feed";
+import { financialTotal, knownPointValue } from "@/lib/financial-values";
+import { getActionImpactValue } from "@/lib/app-helpers";
+import { currency } from "@/lib/api-v2";
 
-function formatKpiValue(value: number, unit: InventoryHealthResponse["kpis"][number]["unit"]) {
+function formatKpiValue(value: number | null, unit: InventoryHealthResponse["kpis"][number]["unit"]) {
+  if (value === null) return "Unknown";
   if (unit === "currency") return currencyFormatter.format(value);
   if (unit === "percent") return `${Math.round(value * 100)}%`;
   if (unit === "days") return `${numberFormatter.format(value)}d`;
@@ -77,7 +81,7 @@ function RiskList({
             <p className="signal-title">{item.name}</p>
             <p className="signal-copy">{item.vendor} - {item.note}</p>
           </div>
-          <strong>{currencyFormatter.format(item.value)}</strong>
+          <strong>{currency(knownPointValue(item))}</strong>
         </div>
       ))}
     </div>
@@ -111,25 +115,25 @@ export default function AnalyticsPage() {
   const statusImpact = useMemo(() => [
     {
       label: "Urgent",
-      value: actions
+      value: financialTotal(actions
         .filter((action) => action.status === "urgent")
-        .reduce((sum, action) => sum + action.estimated_profit_impact, 0),
+        .map(getActionImpactValue)),
     },
     {
       label: "Optimize",
-      value: actions
+      value: financialTotal(actions
         .filter((action) => action.status === "optimize")
-        .reduce((sum, action) => sum + action.cash_tied_up, 0),
+        .map(getActionImpactValue)),
     },
     {
       label: "Dead",
-      value: actions
+      value: financialTotal(actions
         .filter((action) => action.status === "dead")
-        .reduce((sum, action) => sum + action.cash_tied_up, 0),
+        .map(getActionImpactValue)),
     },
   ], [actions]);
 
-  const maxImpact = Math.max(...statusImpact.map((item) => item.value), 1);
+  const maxImpact = Math.max(...statusImpact.map((item) => item.value ?? 0), 1);
   const urgencyMix = (["critical", "high", "medium"] as const).map((level) => ({
     label: urgencyLabel[level],
     value: actions.filter(
@@ -162,7 +166,7 @@ export default function AnalyticsPage() {
               <KpiCard
                 key={kpi.label}
                 label={kpi.label}
-                value={formatKpiValue(kpi.value, kpi.unit)}
+                value={formatKpiValue(knownPointValue(kpi), kpi.unit)}
                 note={kpi.note}
               />
             ))}
@@ -283,14 +287,14 @@ export default function AnalyticsPage() {
                 <div key={item.label} className="bar-row">
                   <div className="bar-row-meta">
                     <Link href={`/actions?status=${item.label.toLowerCase()}&sort=impact`}>{item.label} · Review SKUs →</Link>
-                    <strong>{currencyFormatter.format(item.value)}</strong>
+                    <strong>{currency(item.value)}</strong>
                   </div>
-                  <div className="bar-track">
+                  {item.value === null ? <p className="signal-copy">Add missing unit costs to compare this category.</p> : <div className="bar-track">
                     <div
                       className="bar-fill"
                       style={{ width: `${(item.value / maxImpact) * 100}%` }}
                     />
-                  </div>
+                  </div>}
                 </div>
               ))}
             </div>

@@ -323,30 +323,33 @@ def send_buy_list_email(
     *,
     email: str,
     items: list[dict],
-    total_cost: float,
-    vendor_totals: dict[str, float],
+    total_cost: float | None,
+    vendor_totals: dict[str, float | None],
 ) -> bool:
     """Send the weekly Monday Buy List digest. Never raises."""
     client = _client()
     if client is None:
         return False
 
+    def cost_label(value: float | None) -> str:
+        return f"${value:,.0f}" if value is not None else "Unknown — add unit costs"
+
     rows = "".join(
         f"""<tr>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;">{item['name']}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#475569;font-size:13px;">{item['vendor'] or '-'}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;text-align:right;">{item['qty']}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;text-align:right;">${item['cost']:,.0f}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;text-align:right;">{cost_label(item['cost'])}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:{'#b91c1c' if item['stockout_prob'] >= 0.5 else '#475569'};font-size:13px;text-align:right;">{item['stockout_prob']:.0%}</td>
         </tr>"""
         for item in items
     )
     vendor_lines = "".join(
-        f'<li style="margin:0 0 4px;color:#475569;font-size:13px;">{vendor or "Unassigned"}: <strong>${amount:,.0f}</strong></li>'
-        for vendor, amount in sorted(vendor_totals.items(), key=lambda kv: kv[1], reverse=True)
+        f'<li style="margin:0 0 4px;color:#475569;font-size:13px;">{vendor or "Unassigned"}: <strong>{cost_label(amount)}</strong></li>'
+        for vendor, amount in sorted(vendor_totals.items(), key=lambda kv: (kv[1] is not None, kv[1] or 0), reverse=True)
     )
     text_lines = "\n".join(
-        f"- {item['name']} ({item['vendor'] or '-'}): order {item['qty']} (~${item['cost']:,.0f}, "
+        f"- {item['name']} ({item['vendor'] or '-'}): order {item['qty']} ({cost_label(item['cost'])}, "
         f"stockout risk {item['stockout_prob']:.0%}, lead time {item['lead_time_days']}d)"
         for item in items
     )
@@ -361,7 +364,7 @@ def send_buy_list_email(
           <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#0f172a;">What to order this week.</h1>
           <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
             Your top {len(items)} reorders, ranked by stockout risk. Total cash required:
-            <strong>${total_cost:,.0f}</strong>.
+            <strong>{cost_label(total_cost)}</strong>.
           </p>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
             <tr>
@@ -394,10 +397,10 @@ def send_buy_list_email(
             "from": DEFAULT_FROM,
             "to": [email],
             "reply_to": DEFAULT_REPLY_TO,
-            "subject": f"Your Monday buy list - {len(items)} reorders, ${total_cost:,.0f} required",
+            "subject": f"Your Monday buy list - {len(items)} reorders, {cost_label(total_cost)} required",
             "html": html,
             "text": (
-                f"Your weekly skubase buy list ({len(items)} reorders, ${total_cost:,.0f} total):\n\n"
+                f"Your weekly skubase buy list ({len(items)} reorders, {cost_label(total_cost)} total):\n\n"
                 f"{text_lines}\n\nOpen PO drafts: {DEFAULT_PRODUCT_URL}/purchase-orders\n"
                 f"Manage this email: {DEFAULT_PRODUCT_URL}/reports\n"
             ),

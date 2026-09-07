@@ -25,6 +25,7 @@ def read_liquidation_plan(
     suggestions = build_liquidation_plan(skus)
     total = sum(s.projected_recovered_capital for s in suggestions)
     return LiquidationResponse(
+        financial_values_known=all(s.financial_values_known for s in suggestions),
         total_capital_recoverable=round(total, 2),
         suggestions=suggestions,
     )

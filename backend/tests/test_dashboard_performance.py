@@ -36,7 +36,8 @@ class CountingCatalog(list):
 class DashboardPerformanceTests(unittest.TestCase):
     def test_vendor_cash_totals_preserve_first_duplicate_match_and_unknown_vendor(self):
         skus = [sku(1, vendor="First"), sku(1, vendor="Second"), sku(2, vendor="Other")]
-        actions = [SimpleNamespace(sku_id=sku_id, status="optimize", cash_tied_up=amount)
+        actions = [SimpleNamespace(sku_id=sku_id, status="optimize", cash_tied_up=amount,
+                                   excess_units=1, financial_values_known=True)
                    for sku_id, amount in [("SKU-1", 10), ("SKU-1", 5), ("SKU-2", 20), ("missing", 7)]]
         with patch.object(dashboard, "build_inventory_actions", return_value=actions):
             result = build(skus)

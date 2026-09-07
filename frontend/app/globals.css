@@ -4439,6 +4439,12 @@ code {
 
 .po-card-head {
   display: flex;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -4449,6 +4455,17 @@ code {
 
 .po-card-head:hover {
   background: var(--surface-muted);
+}
+
+.po-card-head:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -3px;
+}
+
+.po-card-head .po-card-vendor,
+.po-card-head .po-card-meta,
+.po-card-head .po-card-total {
+  display: block;
 }
 
 .po-card-vendor {
@@ -5272,6 +5289,13 @@ code {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
+}
+
+@media (max-width: 700px) {
+  .po-filter-panel,
+  .po-shipping-control {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Transfers --------------------------------------------------------- */

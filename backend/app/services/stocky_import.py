@@ -162,8 +162,8 @@ def import_stocky_products_csv(
             vendor = cell("vendor") or None
             category = cell("category") or None
             price = _to_decimal(cell("price"))
-            cost = _to_decimal(cell("cost"))
-            cost_value = cost if cost > 0 else None
+            cost = _to_decimal(cell("cost"), default="NaN")
+            cost_value = cost if cost.is_finite() and cost >= 0 else None
             inventory_qty = _to_int(cell("inventory"))
             lead_time = _to_int(cell("lead_time_days"))
             lead_time_value = lead_time if lead_time > 0 else None

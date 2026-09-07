@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import OrderLineItem, Product
 from app.schemas_v2 import BundleOpportunity
+from app.services.cost_provenance import cost_known
 
 
 def recommend_bundle_opportunities(
@@ -204,14 +205,16 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
             pairings=[],
             dead_stock_sku_count=len(dead),
             dead_stock_capital=dead_capital,
+            financial_values_known=all(cost_known(sku) for sku in dead),
         )
 
-    dead.sort(key=lambda sku: sku.inventory * sku.cost, reverse=True)
+    dead.sort(key=lambda sku: (cost_known(sku), sku.inventory * sku.cost if cost_known(sku) else sku.days_since_last_sale), reverse=True)
     pairings: list[DeadStockPairing] = []
     for dead_sku in dead[: limit * 2]:
         anchor, reason = _best_anchor(dead_sku, anchors)
         if anchor is None:
             continue
+        costs_known = cost_known(anchor) and cost_known(dead_sku)
 
         bundle_price = round(anchor.price + dead_sku.price * (1 - DEAD_ITEM_DISCOUNT), 2)
         bundle_cost = round(anchor.cost + dead_sku.cost, 2)
@@ -234,6 +237,7 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
 
         pairings.append(
             DeadStockPairing(
+                financial_values_known=costs_known,
                 id=f"{anchor.sku_id}+{dead_sku.sku_id}",
                 anchor_product_name=anchor.name,
                 anchor_sku=anchor.sku_id,
@@ -255,6 +259,10 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
                 estimated_months_to_clear=months_to_clear,
                 projected_cash_recovered=recovered,
                 explanation=(
+                    f"{dead_sku.name} has not sold in {dead_sku.days_since_last_sale} days with {dead_sku.inventory} units on hand. "
+                    f"{anchor.name} sells {anchor.last_30_day_sales} units/month ({reason}). "
+                    "Add unit costs for both products before choosing a bundle price or relying on margin and cash-recovery estimates."
+                    if not costs_known else
                     f"{dead_sku.name} has not sold in {dead_sku.days_since_last_sale} days "
                     f"with ${capital:,.0f} tied up in {dead_sku.inventory} units. "
                     f"{anchor.name} sells {anchor.last_30_day_sales} units/month ({reason}). "
@@ -267,11 +275,12 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
         if len(pairings) >= limit:
             break
 
-    pairings.sort(key=lambda p: p.dead_capital_tied_up, reverse=True)
+    pairings.sort(key=lambda p: (p.financial_values_known, p.dead_capital_tied_up if p.financial_values_known else p.dead_days_since_last_sale), reverse=True)
     return DeadStockPairingsResponse(
         pairings=pairings,
         dead_stock_sku_count=len(dead),
         dead_stock_capital=dead_capital,
+        financial_values_known=all(cost_known(sku) for sku in dead),
     )
 
 

@@ -1,5 +1,6 @@
 import type { InventoryAction } from "@/lib/api";
 import { isHistoryReviewAction } from "@/lib/action-quality";
+import { getActionImpactValue } from "@/lib/app-helpers";
 
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -11,7 +12,7 @@ export function actionTableMetrics(action: InventoryAction) {
     : action.status === "urgent" && finite(action.days_until_stockout) ? action.days_until_stockout
     : finite(action.days_of_inventory) ? action.days_of_inventory : null;
   const leadTime = finite(action.lead_time_days_used) ? action.lead_time_days_used : null;
-  const impact = historyReview ? null : action.status === "urgent" ? action.estimated_profit_impact : action.cash_tied_up;
+  const impact = historyReview ? null : getActionImpactValue(action);
   return {
     historyReview,
     coverage,

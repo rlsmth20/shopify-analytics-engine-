@@ -1,4 +1,5 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
+import type { FinancialProvenance, KnownValue } from "@/lib/financial-values";
 // V2 API client for forecast, analytics, reorder, suppliers, bundles, transfers,
 // liquidation, alerts, and dashboard endpoints.
 
@@ -117,7 +118,7 @@ export type ForecastResult = {
   trust_reasons: string[];
 };
 
-export type SkuScorecard = {
+export type SkuScorecard = FinancialProvenance & {
   sku_id: string;
   name: string;
   vendor: string;
@@ -134,7 +135,7 @@ export type SkuScorecard = {
   classification_note: string;
 };
 
-export type InventoryHealthKpi = {
+export type InventoryHealthKpi = KnownValue & {
   label: string;
   value: number;
   unit: "currency" | "count" | "percent" | "days";
@@ -148,7 +149,7 @@ export type InventoryHealthBucket = {
   tone: "positive" | "negative" | "neutral";
 };
 
-export type InventoryHealthSku = {
+export type InventoryHealthSku = KnownValue & {
   sku_id: string;
   name: string;
   vendor: string;
@@ -175,7 +176,7 @@ export type InventoryHealthResponse = {
   generated_at: string;
 };
 
-export type ReorderSuggestion = {
+export type ReorderSuggestion = FinancialProvenance & {
   sku_id: string;
   name: string;
   vendor: string;
@@ -197,11 +198,12 @@ export type ReorderSuggestion = {
   rationale: string;
 };
 
-export type ReorderFeed = {
+export type ReorderFeed = FinancialProvenance & {
   service_level: number;
   suggestions: ReorderSuggestion[];
   total_extended_cost: number;
   vendor_totals: Record<string, number>;
+  known_vendor_totals?: Record<string, number | null>;
 };
 
 export type SupplierScorecard = {
@@ -217,7 +219,7 @@ export type SupplierScorecard = {
   notes: string[];
 };
 
-export type BundleHealth = {
+export type BundleHealth = FinancialProvenance & {
   bundle_sku_id: string;
   bundle_name: string;
   max_bundles_sellable: number;
@@ -269,7 +271,7 @@ export type TransferRecommendation = {
   rationale: string;
 };
 
-export type LiquidationSuggestion = {
+export type LiquidationSuggestion = FinancialProvenance & {
   sku_id: string;
   name: string;
   on_hand: number;
@@ -282,7 +284,7 @@ export type LiquidationSuggestion = {
   rationale: string;
 };
 
-export type PurchaseOrderLine = {
+export type PurchaseOrderLine = FinancialProvenance & {
   sku_id: string;
   name: string;
   qty: number;
@@ -303,7 +305,7 @@ export type PurchaseOrderReceipt = {
   created_at: string;
 };
 
-export type PurchaseOrderDraft = {
+export type PurchaseOrderDraft = FinancialProvenance & {
   po_id: string;
   vendor: string;
   created_at: string;
@@ -322,7 +324,7 @@ export type PurchaseOrderDraft = {
   receipts?: PurchaseOrderReceipt[];
 };
 
-export type BuyingCalendarLine = {
+export type BuyingCalendarLine = FinancialProvenance & {
   sku_id: string;
   name: string;
   qty: number;
@@ -334,7 +336,7 @@ export type BuyingCalendarLine = {
   lead_time_days: number | null;
 };
 
-export type BuyingCalendarEvent = {
+export type BuyingCalendarEvent = FinancialProvenance & {
   event_id: string;
   vendor: string;
   source: "recommended" | "saved";
@@ -351,7 +353,7 @@ export type BuyingCalendarEvent = {
   lines: BuyingCalendarLine[];
 };
 
-export type BuyingCalendarResponse = {
+export type BuyingCalendarResponse = FinancialProvenance & {
   generated_at: string;
   horizon_days: number;
   events: BuyingCalendarEvent[];
@@ -424,7 +426,7 @@ export type NotificationChannelConfig = {
   verified: boolean;
 };
 
-export type DashboardKpi = {
+export type DashboardKpi = KnownValue & {
   label: string;
   value: number;
   unit: "currency" | "count" | "percent" | "days";
@@ -432,7 +434,7 @@ export type DashboardKpi = {
   tone: "positive" | "negative" | "neutral";
 };
 
-export type DashboardSeriesPoint = {
+export type DashboardSeriesPoint = KnownValue & {
   label: string;
   value: number;
 };
@@ -688,7 +690,7 @@ export const fetchTransfers = (signal?: AbortSignal) =>
   get<{ transfers: TransferRecommendation[] }>("/transfers", signal);
 
 export const fetchLiquidation = (signal?: AbortSignal) =>
-  get<{
+  get<FinancialProvenance & {
     total_capital_recoverable: number;
     suggestions: LiquidationSuggestion[];
   }>("/liquidation", signal);
@@ -778,8 +780,8 @@ export const toggleAlertRule = async (
 // Formatters
 // ---------------------------------------------------------------------------
 
-export const currency = (n: number) =>
-  new Intl.NumberFormat("en-US", {
+export const currency = (n: number | null | undefined) =>
+  typeof n !== "number" || !Number.isFinite(n) ? "Unknown" : new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,

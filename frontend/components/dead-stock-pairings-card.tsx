@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { API_BASE_URL } from "@/lib/api-base";
 import { exportFormattedReport } from "@/lib/report-export";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { financialValue, financialTotal, type FinancialProvenance } from "@/lib/financial-values";
+import { currency } from "@/lib/api-v2";
 
-type DeadStockPairing = {
+type DeadStockPairing = FinancialProvenance & {
   id: string;
   anchor_product_name: string;
   anchor_monthly_units: number;
@@ -26,17 +28,11 @@ type DeadStockPairing = {
   explanation: string;
 };
 
-type PairingsResponse = {
+type PairingsResponse = FinancialProvenance & {
   pairings: DeadStockPairing[];
   dead_stock_sku_count: number;
   dead_stock_capital: number;
 };
-
-const money = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 function isGiftSeason(): boolean {
   const month = new Date().getMonth(); // 8 = September, 10 = November
@@ -77,32 +73,31 @@ export function DeadStockPairingsCard() {
       kpis: [
         { label: "Pairings", value: String(data.pairings.length) },
         { label: "Dead SKUs", value: String(data.dead_stock_sku_count), tone: "danger" },
-        { label: "Capital tied up", value: money.format(data.dead_stock_capital), tone: "danger" },
+        { label: "Capital tied up", value: currency(financialValue(data, "dead_stock_capital", data.dead_stock_capital)), tone: "danger" },
         {
           label: "Projected recovery (90d)",
-          value: money.format(
-            data.pairings.reduce((sum, pairing) => sum + pairing.projected_cash_recovered, 0),
-          ),
+          value: currency(financialTotal(data.pairings.map(pairing => financialValue(pairing, "projected_cash_recovered", pairing.projected_cash_recovered)))),
           tone: "good",
         },
       ],
       charts: [
         {
-          title: "Capital freed per pairing",
+          title: "Capital tied up per pairing · known costs only",
           points: [...data.pairings]
-            .sort((l, r) => r.dead_capital_tied_up - l.dead_capital_tied_up)
+            .filter(p => financialValue(p, "dead_capital_tied_up", p.dead_capital_tied_up) !== null)
+            .sort((l, r) => financialValue(r, "dead_capital_tied_up", r.dead_capital_tied_up)! - financialValue(l, "dead_capital_tied_up", l.dead_capital_tied_up)!)
             .slice(0, 8)
             .map((pairing) => ({
               label: `${pairing.anchor_product_name} + ${pairing.dead_product_name}`,
-              value: pairing.dead_capital_tied_up,
-              display: money.format(pairing.dead_capital_tied_up),
+              value: financialValue(pairing, "dead_capital_tied_up", pairing.dead_capital_tied_up)!,
+              display: currency(financialValue(pairing, "dead_capital_tied_up", pairing.dead_capital_tied_up)),
               tone: "danger",
             })),
         },
       ],
       todos: [
         { label: "Build the largest pairings first", detail: "They free the most cash per bundle created.", tone: "danger" },
-        { label: "Price at the suggested bundle price", detail: "The discount is on the slow item only, protecting your anchor's margin.", tone: "warning" },
+        { label: "Review costs and pricing", detail: "Record missing unit costs and confirm margins before offering a bundle.", tone: "warning" },
         { label: "Revisit in 30 days", detail: "Re-export to compare actual sell-through against the projection.", tone: "good" },
       ],
       tableTitle: "Dead-stock Pairings",
@@ -136,8 +131,8 @@ export function DeadStockPairingsCard() {
           label: "Bundle price",
           align: "right",
           width: 14,
-          format: (p) => money.format(p.suggested_bundle_price),
-          numericValue: (p) => p.suggested_bundle_price,
+          format: (p) => currency(financialValue(p, "suggested_bundle_price", p.suggested_bundle_price)),
+          numericValue: (p) => financialValue(p, "suggested_bundle_price", p.suggested_bundle_price),
           numFmt: '"$"#,##0.00',
         },
         {
@@ -145,10 +140,10 @@ export function DeadStockPairingsCard() {
           label: "Margin",
           align: "right",
           width: 10,
-          format: (p) => `${p.bundle_margin_pct.toFixed(0)}%`,
-          numericValue: (p) => p.bundle_margin_pct / 100,
+          format: (p) => pairingMargin(p),
+          numericValue: (p) => financialValue(p, "bundle_margin_pct", p.bundle_margin_pct) === null ? null : financialValue(p, "bundle_margin_pct", p.bundle_margin_pct)! / 100,
           numFmt: "0%",
-          tone: (p) => (p.bundle_margin_pct >= 40 ? "good" : null),
+          tone: (p) => ((financialValue(p, "bundle_margin_pct", p.bundle_margin_pct) ?? 0) >= 40 ? "good" : null),
         },
         {
           key: "monthly",
@@ -164,8 +159,8 @@ export function DeadStockPairingsCard() {
           label: "Capital tied up",
           align: "right",
           width: 15,
-          format: (p) => money.format(p.dead_capital_tied_up),
-          numericValue: (p) => p.dead_capital_tied_up,
+          format: (p) => currency(financialValue(p, "dead_capital_tied_up", p.dead_capital_tied_up)),
+          numericValue: (p) => financialValue(p, "dead_capital_tied_up", p.dead_capital_tied_up),
           numFmt: '"$"#,##0',
           tone: () => "danger",
           summarize: "sum",
@@ -175,8 +170,8 @@ export function DeadStockPairingsCard() {
           label: "Recovery (90d)",
           align: "right",
           width: 15,
-          format: (p) => money.format(p.projected_cash_recovered),
-          numericValue: (p) => p.projected_cash_recovered,
+          format: (p) => currency(financialValue(p, "projected_cash_recovered", p.projected_cash_recovered)),
+          numericValue: (p) => financialValue(p, "projected_cash_recovered", p.projected_cash_recovered),
           numFmt: '"$"#,##0',
           tone: () => "good",
           summarize: "sum",
@@ -197,7 +192,7 @@ export function DeadStockPairingsCard() {
         </div>
         <div className="button-row" style={{ alignItems: "center", gap: "8px" }}>
           <span className="status-badge status-failed">
-            {money.format(data.dead_stock_capital)} tied up
+            {currency(financialValue(data, "dead_stock_capital", data.dead_stock_capital))} tied up
           </span>
           <button type="button" className="button button-ghost" onClick={exportPairings}>
             Export Excel
@@ -224,8 +219,7 @@ export function DeadStockPairingsCard() {
                 {pairing.dead_days_since_last_sale}d without a sale ({pairing.match_reason})
               </p>
               <p className="signal-copy">
-                Suggested bundle {money.format(pairing.suggested_bundle_price)} -{" "}
-                {pairing.bundle_margin_pct.toFixed(0)}% margin - ~
+                {pairing.financial_values_known === false ? "Add unit costs before choosing a bundle price" : `Suggested bundle ${currency(financialValue(pairing, "suggested_bundle_price", pairing.suggested_bundle_price))} · ${pairingMargin(pairing)} margin`} · ~
                 {pairing.estimated_monthly_bundles} bundles/mo
                 {pairing.estimated_months_to_clear !== null
                   ? ` - clears in ~${pairing.estimated_months_to_clear} months`
@@ -247,7 +241,7 @@ export function DeadStockPairingsCard() {
               </button>
             </div>
             <div style={{ textAlign: "right" }}>
-              <strong>{money.format(pairing.projected_cash_recovered)}</strong>
+              <strong>{currency(financialValue(pairing, "projected_cash_recovered", pairing.projected_cash_recovered))}</strong>
               <p className="signal-copy">projected recovery (90d)</p>
             </div>
           </div>
@@ -255,4 +249,9 @@ export function DeadStockPairingsCard() {
       </div>
     </div>
   );
+}
+
+function pairingMargin(pairing: DeadStockPairing): string {
+  const margin = financialValue(pairing, "bundle_margin_pct", pairing.bundle_margin_pct);
+  return margin === null ? "Unknown" : `${margin.toFixed(0)}%`;
 }

@@ -31,6 +31,8 @@ def save_purchase_order(
     shop_id: int,
     draft: PurchaseOrderDraft,
 ) -> PurchaseOrderDraft:
+    if not draft.financial_values_known or any(not line.financial_values_known for line in draft.lines):
+        raise ValueError("Record explicit unit costs for every purchase-order line before saving.")
     record = db.scalar(
         select(PurchaseOrderRecord)
         .where(PurchaseOrderRecord.shop_id == shop_id)
@@ -38,7 +40,7 @@ def save_purchase_order(
     )
     old_received_by_sku: dict[str, int] = {}
     if record is None:
-        record = PurchaseOrderRecord(shop_id=shop_id, po_id=draft.po_id)
+        record = PurchaseOrderRecord(shop_id=shop_id, po_id=draft.po_id, vendor=draft.vendor)
         db.add(record)
         db.flush()
     else:

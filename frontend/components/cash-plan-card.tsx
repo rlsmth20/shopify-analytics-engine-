@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 
 import { API_BASE_URL } from "@/lib/api-base";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
+import { financialValue, type FinancialProvenance } from "@/lib/financial-values";
+import { currency } from "@/lib/api-v2";
 
-type CashPlanVendor = {
+type CashPlanVendor = FinancialProvenance & {
   vendor: string;
   order_now_cost: number;
   deferrable_cost: number;
@@ -13,7 +15,7 @@ type CashPlanVendor = {
   max_lead_time_days: number;
 };
 
-type CashPlan = {
+type CashPlan = FinancialProvenance & {
   order_now_cost: number;
   deferrable_cost: number;
   total_cost: number;
@@ -22,12 +24,6 @@ type CashPlan = {
   vendors: CashPlanVendor[];
   explanation: string;
 };
-
-const money = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 export function CashPlanCard({
   serviceLevel,
@@ -59,7 +55,7 @@ export function CashPlanCard({
     };
   }, [serviceLevel, shippingCost]);
 
-  if (!plan || plan.total_cost <= 0) return null;
+  if (!plan || (plan.order_now_items === 0 && plan.deferrable_items === 0)) return null;
 
   return (
     <div className="chart-card">
@@ -72,18 +68,18 @@ export function CashPlanCard({
       <div className="kpi-grid kpi-grid-tight" style={{ marginTop: "12px" }}>
         <div className="kpi-card">
           <p className="kpi-label">Order this week</p>
-          <p className="kpi-value">{money.format(plan.order_now_cost)}</p>
+          <p className="kpi-value">{currency(financialValue(plan, "order_now_cost", plan.order_now_cost))}</p>
           <p className="kpi-note">{plan.order_now_items} SKUs at/below reorder point</p>
         </div>
         <div className="kpi-card">
           <p className="kpi-label">Deferrable</p>
-          <p className="kpi-value">{money.format(plan.deferrable_cost)}</p>
+          <p className="kpi-value">{currency(financialValue(plan, "deferrable_cost", plan.deferrable_cost))}</p>
           <p className="kpi-note">{plan.deferrable_items} top-ups that can wait if cash is tight</p>
         </div>
         <div className="kpi-card">
           <p className="kpi-label">Total recommended</p>
-          <p className="kpi-value">{money.format(plan.total_cost)}</p>
-          <p className="kpi-note">At the current service level setting</p>
+          <p className="kpi-value">{currency(financialValue(plan, "total_cost", plan.total_cost))}</p>
+          <p className="kpi-note">{financialValue(plan, "total_cost", plan.total_cost) === null ? "Add missing unit costs to calculate the budget" : "At the current service level setting"}</p>
         </div>
       </div>
       {plan.vendors.length > 0 ? (
@@ -98,9 +94,9 @@ export function CashPlanCard({
                 </p>
               </div>
               <div style={{ textAlign: "right" }}>
-                <strong>{money.format(vendor.order_now_cost)}</strong>
-                {vendor.deferrable_cost > 0 ? (
-                  <p className="signal-copy">+{money.format(vendor.deferrable_cost)} deferrable</p>
+                <strong>{currency(financialValue(vendor, "order_now_cost", vendor.order_now_cost))}</strong>
+                {financialValue(vendor, "deferrable_cost", vendor.deferrable_cost) === null ? <p className="signal-copy">Deferrable cost unknown</p> : vendor.deferrable_cost > 0 ? (
+                  <p className="signal-copy">+{currency(financialValue(vendor, "deferrable_cost", vendor.deferrable_cost))} deferrable</p>
                 ) : null}
               </div>
             </div>

@@ -13,6 +13,7 @@ import math
 
 from app.schemas import SkuDetail
 from app.schemas_v2 import LiquidationSuggestion
+from app.services.cost_provenance import cost_known, MISSING_COST_WARNING
 
 
 DEAD_STOCK_THRESHOLD_DAYS = 45
@@ -28,6 +29,17 @@ def build_liquidation_plan(skus: list[SkuDetail]) -> list[LiquidationSuggestion]
         if sku.days_since_last_sale < DEAD_STOCK_THRESHOLD_DAYS:
             continue
         if sku.inventory <= 0:
+            continue
+
+        if not cost_known(sku):
+            suggestions.append(LiquidationSuggestion(
+                sku_id=sku.sku_id, name=sku.name, on_hand=sku.inventory,
+                days_since_last_sale=sku.days_since_last_sale, cost_source=sku.cost_source,
+                capital_tied_up=round(sku.inventory * sku.cost, 2),
+                suggested_markdown_pct=0.0, suggested_price=sku.price,
+                projected_recovered_capital=0.0, tactic="markdown",
+                rationale=f"Review {sku.inventory} stale units. {MISSING_COST_WARNING} No markdown or liquidation price is recommended yet.",
+            ))
             continue
 
         margin = (sku.price - sku.cost) / max(sku.price, 0.01)
@@ -52,6 +64,7 @@ def build_liquidation_plan(skus: list[SkuDetail]) -> list[LiquidationSuggestion]
         suggestions.append(
             LiquidationSuggestion(
                 sku_id=sku.sku_id,
+                cost_source=sku.cost_source,
                 name=sku.name,
                 on_hand=sku.inventory,
                 days_since_last_sale=sku.days_since_last_sale,
@@ -64,7 +77,7 @@ def build_liquidation_plan(skus: list[SkuDetail]) -> list[LiquidationSuggestion]
             )
         )
 
-    suggestions.sort(key=lambda s: s.capital_tied_up, reverse=True)
+    suggestions.sort(key=lambda s: (s.financial_values_known, s.capital_tied_up if s.financial_values_known else s.days_since_last_sale), reverse=True)
     return suggestions
 
 
