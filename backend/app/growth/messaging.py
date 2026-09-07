@@ -17,6 +17,42 @@ from .skills import active_skill
 from .store import digest, enqueue, insert_once, record, require_lease
 
 
+def reconcile_provider_events(db, message):
+    """Apply retained signed events under the shared dispatch lock.
+
+    Webhooks can beat the HTTP receipt. Both writers acquire the same lock before
+    recording their half, so whichever commits second can join the two records.
+    Reapplying an event is safe; delivery must never clear a bounce or complaint.
+    """
+    if not message.provider_id:
+        return
+    events = db.scalars(select(Evidence).where(
+        Evidence.kind == "PROVIDER_EVENT", Evidence.source == "resend_signed_webhook",
+        Evidence.data["data"]["email_id"].as_string() == message.provider_id))
+    kinds = {event.data.get("type") for event in events}
+    if kinds & {"email.bounced", "email.complained"}:
+        message.status = "complained" if "email.complained" in kinds else "bounced"
+        contact = db.get(Contact, message.contact_id)
+        if contact:
+            contact.suppressed = True
+            contact.status = "delivery_failure"
+    elif "email.delivered" in kinds and message.status == "sent":
+        message.status = "delivered"
+
+
+def record_signed_provider_event(db, event_id, event):
+    """The caller verifies the signature; unmatched events remain durable."""
+    from .outbound import lock
+    lock(db)
+    retained = record(db, "provider-event:" + event_id, "PROVIDER_EVENT", "mailbox", event,
+                      source="resend_signed_webhook")
+    provider_id = retained.data.get("data", {}).get("email_id")
+    if isinstance(provider_id, str) and provider_id:
+        message = db.scalar(select(Message).where(Message.provider_id == provider_id))
+        if message:
+            reconcile_provider_events(db, message)
+
+
 def resend_request(path, *, data=None, key=None):
     token = os.getenv("GROWTH_RESEND_API_KEY", "")
     if not token:
@@ -112,11 +148,14 @@ def send(factory, work, *, policy=None, provider=resend_request):
             db.commit()
         raise GrowthError("Send outcome uncertain; reconcile receipt before further contact", "ambiguous") from None
     with factory() as db:
+        from .outbound import lock
+        lock(db)
         message = db.get(Message, message_id)
         message.provider_id = result["id"]
         if message.status in ("sending", "unknown"):
             message.status = "sent"
         message.sent_at = time.time()
+        reconcile_provider_events(db, message)
         cost = db.get(Usage, usage.id)
         cost.estimated_usd, cost.outcome = policy.email_unit_usd, "completed"
         record(db, f"receipt:{message_id}", "EMAIL_SENT", message.contact_id,

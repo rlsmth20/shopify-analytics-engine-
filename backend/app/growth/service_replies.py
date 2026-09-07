@@ -9,6 +9,14 @@ from .policy import GrowthError
 from .store import digest, enqueue, insert_once, record
 from .skills import active_skill
 
+APP_REVIEW_DISCLOSURE = "Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store."
+
+
+def service_body(answer):
+    return (answer + "\n\n" + APP_REVIEW_DISCLOSURE +
+            "\n\nSkubase | info@skubase.io\nReply 'stop' if you don't want further replies.")
+
+
 SERVICE_KNOWLEDGE = {
     "connection": {
         "patterns": (r"(?:help|how|where|cannot|can't|unable).{0,70}(?:connect|install|log in|login)",),
@@ -22,7 +30,7 @@ SERVICE_KNOWLEDGE = {
     },
     "data_safety": {
         "patterns": (r"(?:send|share|email).{0,50}(?:password|token|customer data)",),
-        "answer": "Please do not email passwords, access tokens or customer records. Use the Shopify connection flow at https://skubase.io/store-sync for your requested analysis. If you already sent a credential, revoke it in the issuing service; this assistant cannot revoke it for you.",
+        "answer": "Please do not email passwords, access tokens or customer records. Use the Shopify connection flow at https://skubase.io/store-sync for your requested analysis. If you already sent a credential, revoke it in the issuing service; Skubase cannot revoke it for you.",
         "sources": ["frontend/app/privacy/page.tsx"],
     },
 }
@@ -63,11 +71,11 @@ def draft_requested_check(db, contact, experiment, variant):
     focus = "cash tied up in slow-moving inventory" if variant == "cash" else "stockout risks and reorder priorities"
     message, fresh = insert_once(db, Message, key="first-contact:" + contact.id, contact_id=contact.id,
         experiment_id=experiment.id, direction="out", variant=variant, subject="Next step for your requested inventory check",
-        body=("Hi,\n\nI'm Skubase's automated assistant, following up on the inventory check you requested. "
+        body=service_body("Hi,\n\nThis is Skubase, following up on the inventory check you requested. "
               f"For that check, we can review {focus} using the data you choose to connect. "
               "Sign in at https://skubase.io/login, then connect your store and start an import at https://skubase.io/store-sync. "
               "The initial analysis is read-only. Please do not email passwords, access tokens or customer records.\n\n"
-              "Reply if you need help with the connection step.\n\nSkubase | info@skubase.io\nReply 'stop' to stop automated responses."))
+              "Reply if you need help with the connection step."))
     if fresh:
         message.skill_version = active_skill(db, "requested_service").version
         permit(db, message, request, "health_check", ["backend/app/api/routes/inventory_risk_snapshot.py"])
@@ -97,7 +105,7 @@ def answer_request(db, contact, event, text, parent=None):
     message, fresh = insert_once(db, Message, key=f"service-answer:{event.id}", contact_id=contact.id,
         experiment_id=parent.experiment_id if parent else None, direction="out", variant="service:" + key,
         reply_to_id=parent.id if parent else None, subject="Help with your Skubase request",
-        body="I'm Skubase's automated assistant.\n\n" + spec["answer"] + "\n\nSkubase | info@skubase.io\nReply 'stop' to stop automated responses.")
+        body=service_body(spec["answer"]))
     if fresh:
         message.skill_version = active_skill(db, "requested_service").version
         permit(db, message, event, key, spec["sources"])

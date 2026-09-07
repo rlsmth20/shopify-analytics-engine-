@@ -1,10 +1,10 @@
 "use client";
 
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { trackEvent } from "@/lib/analytics";
+import { getGrowthAttribution, trackEvent } from "@/lib/analytics";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -45,18 +45,6 @@ export function InventoryRiskSnapshotForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [started, setStarted] = useState(false);
-
-  const utmParams = useMemo(() => {
-    if (typeof window === "undefined") return {};
-    const params = new URLSearchParams(window.location.search);
-    return {
-      utm_source: params.get("utm_source") || undefined,
-      utm_medium: params.get("utm_medium") || undefined,
-      utm_campaign: params.get("utm_campaign") || undefined,
-      utm_content: params.get("utm_content") || undefined,
-      utm_term: params.get("utm_term") || undefined,
-    };
-  }, []);
 
   useEffect(() => {
     trackEvent("inventory_snapshot_page_view");
@@ -99,7 +87,7 @@ export function InventoryRiskSnapshotForm({
           ...form,
           company_name: deriveCompanyName(form.store_url),
           source: "inventory_risk_snapshot",
-          ...utmParams,
+          ...getGrowthAttribution(),
         }),
       });
       const body = await response.json().catch(() => null);

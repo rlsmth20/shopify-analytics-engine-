@@ -247,20 +247,11 @@ async def resend_webhook(request: Request, db: DB):
     verify_resend(body, request.headers)
     event = json.loads(body)
     event_id = request.headers["svix-id"]
-    record(db, "provider-event:" + event_id, "PROVIDER_EVENT", "mailbox", event, source="resend_signed_webhook")
     if event.get("type") == "email.received":
+        record(db, "provider-event:" + event_id, "PROVIDER_EVENT", "mailbox", event, source="resend_signed_webhook")
         enqueue(db, "inbound-webhook:" + event_id, "inbox", priority=100)
     else:
-        data = event.get("data", {})
-        message = db.scalar(select(Message).where(Message.provider_id == data.get("email_id")))
-        if message:
-            kind = event.get("type")
-            if kind in ("email.bounced", "email.complained"):
-                message.status = "bounced" if kind == "email.bounced" else "complained"
-                contact = db.get(Contact, message.contact_id)
-                contact.suppressed = True
-                contact.status = "delivery_failure"
-            elif kind == "email.delivered" and message.status == "sent":
-                message.status = "delivered"
+        from app.growth.messaging import record_signed_provider_event
+        record_signed_provider_event(db, event_id, event)
     db.commit()
     return {"accepted": True}

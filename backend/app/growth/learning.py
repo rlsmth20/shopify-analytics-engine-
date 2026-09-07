@@ -19,7 +19,9 @@ def ensure_experiment(db):
         record(db, "retired-channel:" + active.id, "EXPERIMENT_STOPPED", active.id, active.result)
         db.flush()
     elif active:
-        return active
+        evaluate(db, active.id)
+        if active.status == "active":
+            return active
     cycle = db.scalar(select(Experiment).where(Experiment.key.like("health-check-%")).order_by(Experiment.started_at.desc()).limit(1))
     index = int(cycle.specification.get("cycle", 0)) + 1 if cycle else 1
     allocation = get_memory(db, "strategic", "strategy").get("cash_allocation", .5)
@@ -56,13 +58,15 @@ def evaluate(db, experiment_id):
         # External-channel cohorts use retained public/form receipts. Do not
         # overwrite them with an empty requested-service email evaluation.
         return experiment.result
-    outgoing = list(db.scalars(select(Message).where(Message.experiment_id == experiment_id, Message.direction == "out",
-                            Message.reply_to_id.is_(None), Message.sent_at.is_not(None))))
+    assigned = list(db.scalars(select(Message).where(Message.experiment_id == experiment_id, Message.direction == "out",
+                            Message.reply_to_id.is_(None), Message.variant.in_(["cash", "reorder"]))))
+    outgoing = [m for m in assigned if m.sent_at is not None]
     incoming = list(db.scalars(select(Message).where(Message.experiment_id == experiment_id, Message.direction == "in")))
     by_contact = {}
     for msg in incoming:
         by_contact.setdefault(msg.contact_id, []).append(msg)
     stats = {v: {"sent": 0, "mature": 0, "mature_engaged": 0, "engaged": 0, "connected": 0, "negative": 0, "censored": 0, "evidence_ids": [], "contradictions": []} for v in ("cash", "reorder")}
+    connected_shops = {v: set() for v in stats}
     now = time.time()
     for message in outgoing:
         if message.variant not in stats:
@@ -82,7 +86,8 @@ def evaluate(db, experiment_id):
         if contact and contact.shop_id:
             connected = db.scalar(select(Evidence.id).where(Evidence.subject == f"shop:{contact.shop_id}",
                                   Evidence.kind == "SHOPIFY_CONNECTION", Evidence.occurred_at >= message.sent_at))
-            s["connected"] += int(connected is not None)
+            if connected is not None:
+                connected_shops[message.variant].add(contact.shop_id)
         for event in db.scalars(select(Evidence).where(Evidence.subject == message.contact_id, Evidence.kind == "REPLY_RECEIVED")):
             if event.data.get("experiment_id") != experiment_id:
                 continue
@@ -93,6 +98,7 @@ def evaluate(db, experiment_id):
     rng = random.Random(42)
     distributions = {}
     for v, s in stats.items():
+        s["connected"] = len(connected_shops[v])
         # Beta(1,1) smoothing. Report interval, denominator and contradictory replies.
         a, b = 1 + s["mature_engaged"], 1 + max(0, s["mature"] - s["mature_engaged"])
         draws = sorted(rng.betavariate(a, b) for _ in range(2000))
@@ -101,19 +107,26 @@ def evaluate(db, experiment_id):
         s["credible_interval_95"] = [round(draws[50], 3), round(draws[1949], 3)]
     rng.shuffle(distributions["cash"])
     p_cash = sum(a > b for a, b in zip(distributions["cash"], distributions["reorder"])) / 2000
-    qualified = sum(s["connected"] for s in stats.values())
+    qualified = len(set().union(*connected_shops.values()))
+    enrollment_closed = (now >= experiment.stop_at or len(assigned) >= experiment.specification["max_contacts"]
+                         or experiment.status == "observing")
+    unresolved_sends = sum(m.sent_at is None and m.status in {"draft", "sending", "unknown"} for m in assigned)
+    observation_pending = any(s["censored"] for s in stats.values()) or unresolved_sends > 0
     mature_enough = min(s["mature"] for s in stats.values()) >= 10
     outcome = "inconclusive"
     if qualified >= 2:
         outcome = "winning"
-    elif now >= experiment.stop_at and sum(s["mature"] for s in stats.values()) >= 10:
+    elif enrollment_closed and not observation_pending and sum(s["mature"] for s in stats.values()) >= 10:
         outcome = "losing"
     winner = ("cash" if p_cash >= .95 else "reorder" if p_cash <= .05 else None) if mature_enough else None
     result = {"arms": stats, "outcome": outcome, "sample_size": len(outgoing), "qualified_stores": qualified,
+              "enrollment_closed": enrollment_closed, "observation_pending": observation_pending,
+              "unresolved_sends": unresolved_sends,
               "p_cash_higher_response": p_cash, "response_winner": winner,
               "interpretation": "Responses are leading signals; connected stores are the primary outcome. Silence remains censored for seven days.",
               "confidence": "low" if not mature_enough else "moderate",
-              "next_action": "Keep learning with a small qualified sample" if not winner else f"Test {winner} framing on a new cohort"}
+              "next_action": ("Continue observing this cohort; preserve its messages and assignments" if enrollment_closed and observation_pending
+                              else "Keep learning with a small qualified sample" if not winner else f"Test {winner} framing on a new cohort")}
     if experiment.result != result:
         experiment.result = result
         event = record(db, f"experiment-result:{experiment.id}:{digest(result)}", "EXPERIMENT_EVALUATED", experiment.id, result, epistemic="INFERENCE")
@@ -158,8 +171,10 @@ def evaluate(db, experiment_id):
                     "activation": "INVENTORY_ANALYSIS_VIEWED" in observed,
                     "payment": True if "SUBSCRIPTION_PURCHASED" in observed else None,
                     "retention": False if "CANCELLATION" in observed else None, "experiment_id": experiment.id})
-    if now >= experiment.stop_at or len(outgoing) >= experiment.specification["max_contacts"]:
-        experiment.status = outcome
+    if enrollment_closed:
+        # Ending enrollment is not evidence that the final send has had time to
+        # produce a response. Keep it in periodic evaluation across restarts.
+        experiment.status = "observing" if observation_pending else outcome
     return result
 
 

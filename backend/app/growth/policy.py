@@ -79,14 +79,21 @@ REPLY_CLASSES = {"SUBSTANTIVE_POSITIVE", "SUBSTANTIVE_NEUTRAL", "SUBSTANTIVE_NEG
 
 def classify_reply(text, headers=None):
     headers = {k.lower(): str(v).lower() for k, v in (headers or {}).items()}
-    lower = text.lower().split("\non ")[0].split("\n>")[0][:4000]
-    if lower.strip() == "stop" or any(t in lower for t in ("unsubscribe", "remove me", "stop emailing", "do not contact", "don't contact")):
+    lower = text.lower().replace("\u2019", "'").split("\non ")[0].split("\n>")[0][:4000]
+    explicit_opt_out = re.search(
+        r"\b(?:stop|cease)\s+(?:emailing|contacting|messaging)\b"
+        r"|\bleave\s+(?:me|us)\s+alone\b"
+        r"|\b(?:take|remove)\s+(?:me|us)\s+(?:off|from)\b"
+        r"|\bno\s+more\s+(?:emails?|messages?|contact)\b", lower)
+    if explicit_opt_out or lower.strip() == "stop" or any(t in lower for t in ("unsubscribe", "remove me", "stop emailing", "do not contact", "don't contact")):
         return "UNSUBSCRIBE"
     if any(t in lower for t in ("delivery failed", "undeliverable", "mailbox not found")):
         return "DELIVERY_FAILURE"
     if headers.get("auto-submitted", "no") != "no" or any(t in lower for t in ("out of office", "automatic reply")):
         return "AUTOMATED"
-    if any(t in lower for t in ("not interested", "no thanks", "no thank you", "not a fit")):
+    explicit_decline = re.search(
+        r"\b(?:do not|don't|dont)\s+want\b.{0,60}\b(?:health check|demo|offer|service|app)\b", lower)
+    if explicit_decline or any(t in lower for t in ("not interested", "no thanks", "no thank you", "not a fit")):
         return "SUBSTANTIVE_NEGATIVE"
     if any(t in lower for t in ("send me", "interested", "health check", "book a demo", "try it", "sign me up")):
         return "SUBSTANTIVE_POSITIVE"

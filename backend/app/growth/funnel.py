@@ -39,6 +39,23 @@ def record_view(db, user, kind, usable):
     db.commit()
 
 
+def link_known_contacts(db, batch_size=200):
+    """Link late-arriving contacts using authenticated account email, never a claimed store URL."""
+    import os
+    excluded = {s.strip().lower() for s in os.getenv("GROWTH_EXCLUDED_SHOP_DOMAINS", "skubase-test.myshopify.com").split(",")}
+    db.flush()
+    matches = db.execute(select(Contact, User).join(User, User.email == Contact.email)
+        .join(Shop, Shop.id == User.shop_id)
+        .where(Contact.shop_id.is_(None), User.is_admin.is_(False),
+               ~func.lower(User.email).like("%@skubase.io"), ~func.lower(Shop.shopify_domain).in_(excluded))
+        .order_by(Contact.created_at, Contact.id).limit(batch_size)).all()
+    for contact, user in matches:
+        contact.shop_id = user.shop_id
+        record(db, f"contact-shop-link:{contact.id}:{user.shop_id}", "IDENTITY_LINK", contact.id,
+               {"shop_id": user.shop_id, "basis": "matching_authenticated_account_email"},
+               source="skubase_backend", epistemic="FACT")
+
+
 def reconcile(db, batch_size=200):
     """Forward-only ID cursors for immutable entities; overlap cursor for mutable rows."""
     for model, name in ((User, "users"), (ShopifyConnection, "connections"), (InventoryRiskSnapshotLead, "leads")):
@@ -51,9 +68,6 @@ def reconcile(db, batch_size=200):
                 product_event(db, "SIGNUP", row.shop_id, f"signup:{row.id}", occurred_at=timestamp(row.created_at))
                 if row.trial_ends_at:
                     product_event(db, "TRIAL_STARTED", row.shop_id, f"trial:{row.id}", occurred_at=timestamp(row.created_at))
-                contact = db.scalar(select(Contact).where(Contact.email == row.email))
-                if contact:
-                    contact.shop_id = row.shop_id
             elif isinstance(row, ShopifyConnection):
                 user = db.scalar(select(User).where(User.shop_id == row.shop_id, User.is_admin.is_(False)))
                 if user and not user.email.endswith("@skubase.io"):
@@ -76,6 +90,10 @@ def reconcile(db, batch_size=200):
                 enqueue(db, f"health-check:{contact.id}", "opportunity", {"contact_id": contact.id}, priority=95)
         if rows:
             remember(db, "working", "cursor:" + name, {"id": rows[-1].id})
+    # Contacts can arrive after the forward-only user cursor, including in this
+    # same batch's form pass. Match only eligible accounts, so unmatched leads
+    # cannot fill the bounded batch and starve known customer identities.
+    link_known_contacts(db, batch_size)
     # Run IDs have immutable starts; completion is reconciled through a durable pending set.
     cursor = get_memory(db, "working", "cursor:sync", {"id": 0, "pending": []})
     rows = list(db.scalars(select(ShopifySyncRun).where(ShopifySyncRun.id > cursor["id"])

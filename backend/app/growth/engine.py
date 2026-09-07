@@ -157,14 +157,14 @@ def reply(factory, work, model=call_model):
 
 def insert_once_message(db, original, contact):
     from .store import insert_once
-    from .service_replies import permit, current_request
+    from .service_replies import permit, current_request, service_body
     request = current_request(db, contact.id)
     if not request:
         raise GrowthError("A positive reply alone does not authorize promotional follow-up")
     message, fresh = insert_once(db, Message, key="assistance:" + contact.id, contact_id=contact.id,
         experiment_id=original.experiment_id, direction="out", reply_to_id=original.id,
         subject="Re: Your Shopify inventory health check",
-        body="I'm Skubase's automated assistant. To continue the inventory check you requested, connect your store at https://skubase.io/store-sync and start an import for read-only analysis. Please don't email customer data, passwords or tokens. Reply with the step if you encounter a connection error.\n\nSkubase | info@skubase.io\nReply 'stop' to stop automated responses.")
+        body=service_body("To continue the Skubase inventory check you requested, connect your store at https://skubase.io/store-sync and start an import for read-only analysis. Please don't email customer data, passwords or tokens. Reply with the step if you encounter a connection error."))
     if fresh:
         permit(db, message, request, "health_check", ["backend/app/api/routes/inventory_risk_snapshot.py"])
     return message, fresh
@@ -217,7 +217,7 @@ def daily_review(factory, work, model=call_model):
         if action == "product_feedback":
             enqueue(db, "review-feedback:" + work.id, "product_feedback", {"feedback": data["bottleneck"]}, priority=90)
         elif action == "evaluate":
-            for exp in db.scalars(select(Experiment).where(Experiment.status == "active").limit(2)):
+            for exp in db.scalars(select(Experiment).where(Experiment.status.in_(["active", "observing"])).limit(2)):
                 enqueue(db, "review-evaluate:" + work.id + ":" + exp.id, "evaluate", {"experiment_id": exp.id}, priority=60)
         elif action == "opportunity":
             candidate = db.scalar(select(Contact).where(Contact.status == "qualified", Contact.suppressed.is_(False)).limit(1))
@@ -253,7 +253,7 @@ def handle(factory, work, *, provider=messaging.resend_request, fetch=discovery.
             feedback = funnel.bottleneck(db)
             if feedback["stage"] != "insufficient_evidence":
                 enqueue(db, "product-feedback:" + digest(feedback), "product_feedback", {"feedback": feedback}, priority=90)
-            for exp in db.scalars(select(Experiment).where(Experiment.status == "active").limit(5)):
+            for exp in db.scalars(select(Experiment).where(Experiment.status.in_(["active", "observing"])).limit(5)):
                 learning.evaluate(db, exp.id)
             result = {"funnel": funnel.funnel_counts(db), "bottleneck": feedback}
         elif work.kind == "evaluate":

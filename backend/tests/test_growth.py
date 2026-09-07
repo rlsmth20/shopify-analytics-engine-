@@ -103,6 +103,9 @@ class GrowthTests(unittest.TestCase):
             self.assertTrue(get_memory(db, "beliefs", "response:cash")["supporting_evidence"])
             self.assertEqual(db.scalar(select(func.count()).select_from(Message).where(Message.direction == "in")), 1)
             self.assertEqual(db.scalar(select(func.count()).select_from(Message).where(Message.direction == "out")), 3)
+            for message in db.scalars(select(Message).where(Message.direction == "out")):
+                self.assertIn("not yet listed in the Shopify App Store", message.body)
+                self.assertNotIn("automated assistant", message.body)
             self.assertEqual(dashboard(db)["mission"]["qualified_users"], 0)
             # Prior intent is not represented as an acquired customer.
         self.assertEqual(len(calls), len(set(calls)))

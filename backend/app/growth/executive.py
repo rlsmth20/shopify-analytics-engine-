@@ -78,7 +78,7 @@ def import_review(db, result, *, model="codex", input_tokens=None, output_tokens
                 result={"evidence_id": event.id, "incremental_api_spend_usd": 0, "subscription_cost_allocation": "UNKNOWN"})
     action = result["next_action"]
     if action == "evaluate":
-        for experiment in db.scalars(select(Experiment).where(Experiment.status == "active").limit(5)):
+        for experiment in db.scalars(select(Experiment).where(Experiment.status.in_(["active", "observing"])).limit(5)):
             enqueue(db, "executive-evaluate:" + day + ":" + experiment.id, "evaluate", {"experiment_id": experiment.id}, priority=70)
     if action == "product_feedback" and packet["bottleneck"]["stage"] != "insufficient_evidence":
         enqueue(db, "executive-feedback:" + day, "product_feedback", {"feedback": packet["bottleneck"]}, priority=90)
