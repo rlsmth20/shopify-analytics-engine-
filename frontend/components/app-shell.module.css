@@ -1,0 +1,18 @@
+.shell :global(.sidebar) { min-width: 0; }
+.mobileHeader { min-width: 0; }
+.navigationToggle { display: none; }
+
+@media (max-width: 1024px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .shell :global(.sidebar) { padding: 16px 18px; gap: 16px; }
+  .mobileHeader { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .shell :global(.brand-copy) { display: none; }
+  .navigationToggle { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 15px; border: 1px solid #66758a; border-radius: 10px; background: #26364e; color: white; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .navigationToggle:focus-visible { outline: 3px solid #a5c9ff; outline-offset: 3px; }
+  .shell :global(.sidebar-nav) { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; overflow: visible; }
+  .shell :global(.nav-link) { justify-content: flex-start; padding: 8px; min-width: 0; }
+  .shell :global(.nav-link-label) { min-width: 0; font-size: .86rem; overflow-wrap: anywhere; }
+  .shell :global(.nav-link-gate) { max-width: 65px; font-size: .6rem; }
+  .shell :global(.sidebar[data-navigation-open="false"] .sidebar-nav),
+  .shell :global(.sidebar[data-navigation-open="false"] .sidebar-note) { display: none; }
+}

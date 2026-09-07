@@ -12,6 +12,11 @@ type AnalyticsWindow = Window & {
 
 const ATTRIBUTION_KEY = "skubase-growth-attribution-v1";
 const UTM_FIELDS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
+const PUBLIC_HEALTH_WORK_ROUTES = new Set([
+  "/tools/inventory-health-check",
+  "/inventory-risk-snapshot",
+  "/inventory-risk-snapshot/thanks",
+]);
 type GrowthState = {
   visitor_id: string; at: number; landing_page: string; attribution: Record<string, string>;
 };
@@ -53,7 +58,12 @@ function currentGrowthAttribution(): Record<string, string> {
 }
 
 function growthTrackingAllowed(): boolean {
-  return typeof window !== "undefined" && !isDemoActive() && navigator.doNotTrack !== "1";
+  if (typeof window === "undefined" || navigator.doNotTrack === "1") return false;
+  if (new URLSearchParams(window.location.search).getAll("demo").includes("1")) return false;
+  // A previous sample-workspace visit must not erase real public-tool work.
+  // The checker separately excludes sample CSV runs. Keep authentication and
+  // all other routes' sticky demo behavior unchanged.
+  return PUBLIC_HEALTH_WORK_ROUTES.has(window.location.pathname) || !isDemoActive();
 }
 
 /** Campaign fields for an explicit form submission, without visitor IDs or referrer data. */

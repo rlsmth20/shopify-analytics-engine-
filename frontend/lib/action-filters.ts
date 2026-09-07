@@ -1,5 +1,6 @@
 import type { InventoryAction } from "@/lib/api";
 import { getActionImpactValue } from "@/lib/app-helpers";
+import { isHistoryReviewAction } from "@/lib/action-quality";
 
 export type ActionFilters = {
   query: string;
@@ -19,13 +20,18 @@ export function filterInventoryActions(actions: InventoryAction[], filters: Acti
     (!query || `${action.sku_id} ${action.name}`.toLocaleLowerCase().includes(query)) &&
     (filters.status === "all" || action.status === filters.status) &&
     (filters.confidence === "all" || action.data_quality_confidence === filters.confidence) &&
-    (filters.stockoutDays === "all" || (action.status === "urgent" && action.days_until_stockout <= Number(filters.stockoutDays)))
+    (filters.stockoutDays === "all" || (action.status === "urgent" && Number.isFinite(action.days_until_stockout) && action.days_until_stockout <= Number(filters.stockoutDays)))
   ).sort((a, b) => {
     const primary = filters.sort === "impact" ? getActionImpactValue(b) - getActionImpactValue(a)
-      : filters.sort === "coverage" ? a.days_of_inventory - b.days_of_inventory
+      : filters.sort === "coverage" ? coverageForSort(a) - coverageForSort(b)
       : b.priority_score - a.priority_score;
     return primary || b.priority_score - a.priority_score || a.sku_id.localeCompare(b.sku_id);
   });
+}
+
+function coverageForSort(action: InventoryAction): number {
+  return !isHistoryReviewAction(action) && Number.isFinite(action.days_of_inventory)
+    ? action.days_of_inventory : Number.POSITIVE_INFINITY;
 }
 
 export function readActionFilters(params: URLSearchParams): ActionFilters {

@@ -46,6 +46,7 @@ PLAN_BY_PRICE_ID: dict[str, str] = {
 }
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing"}
+TERMINAL_SUBSCRIPTION_STATUSES = {"canceled", "incomplete_expired"}
 
 FRONTEND_URL = os.getenv("FRONTEND_ORIGIN", "https://skubase.io").split(",")[0].strip().rstrip("/")
 
@@ -305,6 +306,33 @@ def create_portal_session(db: DbSession, *, user: User) -> str:
     return portal.url
 
 
+def _current_webhook_subscription(subscription_id: str) -> object:
+    """One bounded read, without SDK retries, for unordered mutable snapshots."""
+    stripe = _stripe()
+    if stripe is None:
+        raise RuntimeError("Stripe subscription verification is unavailable.")
+    client = stripe.StripeClient(
+        stripe.api_key,
+        max_network_retries=0,
+        http_client=stripe.http_client.new_default_http_client(timeout=10),
+    )
+    subscription = client.subscriptions.retrieve(subscription_id)
+    if _get_attr(subscription, "id") != subscription_id or not _get_attr(subscription, "status"):
+        raise RuntimeError("Stripe returned an incomplete subscription.")
+    return subscription
+
+
+def _apply_webhook_subscription(sub: Subscription, snapshot: object) -> None:
+    sub.status = str(_get_attr(snapshot, "status"))
+    sub.cancel_at_period_end = bool(_get_attr(snapshot, "cancel_at_period_end", False))
+    period_end = _get_subscription_period_end(snapshot)
+    if period_end is not None:
+        sub.current_period_end = period_end
+    price_id = _get_first_item_price_id(snapshot)
+    if price_id in PLAN_BY_PRICE_ID:
+        sub.plan = PLAN_BY_PRICE_ID[price_id]
+
+
 def handle_webhook_event(db: DbSession, *, event: dict) -> None:
     """Apply a verified Stripe webhook event to the local Subscription row."""
     event_type = event.get("type", "")
@@ -320,13 +348,25 @@ def handle_webhook_event(db: DbSession, *, event: dict) -> None:
             shop_id = int(shop_id_raw)
         except (ValueError, TypeError):
             return
-        sub = db.scalar(select(Subscription).where(Subscription.shop_id == shop_id))
+        sub = db.scalar(select(Subscription).where(Subscription.shop_id == shop_id).with_for_update())
+        if sub is not None and sub.stripe_subscription_id:
+            # Checkout is an association event, not proof that a subscription is
+            # still active. A replay must not undo cancellation or Shopify billing.
+            if sub.stripe_subscription_id == subscription_id or sub.stripe_subscription_id.startswith("shopify:"):
+                return
+        snapshot = _current_webhook_subscription(subscription_id)
+        if _get_attr(snapshot, "customer") != customer_id:
+            raise RuntimeError("Stripe checkout customer does not match its subscription.")
+        if _get_attr(snapshot, "status") in TERMINAL_SUBSCRIPTION_STATUSES:
+            return
+        if sub is not None and sub.stripe_subscription_id and sub.status not in TERMINAL_SUBSCRIPTION_STATUSES:
+            raise RuntimeError("Checkout conflicts with the existing subscription.")
         if sub is None:
             sub = Subscription(shop_id=shop_id)
             db.add(sub)
         sub.stripe_customer_id = customer_id
         sub.stripe_subscription_id = subscription_id
-        sub.status = "active"
+        _apply_webhook_subscription(sub, snapshot)
         db.commit()
         return
 
@@ -340,30 +380,33 @@ def handle_webhook_event(db: DbSession, *, event: dict) -> None:
         if not stripe_sub_id:
             return
         sub = db.scalar(
-            select(Subscription).where(Subscription.stripe_subscription_id == stripe_sub_id)
+            select(Subscription).where(Subscription.stripe_subscription_id == stripe_sub_id).with_for_update()
         )
         if sub is None:
             # Fallback: try matching by customer id.
             customer_id = sub_obj.get("customer")
             if customer_id:
                 sub = db.scalar(
-                    select(Subscription).where(Subscription.stripe_customer_id == customer_id)
+                    select(Subscription).where(Subscription.stripe_customer_id == customer_id).with_for_update()
                 )
             if sub is None:
                 return
+            # An event for a previous subscription must not replace a newer one,
+            # even if the Stripe customer is shared. Checkout binds replacements.
+            if sub.stripe_subscription_id and sub.stripe_subscription_id != stripe_sub_id:
+                return
 
         sub.stripe_subscription_id = stripe_sub_id
-        sub.status = sub_obj.get("status", "inactive")
-        sub.cancel_at_period_end = bool(sub_obj.get("cancel_at_period_end", False))
-        period_end = sub_obj.get("current_period_end")
-        if isinstance(period_end, (int, float)):
-            sub.current_period_end = datetime.fromtimestamp(int(period_end), tz=timezone.utc)
-        # Resolve plan from the subscription's first price.
-        items = sub_obj.get("items", {}).get("data", [])
-        if items:
-            price_id = items[0].get("price", {}).get("id", "")
-            if price_id in PLAN_BY_PRICE_ID:
-                sub.plan = PLAN_BY_PRICE_ID[price_id]
+        if event_type == "customer.subscription.deleted":
+            sub.status = "canceled"
+            sub.cancel_at_period_end = False
+        elif sub.status not in TERMINAL_SUBSCRIPTION_STATUSES:
+            # Event timestamps have second precision and aren't a total order.
+            # Read the current provider state instead of applying an old snapshot.
+            snapshot = _current_webhook_subscription(stripe_sub_id)
+            if _get_attr(snapshot, "customer") != sub.stripe_customer_id:
+                raise RuntimeError("Stripe subscription customer does not match the account.")
+            _apply_webhook_subscription(sub, snapshot)
         db.commit()
         return
 

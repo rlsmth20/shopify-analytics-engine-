@@ -5,12 +5,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
 from app.growth import engine, learning
-from app.growth.models import Contact, Experiment, Message
+from app.growth.models import Contact, Evidence, Experiment, Message
 from app.growth.store import enqueue, get_memory, record
 
 
@@ -98,3 +98,31 @@ class GrowthLearningTests(unittest.TestCase):
             self.assertEqual(exp.status, "observing")
             self.assertTrue(result["enrollment_closed"])
             self.assertEqual(result["arms"]["reorder"]["mature"], 0)
+
+    def test_template_revision_rolls_enrollment_without_rewriting_old_messages(self):
+        from app.growth.service_replies import SERVICE_TEMPLATE_REVISION
+        self.cohort(count=2, unknown_last=True)
+        with self.factory() as db:
+            old = db.get(Experiment, self.experiment_id)
+            old.specification = {key: value for key, value in old.specification.items() if key != "template_revision"}
+            messages = list(db.scalars(select(Message).where(Message.experiment_id == old.id)))
+            before = {message.id: (message.body, message.status, message.sent_at, message.experiment_id) for message in messages}
+            next_cohort = learning.ensure_experiment(db)
+            self.assertNotEqual(next_cohort.id, old.id)
+            self.assertEqual(old.status, "observing")
+            self.assertEqual(next_cohort.specification["template_revision"], SERVICE_TEMPLATE_REVISION)
+            self.assertEqual(next_cohort.specification["workflow"], "browser_health_check")
+            self.assertEqual(next_cohort.specification["cash_allocation"], old.specification["cash_allocation"])
+            self.assertIsNone(old.specification.get("template_revision"))
+            self.assertIsNotNone(db.scalar(select(Evidence).where(Evidence.kind == "EXPERIMENT_ENROLLMENT_CLOSED", Evidence.subject == old.id)))
+            self.assertEqual(learning.ensure_experiment(db).id, next_cohort.id)
+            for message in messages:
+                self.assertEqual((message.body, message.status, message.sent_at, message.experiment_id), before[message.id])
+            # An explicitly older revision gets the same separation, not an
+            # in-place spec edit or reassignment of an existing message.
+            next_cohort.specification = {**next_cohort.specification, "template_revision": "connection-required-v0"}
+            db.flush()
+            third_cohort = learning.ensure_experiment(db)
+            self.assertNotEqual(third_cohort.id, next_cohort.id)
+            self.assertEqual(next_cohort.status, "observing")
+            self.assertEqual(third_cohort.specification["template_revision"], SERVICE_TEMPLATE_REVISION)

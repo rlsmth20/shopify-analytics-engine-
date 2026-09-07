@@ -3,9 +3,9 @@
     "purpose": "Fulfill a real inventory-check request or a narrowly matched Skubase support question.",
     "inputs": ["recent request evidence", "suppression state", "verified product knowledge", "service scope"],
     "tools": ["evidence_read", "draft", "send_email"],
-    "process": ["Verify a recent request", "Identify Skubase honestly without inventing a human identity", "Answer only the requested service need", "Disclose the current Shopify App Store review status", "Do not add promotion", "Bind the exact body to the request and source knowledge", "Check suppression and dispatch authority immediately before sending", "Retain provider receipt"],
+    "process": ["Verify a recent request", "Identify Skubase honestly without inventing a human identity", "For requested inventory checks, offer the no-install browser SKU diagnostic at /tools/inventory-health-check", "Explain that SKU entries stay in the browser, results depend on entered assumptions, and a reorder trigger is not an order quantity", "Answer only the requested service need and offer a reply for interpretation help", "Disclose the current Shopify App Store review status", "Do not add promotion", "Bind the exact body and template revision to the request and source knowledge", "Preserve earlier workflow cohorts when the service template changes", "Check suppression and dispatch authority immediately before sending", "Retain provider receipt"],
     "output": "One source-grounded service response and its durable dispatch record.",
-    "success_signal": "The requester completes the connection or resolves the requested service question.",
+    "success_signal": "The requester obtains a useful inventory review or resolves the requested service question; verified first store connections and payments are stronger commercial outcomes. Anonymous calculator use alone is not an activation or qualified customer.",
     "failure_conditions": ["No service request", "Stale request", "Uncertain knowledge match", "Body changed after authorization", "Opt out", "Provider ambiguity"],
     "cost_expectation": "Deterministic templates, zero model tokens. Legitimate requested-service replies are exempt from the rolling 20-new-merchant ceiling; existing request, suppression and cost gates still apply. No postal address is collected."
   }

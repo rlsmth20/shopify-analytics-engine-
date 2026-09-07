@@ -37,12 +37,7 @@ function fixture({ stored, doNotTrack = "0", demo = false, blockedStorage = fals
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
-test("a tagged landing survives internal navigation into the actual health-check submission", async () => {
-  const f = fixture();
-  f.window.location.search = "?utm_source=community&utm_campaign=cohort-a&utm_content=message-2";
-  await f.api.trackGrowthEvent("VISITOR");
-  f.window.location.search = "";
-  f.window.location.pathname = "/inventory-risk-snapshot";
+async function submitHealthRequest(f) {
   let payload;
   let stateIndex = 0;
   const formContext = { ...f.context, exports: {},
@@ -67,6 +62,16 @@ test("a tagged landing survives internal navigation into the actual health-check
   vm.runInNewContext(formSource, formContext);
   const form = formContext.exports.InventoryRiskSnapshotForm({});
   await form.props.onSubmit({ preventDefault() {} });
+  return payload;
+}
+
+test("a tagged landing survives internal navigation into the actual health-check submission", async () => {
+  const f = fixture();
+  f.window.location.search = "?utm_source=community&utm_campaign=cohort-a&utm_content=message-2";
+  await f.api.trackGrowthEvent("VISITOR");
+  f.window.location.search = "";
+  f.window.location.pathname = "/inventory-risk-snapshot";
+  const payload = await submitHealthRequest(f);
   assert.equal(payload.utm_campaign, "cohort-a");
   assert.equal(payload.utm_source, "community");
   assert.equal(payload.utm_content, "message-2");
@@ -117,4 +122,63 @@ test("blocked storage preserves explicit form campaigns without breaking submiss
   assert.deepEqual(plain(f.api.getGrowthAttribution()), { utm_campaign: "current" });
   await f.api.trackGrowthEvent("VISITOR");
   assert.equal(f.calls.length, 0);
+});
+
+test("sticky workspace demo does not suppress real browser check to actual review-request attribution", async () => {
+  const f = fixture({ demo: true });
+  f.window.location.pathname = "/dashboard";
+  f.window.location.search = "?demo=1";
+  await f.api.trackGrowthEvent("INVENTORY_ANALYSIS_VIEWED");
+  assert.equal(f.calls.length, 0);
+
+  f.window.location.pathname = "/tools/inventory-health-check";
+  f.window.location.search = "?utm_source=free_tool&utm_campaign=inventory-health-check-v1&utm_content=demo-transition";
+  await f.api.trackGrowthEvent("CALCULATOR_USED");
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].name, "CALCULATOR_USED");
+  assert.equal(f.calls[0].landing_page, "/tools/inventory-health-check");
+  const visitorId = f.calls[0].visitor_id;
+
+  f.window.location.pathname = "/inventory-risk-snapshot";
+  f.window.location.search = "";
+  const payload = await submitHealthRequest(f);
+  assert.equal(payload.utm_source, "free_tool");
+  assert.equal(payload.utm_campaign, "inventory-health-check-v1");
+  assert.equal(payload.utm_content, "demo-transition");
+  assert.equal(payload.visitor_id, undefined);
+  assert.equal(payload.referrer, undefined);
+
+  f.window.location.pathname = "/inventory-risk-snapshot/thanks";
+  await f.api.trackGrowthEvent("VISITOR");
+  assert.equal(f.calls.at(-1).visitor_id, visitorId);
+  assert.equal(f.calls.at(-1).attribution.utm_campaign, "inventory-health-check-v1");
+});
+
+test("explicit demo and DNT still exclude telemetry and attribution on all public-health routes", async () => {
+  for (const pathname of ["/tools/inventory-health-check", "/inventory-risk-snapshot", "/inventory-risk-snapshot/thanks"]) {
+    for (const options of [{ demo: true, search: "?demo=1&utm_campaign=excluded" },
+      { demo: false, search: "?demo=1&utm_campaign=excluded" },
+      { demo: true, doNotTrack: "1", search: "?utm_campaign=excluded" },
+      { demo: false, doNotTrack: "1", search: "?utm_campaign=excluded" }]) {
+      const f = fixture(options);
+      f.window.location.pathname = pathname;
+      f.window.location.search = options.search;
+      assert.deepEqual(plain(f.api.getGrowthAttribution()), {}, `${pathname}: attribution`);
+      await f.api.trackGrowthEvent("CALCULATOR_USED");
+      assert.equal(f.calls.length, 0, `${pathname}: telemetry`);
+      assert.equal(f.storage.size, 0, `${pathname}: storage`);
+    }
+  }
+});
+
+test("sticky demo remains excluded on app routes and unrelated public routes", async () => {
+  for (const pathname of ["/dashboard", "/actions", "/pricing", "/tools/other", "/inventory-risk-snapshot/other"]) {
+    const f = fixture({ demo: true });
+    f.window.location.pathname = pathname;
+    f.window.location.search = "?utm_campaign=excluded";
+    assert.deepEqual(plain(f.api.getGrowthAttribution()), {});
+    await f.api.trackGrowthEvent("VISITOR");
+    assert.equal(f.calls.length, 0, pathname);
+    assert.equal(f.storage.size, 0, pathname);
+  }
 });

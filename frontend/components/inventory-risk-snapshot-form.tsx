@@ -112,8 +112,8 @@ export function InventoryRiskSnapshotForm({
         <p className="snapshot-form-eyebrow">Free diagnostic</p>
         <h2 className="snapshot-form-title">Request your free snapshot</h2>
         <p className="snapshot-form-copy">
-          Send the basics. We will confirm fit, then use Shopify access or export data
-          to prepare a short inventory action snapshot.
+          Send the basics. We will email the next step for your inventory check and
+          offer help interpreting the priorities. No app installation is needed to start.
         </p>
       </div>
 
@@ -188,7 +188,7 @@ export function InventoryRiskSnapshotForm({
         {submitting ? "Submitting..." : "Request free snapshot"}
       </button>
       <p className="snapshot-form-footnote">
-        No credit card. Read-only for the scan unless you approve otherwise.
+        No credit card. This form does not connect to or change your Shopify store.
       </p>
     </form>
   );

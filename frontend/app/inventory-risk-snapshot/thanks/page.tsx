@@ -14,22 +14,20 @@ export default function InventoryRiskSnapshotThanksPage() {
 
       <section className="marketing-hero">
         <p className="marketing-eyebrow">Request received</p>
-        <h1 className="marketing-hero-title">You&apos;re on the list.</h1>
+        <h1 className="marketing-hero-title">Your inventory review request is in.</h1>
         <p className="marketing-hero-sub">
-          Skubase will confirm fit, then use read-only Shopify access or export data
-          to prepare a short inventory risk snapshot with practical SKU-level actions.
+          We&apos;ll review your request and reply from info@skubase.io. You can start
+          now with a browser-based check of your SKU summary—no app installation needed.
         </p>
         <div className="marketing-hero-ctas">
-          <Link href="/dashboard?demo=1" className="button button-primary button-lg">
-            View demo
+          <Link href="/tools/inventory-health-check" className="button button-primary button-lg">
+            Check my inventory summary
           </Link>
-          <Link href="/blog/how-to-clear-dead-stock-shopify" className="button button-secondary button-lg">
-            Read the dead stock guide
-          </Link>
-          <Link href="/goodbye-stocky" className="button button-secondary button-lg">
-            Stocky migration
+          <Link href="/sample-inventory-risk-snapshot" className="button button-secondary button-lg">
+            See a sample report
           </Link>
         </div>
+        <p className="marketing-hero-trust">Skubase is currently in Shopify&apos;s review process and is not yet listed in the Shopify App Store. A SKU summary lets us start the discussion while review is pending. Please don&apos;t email customer records, passwords or access tokens.</p>
       </section>
     </div>
   );

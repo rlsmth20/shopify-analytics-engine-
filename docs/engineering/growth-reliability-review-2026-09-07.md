@@ -1,5 +1,7 @@
 # Growth reliability review — September 7, 2026
 
+Deployment update: commit `0c4843c` is now live. Railway deployment `9fd59128-d455-4e22-8161-150556746ec7` succeeded; Vercel deployment `dpl_CQQfPwtexPTV3EQe6kLgPvVoC3jH` is ready and aliased to `www.skubase.io`. Public page and API health checks returned 200. Retained deployment evidence is `5082`; requested-service skill version 2 was activated through the audited revision workflow. The worker remained running with 13 of 20 first-contact slots used and no unresolved reservations at verification. The report below describes the original development pass; the separate billing fix is covered in `stripe-webhook-reliability-2026-09-07.md`.
+
 This development pass fixes observed failures in local isolated fixtures. It did not send merchant messages, spend on advertising/APIs, alter the rolling 20-contact ceiling, or deploy to production. Simulated responses and payments are not campaign evidence.
 
 ## Changes and evidence

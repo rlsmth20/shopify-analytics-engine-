@@ -1,9 +1,10 @@
 """Evidence-linked experiments; small samples change allocation cautiously."""
 import math
 import random
+import re
 import time
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .models import Contact, Evidence, Experiment, Memory, Message
 from .store import digest, enqueue, get_memory, insert_once, record, remember
@@ -12,23 +13,34 @@ POSITIVE = {"SUBSTANTIVE_POSITIVE", "QUESTION", "SUBSTANTIVE_NEUTRAL"}
 
 
 def ensure_experiment(db):
-    active = db.scalar(select(Experiment).where(Experiment.status == "active", Experiment.key.like("health-check-%")).order_by(Experiment.started_at).limit(1))
-    if active and active.specification.get("channel") != "requested_health_check":
-        active.status = "inconclusive"
-        active.result = {**active.result, "interpretation": "Stopped: Resend cannot carry unsolicited outreach. Preserve this cohort; requested-service fulfillment is a separate experiment."}
-        record(db, "retired-channel:" + active.id, "EXPERIMENT_STOPPED", active.id, active.result)
-        db.flush()
-    elif active:
-        evaluate(db, active.id)
-        if active.status == "active":
-            return active
+    from .service_replies import SERVICE_TEMPLATE_REVISION
+    active_cohorts = list(db.scalars(select(Experiment).where(Experiment.status == "active",
+        Experiment.key.like("health-check-%")).order_by(Experiment.started_at)))
+    for active in active_cohorts:
+        if active.specification.get("channel") != "requested_health_check":
+            active.status = "inconclusive"
+            active.result = {**active.result, "interpretation": "Stopped: Resend cannot carry unsolicited outreach. Preserve this cohort; requested-service fulfillment is a separate experiment."}
+            record(db, "retired-channel:" + active.id, "EXPERIMENT_STOPPED", active.id, active.result)
+            db.flush()
+        elif active.specification.get("template_revision") != SERVICE_TEMPLATE_REVISION:
+            active.status = "observing"
+            closure = {"enrollment_closed": True, "reason": "Requested-service workflow changed; preserve old messages and observe their outcomes in the original cohort.",
+                "previous_template_revision": active.specification.get("template_revision"), "next_template_revision": SERVICE_TEMPLATE_REVISION}
+            active.result = {**active.result, **closure}
+            record(db, "template-enrollment-closed:" + active.id, "EXPERIMENT_ENROLLMENT_CLOSED", active.id, closure)
+            db.flush()
+        else:
+            evaluate(db, active.id)
+            if active.status == "active":
+                return active
     cycle = db.scalar(select(Experiment).where(Experiment.key.like("health-check-%")).order_by(Experiment.started_at.desc()).limit(1))
     index = int(cycle.specification.get("cycle", 0)) + 1 if cycle else 1
     allocation = get_memory(db, "strategic", "strategy").get("cash_allocation", .5)
     spec = {"cycle": index, "hypothesis": "Cash-exposure versus reorder-priority framing of a free Shopify Inventory Health Check changes qualified engagement.",
-            "channel": "requested_health_check", "target_customer": "Shopify operators who explicitly requested an inventory check; ICP remains provisional",
+            "channel": "requested_health_check", "template_revision": SERVICE_TEMPLATE_REVISION,
+            "workflow": "browser_health_check", "target_customer": "Shopify operators who explicitly requested an inventory check; ICP remains provisional",
             "message_positioning": {"cash": "cash tied up in slow-moving stock", "reorder": "what to reorder before stock runs out"},
-            "action": "Fulfill each requested check with one concise setup message; never cold outreach through Resend",
+            "action": "Fulfill each requested check with one concise link to the free browser inventory health tool; no account or Shopify installation required, never cold outreach through Resend",
             "primary_metric": "distinct qualified stores connected", "secondary_metrics": ["substantive responses", "signup", "activation", "payment"],
             "cost": {"advertising_usd": 0, "model_api_usd": "ledger", "human_minutes": None},
             "stop_condition": "14 days or 20 first contacts; stop early for complaints or downstream friction",
@@ -178,25 +190,70 @@ def evaluate(db, experiment_id):
     return result
 
 
+def organic_landing_page(specification):
+    """Only an explicit local page path can provide untagged tool attribution.
+
+    Existing reorder experiments predate the landing_page field. An invalid new
+    value does not silently fall back and borrow that older tool's visitors.
+    """
+    if "landing_page" not in specification:
+        return "/tools/reorder-point-calculator"
+    page = specification["landing_page"]
+    if isinstance(page, str) and len(page) <= 200 and re.fullmatch(r"/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+/?", page):
+        return page.rstrip("/")
+    return None
+
+
+def organic_tool_matches(event, experiment, landing_page):
+    attribution = event.data.get("attribution")
+    campaign = attribution.get("utm_campaign") if isinstance(attribution, dict) else None
+    # An explicit cohort wins over a shared or previously visited page. Without
+    # this precedence the same use can enter two experiments through the OR.
+    if campaign:
+        return campaign == experiment.key
+    page = event.data.get("landing_page")
+    return landing_page is not None and isinstance(page, str) and page.rstrip("/") == landing_page
+
+
 def evaluate_organic(db, experiment):
+    now = time.time()
     events = list(db.scalars(select(Evidence).where(Evidence.occurred_at >= experiment.started_at,
-        Evidence.kind.in_(["ACCESS_REQUESTED", "CALCULATOR_USED", "SHOPIFY_CONNECTION"]))))
-    requests = {e.subject for e in events if e.kind == "ACCESS_REQUESTED" and e.data.get("utm_campaign") == experiment.key}
-    visitors = {e.subject for e in events if e.kind == "CALCULATOR_USED" and
-                (e.data.get("landing_page") == "/tools/reorder-point-calculator" or
-                 e.data.get("attribution", {}).get("utm_campaign") == experiment.key)}
-    shops = {m.key for m in db.scalars(select(Memory).where(Memory.namespace == "attribution"))
-             if m.value.get("utm_campaign") == experiment.key}
-    shops.update(f"shop:{c.shop_id}" for c in db.scalars(select(Contact).where(Contact.id.in_(requests))) if c.shop_id)
-    connected = {e.subject for e in events if e.kind == "SHOPIFY_CONNECTION" and e.subject in shops}
+        Evidence.occurred_at <= now, Evidence.kind.in_(["ACCESS_REQUESTED", "CALCULATOR_USED"]))))
+    request_times = {}
+    for event in events:
+        if event.kind == "ACCESS_REQUESTED" and event.data.get("utm_campaign") == experiment.key:
+            request_times[event.subject] = min(request_times.get(event.subject, event.occurred_at), event.occurred_at)
+    requests = set(request_times)
+    landing_page = organic_landing_page(experiment.specification)
+    visitors = {e.subject for e in events if e.kind == "CALCULATOR_USED" and organic_tool_matches(e, experiment, landing_page)}
+    # A campaign tag on an existing account is not a new customer. Require an
+    # actual request in this campaign, then a verified account identity link and
+    # the store's first ever connection strictly after that request. Historical
+    # connections remain baseline even when a later reconnect falls in-window.
+    shop_requests = {}
+    linked_requests = set()
+    for contact in db.scalars(select(Contact).where(Contact.id.in_(requests))):
+        if contact.shop_id is not None:
+            shop = f"shop:{contact.shop_id}"
+            shop_requests[shop] = min(shop_requests.get(shop, request_times[contact.id]), request_times[contact.id])
+            linked_requests.add(contact.id)
+    first_connections = dict(db.execute(select(Evidence.subject, func.min(Evidence.occurred_at)).where(
+        Evidence.kind == "SHOPIFY_CONNECTION", Evidence.subject.in_(shop_requests), Evidence.occurred_at <= now,
+        Evidence.data["verified"].as_boolean().is_(True)).group_by(Evidence.subject)).all())
+    connected = {shop for shop, at in first_connections.items() if at > shop_requests[shop]}
+    baseline = set(first_connections) - connected
     outcome = "winning" if connected else "inconclusive"
     result = {"qualified_stores": len(connected), "health_check_requests": len(requests), "calculator_users": len(visitors),
+              "baseline_connected_stores": len(baseline), "unlinked_requests": len(requests - linked_requests),
+              "linked_stores_awaiting_connection": len(set(shop_requests) - set(first_connections)),
+              "attribution_basis": "campaign_request_before_first_verified_store_connection",
+              "landing_page": landing_page, "landing_page_config_valid": landing_page is not None,
               "outcome": outcome, "confidence": "low", "sample_size": len(visitors),
-              "interpretation": "Attributed connections are the outcome; tool uses are diagnostic only. Missing attribution is not inferred.",
+              "interpretation": "Only a store's first verified connection after its campaign-specific request counts as acquired. Earlier or simultaneous connections and later reconnects remain baseline. Tool uses are diagnostic; missing identity links remain unknown. Observed sequence does not establish causation.",
               "next_action": "Review request-to-connection friction" if requests else "Observe qualified demand before expanding content"}
     if experiment.result != result:
         experiment.result = result
         record(db, f"organic-result:{experiment.id}:{digest(result)}", "EXPERIMENT_EVALUATED", experiment.id, result, epistemic="INFERENCE")
-    if time.time() >= experiment.stop_at:
+    if now >= experiment.stop_at:
         experiment.status = outcome
     return result

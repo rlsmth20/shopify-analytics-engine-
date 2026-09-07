@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_current_user
 from app.db.models import User
@@ -161,11 +162,20 @@ async def stripe_webhook(
     if event is None:
         raise HTTPException(status_code=400, detail="Invalid Stripe signature.")
     try:
-        handle_webhook_event(db, event=event)
+        # The legacy Stripe service uses synchronous DB and HTTP clients. Keep
+        # its bounded provider lookup off the API event loop.
+        await run_in_threadpool(handle_webhook_event, db, event=event)
         from app.growth.billing_events import stripe_event
-        stripe_event(db, event)
+        await run_in_threadpool(stripe_event, db, event)
     except Exception as exc:
-        # Log, but return 200 so Stripe doesn't retry indefinitely on bugs.
+        # A verified delivery is acknowledged only after both projections persist.
+        # The subscription handler may already have committed; replay is safe and
+        # lets a retry finish growth evidence after a transient projection failure.
+        db.rollback()
         import logging
-        logging.getLogger(__name__).exception("Webhook handler failed: %s", exc)
+        logging.getLogger(__name__).exception("Stripe webhook processing failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Stripe event processing is temporarily unavailable.",
+        ) from exc
     return {"received": True}

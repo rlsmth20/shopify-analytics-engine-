@@ -19,6 +19,7 @@ export function MarketingFooter() {
         <Link href="/pricing">Pricing</Link>
         <Link href="/about">About</Link>
         <Link href="/blog">Blog</Link>
+        <Link href="/tools/inventory-health-check">Free inventory check</Link>
         <Link href="/changelog">Changelog</Link>
         <Link href="/goodbye-stocky">Stocky migration</Link>
         <Link href="/goodbye-genie">Genie migration</Link>

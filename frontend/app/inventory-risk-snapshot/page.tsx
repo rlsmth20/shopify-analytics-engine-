@@ -1,6 +1,7 @@
 import { InventoryRiskSnapshotCtas } from "@/components/inventory-risk-snapshot-ctas";
 import { InventoryRiskSnapshotForm } from "@/components/inventory-risk-snapshot-form";
 import { MarketingNav } from "@/components/marketing-nav";
+import Link from "next/link";
 
 export const metadata = {
   title: "Free Shopify Inventory Risk Snapshot - skubase",
@@ -26,8 +27,8 @@ const audience = [
 const reassurance = [
   "No credit card required",
   "Sample report available immediately",
-  "Actual snapshot uses Shopify access or export data",
-  "Read-only for the scan unless otherwise stated",
+  "Browser check works from a SKU summary",
+  "No app installation required for the first check",
 ];
 
 const faqs = [
@@ -37,7 +38,7 @@ const faqs = [
   },
   {
     q: "Do I need to install anything?",
-    a: "No. Submit your store URL and context first. If deeper data is needed, we will tell you exactly what to share.",
+    a: "No. Start with the browser-based inventory health check, or submit your store URL and context for a review. Skubase is currently in Shopify's review process and is not yet listed in the App Store. We can work from a SKU summary while review is pending.",
   },
   {
     q: "What does the snapshot include?",
@@ -53,7 +54,7 @@ const faqs = [
   },
   {
     q: "What happens after I submit?",
-    a: "Skubase reviews the store and sends a short inventory risk snapshot. If the store is not a fit, we will say so plainly.",
+    a: "We will email the next step from info@skubase.io. Start with the free browser check, then reply with the inventory question you want help interpreting. A store URL alone does not give Skubase access to your inventory data.",
   },
 ];
 
@@ -74,8 +75,9 @@ export default function InventoryRiskSnapshotPage() {
         <InventoryRiskSnapshotCtas />
         <p className="marketing-hero-trust">
           Built for Shopify merchants with real SKU complexity. The sample report is instant;
-          a real snapshot needs Shopify access or export data.
+          a real analysis needs your inventory and sales summary. Skubase is in Shopify review and is not yet listed in the App Store.
         </p>
+        <p className="marketing-hero-trust">Want an immediate first check? <Link href="/tools/inventory-health-check">Check your SKU summary in your browser</Link>. No account, installation or file upload to Skubase is required.</p>
       </section>
 
       <section className="snapshot-two-column">
@@ -115,8 +117,8 @@ export default function InventoryRiskSnapshotPage() {
         <div className="migration-steps">
           {[
             ["1", "Submit your store URL", "Send the store and a little context about your inventory issue."],
-            ["2", "Share read-only access or export data if it is a fit", "A real snapshot needs inventory and sales signals; the public sample is available immediately."],
-            ["3", "You receive a short inventory action snapshot", "You get practical actions to focus on this week without a sales deck."],
+            ["2", "Check your SKU summary in the browser", "Use stock and units sold over a stated period. Your entries stay in your browser; the tool needs no account or installation."],
+            ["3", "Review the priorities and ask for help", "Download the review list and reply to our email with the inventory question you want to solve. We can work with you to understand a missing workflow or feature."],
           ].map(([number, title, body]) => (
             <article key={number} className="migration-step">
               <span className="migration-step-number">{number}</span>

@@ -51,3 +51,13 @@ test("insufficient history is distinct from established excess and urgent stocko
   assert.equal(isHistoryReviewAction({ status: "optimize" }), false);
   assert.equal(isHistoryReviewAction({ status: "urgent", sales_history_complete: false }), false);
 });
+test("an unknown stockout date does not count as an imminent stockout", () => {
+  const missing = { ...actions[0], days_until_stockout: null };
+  assert.equal(filterInventoryActions([missing], { ...defaults, stockoutDays: "7" }).length, 0);
+});
+test("coverage sorting places unknown or insufficient-history coverage after established coverage", () => {
+  const missing = { ...actions[0], sku_id: "unknown", days_of_inventory: null };
+  const review = { ...actions[0], sku_id: "review", status: "optimize", sales_history_complete: false, days_of_inventory: 0 };
+  const result = filterInventoryActions([missing, review, actions[0]], { ...defaults, sort: "coverage" });
+  assert.equal(result[0].sku_id, "blue-1");
+});

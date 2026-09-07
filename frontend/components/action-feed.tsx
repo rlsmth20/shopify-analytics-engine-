@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DEFAULT_ACTION_FILTERS, filterInventoryActions, readActionFilters, type ActionFilters } from "@/lib/action-filters";
 
 import { ActionCard } from "@/components/action-card";
+import { ActionTable } from "@/components/action-table";
 import { EmptyState } from "@/components/empty-state";
 import type { ActionDataSource, InventoryAction } from "@/lib/api";
 import {
@@ -28,6 +29,7 @@ export function ActionFeed({
   const [filters, setFilters] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS);
   const [filtersReady, setFiltersReady] = useState(false);
   const [limit, setLimit] = useState(30);
+  const [view, setView] = useState<"cards" | "table">("cards");
   useEffect(() => {
     const read = () => { setFilters(readActionFilters(new URLSearchParams(window.location.search))); setLimit(30); };
     read();
@@ -89,6 +91,19 @@ export function ActionFeed({
           </div>
 
           <div className="toolbar-actions">
+            <div className="filter-row" role="group" aria-label="Action view">
+              {(["cards", "table"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={`filter-chip${view === option ? " filter-chip-active" : ""}`}
+                  aria-pressed={view === option}
+                  onClick={() => setView(option)}
+                >
+                  {option === "cards" ? "Cards" : "Compare table"}
+                </button>
+              ))}
+            </div>
             <label className="field-label field-label-inline">
               <span>Sort</span>
               <select
@@ -150,10 +165,6 @@ export function ActionFeed({
           tone="error"
         />
       ) : null}
-      {!isLoading && !errorMessage && visibleActions.length > limit ? (
-        <button type="button" className="button button-secondary" onClick={() => setLimit((previous) => previous + 30)}>Show next {Math.min(30, visibleActions.length - limit)} actions</button>
-      ) : null}
-
       {!isLoading && !errorMessage && visibleActions.length === 0 ? (
         <EmptyState
           title="No actions to show"
@@ -165,7 +176,9 @@ export function ActionFeed({
         />
       ) : null}
 
-      {!isLoading && !errorMessage ? (
+      {!isLoading && !errorMessage && view === "table" && displayedActions.length > 0 ? <ActionTable actions={displayedActions} /> : null}
+
+      {!isLoading && !errorMessage && view === "cards" ? (
         <div className="action-group-stack">
           <ActionSection
             title="Urgent"
@@ -183,6 +196,9 @@ export function ActionFeed({
             actions={visibleGroups.dead}
           />
         </div>
+      ) : null}
+      {!isLoading && !errorMessage && visibleActions.length > limit ? (
+        <button type="button" className="button button-secondary" onClick={() => setLimit((previous) => previous + 30)}>Show next {Math.min(30, visibleActions.length - limit)} actions</button>
       ) : null}
     </div>
   );

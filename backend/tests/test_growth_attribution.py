@@ -42,8 +42,13 @@ class GrowthAttributionTests(unittest.TestCase):
 
     def test_same_batch_request_links_account_and_attributes_connection_once(self):
         with self.factory() as db:
-            shop_id = self.account(db)
             self.lead(db)
+            # SQLite defaults have second precision. Establish a real request-
+            # before-connection sequence rather than relying on call ordering.
+            lead = db.scalar(select(InventoryRiskSnapshotLead))
+            lead.created_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+            db.commit()
+            shop_id = self.account(db)
             experiment = Experiment(key="fixture-organic", specification={"channel": "organic_search"},
                 started_at=(datetime.now(timezone.utc) - timedelta(days=1)).timestamp(),
                 stop_at=(datetime.now(timezone.utc) + timedelta(days=1)).timestamp())

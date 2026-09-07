@@ -3,7 +3,7 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { AskSkubaseChat } from "@/components/ask-skubase-chat";
 import { useAuth } from "@/components/auth-guard";
@@ -16,6 +16,7 @@ import {
   type PlanTierKey,
 } from "@/lib/plans";
 import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
+import styles from "./app-shell.module.css";
 
 type NavItem = {
   href: string;
@@ -185,6 +186,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [embedded, setEmbedded] = useState(false);
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationToggle = useRef<HTMLButtonElement>(null);
   const [shopifyDomain, setShopifyDomain] = useState<string | null>(null);
   const [storeLoaded, setStoreLoaded] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -348,8 +351,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       : "No active plan";
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell ${styles.shell}`}>
+      <aside className="sidebar" data-navigation-open={navigationOpen}>
+        <div className={styles.mobileHeader}>
         <div className="sidebar-brand">
           <span className="brand-mark">sb</span>
           <div>
@@ -357,8 +361,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="brand-copy">Forecast - Replenish - Recover</p>
           </div>
         </div>
+        <button type="button" ref={navigationToggle} className={styles.navigationToggle} aria-expanded={navigationOpen}
+          aria-controls="workspace-navigation" onClick={() => setNavigationOpen(!navigationOpen)}>
+          {navigationOpen ? "Close menu" : "Menu"}
+        </button>
+        </div>
 
-        <nav className="sidebar-nav" aria-label="Primary">
+        <nav id="workspace-navigation" className="sidebar-nav" aria-label="Primary">
           {groupedNav.map((group) => (
             <div key={group.section} className="sidebar-nav-group">
               <p className="sidebar-nav-heading">{group.section}</p>
@@ -374,6 +383,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={() => { if (navigationOpen) navigationToggle.current?.focus(); setNavigationOpen(false); }}
+                    aria-current={isActive ? "page" : undefined}
                     className={`nav-link${isActive ? " nav-link-active" : ""}${
                       isLocked ? " nav-link-locked" : ""
                     }`}
@@ -414,10 +425,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="demo-banner-mark" aria-hidden>o</span>
             <span>
               <strong>This is sample data - not your store.</strong>{" "}
-              <Link href="/login" className="demo-banner-link">
-                Start your free 14-day trial
+              <Link href="/tools/inventory-health-check" className="demo-banner-link">
+                Check your own inventory for free
               </Link>{" "}
-              to connect Shopify and see your actual stockouts, reorder queue, and dead stock. No credit card required.
+              with a CSV summary, no installation required. Skubase is in Shopify review and is not yet listed in the App Store.
             </span>
           </div>
         ) : hasRealData === false ? (

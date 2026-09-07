@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
+import { getStripePortalAction } from "@/lib/billing-view";
 import { PRICING_TIERS } from "@/lib/plans";
 import {
   authenticatedFetch,
@@ -179,7 +180,9 @@ export default function BillingPage() {
 
   const isActive = sub.subscription_status === "active" || sub.subscription_status === "trialing";
   const isShopifyBilling = sub.is_shopify_installed;
-  const showTrialCard = !isShopifyBilling && user.in_trial && !isActive && trialDaysLeft !== null;
+  const stripePortalAction = getStripePortalAction(sub);
+  const needsStripePayment = stripePortalAction === "update_payment";
+  const showTrialCard = !isShopifyBilling && !needsStripePayment && user.in_trial && !isActive && trialDaysLeft !== null;
   const includedFeaturesByTier = PRICING_TIERS.map((tier) => ({
     ...tier,
     includedFeatures: tier.features.filter((feature) => feature.included).slice(0, 6),
@@ -220,7 +223,9 @@ export default function BillingPage() {
                 {isShopifyBilling ? "Shopify billing" : "Current plan"}
               </p>
               <h2 className="section-title">
-                {isActive
+                {needsStripePayment
+                  ? "Payment needs attention"
+                  : isActive
                   ? sub.plan_name
                   : isShopifyBilling
                   ? "Choose a Shopify plan"
@@ -231,10 +236,10 @@ export default function BillingPage() {
             </div>
             <span
               className={`status-badge ${
-                isActive ? "status-succeeded" : user.in_trial && !isShopifyBilling ? "status-succeeded" : "status-failed"
+                isActive ? "status-succeeded" : user.in_trial && !isShopifyBilling && !needsStripePayment ? "status-succeeded" : "status-failed"
               }`}
             >
-              {isActive ? sub.subscription_status : user.in_trial && !isShopifyBilling ? "trial" : sub.subscription_status}
+              {needsStripePayment ? "Payment due" : isActive ? sub.subscription_status : user.in_trial && !isShopifyBilling ? "trial" : sub.subscription_status}
             </span>
           </div>
 
@@ -244,6 +249,8 @@ export default function BillingPage() {
                 ? isActive
                   ? `Your Shopify app subscription is active. Next billing date: ${formatDate(sub.current_period_end)}.`
                   : "Pick a plan below - you approve the charge on Shopify's confirmation page and it lands on your Shopify invoice."
+                : needsStripePayment
+                ? "Your existing Stripe subscription needs a payment update. Open the billing portal to review your invoice and update your payment method."
                 : isActive
                 ? `Your subscription is active. Next billing date: ${formatDate(sub.current_period_end)}.`
                 : user.in_trial
@@ -278,7 +285,7 @@ export default function BillingPage() {
                   Manage plan in Shopify
                 </button>
               ) : null
-            ) : isActive ? (
+            ) : stripePortalAction ? (
               <>
                 <button
                   type="button"
@@ -286,7 +293,7 @@ export default function BillingPage() {
                   onClick={openStripePortal}
                   disabled={portalLoading}
                 >
-                  {portalLoading ? "Opening..." : "Open billing portal"}
+                  {portalLoading ? "Opening..." : needsStripePayment ? "Update payment details" : "Open billing portal"}
                 </button>
                 {portalFallbackUrl ? (
                   <a

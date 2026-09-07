@@ -42,7 +42,8 @@ export function ReorderCalculator() {
       <p style={{ fontSize: 30, margin: "0 0 12px" }}><strong>{result.point.toLocaleString()} units</strong> <span style={{ fontSize: 14 }}>reorder point</span></p>
       <p>Inventory position: <strong>{result.position.toLocaleString()} units</strong>. {result.position <= result.point ? "At or below your trigger: review a reorder and the timing of incoming stock." : "Above your trigger: keep monitoring demand and supplier lead time."}</p>
       <p>Want to check more than one SKU?</p>
-      <Link className="button button-primary" href="/inventory-risk-snapshot?utm_source=free_tool&utm_medium=organic&utm_campaign=reorder-calculator-v1">Request a free inventory health check</Link>
+      <Link className="button button-primary" href="/tools/inventory-health-check?utm_source=free_tool&utm_medium=organic&utm_campaign=reorder-calculator-v1">Check a SKU summary</Link>
+      <p><Link href="/inventory-risk-snapshot?utm_source=free_tool&utm_medium=organic&utm_campaign=reorder-calculator-v1">Or request a free review with Skubase</Link>.</p>
     </div>}
   </section>;
 }

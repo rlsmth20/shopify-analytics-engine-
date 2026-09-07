@@ -10,6 +10,13 @@ from .store import digest, enqueue, insert_once, record
 from .skills import active_skill
 
 APP_REVIEW_DISCLOSURE = "Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store."
+HEALTH_CHECK_URL = "https://skubase.io/tools/inventory-health-check"
+SERVICE_TEMPLATE_REVISION = "browser-health-check-v1"
+HEALTH_CHECK_SOURCES = [
+    "frontend/app/tools/inventory-health-check/page.tsx",
+    "frontend/lib/inventory-health-check.ts",
+    "frontend/components/inventory-health-checker.tsx",
+]
 
 
 def service_body(answer):
@@ -20,18 +27,27 @@ def service_body(answer):
 SERVICE_KNOWLEDGE = {
     "connection": {
         "patterns": (r"(?:help|how|where|cannot|can't|unable).{0,70}(?:connect|install|log in|login)",),
-        "answer": "To continue your requested inventory analysis, sign in at https://skubase.io/login, then open https://skubase.io/store-sync and choose Connect Shopify. Review Shopify's permission screen and return to Store sync to start an import. If a step fails, reply with the step and error text, without passwords or access tokens.",
-        "sources": ["frontend/app/(app-shell)/store-sync/page.tsx", "backend/app/api/routes/shopify_ingestion.py"],
+        "answer": f"You can start your requested inventory check without a Shopify installation or account at {HEALTH_CHECK_URL}. "
+                  "Add a SKU summary of on-hand units and units sold over your chosen sales period. "
+                  "The check runs in your browser; your SKU entries are not sent to Skubase. "
+                  "If you need help with an existing Skubase account or connection, reply with the step and error text, without passwords or access tokens.",
+        "sources": HEALTH_CHECK_SOURCES,
     },
     "read_only": {
         "patterns": (r"(?:will|can|does|do).{0,70}(?:change|edit|write|modify).{0,40}(?:inventory|store|stock)", r"read.only"),
-        "answer": "The connected-store inventory analysis reads the store data needed for analysis. It does not automatically place supplier orders or change Shopify inventory quantities. Review the permission screen when connecting, and keep purchasing decisions under your control.",
-        "sources": ["backend/app/services/shopify_oauth.py", "backend/app/services/shopify_sync.py"],
+        "answer": f"For your requested check, the free tool at {HEALTH_CHECK_URL} processes a SKU summary in your browser. "
+                  "It does not connect to your store, send your SKU entries to Skubase, change Shopify inventory or place supplier orders. "
+                  "Its stock-cover estimates and reorder triggers depend on the sales period and assumptions you enter. "
+                  "A trigger is not an order quantity; check incoming orders and current demand before purchasing. Reply if you need help interpreting a result.",
+        "sources": HEALTH_CHECK_SOURCES,
     },
     "data_safety": {
         "patterns": (r"(?:send|share|email).{0,50}(?:password|token|customer data)",),
-        "answer": "Please do not email passwords, access tokens or customer records. Use the Shopify connection flow at https://skubase.io/store-sync for your requested analysis. If you already sent a credential, revoke it in the issuing service; Skubase cannot revoke it for you.",
-        "sources": ["frontend/app/privacy/page.tsx"],
+        "answer": f"Please do not email passwords, access tokens or customer records. For your requested analysis, use {HEALTH_CHECK_URL} "
+                  "with a SKU summary of stock and units sold; no customer details are needed. "
+                  "Your SKU entries stay in your browser and are not sent to Skubase. "
+                  "If you already sent a credential, revoke it in the issuing service; Skubase cannot revoke it for you. Reply if you need help preparing the summary.",
+        "sources": [*HEALTH_CHECK_SOURCES, "frontend/app/privacy/page.tsx"],
     },
 }
 
@@ -45,7 +61,8 @@ def current_request(db, contact_id):
 def permit(db, message, request_event, scope, sources):
     record(db, "service-permit:" + message.id, "SERVICE_RESPONSE_AUTHORIZED", message.id,
            {"request_evidence_id": request_event.id, "contact_id": message.contact_id, "scope": scope,
-            "body_hash": digest([message.subject, message.body]), "knowledge_sources": sources},
+            "body_hash": digest([message.subject, message.body]), "knowledge_sources": sources,
+            "template_revision": SERVICE_TEMPLATE_REVISION},
            source="service_fulfillment_policy", epistemic="FACT")
 
 
@@ -68,19 +85,23 @@ def draft_requested_check(db, contact, experiment, variant):
     request = current_request(db, contact.id)
     if not request:
         raise GrowthError("No recent inventory-health-check request; no unsolicited Resend outreach")
-    focus = "cash tied up in slow-moving inventory" if variant == "cash" else "stockout risks and reorder priorities"
+    focus = ("stock above your chosen coverage target and its cost when unit costs are provided"
+             if variant == "cash" else "possible stockout risks and reorder triggers")
     message, fresh = insert_once(db, Message, key="first-contact:" + contact.id, contact_id=contact.id,
         experiment_id=experiment.id, direction="out", variant=variant, subject="Next step for your requested inventory check",
-        body=service_body("Hi,\n\nThis is Skubase, following up on the inventory check you requested. "
-              f"For that check, we can review {focus} using the data you choose to connect. "
-              "Sign in at https://skubase.io/login, then connect your store and start an import at https://skubase.io/store-sync. "
-              "The initial analysis is read-only. Please do not email passwords, access tokens or customer records.\n\n"
-              "Reply if you need help with the connection step."))
+        body=service_body("Hi,\n\nThis is Skubase, following up on the free inventory check you requested.\n\n"
+              f"Start at {HEALTH_CHECK_URL} — no account or Shopify installation needed. "
+              "Add a SKU summary of on-hand units and units sold over a stated period; unit cost, supplier lead time and safety stock are optional. "
+              "The check runs in your browser. Your SKU entries are not sent to Skubase.\n\n"
+              f"It highlights {focus}. Results depend on the sales period and assumptions you enter; a reorder trigger is not an order quantity.\n\n"
+              "If you want help interpreting 5–10 products, reply with the inventory question you want to solve. "
+              "Please do not email passwords, access tokens or customer records."))
     if fresh:
         message.skill_version = active_skill(db, "requested_service").version
-        permit(db, message, request, "health_check", ["backend/app/api/routes/inventory_risk_snapshot.py"])
+        permit(db, message, request, "health_check", ["backend/app/api/routes/inventory_risk_snapshot.py", *HEALTH_CHECK_SOURCES])
         record(db, "draft:" + message.id, "EMAIL_DRAFTED", contact.id,
-               {"message_id": message.id, "experiment_id": experiment.id, "variant": variant, "purpose": "requested_service"})
+               {"message_id": message.id, "experiment_id": experiment.id, "variant": variant, "purpose": "requested_service",
+                "template_revision": SERVICE_TEMPLATE_REVISION})
     return message
 
 
@@ -110,6 +131,7 @@ def answer_request(db, contact, event, text, parent=None):
         message.skill_version = active_skill(db, "requested_service").version
         permit(db, message, event, key, spec["sources"])
         record(db, "service-reply:" + message.id, "SERVICE_REPLY_DRAFTED", contact.id,
-               {"message_id": message.id, "request_evidence_id": event.id, "topic": key})
+               {"message_id": message.id, "request_evidence_id": event.id, "topic": key,
+                "template_revision": SERVICE_TEMPLATE_REVISION})
         enqueue(db, "send:" + message.id, "send", {"message_id": message.id}, priority=95)
     return message

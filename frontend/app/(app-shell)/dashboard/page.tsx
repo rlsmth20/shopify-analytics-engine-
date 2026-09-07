@@ -12,13 +12,15 @@ import {
   DivergingBarChart,
   DonutChart,
   HorizontalBarChart,
-  Sparkline,
 } from "@/components/charts";
 import {
   currency,
   fetchDashboard,
   type DashboardResponse,
+  type DashboardSeriesPoint,
 } from "@/lib/api-v2";
+import { dashboardKpiNote, formatDashboardMoney, formatForecastVariance, labelRevenueDays } from "@/lib/dashboard-presentation";
+import styles from "./dashboard.module.css";
 
 const ONBOARDING_STORAGE_KEY = "skubase_stocky_migration_steps";
 const ONBOARDING_DISMISSED_KEY = "skubase_dashboard_onboarding_dismissed";
@@ -172,8 +174,10 @@ export default function DashboardPage() {
     );
   }
 
+  const revenueDays = labelRevenueDays(data.revenue_trend_30d, data.generated_at);
+
   return (
-    <div className="dashboard">
+    <div className={`dashboard ${styles.dashboard}`}>
       <section className="dashboard-kpis">
         {data.kpis.map((kpi) => (
           <div key={kpi.label} className={`kpi-card kpi-tone-${kpi.tone}`}>
@@ -184,6 +188,8 @@ export default function DashboardPage() {
                   ? currency(kpi.value)
                   : kpi.unit === "percent"
                   ? `${kpi.value.toFixed(1)}%`
+                  : kpi.unit === "days"
+                  ? `${kpi.value.toLocaleString()} days`
                   : kpi.value.toLocaleString()}
               </p>
               {kpi.delta_pct !== null ? (
@@ -203,11 +209,7 @@ export default function DashboardPage() {
                 </span>
               ) : null}
             </div>
-            <Sparkline
-              values={sparkValues(kpi.label, data)}
-              width={140}
-              height={36}
-            />
+            <p className={styles.kpiNote}>{dashboardKpiNote(kpi.label)}</p>
           </div>
         ))}
       </section>
@@ -294,14 +296,18 @@ export default function DashboardPage() {
         <ChartPanel
           className="col-8"
           title="Revenue · last 30 days"
-          subtitle="Daily revenue across the full catalog"
+          subtitle="Recorded daily order revenue · USD · completed UTC days"
           accent="primary"
         >
-          <AreaLineChart
-            points={data.revenue_trend_30d}
-            height={240}
-            yFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
-          />
+          <div className={styles.revenuePlot}>
+            <AreaLineChart
+              points={revenueDays}
+              height={240}
+              yFormatter={formatDashboardMoney}
+              label="Daily order revenue in USD"
+            />
+          </div>
+          <SeriesTable points={revenueDays} caption="Recorded revenue by day (UTC)" nameLabel="Date" valueLabel="Revenue (USD)" formatter={formatDashboardMoney} />
         </ChartPanel>
 
         <ChartPanel
@@ -314,40 +320,42 @@ export default function DashboardPage() {
             centerLabel="SKUs"
             centerValue={data.stock_health_breakdown
               .reduce((s, p) => s + p.value, 0)
-              .toString()}
+              .toLocaleString()}
           />
         </ChartPanel>
 
         <ChartPanel
           className="col-8"
-          title="Top revenue movers"
-          subtitle="30-day revenue contribution by SKU"
+          title="Best sellers · revenue contribution"
+          subtitle="Top 8 by units sold · 30-day sales at current prices (USD)"
           accent="success"
         >
           <HorizontalBarChart
             points={data.top_movers.slice(0, 8)}
             valueFormatter={currency}
           />
+          <SeriesTable points={data.top_movers.slice(0, 8)} caption="Revenue from best-selling SKUs" nameLabel="Product" valueLabel="Revenue (USD)" formatter={formatDashboardMoney} />
         </ChartPanel>
 
         <ChartPanel
           className="col-4"
           title="ABC distribution"
-          subtitle="Revenue concentration across the catalog"
+          subtitle="Number of SKUs in each revenue-based ABC class"
+          footer="A, B and C group products by revenue contribution. The counts show catalog mix, not each class’s share of revenue."
         >
           <DonutChart
             points={data.abc_distribution}
             centerLabel="SKUs"
             centerValue={data.abc_distribution
               .reduce((s, p) => s + p.value, 0)
-              .toString()}
+              .toLocaleString()}
           />
         </ChartPanel>
 
         <ChartPanel
           className="col-8"
           title="Cash parked by supplier"
-          subtitle="Overstock + dead stock at cost, top 6 suppliers"
+          subtitle="Optimize + dead-stock capital at cost · top 6 suppliers · USD"
           accent="warning"
         >
           <HorizontalBarChart
@@ -355,29 +363,34 @@ export default function DashboardPage() {
             valueFormatter={currency}
             barClassName="chart-hbar chart-hbar-warning"
           />
+          <SeriesTable points={data.cash_at_risk_by_vendor} caption="Capital requiring review by supplier" nameLabel="Supplier" valueLabel="Capital (USD)" formatter={formatDashboardMoney} />
         </ChartPanel>
 
         <ChartPanel
           className="col-4"
           title="Alert activity"
-          subtitle="Events fired by severity"
+          subtitle="Severity of the most recent 500 alert events"
           accent="danger"
         >
-          <DonutChart
+          {data.alert_counts_by_severity.some((point) => point.value > 0) ? <DonutChart
             points={data.alert_counts_by_severity}
             centerLabel="Events"
             centerValue={data.alert_counts_by_severity
               .reduce((s, p) => s + p.value, 0)
-              .toString()}
-          />
+              .toLocaleString()}
+          /> : <p className={styles.chartEmpty}>No alert events recorded. <Link href="/alerts">Review your alert rules</Link> to make sure important inventory changes reach you.</p>}
         </ChartPanel>
 
         <ChartPanel
           className="col-6"
-          title="Forecast accuracy · last 7 days"
-          subtitle="Actual vs predicted, % variance"
+          title="Forecast variance · last 7 days"
+          subtitle="Actual units sold compared with predicted units · up to 5 best sellers"
+          footer="Positive means demand exceeded the forecast; negative means it fell short. Zero means actual and forecast matched. This is a variance check, not an overall accuracy score."
         >
-          <DivergingBarChart points={data.forecast_vs_actual_7d} />
+          {data.forecast_vs_actual_7d.length > 0
+            ? <DivergingBarChart points={data.forecast_vs_actual_7d} valueFormatter={formatForecastVariance} />
+            : <p className={styles.chartEmpty}>No comparable forecasts yet. Percentage variance needs a non-zero forecast to compare with recorded sales.</p>}
+          <SeriesTable points={data.forecast_vs_actual_7d} caption="Actual minus predicted units, as a percentage of predicted units" nameLabel="Product" valueLabel="Variance" formatter={formatForecastVariance} />
         </ChartPanel>
 
         <ChartPanel
@@ -429,14 +442,35 @@ function parseCompletedOnboardingSteps(stored: string | null): string[] {
   return [];
 }
 
-function sparkValues(label: string, data: DashboardResponse): number[] {
-  if (label.toLowerCase().includes("revenue")) {
-    return data.revenue_trend_30d.map((p) => p.value);
-  }
-  if (label.toLowerCase().includes("movers")) {
-    return data.top_movers.map((p) => p.value);
-  }
-  return data.revenue_trend_30d.slice(-14).map((p) => p.value);
+function SeriesTable({ points, caption, nameLabel, valueLabel, formatter }: {
+  points: DashboardSeriesPoint[];
+  caption: string;
+  nameLabel: string;
+  valueLabel: string;
+  formatter: (value: number) => string;
+}) {
+  if (points.length === 0) return null;
+  return (
+    <details className={styles.dataDetails}>
+      <summary>View exact values</summary>
+      <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={caption}>
+        <table className={styles.dataTable}>
+          <caption>{caption}</caption>
+          <thead>
+            <tr><th scope="col">{nameLabel}</th><th scope="col">{valueLabel}</th></tr>
+          </thead>
+          <tbody>
+            {points.map((point, index) => (
+              <tr key={`${point.label}-${index}`}>
+                <th scope="row">{point.label}</th>
+                <td>{formatter(point.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
 }
 
 function TodayRow({

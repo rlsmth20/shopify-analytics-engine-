@@ -1,0 +1,58 @@
+.dashboard :global(.chart-panel) { min-width: 0; }
+.dashboard :global(.chart-panel-head) { display: block; }
+.dashboard :global(.chart-panel-title) { line-height: 1.4; }
+.dashboard :global(.chart-panel-subtitle) { line-height: 1.5; }
+.dashboard :global(.kpi-value) { font-variant-numeric: tabular-nums; }
+.dashboard :global(.chart-area) { display: block; width: 100%; height: 240px; }
+.dashboard :global(.chart-tick),
+.dashboard :global(.chart-tick-x) { fill: var(--muted-strong); font-size: 12px; }
+.dashboard :global(.chart-readout) { flex-wrap: wrap; line-height: 1.5; text-align: center; }
+.dashboard :global(.hbar-wrapper) { display: grid; gap: 16px; }
+.dashboard :global(.hbar-row) { grid-template-columns: minmax(0, 1fr) minmax(80px, 1fr) minmax(80px, auto); }
+.dashboard :global(.hbar-label),
+.dashboard :global(.diverging-label) { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+.dashboard :global(.hbar-track .chart-hbar) { height: 100%; background: var(--chart-color-1); border-radius: inherit; }
+.dashboard :global(.hbar-track .chart-hbar-warning) { background: var(--chart-color-4); }
+.dashboard :global(.hbar-value) { white-space: nowrap; }
+.dashboard :global(.donut-wrapper) { grid-template-columns: 1fr; gap: 18px; justify-items: center; }
+.dashboard :global(.donut-wrapper > svg),
+.dashboard :global(.donut-center) { grid-area: 1 / 1; }
+.dashboard :global(.donut-center) { text-align: center; }
+.dashboard :global(.donut-value) { color: var(--ink); font-size: 1.65rem; font-variant-numeric: tabular-nums; }
+.dashboard :global(.donut-label) { color: var(--muted-strong); font-size: 0.8rem; font-weight: 500; }
+.dashboard :global(.donut-bg) { stroke: var(--surface-muted); }
+.dashboard :global(.donut-legend) { width: 100%; }
+.dashboard :global(.donut-legend-swatch) { flex-shrink: 0; }
+.dashboard :global(.donut-legend-value) { margin-left: auto; }
+.dashboard :global(.diverging-row) { grid-template-columns: minmax(0, 1fr) minmax(80px, 1fr) 75px; }
+.dashboard :global(.diverging-track) { position: relative; height: 14px; background: var(--surface-muted); border-radius: 4px; }
+.dashboard :global(.diverging-axis) { position: absolute; left: 50%; top: -3px; height: 20px; border-left: 1px solid var(--muted); }
+.dashboard :global(.diverging-bar) { position: absolute; height: 100%; border-radius: 3px; }
+.dashboard :global(.diverging-bar.pos) { background: var(--chart-color-1); }
+.dashboard :global(.diverging-bar.neg) { background: var(--chart-color-4); }
+.dashboard :global(.diverging-value) { white-space: nowrap; }
+.kpiNote { color: var(--muted-strong); font-size: 0.8rem; line-height: 1.5; margin-top: auto; }
+.dataDetails { margin-top: 18px; border-top: 1px solid var(--line); }
+.dataDetails > summary { cursor: pointer; padding: 12px 0; color: var(--ink-soft); font-size: 0.85rem; font-weight: 600; }
+.dataDetails > summary:focus-visible { outline: 2px solid var(--chart-color-1); outline-offset: 3px; }
+.tableScroll { overflow: auto; max-height: 280px; border: 1px solid var(--line); border-radius: 10px; }
+.tableScroll:focus-visible { outline: 2px solid var(--chart-color-1); outline-offset: 3px; }
+.dataTable { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.dataTable caption { text-align: left; color: var(--muted-strong); padding: 10px 12px; }
+.dataTable th, .dataTable td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; line-height: 1.45; }
+.dataTable thead th { position: sticky; top: 0; background: var(--surface-muted); font-weight: 600; }
+.dataTable tbody th { font-weight: 500; overflow-wrap: anywhere; }
+.dataTable tr > :last-child { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dataTable tbody tr:last-child > * { border-bottom: 0; }
+.chartEmpty { border: 1px dashed var(--line-strong); border-radius: 14px; padding: 24px; color: var(--muted-strong); line-height: 1.6; }
+@media (max-width: 1000px) {
+  .dashboard :global(.dashboard-grid > .chart-panel) { grid-column: span 12; }
+}
+@media (max-width: 560px) {
+  .dashboard :global(.chart-panel) { padding: 18px 14px; }
+  .dashboard :global(.hbar-row), .dashboard :global(.diverging-row) { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; }
+  .dashboard :global(.hbar-track), .dashboard :global(.diverging-track) { grid-column: 1 / -1; grid-row: 2; }
+  .dashboard :global(.hbar-value), .dashboard :global(.diverging-value) { grid-column: 2; grid-row: 1; }
+  .dashboard :global(.chart-area) { height: 210px; min-width: 430px; }
+  .revenuePlot { overflow-x: auto; padding-bottom: 8px; }
+}

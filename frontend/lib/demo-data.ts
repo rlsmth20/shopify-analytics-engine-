@@ -127,12 +127,12 @@ function erf(x: number): number {
 function buildRevenueTrend(): { label: string; value: number }[] {
   const base = 1580;
   const trend: { label: string; value: number }[] = [];
-  for (let i = 29; i >= 0; i--) {
+  for (let i = 30; i >= 1; i--) {
     const d = new Date();
-    d.setDate(d.getDate() - i);
+    d.setUTCDate(d.getUTCDate() - i);
     const label = d.toISOString().slice(0, 10);
     // weekend bump + some noise
-    const dow = d.getDay();
+    const dow = d.getUTCDay();
     const weekendMult = dow === 0 || dow === 6 ? 1.35 : 1.0;
     const noise = 0.85 + Math.abs(Math.sin(i * 7.3)) * 0.35;
     trend.push({ label, value: Math.round(base * weekendMult * noise) });
@@ -178,13 +178,11 @@ export const DEMO_DASHBOARD = {
     { label: "BlueLine Imports", value: 560 },
   ],
   forecast_vs_actual_7d: [
-    { label: "Mon", value: 4.2 },
-    { label: "Tue", value: -2.1 },
-    { label: "Wed", value: 7.8 },
-    { label: "Thu", value: -1.4 },
-    { label: "Fri", value: 3.3 },
-    { label: "Sat", value: -5.6 },
-    { label: "Sun", value: 2.0 },
+    { label: "Premium Linen Shirt", value: 4.2 },
+    { label: "Organic Cotton Hoodie", value: -2.1 },
+    { label: "Slim Fit Chinos", value: 7.8 },
+    { label: "Wool Blend Sweater", value: -1.4 },
+    { label: "Classic Polo", value: 3.3 },
   ],
   alert_counts_by_severity: [
     { label: "Critical", value: 3 },

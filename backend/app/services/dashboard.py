@@ -152,7 +152,7 @@ def build_dashboard(
         reverse=True,
     )[:6]
 
-    # Forecast vs actual 7d (simple: forecast 30d then compare days)
+    # Backtest the held-out week against that same seven-day forecast horizon.
     forecast_vs_actual: list[DashboardSeriesPoint] = []
     for sku in top_movers[:5]:
         history = daily_history_fn(sku.sku_id, 90)
@@ -165,11 +165,18 @@ def build_dashboard(
             ),
             horizon_days=7,
         )
-        predicted = forecast.projected_30_day_demand / 30 * 7
+        # A prorated 30-day total includes later trend/seasonality and is not
+        # the prediction for the held-out week, even when horizon_days is 7.
+        predicted = sum(point.expected_units for point in forecast.points)
+        if predicted <= 0:
+            # Percentage variance is undefined when the forecast is zero.
+            # Preserve "no comparison" instead of inventing perfect accuracy
+            # (zero actuals) or dividing by an arbitrary tiny denominator.
+            continue
         actual = sum(history[-7:])
         forecast_vs_actual.append(
             DashboardSeriesPoint(
-                label=sku.name, value=round((actual - predicted) / max(predicted, 0.01) * 100, 1)
+                label=sku.name, value=round((actual - predicted) / predicted * 100, 1)
             )
         )
 
