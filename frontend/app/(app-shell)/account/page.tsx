@@ -8,34 +8,56 @@ import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
 import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
+import { accountPlanConfirmed, readAccountConnection, type AccountConnection } from "@/lib/account-data";
 
 const API_BASE = APP_API_BASE_URL;
-
-type Connection = {
-  connected: boolean;
-  shopify_domain: string | null;
-  last_sync_at: string | null;
-};
 
 export default function AccountPage() {
   const { user, logout } = useAuth();
   const [sub, setSub] = useState<Entitlements | null>(null);
-  const [conn, setConn] = useState<Connection | null>(null);
+  const [conn, setConn] = useState<AccountConnection | null>(null);
   const [embedded, setEmbedded] = useState(false);
+  const [planLoading, setPlanLoading] = useState(true);
+  const [connectionLoading, setConnectionLoading] = useState(true);
+  const [planError, setPlanError] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
+  const [planRetry, setPlanRetry] = useState(0);
+  const [connectionRetry, setConnectionRetry] = useState(0);
 
   useEffect(() => {
     setEmbedded(isEmbeddedShopifyContext());
   }, []);
 
   useEffect(() => {
-    void fetchEntitlements()
-      .then((d) => setSub(d))
-      .catch(() => setSub(null));
-    void authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => setConn(d as Connection))
-      .catch(() => setConn(null));
-  }, []);
+    if (user.id === 0) return;
+    let active = true;
+    setPlanLoading(true);
+    setPlanError(false);
+    void fetchEntitlements({ fresh: planRetry > 0 })
+      .then(data => {
+        if (!accountPlanConfirmed(data)) throw new Error("Plan status unavailable");
+        if (active) setSub(data);
+      })
+      .catch(() => { if (active) { setPlanError(true); setSub(null); } })
+      .finally(() => { if (active) setPlanLoading(false); });
+    return () => { active = false; };
+  }, [user.id, planRetry]);
+
+  useEffect(() => {
+    if (user.id === 0) return;
+    const controller = new AbortController();
+    setConnectionLoading(true);
+    setConnectionError(false);
+    void authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, { credentials: "include", signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Connection status unavailable");
+        return readAccountConnection(await response.json());
+      })
+      .then(data => { if (!controller.signal.aborted) setConn(data); })
+      .catch(() => { if (!controller.signal.aborted) { setConnectionError(true); setConn(null); } })
+      .finally(() => { if (!controller.signal.aborted) setConnectionLoading(false); });
+    return () => controller.abort();
+  }, [user.id, connectionRetry]);
 
   return (
     <div className="page-stack">
@@ -81,7 +103,7 @@ export default function AccountPage() {
                 void logout();
               }}
             >
-              Sign out of all sessions
+              Sign out
             </button>
           </div>
         )}
@@ -90,6 +112,9 @@ export default function AccountPage() {
       <div className="content-grid content-grid-2-1">
         <SectionCard>
           {(() => {
+            if (user.id === 0) return <><p className="section-eyebrow">Plan</p><h2 className="section-title section-title-small">Sample workspace</h2><p className="section-copy">Sample data lets you explore the product. Sign in to view your actual plan.</p><Link className="button button-ghost" href="/login">Sign in</Link></>;
+            if (planLoading) return <><p className="section-eyebrow">Plan</p><p className="section-copy" role="status">Checking your plan…</p></>;
+            if (planError || !sub) return <><p className="section-eyebrow">Plan</p><h2 className="section-title section-title-small">Plan status unavailable</h2><p className="section-copy">We could not confirm your plan. This does not mean your subscription has ended.</p><div className="button-row"><button type="button" className="button button-ghost" onClick={() => setPlanRetry(value => value + 1)}>Retry plan status</button><Link className="button button-ghost" href="/billing">Open billing</Link></div></>;
             const isActive = sub?.subscription_status === "active" || sub?.subscription_status === "trialing";
             const isShopifyBilling = Boolean(sub?.is_shopify_installed);
             const trialDaysLeft: number | null = (() => {
@@ -122,7 +147,7 @@ export default function AccountPage() {
                   {isActive
                     ? isShopifyBilling
                       ? "Plan details and app subscription charges are managed through Shopify."
-                      : "Plan details, invoice history, and payment method are managed in the Stripe Customer Portal."
+                      : sub.billing_provider === "stripe" ? "Plan details, invoice history, and payment method are managed in the Stripe Customer Portal." : "View your trial and available plans on the billing page."
                     : user.in_trial && !isShopifyBilling
                     ? "You're on a free trial. Subscribe on the billing page before your trial ends."
                     : "No active subscription. Pick a plan to keep your access."}
@@ -142,25 +167,26 @@ export default function AccountPage() {
             <div>
               <p className="section-eyebrow">Shopify connection</p>
               <h2 className="section-title section-title-small">
-                {conn?.connected ? "Connected" : "Not connected"}
+                {user.id === 0 ? "Sample workspace" : connectionLoading ? "Checking connection…" : connectionError || !conn ? "Connection status unavailable" : conn.connected ? "Connected" : "Not connected"}
               </h2>
             </div>
             <span
               className={`status-badge ${
-                conn?.connected ? "status-succeeded" : "status-failed"
+                conn?.connected && !connectionError && !connectionLoading ? "status-succeeded" : ""
               }`}
             >
-              {conn?.connected ? "Live" : "Off"}
+              {user.id === 0 ? "Demo" : connectionLoading ? "Checking" : connectionError || !conn ? "Unknown" : conn.connected ? "Connected" : "Not linked"}
             </span>
           </div>
           <p className="section-copy">
-            {conn?.connected
+            {user.id === 0 ? "Sample inventory does not require a Shopify connection." : connectionLoading ? "Loading your saved Shopify connection." : connectionError || !conn ? "We could not confirm the store connection. Try again before reconnecting or changing settings." : conn.connected
               ? `Connected to ${conn.shopify_domain}. Manage on the Store Sync page.`
-              : "Connect your Shopify store to pull live products and orders."}
+              : "Open Connect & import for Shopify access guidance or CSV import. Skubase is in Shopify review and is not listed in the App Store yet."}
           </p>
           <div className="button-row">
+            {connectionError ? <button type="button" className="button button-ghost" onClick={() => setConnectionRetry(value => value + 1)}>Retry connection status</button> : null}
             <Link href="/store-sync" className="button button-ghost">
-              Manage Shopify
+              Connect & import
             </Link>
           </div>
         </SectionCard>

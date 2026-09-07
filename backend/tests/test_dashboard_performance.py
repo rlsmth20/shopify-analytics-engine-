@@ -34,6 +34,11 @@ class CountingCatalog(list):
 
 
 class DashboardPerformanceTests(unittest.TestCase):
+    def setUp(self):
+        history_patch = patch.object(dashboard, "list_recent_events", return_value=[])
+        history_patch.start()
+        self.addCleanup(history_patch.stop)
+
     def test_vendor_cash_totals_preserve_first_duplicate_match_and_unknown_vendor(self):
         skus = [sku(1, vendor="First"), sku(1, vendor="Second"), sku(2, vendor="Other")]
         actions = [SimpleNamespace(sku_id=sku_id, status="optimize", cash_tied_up=amount,

@@ -390,6 +390,37 @@ class NotificationChannelRecord(Base):
     )
 
 
+class AlertEventRecord(Base):
+    """Durable matched inventory incident; delivery acceptance is tracked separately."""
+    __tablename__ = "alert_events"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    rule_id: Mapped[str] = mapped_column(String(64), index=True)
+    subject_key: Mapped[str] = mapped_column(String(64), index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AlertDeliveryAttemptRecord(Base):
+    """One channel/destination per incident, with bounded retry and durable acceptance."""
+    __tablename__ = "alert_deliveries"
+    __table_args__ = (UniqueConstraint("event_id", "channel", "target_fingerprint", name="uq_alert_delivery_destination"),)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_id: Mapped[str] = mapped_column(ForeignKey("alert_events.id", ondelete="CASCADE"), index=True)
+    channel: Mapped[str] = mapped_column(String(16))
+    target_fingerprint: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_receipt: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    attempt_history: Mapped[list[dict]] = mapped_column(JSON, default=list)
+
+
 class WaitlistSignup(Base):
     """Captures merchant interest before real auth + Stripe billing ship.
 
@@ -637,6 +668,30 @@ class InventoryValueSnapshot(Base):
         server_default=func.now(),
         default=func.now(),
     )
+
+
+class ScheduledEmailDeliveryRecord(Base):
+    """One frozen report email per schedule/calendar period, claimed before sending."""
+
+    __tablename__ = "scheduled_email_deliveries"
+    __table_args__ = (UniqueConstraint("schedule_id", "period_key", name="uq_scheduled_email_period"),)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    schedule_id: Mapped[int] = mapped_column(ForeignKey("report_schedule_records.id", ondelete="CASCADE"), index=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    report_type: Mapped[str] = mapped_column(String(64))
+    period_key: Mapped[str] = mapped_column(String(32))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(24), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    first_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_receipt: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    attempt_history: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), index=True)
 
 
 class DigestSendLog(Base):

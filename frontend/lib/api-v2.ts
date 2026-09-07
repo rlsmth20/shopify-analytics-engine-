@@ -1,5 +1,6 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import type { FinancialProvenance, KnownValue } from "@/lib/financial-values";
+import type { ScheduledEmailDelivery } from "@/lib/email-schedule";
 // V2 API client for forecast, analytics, reorder, suppliers, bundles, transfers,
 // liquidation, alerts, and dashboard endpoints.
 
@@ -373,9 +374,9 @@ export type AuditLogEvent = {
   created_at: string;
 };
 
-export type ReportSchedule = {
+export type ReportSchedule = ScheduledEmailDelivery & {
   id: number;
-  report_type: "actions" | "stockout" | "dead-stock" | "reorder";
+  report_type: "actions" | "stockout" | "dead-stock" | "reorder" | "weekly_buy_list";
   cadence: "weekly" | "monthly";
   channel: "email";
   recipient_email: string;
@@ -417,6 +418,11 @@ export type AlertEvent = {
   fired_at: string;
   channels_sent: NotificationChannel[];
   delivered: boolean;
+  preview?: boolean;
+  delivery_status?: "preview" | "accepted" | "partial" | "failed" | "pending" | "skipped" | "unknown";
+  delivery_errors?: Record<string, string>;
+  resolved?: boolean;
+  uncertain_channels?: NotificationChannel[];
 };
 
 export type NotificationChannelConfig = {
@@ -424,6 +430,17 @@ export type NotificationChannelConfig = {
   enabled: boolean;
   target: string;
   verified: boolean;
+  available?: boolean;
+  availability_reason?: string;
+  configured?: boolean;
+  verification_label?: string;
+};
+
+export type NotificationChannelsResponse = {
+  channels: NotificationChannelConfig[];
+  scheduler_enabled?: boolean;
+  evaluation_interval_seconds?: number;
+  cooldown_seconds?: number;
 };
 
 export type DashboardKpi = KnownValue & {
@@ -702,7 +719,7 @@ export const fetchAlertEvents = (signal?: AbortSignal) =>
   get<{ events: AlertEvent[] }>("/alerts/events", signal);
 
 export const fetchChannels = (signal?: AbortSignal) =>
-  get<{ channels: NotificationChannelConfig[] }>("/alerts/channels", signal);
+  get<NotificationChannelsResponse>("/alerts/channels", signal);
 
 export const updateChannel = (
   payload: { channel: NotificationChannel; enabled: boolean; target: string },
@@ -712,7 +729,12 @@ export const updateChannel = (
 export const sendTestAlert = (
   payload: { channel: NotificationChannel; target: string },
   signal?: AbortSignal
-) => postJson<{ delivered: boolean; error: string }>("/alerts/test", payload, signal);
+) => postJson<{ delivered: boolean; error: string | null; status?: "accepted" | "failed" | "unknown" | "unavailable"; persisted_verified?: boolean }>("/alerts/test", payload, signal);
+
+export const retryUncertainAlert = (eventId: string, channel: NotificationChannel, signal?: AbortSignal) =>
+  postJson<{ queued: boolean }>(`/alerts/events/${encodeURIComponent(eventId)}/retry`, {
+    channel, acknowledge_possible_duplicate: true,
+  }, signal);
 
 export const evaluateAlertsNow = (dryRun: boolean, signal?: AbortSignal) =>
   postJson<{ events: AlertEvent[] }>(

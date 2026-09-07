@@ -15,7 +15,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.db.models import (
-    AuditLogRecord, Base, InventoryRiskSnapshotLead, MagicLinkToken,
+    AlertDeliveryAttemptRecord, AlertEventRecord, AuditLogRecord, Base, InventoryRiskSnapshotLead, MagicLinkToken,
     NotificationChannelRecord, OrderLineItem, Session as LoginSession, Shop,
     ShopifyConnection, Subscription, User, WaitlistSignup,
 )
@@ -55,12 +55,10 @@ def _shops(db: DbSession, domain: str) -> list[Shop]:
 
 
 def _clear_runtime_data(shop_ids: list[int]) -> None:
-    from app.services import alerts
     from app.services.shopify_billing import invalidate_shopify_billing_cache
 
     for shop_id in shop_ids:
         invalidate_shopify_billing_cache(shop_id)
-    alerts._EVENTS[:] = [entry for entry in alerts._EVENTS if entry[0] not in shop_ids]
 
 
 def _newer_install(conn: ShopifyConnection, triggered_at: datetime | None, *, redact: bool) -> bool:
@@ -123,6 +121,11 @@ def redact_shop(
                 db.execute(delete(MagicLinkToken).where(MagicLinkToken.email.in_([user.email for user in users])))
             # These legacy tables predate the shop_id foreign key convention.
             db.execute(delete(NotificationChannelRecord).where(NotificationChannelRecord.channel.like(f"{shop.id}:%")))
+            # Delivery attempts inherit tenant ownership from their event and
+            # intentionally have no duplicate shop_id. Delete explicitly so
+            # privacy does not depend on SQLite's optional FK enforcement.
+            db.execute(delete(AlertDeliveryAttemptRecord).where(AlertDeliveryAttemptRecord.event_id.in_(
+                select(AlertEventRecord.id).where(AlertEventRecord.shop_id == shop.id))))
             # Delete all tenant-owned tables in FK dependency order, including
             # settings, orders, reports, audit history, billing and auth users.
             # Explicit SQL works with both PostgreSQL and SQLite; it does not

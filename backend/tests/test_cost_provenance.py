@@ -39,6 +39,11 @@ def suggestions(product):
 
 
 class CostProvenanceTests(unittest.TestCase):
+    def setUp(self):
+        self.history_patch = patch.object(dashboard, "list_recent_events", return_value=[])
+        self.history_patch.start()
+        self.addCleanup(self.history_patch.stop)
+
     def test_legacy_metric_constructors_serialize_known_values_without_false_unknowns(self):
         examples = [DashboardKpi(label="Revenue", value=15, unit="currency", delta_pct=None, tone="positive"),
                     DashboardSeriesPoint(label="Healthy", value=0),

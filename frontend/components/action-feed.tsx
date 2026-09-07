@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DEFAULT_ACTION_FILTERS, filterInventoryActions, readActionFilters, type ActionFilters } from "@/lib/action-filters";
 
@@ -163,16 +164,18 @@ export function ActionFeed({
               : errorMessage
           }
           tone="error"
+          actions={<Link className="button button-ghost" href="/store-sync">Check connection & imports</Link>}
         />
       ) : null}
       {!isLoading && !errorMessage && visibleActions.length === 0 ? (
         <EmptyState
-          title="No actions to show"
+          title={actions.length === 0 ? "No inventory recommendations yet" : "No matching actions"}
           description={
             actions.length === 0
-              ? "The backend did not return any actionable inventory items."
-              : "No actions match the current filter."
+              ? "There are no recommendations in this queue. Check that current inventory, recent sales, and supplier lead times are available. An empty queue alone does not confirm that every product has healthy stock."
+              : "No actions match these filters. Clear them to see the full queue."
           }
+          actions={actions.length === 0 ? <><Link className="button button-primary" href="/store-sync">Check inventory & sales imports</Link><Link className="button button-ghost" href="/lead-time-settings">Review lead times</Link></> : <button className="button button-primary" type="button" onClick={() => updateFilters(DEFAULT_ACTION_FILTERS)}>Show all actions</button>}
         />
       ) : null}
 

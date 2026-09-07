@@ -36,12 +36,12 @@ ingestion is wired; every route is already public and typed end-to-end.
 - bundle / kit bottleneck analysis
 - multi-location transfer recommendations
 - dead-stock liquidation plans (markdown / bundle / wholesale / write-off)
-- alert rule engine with email, SMS, Slack, and webhook delivery
+- alert rule engine with email, Slack, and webhook delivery after channel setup; SMS remains planned
 - redesigned dashboard with chart library and "What should I do today?" rail
 
 ## Later Phases
 
-- persist alert rules and channel config (currently in-memory)
+- alert rules and channel configuration are persisted; September 2026 delivery work adds durable incident history, bounded retries, and test status
 - Shopify ingestion swap — feed real history into the forecasting/reorder pipeline
 - lead times informed by observed restock history, not merchant input alone
 - approval / send flow for draft purchase orders

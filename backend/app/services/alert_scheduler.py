@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.db.models import User
 from app.db.session import SessionLocal
-from app.services.alert_evaluation import evaluate_shop_alerts, user_has_active_access
+from app.services.alert_evaluation import evaluate_shop_alerts, user_has_active_access, has_enabled_delivery_route
 from app.services.inventory_value import capture_all_inventory_snapshots
 from app.services.scheduled_reports import run_scheduled_reports_once
 from app.services.weekly_digest import run_weekly_digests_once
@@ -50,12 +50,13 @@ def run_alert_evaluation_once(*, cooldown_seconds: int) -> int:
         for user in users:
             if user.shop_id in seen_shop_ids:
                 continue
-            seen_shop_ids.add(user.shop_id)
-
-            if not user_has_active_access(db, user):
-                continue
-
             try:
+                if not has_enabled_delivery_route(db, user.shop_id):
+                    seen_shop_ids.add(user.shop_id)
+                    continue
+                if not user_has_active_access(db, user):
+                    continue
+                seen_shop_ids.add(user.shop_id)
                 events = evaluate_shop_alerts(
                     db,
                     user,
@@ -63,6 +64,7 @@ def run_alert_evaluation_once(*, cooldown_seconds: int) -> int:
                     cooldown_seconds=cooldown_seconds,
                 )
             except Exception:
+                db.rollback()
                 logger.exception("Automatic alert evaluation failed for shop_id=%s", user.shop_id)
                 continue
 
@@ -77,12 +79,13 @@ def _run_daily_jobs() -> None:
     from datetime import datetime, timezone
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if _last_snapshot_date == today:
-        return
-    _last_snapshot_date = today
-    captured = capture_all_inventory_snapshots()
-    if captured:
-        logger.info("Captured inventory value snapshots for %s shop(s)", captured)
+    if _last_snapshot_date != today:
+        captured = capture_all_inventory_snapshots()
+        _last_snapshot_date = today
+        if captured:
+            logger.info("Captured inventory value snapshots for %s shop(s)", captured)
+    # Each email runner checks eligible dates and durable successful-send logs.
+    # Revisit failures on the next tick rather than suppressing the entire day.
     sent = run_weekly_digests_once()
     if sent:
         logger.info("Sent %s weekly buy-list digest(s)", sent)

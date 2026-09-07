@@ -1,5 +1,7 @@
 # Purchasing trust and financial evidence release
 
+Released as commit `40750b5`. Vercel `dpl_7pshzm17U5KjM1bkWtT7gjtjNF7x` is READY on www.skubase.io; Railway `4501e9d6-af1f-43a8-b901-dca8712657f3` is SUCCESS. Public health checks and the production cost-provenance OpenAPI contract passed. Deployment evidence **5238** records the release; the growth worker remained running and unpaused with 13/20 first contacts used and no unresolved reservations.
+
 Missing product costs previously appeared as confident financial amounts by substituting 40% of retail price. This release carries cost provenance from the database into actions, charts, reports, Excel exports, recovery plans and purchasing decisions. Unknown is distinct from a recorded zero; physical stock and demand signals remain usable. Historical inventory charts explicitly show a recorded-cost subtotal because old snapshots lack coverage metadata.
 
 The buying calendar now nets timely, outstanding issued PO quantities before recommending another buy. Opening a supplier email draft no longer marks a PO sent. Explicit zero-cost imports and freight are preserved, first-time PO saving no longer flushes a missing vendor, and unknown generated prices require explicit cost entry before saving. Incomplete sales history no longer produces a Healthy badge. PO review headers support keyboard disclosure, and phone layouts stack filters and freight controls while tables scroll locally.

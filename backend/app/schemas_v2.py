@@ -445,6 +445,11 @@ class ReportSchedule(ApiModel):
     enabled: bool
     created_at: datetime
     updated_at: datetime
+    last_delivery_status: Literal["pending", "accepted", "failed", "unavailable", "unknown"] | None = None
+    last_sent_at: datetime | None = None
+    last_delivery_error: str | None = None
+    delivery_attempts: int = 0
+    last_delivery_period: str | None = None
 
 
 class ReportSchedulesResponse(ApiModel):
@@ -452,11 +457,26 @@ class ReportSchedulesResponse(ApiModel):
 
 
 class UpsertReportScheduleRequest(ApiModel):
-    report_type: Literal["actions", "stockout", "dead-stock", "reorder"]
+    report_type: Literal["actions", "stockout", "dead-stock", "reorder", "weekly_buy_list"]
     cadence: Literal["weekly", "monthly"] = "weekly"
     channel: Literal["email"] = "email"
     recipient_email: str = Field(min_length=3, max_length=320)
     enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_schedule_recipient(self):
+        from email.utils import parseaddr
+
+        email = self.recipient_email.strip()
+        local, separator, domain = email.rpartition("@")
+        if (not separator or not local or "@" in local or "." not in domain
+                or not all(domain.split(".")) or any(char.isspace() for char in email)
+                or parseaddr(email)[1] != email):
+            raise ValueError("Enter one valid recipient email address.")
+        if self.report_type == "weekly_buy_list" and self.cadence != "weekly":
+            raise ValueError("The weekly buy list requires weekly cadence.")
+        self.recipient_email = email
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -520,6 +540,11 @@ class AlertEvent(ApiModel):
     fired_at: datetime
     channels_sent: list[NotificationChannel]
     delivered: bool
+    preview: bool = False
+    delivery_status: Literal["preview", "accepted", "partial", "failed", "pending", "skipped", "unknown"] = "skipped"
+    delivery_errors: dict[str, str] = Field(default_factory=dict)
+    resolved: bool = False
+    uncertain_channels: list[NotificationChannel] = Field(default_factory=list)
 
 
 class AlertListResponse(ApiModel):
@@ -537,10 +562,17 @@ class NotificationChannelConfig(ApiModel):
         description="Email address, phone number, Slack webhook URL, or generic webhook URL."
     )
     verified: bool = False
+    available: bool = True
+    availability_reason: str = ""
+    configured: bool = False
+    verification_label: str = "Not tested"
 
 
 class NotificationChannelsResponse(ApiModel):
     channels: list[NotificationChannelConfig]
+    scheduler_enabled: bool = True
+    evaluation_interval_seconds: int = 900
+    cooldown_seconds: int = 21600
 
 
 class CreateAlertRuleRequest(ApiModel):
@@ -570,6 +602,11 @@ class UpdateNotificationChannelRequest(ApiModel):
 class TestAlertRequest(ApiModel):
     channel: NotificationChannel
     target: str
+
+
+class RetryAlertDeliveryRequest(ApiModel):
+    channel: NotificationChannel
+    acknowledge_possible_duplicate: bool = False
 
 
 # ---------------------------------------------------------------------------

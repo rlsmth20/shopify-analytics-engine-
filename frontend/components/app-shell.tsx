@@ -13,39 +13,11 @@ import {
   planDisplayName,
   planToTier,
   tierAllows,
-  type PlanTierKey,
 } from "@/lib/plans";
 import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embedded";
+import { findWorkspacePages, productDataPresent, type NavItem } from "@/lib/workspace-navigation";
+import { accountPlanConfirmed, readAccountConnection } from "@/lib/account-data";
 import styles from "./app-shell.module.css";
-
-type NavItem = {
-  href: string;
-  label: string;
-  section: "Command" | "Intelligence" | "Operations" | "Settings";
-  icon: string;
-  minTier?: PlanTierKey;
-};
-
-const navigationItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", section: "Command", icon: "DB" },
-  { href: "/actions", label: "Action Queue", section: "Command", icon: "AQ" },
-  { href: "/alerts", label: "Alerts & Rules", section: "Command", icon: "AR" },
-  { href: "/forecast", label: "Forecast", section: "Intelligence", icon: "FC", minTier: "growth" },
-  { href: "/analytics", label: "Inventory Health", section: "Intelligence", icon: "IH" },
-  { href: "/reports", label: "Reports & Exports", section: "Intelligence", icon: "RX" },
-  { href: "/suppliers", label: "Suppliers", section: "Intelligence", icon: "SP", minTier: "scale" },
-  { href: "/purchase-orders", label: "Reorder / POs", section: "Operations", icon: "PO", minTier: "growth" },
-  { href: "/stocky-migration", label: "Stocky Migration", section: "Operations", icon: "SM" },
-  { href: "/transfers", label: "Transfers", section: "Operations", icon: "TR", minTier: "scale" },
-  { href: "/bundles", label: "Bundle Opportunities", section: "Operations", icon: "BO", minTier: "growth" },
-  { href: "/liquidation", label: "Dead Stock", section: "Operations", icon: "DS" },
-  { href: "/store-sync", label: "Store Sync", section: "Settings", icon: "SS" },
-  { href: "/lead-time-settings", label: "Inventory Rules", section: "Settings", icon: "IR", minTier: "growth" },
-  { href: "/billing", label: "Billing", section: "Settings", icon: "BL" },
-  { href: "/account", label: "Account", section: "Settings", icon: "AC" },
-  { href: "/privacy-requests", label: "Privacy Requests", section: "Settings", icon: "PR" },
-  { href: "/feedback", label: "Contact & Feedback", section: "Settings", icon: "CF" }
-];
 
 type PageMeta = { eyebrow: string; title: string; description: string };
 
@@ -89,7 +61,7 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Intelligence",
     title: "Reports & exports",
     description:
-      "A lightweight library of the inventory reports and exports already wired into skubase."
+      "Choose a report, filter the products you need, and export the results."
   },
   "/suppliers": {
     eyebrow: "Intelligence",
@@ -125,13 +97,13 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Operations",
     title: "Dead stock recovery.",
     description:
-      "Every dead-stock SKU comes with a plan - markdown, bundle, wholesale, or write-off - and a dollar-impact estimate."
+      "Review slow-moving inventory and recovery options. Add recorded unit costs before relying on a clearance price or cash estimate."
   },
   "/store-sync": {
     eyebrow: "Settings",
-    title: "Manual Shopify sync",
+    title: "Connect and import inventory",
     description:
-      "Trigger ingestion and inspect the latest sync run."
+      "Connect Shopify, refresh your store data, or import a Stocky or ShipStation CSV."
   },
   "/lead-time-settings": {
     eyebrow: "Settings",
@@ -158,6 +130,15 @@ const pageMeta: Record<string, PageMeta> = {
     eyebrow: "Support",
     title: "Contact us",
     description: "Report a bug, ask a question, or share feedback - we reply within one business day."
+  },
+  "/import-stocky": {
+    eyebrow: "Setup", title: "Import Stocky CSV", description: "Upload your export, match its columns, and review the result before relying on the recommendations."
+  },
+  "/import-shipstation": {
+    eyebrow: "Setup", title: "Import ShipStation CSV", description: "Bring shipment history into Skubase to help assess product demand."
+  },
+  "/growth": {
+    eyebrow: "Owner", title: "Growth dashboard", description: "Follow qualified customer signals, active conversations, experiments, and the next growth action."
   }
 };
 
@@ -187,9 +168,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const [embedded, setEmbedded] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [navigationQuery, setNavigationQuery] = useState("");
+  const navigationSearch = useRef<HTMLInputElement>(null);
   const navigationToggle = useRef<HTMLButtonElement>(null);
   const [shopifyDomain, setShopifyDomain] = useState<string | null>(null);
   const [storeLoaded, setStoreLoaded] = useState(false);
+  const [connectionStatusFailed, setConnectionStatusFailed] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [syncConnected, setSyncConnected] = useState<boolean>(false);
   const [subscription, setSubscription] = useState<Entitlements | null>(null);
@@ -199,6 +183,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // "Sample data" chip and the yellow demo-mode banner so paid customers
   // don't see "demo" labels on their own data.
   const [hasRealData, setHasRealData] = useState<boolean | null>(null);
+  const [inventoryStatusFailed, setInventoryStatusFailed] = useState(false);
 
   // Trial countdown - only meaningful for real (non-demo) users.
   const trialDaysLeft: number | null = (() => {
@@ -220,7 +205,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       // remains the source of truth for the store displayed below.
     }
     setShopifyDomain((previous) => storedDomain || previous || "");
-    setStoreLoaded(true);
+    if (user.id === 0) setStoreLoaded(true);
   }, [pathname]);
 
   useEffect(() => {
@@ -235,6 +220,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     let cancelled = false;
     void fetchEntitlements()
       .then((data) => {
+        if (!accountPlanConfirmed(data)) throw new Error("Plan status unavailable");
         if (!cancelled) setSubscription(data);
       })
       .catch(() => {
@@ -250,51 +236,51 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user.id]);
+  }, [user.id, pathname]);
 
   useEffect(() => {
     if (user.id === 0) return;
     let cancelled = false;
+    setStoreLoaded(false);
+    setConnectionStatusFailed(false);
     void authenticatedFetch(`${API_BASE}/integrations/shopify/connection`, {
       credentials: "include",
     })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((conn: { connected?: boolean; shopify_domain?: string | null; last_sync_at?: string | null } | null) => {
-        if (cancelled || !conn) return;
-        if (conn.connected && conn.shopify_domain) setShopifyDomain(conn.shopify_domain);
-        setSyncConnected(Boolean(conn.connected));
+      .then(async r => { if (!r.ok) throw new Error("Connection status unavailable"); return readAccountConnection(await r.json()); })
+      .then(conn => {
+        if (cancelled) return;
+        setShopifyDomain(conn.connected ? conn.shopify_domain : null);
+        setSyncConnected(conn.connected);
         setLastSyncAt(conn.last_sync_at ?? null);
       })
       .catch(() => {
-        // Sync chip is best-effort.
-      });
+        if (!cancelled) { setConnectionStatusFailed(true); setSyncConnected(false); setLastSyncAt(null); }
+      })
+      .finally(() => { if (!cancelled) setStoreLoaded(true); });
     return () => {
       cancelled = true;
     };
-  }, [user.id]);
+  }, [user.id, pathname]);
 
   useEffect(() => {
+    if (user.id === 0) return;
     let cancelled = false;
     void authenticatedFetch(`${API_BASE}/skus/summary`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : { product_count: 0 }))
+      .then((r) => { if (!r.ok) throw new Error("Inventory status unavailable"); return r.json(); })
       .then((summary: unknown) => {
         if (cancelled) return;
-        const productCount =
-          typeof summary === "object" &&
-          summary !== null &&
-          "product_count" in summary &&
-          typeof summary.product_count === "number"
-            ? summary.product_count
-            : 0;
-        setHasRealData(productCount > 0);
+        const present = productDataPresent(summary);
+        if (present === null) throw new Error("Inventory status unavailable");
+        setHasRealData(present);
+        setInventoryStatusFailed(false);
       })
       .catch(() => {
-        if (!cancelled) setHasRealData(false);
+        if (!cancelled) { setHasRealData(null); setInventoryStatusFailed(true); }
       });
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, user.id]);
 
   // Sync freshness chip — silent sync breakage is the #1 trust killer in
   // competing tools, so surface staleness instead of hiding it.
@@ -327,10 +313,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const appContainerClassName = `page-container${isWideAppRoute ? " page-container-wide" : ""}`;
   const headerClassName = `top-header${isWideAppRoute ? " top-header-wide" : ""}`;
 
+  const visibleNav = findWorkspacePages(navigationQuery, user.is_admin);
   const groupedNav = SECTION_ORDER.map((section) => ({
     section,
-    items: navigationItems.filter((item) => item.section === section)
-  }));
+    items: visibleNav.filter((item) => item.section === section)
+  })).filter(group => group.items.length > 0);
 
   const paidTier =
     subscription?.subscription_status === "active" || subscription?.subscription_status === "trialing"
@@ -340,12 +327,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const isShopifyInstalled = Boolean(subscription?.is_shopify_installed);
   const directTrialAccess =
     Boolean(user.in_trial) && !isShopifyInstalled && !isEmbeddedShopifyContext();
-  const unlockAll = user.id === 0 || directTrialAccess || !subscriptionLoaded;
+  const unlockAll = user.id === 0 || directTrialAccess || !subscriptionLoaded || subscriptionStatusFailed;
   const planChipLabel =
     user.id === 0
       ? "Sample workspace"
       : !subscriptionLoaded
       ? "Loading plan..."
+      : subscriptionStatusFailed
+      ? "Plan status unavailable"
       : subscription?.subscription_status === "active" || subscription?.subscription_status === "trialing"
       ? planDisplayName(subscription.plan_id)
       : "No active plan";
@@ -367,10 +356,23 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
         </div>
 
+        <div className={styles.navigationSearch}>
+          <label htmlFor="workspace-search">Find a page or task</label>
+          <div className={styles.searchControl}>
+            <input id="workspace-search" ref={navigationSearch} type="search" value={navigationQuery}
+              placeholder="Try “email alerts”" autoComplete="off" aria-controls="workspace-navigation"
+              onChange={event => setNavigationQuery(event.target.value)}
+              onKeyDown={event => { if (event.key === "Escape") { setNavigationQuery(""); event.stopPropagation(); } }} />
+            {navigationQuery ? <button type="button" aria-label="Clear page search" onClick={() => { setNavigationQuery(""); navigationSearch.current?.focus(); }}>×</button> : null}
+          </div>
+          {navigationQuery.trim() ? <p role="status">{visibleNav.length} matching page{visibleNav.length === 1 ? "" : "s"}</p> : null}
+        </div>
+
         <nav id="workspace-navigation" className="sidebar-nav" aria-label="Primary">
+          {groupedNav.length === 0 ? <p className={styles.noResults}>No page found. Try “import”, “reorder”, “alerts”, or “billing”.</p> : null}
           {groupedNav.map((group) => (
             <div key={group.section} className="sidebar-nav-group">
-              <p className="sidebar-nav-heading">{group.section}</p>
+              <p className="sidebar-nav-heading">{{ Command: "Start here", Intelligence: "Understand stock", Operations: "Buy & recover", Settings: "Setup & support" }[group.section]}</p>
               {group.items.map((item) => {
                 const isActive =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -383,7 +385,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => { if (navigationOpen) navigationToggle.current?.focus(); setNavigationOpen(false); }}
+                    onClick={() => { if (navigationOpen) navigationToggle.current?.focus(); setNavigationOpen(false); setNavigationQuery(""); }}
                     aria-current={isActive ? "page" : undefined}
                     className={`nav-link${isActive ? " nav-link-active" : ""}${
                       isLocked ? " nav-link-locked" : ""
@@ -435,12 +437,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="demo-banner" role="status">
             <span className="demo-banner-mark" aria-hidden>*</span>
             <span>
-              <strong>No data yet.</strong> Import your Stocky or ShipStation
-              CSV - or{" "}
+              <strong>No product data yet.</strong>{" "}
               <Link href="/store-sync" className="demo-banner-link">
-                connect your Shopify store
+                Choose a connection or import option
               </Link>{" "}
-              - to see real recommendations.
+              to get started. Recommendations need current stock and sales history.
             </span>
           </div>
         ) : null}
@@ -478,7 +479,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="header-meta">
             <span className="header-chip header-chip-tone">
-              {storeLoaded ? (shopifyDomain ? shopifyDomain : "No store selected") : "Loading store..."}
+              {user.id === 0 ? "Sample workspace" : !storeLoaded ? "Loading store..." : connectionStatusFailed ? "Connection status unavailable" : shopifyDomain || "No store connected"}
             </span>
             {syncChip ? (
               <span
@@ -488,9 +489,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {syncChip.label}
               </span>
             ) : null}
-            {hasRealData === false ? (
-              <span className="header-chip">Sample data</span>
-            ) : null}
+            {user.id === 0 ? <span className="header-chip">Sample data</span> : hasRealData === false ? <span className="header-chip">No product data</span> : inventoryStatusFailed ? <span className="header-chip">Inventory status unavailable</span> : null}
             {user.id !== 0 && !embedded ? (
               // Embedded users authenticate via Shopify; their synthetic
               // shopify-admin+... address would only confuse.

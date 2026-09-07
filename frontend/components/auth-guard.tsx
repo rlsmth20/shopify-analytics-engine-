@@ -3,6 +3,7 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { invalidateEntitlementsCache } from "@/lib/entitlements";
 
 import {
   authenticatedFetch,
@@ -75,6 +76,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const [needsInstall, setNeedsInstall] = useState(false);
 
   async function refresh() {
+    invalidateEntitlementsCache();
     setLoading(true);
     setAuthError(null);
     setNeedsInstall(false);
@@ -101,6 +103,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    invalidateEntitlementsCache();
     try {
       await authenticatedFetch(`${API_BASE}/auth/logout`, {
         method: "POST",
@@ -120,6 +123,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    invalidateEntitlementsCache();
     const demo = detectDemo();
     const embedded = getEmbeddedShopifyContext() !== null;
     setIsEmbedded(embedded);

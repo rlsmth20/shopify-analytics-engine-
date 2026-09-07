@@ -58,8 +58,8 @@ const ACTION_PATH_STEPS = [
   },
 ] as const;
 const ONBOARDING_STEPS = [
-  { id: "connect-shopify", label: "Connect Shopify", href: "/store-sync" },
-  { id: "upload-stocky", label: "Import sales history", href: "/import-stocky" },
+  { id: "connect-shopify", label: "Review Shopify access & sync", href: "/store-sync" },
+  { id: "upload-stocky", label: "Import current inventory", href: "/import-stocky" },
   { id: "lead-times", label: "Set lead times", href: "/lead-time-settings" },
   { id: "forecast-review", label: "Review forecast trust", href: "/forecast" },
   { id: "purchase-orders", label: "Save first PO", href: "/purchase-orders" },
@@ -133,31 +133,32 @@ export default function DashboardPage() {
       <div className="dashboard-empty">
         <div className="dashboard-empty-card">
           <p className="dashboard-empty-eyebrow">Welcome to skubase</p>
-          <h2 className="dashboard-empty-title">No data in your workspace yet.</h2>
+          <h2 className="dashboard-empty-title">Add inventory to start planning.</h2>
           <p className="dashboard-empty-copy">
-            Sync your Shopify inventory and recent orders to see stockout risks,
-            reorder recommendations, and cash tied up in slow-moving products.
-            You can also import a Stocky or ShipStation export.
+            Planning needs current stock, recent sales, and supplier lead times.
+            Import current inventory from Stocky and shipment history from ShipStation
+            using matching SKUs. Skubase is in Shopify App Store review and is not listed yet;
+            stores with existing access can also sync through Shopify.
           </p>
           <div className="dashboard-empty-steps">
             <Link href="/store-sync" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">1</span>
-              <div><p className="dashboard-empty-step-title">Sync your Shopify store</p><p className="dashboard-empty-step-body">Your store connects when you open skubase in Shopify. Run the first sync to load inventory and orders.</p></div>
+              <div><p className="dashboard-empty-step-title">Shopify access & sync</p><p className="dashboard-empty-step-body">Review access options, or sync inventory and orders if Skubase is already installed for your store.</p></div>
               <span aria-hidden>→</span>
             </Link>
             <Link href="/import-stocky" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">2</span>
               <div>
-                <p className="dashboard-empty-step-title">Import Stocky CSV</p>
-                <p className="dashboard-empty-step-body">Export Inventory On Hand from Stocky — maps in one step.</p>
+                <p className="dashboard-empty-step-title">Import current inventory</p>
+                <p className="dashboard-empty-step-body">Stocky’s Inventory On Hand export supplies your catalog and stock quantities, not sales history.</p>
               </div>
               <span aria-hidden>→</span>
             </Link>
             <Link href="/import-shipstation" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">3</span>
               <div>
-                <p className="dashboard-empty-step-title">Import ShipStation CSV</p>
-                <p className="dashboard-empty-step-body">Drop in your ShipStation shipment export to seed velocity data.</p>
+                <p className="dashboard-empty-step-title">Import shipment history</p>
+                <p className="dashboard-empty-step-body">A ShipStation export supplies demand history. Match its SKUs to your imported inventory.</p>
               </div>
               <span aria-hidden>→</span>
             </Link>

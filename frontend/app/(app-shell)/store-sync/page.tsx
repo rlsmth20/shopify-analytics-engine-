@@ -226,22 +226,26 @@ export default function StoreSyncPage() {
         ) : (
           <>
             <p className="section-copy">
-              Install the skubase app on your Shopify store. We&apos;ll pull
-              products, inventory, and recent paid orders so the
-              forecast and action queue can run on real data.
+              Skubase is in Shopify App Store review and is not listed yet.
+              You can start with CSV imports below or try the free inventory
+              health check while Shopify access is being arranged.
             </p>
             <div className="sync-safety-note" role="status">
               <strong>Safe by default.</strong> Initial Shopify access is
               read-only for planning. Any future write-back flow should require
               a preview and explicit approval before touching Shopify stock.
             </div>
-            <p className="section-copy">Open skubase from the Apps section of your Shopify Admin. Your store connects automatically when the app opens.</p>
+            <p className="section-copy">If Skubase is already installed for your store, open it from the Apps section of Shopify Admin to connect that store.</p>
             {embeddedShop ? (
               <button type="button" className="button button-primary" disabled={installLoading} onClick={() => void handleReconnect()}>
                 {installLoading ? "Connecting…" : "Reconnect this store"}
               </button>
             ) : (
-              <a className="button button-primary" href="https://admin.shopify.com" target="_top">Open Shopify Admin</a>
+              <div className="button-row">
+                <Link className="button button-primary" href="/tools/inventory-health-check">Try the free inventory health check</Link>
+                <a className="button button-ghost" href="mailto:info@skubase.io?subject=Skubase%20Shopify%20access">Ask about Shopify access</a>
+                <a className="button button-ghost" href="https://admin.shopify.com" target="_top">Open Shopify Admin if already installed</a>
+              </div>
             )}
             {installError ? <p className="auth-error" role="alert">{installError}</p> : null}
           </>
@@ -251,14 +255,16 @@ export default function StoreSyncPage() {
       <SectionCard>
         <div className="section-heading">
           <div>
-            <p className="section-eyebrow">No Shopify? No problem.</p>
+            <p className="section-eyebrow">Start with your existing exports</p>
             <h2 className="section-title section-title-small">CSV imports work too</h2>
           </div>
         </div>
         <p className="section-copy">
-          You can import your Stocky catalog or your ShipStation shipment
-          history as CSV today — same dashboard, same actions, no OAuth
-          required.
+          Stocky imports supply your catalog and current stock quantities.
+          ShipStation imports supply shipment history. Reorder planning needs
+          both current inventory and recent sales for matching SKUs, plus supplier
+          lead times. Shipment history alone does not tell us how much stock you have.
+          These CSV imports do not require a Shopify app installation.
         </p>
         <div className="button-row">
           <Link href="/import-stocky" className="button button-ghost">
@@ -268,6 +274,7 @@ export default function StoreSyncPage() {
             Import ShipStation CSV
           </Link>
         </div>
+        <p className="section-copy">After importing, <Link href="/lead-time-settings">check your supplier lead times</Link> and <Link href="/actions">review your action queue</Link>. Add missing history before relying on demand estimates.</p>
       </SectionCard>
     </div>
   );

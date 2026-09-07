@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { isDemoActive } from "@/lib/shopify-embedded";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ReportEmptyState,
@@ -19,18 +19,19 @@ import {
   type ReportMetric,
 } from "@/components/reports/report-components";
 import { ProjectedStockHealth } from "@/components/projected-stock-health";
-import { fetchInventoryActions, type InventoryAction } from "@/lib/api";
+import type { InventoryAction } from "@/lib/api";
 import { isHistoryReviewAction } from "@/lib/action-quality";
 import { statusLabel } from "@/lib/app-helpers";
 import { financialTotal, financialValue } from "@/lib/financial-values";
 import { stockoutRiskLevel, type StockoutRiskLevel } from "@/lib/stock-health-state";
 import {
+  loadReportData, reportContextWarning, reportDataset,
+  type LoadedReportData as LoadedData, type ReportKind, type ReportLoadState,
+} from "@/lib/report-data";
+import {
   currency,
   fetchAuditEvents,
-  fetchForecasts,
   fetchReportSchedules,
-  fetchReorderSuggestions,
-  fetchScorecards,
   saveReportSchedule,
   type AuditLogEvent,
   type ForecastResult,
@@ -39,6 +40,9 @@ import {
   type SkuScorecard,
 } from "@/lib/api-v2";
 import { useAuth } from "@/components/auth-guard";
+import { GatedFeature } from "@/components/gated-feature";
+import { ScheduledEmailStatus } from "@/components/scheduled-email-status";
+import { readEmailSchedules, validScheduleEmail } from "@/lib/email-schedule";
 import { entitlementHas, fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import {
   exportFormattedReport,
@@ -48,7 +52,6 @@ import {
   type Tone as XlsxTone,
 } from "@/lib/report-export";
 
-type ReportKind = "actions" | "stockout" | "dead-stock" | "reorder";
 type SortDirection = "asc" | "desc";
 
 type ReportRow = {
@@ -80,13 +83,6 @@ type ReportRow = {
   targetCoverage: number | null;
   estimatedCost: number | null;
   orderDeadline: string;
-};
-
-type LoadedData = {
-  actions: InventoryAction[];
-  forecasts: ForecastResult[];
-  reorder: ReorderSuggestion[];
-  scorecards: SkuScorecard[];
 };
 
 const reportCards = [
@@ -169,8 +165,8 @@ const reportCards = [
   {
     title: "Schedule Preferences",
     category: "Automation",
-    description: "Save report delivery preferences; automated email delivery is planned.",
-    status: "Delivery planned",
+    description: "Schedule weekly or monthly report emails when there are inventory findings to share.",
+    status: "Email schedules",
     href: "/reports",
     cta: "Configure schedule",
   },
@@ -202,46 +198,26 @@ const reportMeta: Record<ReportKind, { title: string; description: string }> = {
 export default function ReportsPage() {
   const { user } = useAuth();
   const [selectedReport, setSelectedReport] = useState<ReportKind>("actions");
-  const [data, setData] = useState<LoadedData | null>(null);
-  const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
+  const [reportLoad, setReportLoad] = useState<ReportLoadState | null>(null);
+  const [reportRetry, setReportRetry] = useState(0);
   const [auditEvents, setAuditEvents] = useState<AuditLogEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [sortKey, setSortKey] = useState("priority");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-  const [scheduleEmail, setScheduleEmail] = useState(user.email);
-  const [scheduleCadence, setScheduleCadence] = useState<ReportSchedule["cadence"]>("weekly");
-  const [scheduleEnabled, setScheduleEnabled] = useState(true);
-  const [scheduleSaving, setScheduleSaving] = useState(false);
-  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [entitlementsLoaded, setEntitlementsLoaded] = useState(user.id === 0);
 
   useEffect(() => {
+    if (!entitlementsLoaded) {
+      setReportLoad(null);
+      return;
+    }
     const controller = new AbortController();
-    setLoading(true);
-    Promise.all([
-      fetchInventoryActions(controller.signal),
-      fetchForecasts(controller.signal),
-      fetchReorderSuggestions(0.95, controller.signal),
-      fetchScorecards(controller.signal),
-    ])
-      .then(([actions, forecasts, reorder, scorecards]) => {
-        setData({
-          actions: actions.actions,
-          forecasts: forecasts.forecasts,
-          reorder: reorder.suggestions,
-          scorecards: scorecards.scorecards,
-        });
-        setError(null);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false));
+    void loadReportData(entitlements, user.id === 0, controller.signal, setReportLoad);
     return () => controller.abort();
-  }, []);
+  }, [entitlements, entitlementsLoaded, user.id, reportRetry]);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,39 +248,22 @@ export default function ReportsPage() {
     setSortKey("priority");
     setSortDirection("desc");
     setSelectedRowId(null);
-    const existing = schedules.find((schedule) => schedule.report_type === selectedReport);
-    setScheduleEmail(existing?.recipient_email || user.email);
-    setScheduleCadence(existing?.cadence || "weekly");
-    setScheduleEnabled(existing?.enabled ?? true);
-    setScheduleNotice(null);
   }, [selectedReport]);
 
   useEffect(() => {
+    if (!entitlementsLoaded) return;
     const controller = new AbortController();
-    Promise.all([
-      fetchReportSchedules(controller.signal),
-      fetchAuditEvents(8, controller.signal),
-    ])
-      .then(([scheduleResponse, auditResponse]) => {
-        setSchedules(scheduleResponse.schedules);
-        setAuditEvents(auditResponse.events);
-        const existing = scheduleResponse.schedules.find(
-          (schedule) => schedule.report_type === selectedReport,
-        );
-        if (existing) {
-          setScheduleEmail(existing.recipient_email);
-          setScheduleCadence(existing.cadence);
-          setScheduleEnabled(existing.enabled);
-        }
-      })
-      .catch(() => {
-        setSchedules([]);
-        setAuditEvents([]);
-      });
+    void fetchAuditEvents(8, controller.signal)
+      .then((response) => { if (!controller.signal.aborted) setAuditEvents(response.events); })
+      .catch(() => { if (!controller.signal.aborted) setAuditEvents([]); });
     return () => controller.abort();
-  }, []);
+  }, [entitlements, entitlementsLoaded, user.id]);
 
   const isDemo = isDemoMode();
+  const data = reportLoad?.data ?? null;
+  const reportSource = reportLoad?.sources[reportDataset(selectedReport)];
+  const loading = !reportSource || reportSource.status === "loading";
+  const contextWarning = reportLoad ? reportContextWarning(selectedReport, reportLoad.sources) : null;
   const rowsByReport = useMemo(() => buildReportRows(data), [data]);
   const rows = rowsByReport[selectedReport];
   const filterConfig = useMemo(
@@ -339,6 +298,7 @@ export default function ReportsPage() {
   }
 
   async function exportWorkbook() {
+    if (!canExport || reportSource?.status !== "ready") return;
     await exportFormattedReport({
       title: reportMeta[selectedReport].title,
       subtitle: reportMeta[selectedReport].description,
@@ -354,48 +314,23 @@ export default function ReportsPage() {
     });
   }
 
-  async function saveSchedule() {
-    const email = scheduleEmail.trim();
-    if (!email || !email.includes("@")) {
-      setScheduleNotice("Enter a valid email before saving the schedule.");
-      return;
-    }
-    setScheduleSaving(true);
-    setScheduleNotice(null);
-    try {
-      const saved = await saveReportSchedule({
-        report_type: selectedReport,
-        cadence: scheduleCadence,
-        channel: "email",
-        recipient_email: email,
-        enabled: scheduleEnabled,
-      });
-      setSchedules((current) => [
-        saved,
-        ...current.filter((schedule) => schedule.report_type !== selectedReport),
-      ]);
+  function recordSavedSchedule(saved: ReportSchedule) {
       setAuditEvents((current) => [
         {
           id: Date.now(),
           event_type: "report_schedule_saved",
           entity_type: "report_schedule",
-          entity_id: selectedReport,
-          summary: `${reportMeta[selectedReport].title} schedule saved for ${email}.`,
+          entity_id: saved.report_type,
+          summary: `${reportMeta[saved.report_type as ReportKind]?.title ?? saved.report_type} schedule saved for ${saved.recipient_email}.`,
           metadata: {
-            report_type: selectedReport,
-            cadence: scheduleCadence,
-            enabled: scheduleEnabled,
+            report_type: saved.report_type,
+            cadence: saved.cadence,
+            enabled: saved.enabled,
           },
           created_at: new Date().toISOString(),
         },
         ...current,
       ].slice(0, 8));
-      setScheduleNotice("Report schedule preference saved.");
-    } catch (err) {
-      setScheduleNotice(err instanceof Error ? err.message : "Schedule could not be saved.");
-    } finally {
-      setScheduleSaving(false);
-    }
   }
 
   return (
@@ -427,8 +362,10 @@ export default function ReportsPage() {
                 <p className="section-eyebrow">{report.category}</p>
                 <h3>{report.title}</h3>
               </div>
-              <span className={`report-status report-status-${statusClass(report.status)}`}>
-                {report.status}
+              <span className={`report-status report-status-${statusClass(
+                "key" in report && reportLoad?.sources[reportDataset(report.key)].status === "locked" ? "Requires plan" : report.status,
+              )}`}>
+                {"key" in report && reportLoad?.sources[reportDataset(report.key)].status === "locked" ? "Growth plan" : report.status}
               </span>
             </div>
             <p className="report-copy">{report.description}</p>
@@ -464,7 +401,7 @@ export default function ReportsPage() {
                   type="button"
                   className="button button-primary"
                   onClick={exportWorkbook}
-                  disabled={visibleRows.length === 0}
+                  disabled={visibleRows.length === 0 || reportSource?.status !== "ready"}
                 >
                   Export filtered Excel
                 </button>
@@ -481,14 +418,29 @@ export default function ReportsPage() {
           }
         />
 
-        {error ? (
+        {reportSource?.status === "locked" ? (
+          <ReportEmptyState
+            title="Included on Growth"
+            description={`${reportMeta[selectedReport].title} uses Growth features. Your Inventory Action and Dead Stock / Overstock previews remain available.`}
+            actions={<Link className="button button-primary" href="/billing">View Growth plan</Link>}
+          />
+        ) : reportSource?.status === "unverified" ? (
+          <ReportEmptyState
+            title="Plan access could not be verified"
+            description="Check Billing to verify access to this report. Your available basic reports can still be viewed."
+            actions={<Link className="button button-secondary" href="/billing">Check plan access</Link>}
+          />
+        ) : reportSource?.status === "error" ? (
           <ReportEmptyState
             title="Report data unavailable"
-            description={error}
-            actions={<Link className="button button-secondary" href="/store-sync">Check store sync</Link>}
+            description={reportSource.message ?? "This report could not be loaded. Other available report previews can still be viewed."}
+            actions={<button type="button" className="button button-secondary" onClick={() => setReportRetry((value) => value + 1)}>Try loading reports again</button>}
           />
+        ) : loading ? (
+          <p className="muted" role="status">Loading {reportMeta[selectedReport].title.toLowerCase()}...</p>
         ) : (
           <>
+            {contextWarning ? <p className="muted" role="status">{contextWarning}</p> : null}
             <ReportMetricCards metrics={metrics} />
             <p className="report-insight">{insight}</p>
             <div className="report-control-panel">
@@ -537,18 +489,12 @@ export default function ReportsPage() {
       </section>
 
       <section className="report-admin-grid">
-        <ReportSchedulePanel
+        <GatedFeature capability="scheduled_reports">
+          <ReportSchedulePanel
           selectedReport={selectedReport}
-          email={scheduleEmail}
-          cadence={scheduleCadence}
-          enabled={scheduleEnabled}
-          saving={scheduleSaving}
-          notice={scheduleNotice}
-          onEmailChange={setScheduleEmail}
-          onCadenceChange={setScheduleCadence}
-          onEnabledChange={setScheduleEnabled}
-          onSave={saveSchedule}
-        />
+          onSaved={recordSavedSchedule}
+          />
+        </GatedFeature>
         <AuditHistoryPanel events={auditEvents} />
       </section>
     </div>
@@ -557,27 +503,87 @@ export default function ReportsPage() {
 
 function ReportSchedulePanel({
   selectedReport,
-  email,
-  cadence,
-  enabled,
-  saving,
-  notice,
-  onEmailChange,
-  onCadenceChange,
-  onEnabledChange,
-  onSave,
+  onSaved,
 }: {
   selectedReport: ReportKind;
-  email: string;
-  cadence: ReportSchedule["cadence"];
-  enabled: boolean;
-  saving: boolean;
-  notice: string | null;
-  onEmailChange: (value: string) => void;
-  onCadenceChange: (value: ReportSchedule["cadence"]) => void;
-  onEnabledChange: (value: boolean) => void;
-  onSave: () => void;
+  onSaved: (saved: ReportSchedule) => void;
 }) {
+  const { user } = useAuth();
+  const demo = user.id === 0;
+  const defaultEmail = user.email.startsWith("shopify-admin+") || user.email.endsWith(".invalid") ? "" : user.email;
+  const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [email, setEmail] = useState(defaultEmail);
+  const [cadence, setCadence] = useState<ReportSchedule["cadence"]>("weekly");
+  const [enabled, setEnabled] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveController = useRef<AbortController | null>(null);
+  const currentReport = useRef(selectedReport);
+  currentReport.current = selectedReport;
+  const savedSchedule = schedules.find(schedule => schedule.report_type === selectedReport);
+
+  useEffect(() => {
+    if (demo) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(null);
+    setSaving(false);
+    setSaveError(null);
+    setNotice(null);
+    void fetchReportSchedules(controller.signal)
+      .then(response => readConfirmedReportSchedules(response))
+      .then(records => { if (!controller.signal.aborted) { setSchedules(records); setLoading(false); } })
+      .catch(error => { if (!controller.signal.aborted) { setLoadError(error instanceof Error ? error.message : "Could not load report schedules."); setLoading(false); } });
+    return () => controller.abort();
+  }, [demo, user.id, retry]);
+
+  useEffect(() => {
+    setEmail(savedSchedule?.recipient_email ?? defaultEmail);
+    setCadence(savedSchedule?.cadence ?? "weekly");
+    setEnabled(savedSchedule?.enabled ?? false);
+  }, [selectedReport, savedSchedule, defaultEmail]);
+
+  useEffect(() => {
+    setNotice(null);
+    setSaveError(null);
+  }, [selectedReport]);
+
+  useEffect(() => () => saveController.current?.abort(), [user.id]);
+
+  async function save() {
+    if (demo || loading || loadError || saving) return;
+    const recipient = email.trim();
+    if (!validScheduleEmail(recipient)) { setSaveError("Enter one valid recipient email before saving the schedule."); return; }
+    const report = selectedReport;
+    const payload = { report_type: report, cadence, channel: "email" as const, recipient_email: recipient, enabled };
+    const controller = new AbortController();
+    saveController.current = controller;
+    setSaving(true); setSaveError(null); setNotice(null);
+    try {
+      const response = await saveReportSchedule(payload, controller.signal);
+      const saved = readConfirmedReportSchedules({ schedules: [response] })[0];
+      if (saved.report_type !== report || saved.cadence !== cadence || saved.channel !== "email" || saved.recipient_email !== recipient || saved.enabled !== enabled) {
+        throw new Error("The server did not confirm this schedule change. Reload the settings before trying again.");
+      }
+      if (controller.signal.aborted) return;
+      setSchedules(current => [saved, ...current.filter(schedule => schedule.report_type !== report)]);
+      onSaved(saved);
+      if (currentReport.current === report) setNotice(enabled ? "Schedule enabled. Available findings will be emailed on the next scheduled date." : "Schedule saved paused. Automatic report emails are off for this report.");
+    } catch (error) {
+      if (!controller.signal.aborted && currentReport.current === report) setSaveError(error instanceof Error ? error.message : "Could not confirm the schedule change. Reload settings before trying again.");
+    } finally {
+      if (!controller.signal.aborted) setSaving(false);
+    }
+  }
+
+  if (demo) return <section className="section-card report-admin-card"><h2 className="section-title section-title-small">Report email schedules</h2><p className="section-copy">This is a sample workspace. No schedule is saved and no report emails are sent. Sign in with your store to configure weekly or monthly report emails.</p><Link className="button button-ghost" href="/login">Sign in to set up reports</Link></section>;
+  if (loading) return <section className="section-card report-admin-card"><p className="section-copy" role="status">Loading saved report schedules…</p></section>;
+  if (loadError) return <section className="section-card report-admin-card"><h2 className="section-title section-title-small">Report schedule unavailable</h2><p className="section-copy" role="alert">{loadError}</p><p className="section-copy">Your existing schedule has not been changed. Load its saved settings before making changes.</p><button className="button button-ghost" type="button" onClick={() => setRetry(value => value + 1)}>Retry schedule settings</button></section>;
+
   return (
     <section className="section-card report-admin-card">
       <div className="section-heading">
@@ -587,11 +593,11 @@ function ReportSchedulePanel({
             Report delivery preferences
           </h2>
           <p className="section-copy">
-            The selected report is emailed to the recipient automatically -
-            weekly schedules send Monday morning, monthly on the 1st (UTC).
+            Enabled schedules email available findings on Mondays for weekly
+            reports or the 1st for monthly reports (UTC). Reports with no findings are skipped.
           </p>
         </div>
-        <ReportStatusBadge tone="positive">Email delivery live</ReportStatusBadge>
+        <ReportStatusBadge tone="neutral">{savedSchedule?.enabled ? "Saved · enabled" : savedSchedule ? "Saved · paused" : "Not scheduled"}</ReportStatusBadge>
       </div>
       <div className="report-schedule-form">
         <label className="report-filter-field">
@@ -606,7 +612,8 @@ function ReportSchedulePanel({
           <span>Cadence</span>
           <select
             value={cadence}
-            onChange={(event) => onCadenceChange(event.target.value as ReportSchedule["cadence"])}
+            onChange={(event) => setCadence(event.target.value as ReportSchedule["cadence"])}
+            disabled={saving}
           >
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
@@ -618,32 +625,44 @@ function ReportSchedulePanel({
             className="input-control"
             type="email"
             value={email}
-            onChange={(event) => onEmailChange(event.target.value)}
-            placeholder="ops@example.com"
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="ops@yourstore.com"
+            disabled={saving}
           />
         </label>
         <label className="report-toggle-row">
           <input
             type="checkbox"
             checked={enabled}
-            onChange={(event) => onEnabledChange(event.target.checked)}
+            onChange={(event) => setEnabled(event.target.checked)}
+            disabled={saving}
           />
-          Enabled
+          Enable automatic report emails
         </label>
       </div>
       <div className="button-row">
         <button
           type="button"
           className="button button-primary"
-          onClick={() => void onSave()}
+          onClick={() => void save()}
           disabled={saving}
         >
           {saving ? "Saving..." : "Save schedule"}
         </button>
       </div>
-      {notice ? <p className="report-schedule-notice">{notice}</p> : null}
+      {notice ? <p className="report-schedule-notice" role="status">{notice}</p> : null}
+      {saveError ? <><p className="report-schedule-notice" role="alert">{saveError}</p><button className="button button-ghost" type="button" disabled={saving} onClick={() => setRetry(value => value + 1)}>Reload saved settings</button></> : null}
+      {savedSchedule ? <ScheduledEmailStatus delivery={savedSchedule} /> : null}
     </section>
   );
+}
+
+function readConfirmedReportSchedules(body: unknown): ReportSchedule[] {
+  const records = readEmailSchedules(body);
+  if (!records.every(record => "cadence" in record && ["weekly", "monthly"].includes(String(record.cadence)) && "channel" in record && record.channel === "email")) {
+    throw new Error("Saved report settings are incomplete. Retry before changing the schedule.");
+  }
+  return records as ReportSchedule[];
 }
 
 function AuditHistoryPanel({ events }: { events: AuditLogEvent[] }) {

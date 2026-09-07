@@ -30,8 +30,10 @@ export type Entitlements = {
 const ENTITLEMENTS_TTL_MS = 60_000;
 let cachedEntitlements: { at: number; value: Entitlements } | null = null;
 let inflight: Promise<Entitlements> | null = null;
+let cacheGeneration = 0;
 
 export function invalidateEntitlementsCache(): void {
+  cacheGeneration += 1;
   cachedEntitlements = null;
   inflight = null;
 }
@@ -54,15 +56,17 @@ export async function fetchEntitlements(options?: { fresh?: boolean }): Promise<
     }
     if (inflight) return inflight;
   }
-  inflight = requestEntitlements(fresh)
+  const generation = cacheGeneration;
+  const pending: Promise<Entitlements> = requestEntitlements(fresh)
     .then((value) => {
-      cachedEntitlements = { at: Date.now(), value };
+      if (generation === cacheGeneration && inflight === pending) cachedEntitlements = { at: Date.now(), value };
       return value;
     })
     .finally(() => {
-      inflight = null;
+      if (inflight === pending) inflight = null;
     });
-  return inflight;
+  inflight = pending;
+  return pending;
 }
 
 export function entitlementHas(

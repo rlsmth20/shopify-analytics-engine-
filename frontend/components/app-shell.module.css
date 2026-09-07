@@ -1,6 +1,16 @@
 .shell :global(.sidebar) { min-width: 0; }
+.shell :global(.app-main) { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 .mobileHeader { min-width: 0; }
 .navigationToggle { display: none; }
+.navigationSearch { display: grid; gap: 7px; min-width: 0; }
+.navigationSearch label { color: #d4deec; font-size: .76rem; font-weight: 600; }
+.searchControl { display: flex; align-items: center; gap: 4px; border: 1px solid #66758a; border-radius: 10px; background: #152237; padding-right: 4px; }
+.searchControl input { width: 100%; min-width: 0; background: transparent; color: #fff; border: 0; padding: 11px 10px; font: inherit; font-size: .82rem; border-radius: 10px; }
+.searchControl input::placeholder { color: #b2c0d3; }
+.searchControl button { flex-shrink: 0; min-width: 36px; min-height: 36px; border: 0; border-radius: 7px; background: #26364e; color: white; font-size: 1.25rem; cursor: pointer; }
+.searchControl input:focus-visible, .searchControl button:focus-visible { outline: 2px solid #a5c9ff; outline-offset: 2px; }
+.navigationSearch p, .noResults { color: #d4deec; font-size: .8rem; line-height: 1.5; margin: 0; }
+.noResults { grid-column: 1 / -1; }
 
 @media (max-width: 1024px) {
   .shell { grid-template-columns: minmax(0, 1fr); }
@@ -14,5 +24,6 @@
   .shell :global(.nav-link-label) { min-width: 0; font-size: .86rem; overflow-wrap: anywhere; }
   .shell :global(.nav-link-gate) { max-width: 65px; font-size: .6rem; }
   .shell :global(.sidebar[data-navigation-open="false"] .sidebar-nav),
+  .shell :global(.sidebar[data-navigation-open="false"]) .navigationSearch,
   .shell :global(.sidebar[data-navigation-open="false"] .sidebar-note) { display: none; }
 }

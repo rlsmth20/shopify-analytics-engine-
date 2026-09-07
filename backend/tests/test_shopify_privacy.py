@@ -18,10 +18,12 @@ from sqlalchemy.pool import StaticPool
 from app.api.deps import get_current_user
 from app.api.routes import shopify_privacy_webhooks as routes
 from app.db.models import (
+    AlertDeliveryAttemptRecord, AlertEventRecord, ScheduledEmailDeliveryRecord,
     AuditLogRecord, Base, InventoryRiskSnapshotLead, MagicLinkToken, NotificationChannelRecord,
     OrderLineItem, Session as LoginSession, Shop, ShopifyConnection, Subscription, User, WaitlistSignup,
 )
 from app.db.session import get_db_session
+from app.growth import models as growth_models  # Register the same tenant tables as production init_db.
 from app.services import shopify_privacy as privacy
 
 SECRET = "fixture-privacy-secret-not-real"
@@ -94,9 +96,16 @@ class PrivacyTests(unittest.TestCase):
             if table.name == "shopify_connections":
                 values.update(shopify_domain=domain, access_token="", uninstalled_at=NOW - timedelta(days=3),
                               installed_at=NOW - timedelta(days=10))
+            if table.name in {"alert_events", "scheduled_email_deliveries"}:
+                values["payload"] = {"subject": f"Private inventory report for shop {shop.id}",
+                                     "to": [f"owner-{shop.id}@example.test"]}
             result = self.db.execute(table.insert().values(**values))
             ids[table.name] = result.inserted_primary_key[0]
         self.db.add_all([
+            AlertDeliveryAttemptRecord(id=f"delivery-{shop.id}", event_id=ids["alert_events"],
+                channel="email", target_fingerprint=f"hash-{shop.id}", status="accepted",
+                provider_receipt=f"provider-{shop.id}",
+                attempt_history=[{"status": "accepted", "provider_receipt": f"provider-{shop.id}"}]),
             LoginSession(user_id=ids["users"], token_hash=f"session-{shop.id}", expires_at=NOW + timedelta(days=1)),
             MagicLinkToken(email=f"owner-{shop.id}@example.test", token_hash=f"magic-{shop.id}", expires_at=NOW),
             NotificationChannelRecord(channel=f"{shop.id}:email", target=f"owner-{shop.id}@example.test"),
@@ -153,6 +162,26 @@ class PrivacyTests(unittest.TestCase):
         for table in Base.metadata.sorted_tables:
             expected = 0 if table.name.startswith("growth_") and "shop_id" not in table.c else 2
             self.assertEqual(self.count(table), expected, table.name)
+        self.assertEqual(self.db.get(AlertDeliveryAttemptRecord, f"delivery-{self.one}").provider_receipt,
+                         f"provider-{self.one}")
+        scheduled = self.db.scalar(select(ScheduledEmailDeliveryRecord).where(ScheduledEmailDeliveryRecord.shop_id == self.one))
+        self.assertIn(f"shop {self.one}", scheduled.payload["subject"])
+
+    def test_alert_attempts_and_frozen_email_payloads_are_purged_without_sqlite_cascades(self):
+        # Production uses FK cascades too, but our explicit tenant purge must
+        # remain complete in SQLite configurations where they are disabled.
+        self.db.commit()
+        self.db.connection().exec_driver_sql("PRAGMA foreign_keys=OFF")
+        self.db.commit()
+        self.assertEqual(self.db.connection().exec_driver_sql("PRAGMA foreign_keys").scalar(), 0)
+        privacy.redact_shop(self.db, shop_domain="one.myshopify.com", triggered_at=None)
+        self.db.expire_all()
+        self.assertIsNone(self.db.get(AlertDeliveryAttemptRecord, f"delivery-{self.one}"))
+        self.assertIsNotNone(self.db.get(AlertDeliveryAttemptRecord, f"delivery-{self.two}"))
+        self.assertEqual([row.shop_id for row in self.db.scalars(select(AlertEventRecord)).all()], [self.two])
+        payloads = self.db.scalars(select(ScheduledEmailDeliveryRecord)).all()
+        self.assertEqual([row.shop_id for row in payloads], [self.two])
+        self.assertIn(f"shop {self.two}", payloads[0].payload["subject"])
 
     def test_reinstalled_shop_survives_old_uninstall_and_redact_deliveries(self):
         conn = self.conn(self.one)

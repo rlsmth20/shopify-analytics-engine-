@@ -1,9 +1,9 @@
 """Transactional email — Resend-backed, fire-and-forget friendly.
 
-Designed to never crash a request: every public function logs and swallows
-errors so the caller (e.g. a FastAPI BackgroundTask) does not need a
-try/except. We log enough to debug a misconfigured RESEND_API_KEY without
-leaking the API key itself.
+Convenience send functions catch errors for request background tasks. Receipt
+functions deliberately raise so durable workers can distinguish accepted,
+rejected, unconfigured and uncertain outcomes. Builders render without sending.
+Provider errors are never logged with credentials or message payloads.
 """
 from __future__ import annotations
 
@@ -238,18 +238,21 @@ def send_contact_notification(
         return False
 
 
-def send_alert_email(
+def send_alert_email_receipt(
     *,
     to: str,
     subject: str,
     body: str,
-) -> bool:
-    """Send an inventory alert email via Resend. Never raises."""
+    idempotency_key: str | None = None,
+) -> str:
+    """Return provider acceptance evidence; the alert worker classifies failures."""
     client = _client()
     if client is None:
-        return False
+        raise RuntimeError("Email provider is not configured.")
 
-    safe_body = body.replace("\n", "<br>")
+    from html import escape
+    safe_body = escape(body).replace("\n", "<br>")
+    safe_subject = escape(subject)
     html = f"""<!doctype html>
 <html><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;">
@@ -257,7 +260,7 @@ def send_alert_email(
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
         <tr><td>
           <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase alert</p>
-          <h2 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#0f172a;">{subject}</h2>
+          <h2 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#0f172a;">{safe_subject}</h2>
           <p style="margin:0 0 24px;color:#334155;font-size:15px;line-height:1.6;">{safe_body}</p>
           <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
           <p style="margin:0;font-size:12px;color:#94a3b8;">skubase &middot; automated inventory alert</p>
@@ -277,11 +280,23 @@ def send_alert_email(
             "text": f"{subject}\n\n{body}\n\n--\nskubase automated alert",
             "tags": [{"name": "category", "value": "alert"}],
         }
-        result = client.Emails.send(params)
-        logger.info("alert email sent: id=%s to=%s", result.get("id"), to)
-        return True
+        result = client.Emails.send(params, {"idempotency_key": idempotency_key} if idempotency_key else None)
+        receipt = result.get("id") if isinstance(result, dict) else None
+        if not receipt:
+            raise RuntimeError("Email provider did not return an acceptance receipt.")
+        logger.info("alert email accepted: id=%s", receipt)
+        return str(receipt)
     except Exception as exc:
-        logger.exception("failed to send alert email to %s: %s", to, exc)
+        raise
+
+
+def send_alert_email(*, to: str, subject: str, body: str) -> bool:
+    """Compatibility wrapper for callers that only need provider acceptance."""
+    try:
+        send_alert_email_receipt(to=to, subject=subject, body=body)
+        return True
+    except Exception:
+        logger.warning("Alert email was not confirmed accepted.")
         return False
 
 
@@ -319,25 +334,23 @@ def send_magic_link_email(email: str, link: str) -> bool:
         return False
 
 
-def send_buy_list_email(
+def build_buy_list_email_params(
     *,
     email: str,
     items: list[dict],
     total_cost: float | None,
     vendor_totals: dict[str, float | None],
-) -> bool:
-    """Send the weekly Monday Buy List digest. Never raises."""
-    client = _client()
-    if client is None:
-        return False
+) -> dict:
+    """Freeze the exact provider request before a scheduled delivery is attempted."""
+    from html import escape
 
     def cost_label(value: float | None) -> str:
         return f"${value:,.0f}" if value is not None else "Unknown — add unit costs"
 
     rows = "".join(
         f"""<tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;">{item['name']}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#475569;font-size:13px;">{item['vendor'] or '-'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;">{escape(str(item['name']))}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#475569;font-size:13px;">{escape(str(item['vendor'] or '-'))}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;text-align:right;">{item['qty']}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:14px;text-align:right;">{cost_label(item['cost'])}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;color:{'#b91c1c' if item['stockout_prob'] >= 0.5 else '#475569'};font-size:13px;text-align:right;">{item['stockout_prob']:.0%}</td>
@@ -345,7 +358,7 @@ def send_buy_list_email(
         for item in items
     )
     vendor_lines = "".join(
-        f'<li style="margin:0 0 4px;color:#475569;font-size:13px;">{vendor or "Unassigned"}: <strong>{cost_label(amount)}</strong></li>'
+        f'<li style="margin:0 0 4px;color:#475569;font-size:13px;">{escape(str(vendor or "Unassigned"))}: <strong>{cost_label(amount)}</strong></li>'
         for vendor, amount in sorted(vendor_totals.items(), key=lambda kv: (kv[1] is not None, kv[1] or 0), reverse=True)
     )
     text_lines = "\n".join(
@@ -384,7 +397,7 @@ def send_buy_list_email(
           <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;">
           <p style="margin:0;font-size:12px;color:#94a3b8;">
             skubase &middot; weekly buy list &middot; manage this email on the
-            <a href="{DEFAULT_PRODUCT_URL}/reports" style="color:#64748b;">Reports page</a>
+            <a href="{DEFAULT_PRODUCT_URL}/purchase-orders" style="color:#64748b;">Purchase Orders page</a>
           </p>
         </td></tr>
       </table>
@@ -392,8 +405,7 @@ def send_buy_list_email(
   </table>
 </body></html>"""
 
-    try:
-        params = {
+    return {
             "from": DEFAULT_FROM,
             "to": [email],
             "reply_to": DEFAULT_REPLY_TO,
@@ -402,19 +414,13 @@ def send_buy_list_email(
             "text": (
                 f"Your weekly skubase buy list ({len(items)} reorders, {cost_label(total_cost)} total):\n\n"
                 f"{text_lines}\n\nOpen PO drafts: {DEFAULT_PRODUCT_URL}/purchase-orders\n"
-                f"Manage this email: {DEFAULT_PRODUCT_URL}/reports\n"
+                f"Manage this email: {DEFAULT_PRODUCT_URL}/purchase-orders\n"
             ),
             "tags": [{"name": "category", "value": "weekly_buy_list"}],
-        }
-        result = client.Emails.send(params)
-        logger.info("buy list email sent: id=%s to=%s", result.get("id"), _mask_email(email))
-        return True
-    except Exception as exc:
-        logger.exception("failed to send buy list email to %s: %s", _mask_email(email), exc)
-        return False
+    }
 
 
-def send_scheduled_report_email(
+def build_scheduled_report_email_params(
     *,
     email: str,
     title: str,
@@ -423,19 +429,17 @@ def send_scheduled_report_email(
     rows: list[list[str]],
     cta_path: str,
     cadence: str,
-) -> bool:
-    """Send a scheduled report digest (Reports page schedules). Never raises."""
-    client = _client()
-    if client is None:
-        return False
+) -> dict:
+    """Build a stable, escaped report request for durable delivery."""
+    from html import escape
 
     header_cells = "".join(
-        f'<th style="padding:8px 10px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:left;">{h}</th>'
+        f'<th style="padding:8px 10px;border-bottom:2px solid #0f172a;color:#64748b;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;text-align:left;">{escape(str(h))}</th>'
         for h in headers
     )
     body_rows = "".join(
         "<tr>" + "".join(
-            f'<td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:13px;">{cell}</td>'
+            f'<td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-size:13px;">{escape(str(cell))}</td>'
             for cell in row
         ) + "</tr>"
         for row in rows
@@ -449,8 +453,8 @@ def send_scheduled_report_email(
       <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
         <tr><td>
           <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase {cadence} report</p>
-          <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#0f172a;">{title}</h1>
-          <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">{intro}</p>
+          <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#0f172a;">{escape(title)}</h1>
+          <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">{escape(intro)}</p>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
             <tr>{header_cells}</tr>
             {body_rows}
@@ -469,8 +473,7 @@ def send_scheduled_report_email(
   </table>
 </body></html>"""
 
-    try:
-        params = {
+    return {
             "from": DEFAULT_FROM,
             "to": [email],
             "reply_to": DEFAULT_REPLY_TO,
@@ -482,10 +485,40 @@ def send_scheduled_report_email(
                 f"Manage delivery: {DEFAULT_PRODUCT_URL}/reports\n"
             ),
             "tags": [{"name": "category", "value": "scheduled_report"}],
-        }
-        result = client.Emails.send(params)
-        logger.info("scheduled report email sent: id=%s to=%s", result.get("id"), _mask_email(email))
+    }
+
+
+class EmailProviderUnavailable(RuntimeError):
+    pass
+
+
+def send_prepared_email_receipt(params: dict, *, idempotency_key: str | None = None) -> str:
+    """Return actual provider acceptance; callers persist/classify uncertain failures."""
+    client = _client()
+    if client is None:
+        raise EmailProviderUnavailable("Email delivery is not configured. Contact support.")
+    result = client.Emails.send(params, {"idempotency_key": idempotency_key} if idempotency_key else None)
+    receipt = result.get("id") if isinstance(result, dict) else None
+    if not receipt:
+        raise RuntimeError("Email provider did not return an acceptance receipt.")
+    return str(receipt)
+
+
+def send_buy_list_email(**kwargs) -> bool:
+    """Compatibility wrapper; recurring jobs use the durable delivery ledger."""
+    try:
+        send_prepared_email_receipt(build_buy_list_email_params(**kwargs))
         return True
-    except Exception as exc:
-        logger.exception("failed to send scheduled report to %s: %s", _mask_email(email), exc)
+    except Exception:
+        logger.warning("Buy-list email acceptance was not confirmed.")
+        return False
+
+
+def send_scheduled_report_email(**kwargs) -> bool:
+    """Compatibility wrapper; recurring jobs use the durable delivery ledger."""
+    try:
+        send_prepared_email_receipt(build_scheduled_report_email_params(**kwargs))
+        return True
+    except Exception:
+        logger.warning("Scheduled-report email acceptance was not confirmed.")
         return False

@@ -2,13 +2,11 @@
 
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const API_BASE = APP_API_BASE_URL;
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
@@ -102,7 +100,7 @@ export default function LoginPage() {
                   placeholder="you@yourstore.com"
                 />
               </label>
-              {error ? <p className="auth-error">{error}</p> : null}
+              {error ? <p className="auth-error" role="alert">{error}</p> : null}
               <button
                 type="submit"
                 disabled={submitting}
@@ -116,14 +114,16 @@ export default function LoginPage() {
               <p className="auth-trial-callout-title">New to skubase?</p>
               <ul className="auth-checklist">
                 <li>Free 14-day trial - no credit card required</li>
-                <li>Connects to Shopify in one click</li>
-                <li>Shows your reorder queue, forecast, and dead stock on day one</li>
+                <li>Import Stocky inventory and ShipStation shipment CSVs</li>
+                <li>Use current stock and sales history to review inventory risks</li>
               </ul>
+              <p className="auth-fine">Skubase is in Shopify App Store review and is not listed yet. <a className="auth-link" href="mailto:info@skubase.io?subject=Skubase%20Shopify%20access">Contact us about Shopify access</a>, or start with CSV imports.</p>
               <p className="auth-fine">Plans from $29/mo after trial - Cancel any time</p>
             </div>
 
             <p className="auth-fine">
               <Link href="/dashboard?demo=1" className="auth-link">View demo first →</Link>
+              {" · "}<Link href="/tools/inventory-health-check" className="auth-link">Try a free inventory health check</Link>
             </p>
           </>
         )}

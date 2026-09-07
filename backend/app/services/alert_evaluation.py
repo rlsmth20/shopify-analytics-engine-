@@ -1,12 +1,12 @@
 """Shared alert evaluation helpers for API routes and background jobs."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from app.db.models import Subscription, User
+from app.db.models import Subscription, User, AlertRuleRecord, NotificationChannelRecord
 from app.schemas_v2 import AlertEvent, NotificationChannel
 from app.services.alerts import EvaluationContext, evaluate, seed_default_rules_and_channels
 from app.services.forecasting import ForecastInputs, forecast_sku
@@ -19,6 +19,9 @@ from app.services.shop_skus import (
     start_weekday_for_shop_history,
 )
 from app.services.supplier_scoring import build_supplier_scorecards
+from app.services.purchase_order_records import load_supplier_observations
+from app.services.notifications import channel_availability
+from app.services.notification_targets import validate_target
 
 
 def current_plan(db: DbSession, user: User) -> str | None:
@@ -36,6 +39,12 @@ def current_plan(db: DbSession, user: User) -> str | None:
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
     if sub is None or sub.status not in ("active", "trialing"):
         return None
+    period_end = sub.current_period_end
+    if period_end is not None:
+        if period_end.tzinfo is None:
+            period_end = period_end.replace(tzinfo=timezone.utc)
+        if period_end + timedelta(days=3) <= datetime.now(timezone.utc):
+            return None
     return sub.plan
 
 
@@ -63,7 +72,9 @@ def allowed_alert_channels(db: DbSession, user: User) -> set[NotificationChannel
         if trial_ends.tzinfo is None:
             trial_ends = trial_ends.replace(tzinfo=timezone.utc)
         if trial_ends > datetime.now(timezone.utc):
-            return set(ALERT_CHANNEL_MIN_TIER.keys())
+            from app.services.shopify_billing import has_active_shopify_connection
+            if not has_active_shopify_connection(db, shop_id=user.shop_id):
+                return set(ALERT_CHANNEL_MIN_TIER.keys())
 
     plan = current_plan(db, user)
     return {
@@ -71,6 +82,29 @@ def allowed_alert_channels(db: DbSession, user: User) -> set[NotificationChannel
         for channel in ALERT_CHANNEL_MIN_TIER
         if plan_allows_alert_channel(plan, channel)
     }
+
+
+def has_enabled_delivery_route(db: DbSession, shop_id: int, allowed_channels=None) -> bool:
+    rule_channels = {channel for channels in db.scalars(select(AlertRuleRecord.channels)
+                    .where(AlertRuleRecord.shop_id == shop_id, AlertRuleRecord.enabled.is_(True))).all()
+                    for channel in (channels or [])}
+    if not rule_channels:
+        return False
+    configs = db.scalars(select(NotificationChannelRecord)
+                        .where(NotificationChannelRecord.channel.like(f"{shop_id}:%"),
+                               NotificationChannelRecord.enabled.is_(True))).all()
+    for config in configs:
+        channel = config.channel.split(":", 1)[1]
+        if channel not in rule_channels or (allowed_channels is not None and channel not in allowed_channels):
+            continue
+        if not channel_availability(channel)[0]:
+            continue
+        try:
+            validate_target(channel, config.target)
+            return True
+        except ValueError:
+            continue
+    return False
 
 
 def build_evaluation_context(db: DbSession, shop_id: int) -> EvaluationContext | None:
@@ -101,11 +135,12 @@ def build_evaluation_context(db: DbSession, shop_id: int) -> EvaluationContext |
         )
         for sku in skus
     ]
-    suppliers = build_supplier_scorecards([], skus)
+    suppliers = build_supplier_scorecards(load_supplier_observations(db, shop_id), skus)
     return EvaluationContext(
         actions=actions,
         forecasts=forecasts,
         supplier_scores=suppliers,
+        sku_metadata={sku.sku_id: {"name": sku.name, "vendor": sku.vendor, "category": sku.category} for sku in skus},
     )
 
 
@@ -117,6 +152,9 @@ def evaluate_shop_alerts(
     cooldown_seconds: int = 0,
 ) -> list[AlertEvent]:
     seed_default_rules_and_channels(user.shop_id)
+    allowed = allowed_alert_channels(db, user)
+    if not dry_run and not has_enabled_delivery_route(db, user.shop_id, allowed):
+        return []
     context = build_evaluation_context(db, user.shop_id)
     if context is None:
         return []
@@ -125,6 +163,6 @@ def evaluate_shop_alerts(
         user.shop_id,
         context,
         deliver_channels=not dry_run,
-        allowed_channels=allowed_alert_channels(db, user),
+        allowed_channels=allowed,
         cooldown_seconds=cooldown_seconds if not dry_run else 0,
     )

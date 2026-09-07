@@ -2,25 +2,26 @@
 
 Turns the Reports page schedule preferences (ReportScheduleRecord rows for
 actions / stockout / dead-stock / reorder) into real emails. Weekly schedules
-go out on Mondays (UTC), monthly on the 1st; DigestSendLog dedups so
-scheduler restarts never double-send.
+are eligible on Mondays (UTC), monthly on the 1st. The shared durable ledger
+freezes each period's email, bounds retries, and holds uncertain outcomes.
 """
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from app.db.models import DigestSendLog, ReportScheduleRecord
+from app.db.models import ReportScheduleRecord
 from app.db.session import SessionLocal
 from app.services.dead_stock import build_liquidation_plan
 from app.services.inventory_engine import build_inventory_actions
 from app.services.reorder_optimizer import build_reorder_suggestions
+from app.services.scheduled_delivery import deliver_scheduled_email
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import load_daily_history_for_shop_skus, load_skus_for_shop
-from app.services.transactional_email import send_scheduled_report_email
+from app.services.transactional_email import build_scheduled_report_email_params
 
 logger = logging.getLogger(__name__)
 
@@ -160,81 +161,32 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
     return None
 
 
-def _already_sent(db: DbSession, *, shop_id: int, digest_type: str, within_days: int) -> bool:
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=within_days)
-    record = db.scalar(
-        select(DigestSendLog)
-        .where(DigestSendLog.shop_id == shop_id)
-        .where(DigestSendLog.digest_type == digest_type)
-        .order_by(DigestSendLog.sent_at.desc())
-        .limit(1)
-    )
-    if record is None or record.sent_at is None:
-        return False
-    sent_at = record.sent_at
-    if sent_at.tzinfo is not None:
-        sent_at = sent_at.astimezone(timezone.utc).replace(tzinfo=None)
-    return sent_at > cutoff
-
-
 def run_scheduled_reports_once(*, force: bool = False) -> int:
-    """Send due scheduled report emails. Returns the number sent."""
+    """Send due reports; return the number of newly recorded provider acceptances."""
     now = datetime.now(timezone.utc)
     sent = 0
     with SessionLocal() as db:
-        schedules = db.scalars(
-            select(ReportScheduleRecord)
+        schedule_ids = db.scalars(
+            select(ReportScheduleRecord.id)
             .where(ReportScheduleRecord.enabled.is_(True))
             .where(ReportScheduleRecord.channel == "email")
+            .where(ReportScheduleRecord.cadence.in_(["weekly", "monthly"]))
             .where(ReportScheduleRecord.report_type.in_(list(REPORT_TITLES)))
         ).all()
-        for schedule in schedules:
-            recipient = (schedule.recipient_email or "").strip()
-            if not recipient or "@" not in recipient:
-                continue
-            cadence = (schedule.cadence or "weekly").lower()
-            if not force:
-                if cadence == "monthly" and now.day != 1:
-                    continue
-                if cadence != "monthly" and now.weekday() != 0:  # Monday
-                    continue
-            digest_type = f"report_{schedule.report_type}"
-            dedup_days = 27 if cadence == "monthly" else 6
-            try:
-                if _already_sent(
-                    db, shop_id=schedule.shop_id, digest_type=digest_type, within_days=dedup_days
-                ):
-                    continue
-                built = build_report_email(
-                    db, shop_id=schedule.shop_id, report_type=schedule.report_type
-                )
-                if built is None:
-                    continue
-                title, intro, headers, rows, cta_path = built
-                delivered = send_scheduled_report_email(
-                    email=recipient,
-                    title=title,
-                    intro=intro,
-                    headers=headers,
-                    rows=rows,
-                    cta_path=cta_path,
-                    cadence=cadence,
-                )
-                if delivered:
-                    db.add(
-                        DigestSendLog(
-                            shop_id=schedule.shop_id,
-                            digest_type=digest_type,
-                            recipient_email=recipient,
-                        )
-                    )
-                    db.commit()
-                    sent += 1
-            except Exception:
-                logger.exception(
-                    "Scheduled report failed shop_id=%s type=%s",
-                    schedule.shop_id,
-                    schedule.report_type,
-                )
-                db.rollback()
+    if not force and now.weekday() != 0 and now.day != 1:
+        return 0
+    for schedule_id in schedule_ids:
+        try:
+            sent += int(deliver_scheduled_email(schedule_id, _prepared_report, force=force))
+        except Exception:
+            logger.exception("Scheduled report failed schedule_id=%s", schedule_id)
     return sent
+
+
+def _prepared_report(db: DbSession, schedule: ReportScheduleRecord) -> dict | None:
+    built = build_report_email(db, shop_id=schedule.shop_id, report_type=schedule.report_type)
+    if built is None:
+        return None
+    title, intro, headers, rows, cta_path = built
+    return build_scheduled_report_email_params(email=schedule.recipient_email.strip(), title=title,
+        intro=intro, headers=headers, rows=rows, cta_path=cta_path, cadence=schedule.cadence)

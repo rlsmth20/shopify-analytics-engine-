@@ -21,7 +21,7 @@ Sources reviewed:
 | Usability, performance, and support | Stocky reviews complain about slow pages, missing filters, no select-all, and poor support after onboarding. Positive reviews reward responsive, tailored support. | Fast action queue, dense filters, bulk actions, high-touch migration support, and clear first-run setup. | Partial. Dashboard/action queue exists. Need stronger filtering, bulk operations, migration checklist, and performance budgets for larger catalogs. | P1 |
 | Supplier and vendor intelligence | Guides and reviews highlight supplier lead times, minimum order quantities, and vendor-specific reorder decisions. | Own "vendors as performers": on-time rate, fill rate, lead-time variance, cost stability, and PO-aware safety stock. | Partial. Supplier scorecards exist, but route currently uses empty PO/receipt observations until receipt history is ingested. | P1 |
 | Bundles, kits, and multi-channel complexity | Bundle handling and multi-channel sync come up repeatedly as reasons merchants outgrow native Shopify. | Handle Shopify bundles/components and import multi-channel history through ShipStation without becoming a full ERP. | Partial. Bundle analyzer service/page exists, but current route returns empty until component mappings land. ShipStation import exists. | P1 |
-| Alerting and escalation | Merchants want alerts that reach the right channel, not just reports they must remember to check. | Alert rules with channel gates: Starter email/Slack, Growth SMS/webhook. | Improved. Plan-gated alert channels now enforced. Fixed alert rules/channels/events to be shop-scoped. | Keep |
+| Alerting and escalation | Merchants want alerts that reach the right channel, not just reports they must remember to check. | Alert rules with channel gates: Starter email/Slack, Growth webhook. SMS is planned, not available. | Improved. Channels require merchant destinations. September 2026 work adds saved test status, durable delivery history, and bounded retries. | Keep |
 
 ## Competitive Gaps We Can Fill
 
@@ -87,7 +87,7 @@ What to build or sharpen:
 - Frontend typecheck passes with `npm run typecheck`.
 - Frontend production build passes with `npm run build`.
 - Backend Python compile passes with `python -m compileall app`.
-- Plan gates are wired backend-side for suppliers, bundles, transfers, liquidation, and Growth-only SMS/webhook alert channels.
+- Plan gates are wired backend-side for suppliers, bundles, transfers, liquidation, and Growth-only webhook alert channels. SMS is reserved in the plan model but delivery is not available.
 - Pricing tiers are centralized in `frontend/lib/plans.ts` and reused by pricing, billing, account, and navigation surfaces.
 - Trial/no-subscription access is gated through `require_active_access()`.
 

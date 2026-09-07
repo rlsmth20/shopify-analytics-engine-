@@ -1,28 +1,14 @@
-"""Notification delivery abstraction.
-
-Provides a single `deliver()` entry point that routes to the configured channel.
-Real credentials are read from environment variables — when they're absent the
-service falls back to an in-memory sink so dev + test runs succeed without
-side effects.
-
-Env vars:
-    SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
-    TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
-    SLACK_WEBHOOK_URL        (default, can be overridden per-alert)
-    GENERIC_WEBHOOK_TIMEOUT  (seconds)
-"""
+"""Notification drivers report provider acceptance, never guaranteed inbox delivery."""
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
-from urllib import request as urllib_request
-from urllib.error import URLError
 
 from app.schemas_v2 import NotificationChannel
+from app.services.notification_targets import NotificationHttpError, post_public_json, validate_target
 
 logger = logging.getLogger(__name__)
 
@@ -36,156 +22,62 @@ class DeliveryRecord:
     delivered: bool
     error: Optional[str] = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    status: str = "accepted"
+    provider_receipt: str | None = None
 
 
-# In-memory sink used for dev / test when credentials aren't configured.
-_DEV_SINK: list[DeliveryRecord] = []
+def channel_availability(channel: str) -> tuple[bool, str]:
+    if channel == "sms":
+        return False, "SMS is planned and is not available yet. Use email or Slack."
+    if channel == "email" and not os.getenv("RESEND_API_KEY"):
+        return False, "The email provider is not configured on the server. Contact support."
+    return True, "Email provider configured; send a test to confirm acceptance." if channel == "email" else "Add your own destination and send a test."
 
 
-def recent_deliveries(limit: int = 50) -> list[DeliveryRecord]:
-    return list(_DEV_SINK[-limit:])
-
-
-def deliver(
-    *,
-    channel: NotificationChannel,
-    target: str,
-    subject: str,
-    body: str,
-) -> DeliveryRecord:
-    """Route a notification to the right channel driver.
-
-    Returns a DeliveryRecord regardless of success so callers can log the attempt.
-    """
+def deliver(*, channel: NotificationChannel, target: str, subject: str, body: str,
+            idempotency_key: str | None = None) -> DeliveryRecord:
+    record = DeliveryRecord(channel, target, subject, body, delivered=False, status="failed")
+    available, reason = channel_availability(channel)
+    if not available:
+        record.status, record.error = "unavailable", reason
+        return record
     try:
+        target = validate_target(channel, target)
         if channel == "email":
-            _send_email(target, subject, body)
-        elif channel == "sms":
-            _send_sms(target, body)
+            from app.services.transactional_email import send_alert_email_receipt
+            record.provider_receipt = send_alert_email_receipt(to=target, subject=subject, body=body,
+                                                               idempotency_key=idempotency_key)
         elif channel == "slack":
-            _send_slack(target, subject, body)
-        elif channel == "webhook":
-            _send_webhook(target, subject, body)
+            post_public_json(target, {"text": f"*{subject}*\n{body}"})
         else:
-            raise ValueError(f"Unknown notification channel: {channel}")
-
-        record = DeliveryRecord(
-            channel=channel,
-            target=target,
-            subject=subject,
-            body=body,
-            delivered=True,
-        )
-    except Exception as exc:  # noqa: BLE001 — we deliberately capture any driver failure
-        logger.exception("Notification delivery failed on channel=%s target=%s", channel, target)
-        record = DeliveryRecord(
-            channel=channel,
-            target=target,
-            subject=subject,
-            body=body,
-            delivered=False,
-            error=str(exc),
-        )
-
-    _DEV_SINK.append(record)
+            try:
+                timeout = int(os.getenv("GENERIC_WEBHOOK_TIMEOUT", "10"))
+            except ValueError:
+                timeout = 10
+            post_public_json(target, {"subject": subject, "body": body,
+                             "emitted_at": datetime.now(timezone.utc).isoformat(), "source": "skubase"}, timeout=timeout)
+        record.delivered, record.status = True, "accepted"
+    except ValueError:
+        record.status, record.error = "unavailable", "The destination or provider request is invalid. Review the channel settings."
+    except NotificationHttpError as exc:
+        record.status = "failed" if exc.status == 429 or exc.status >= 500 else "unavailable"
+        record.error = str(exc)
+    except Exception as exc:
+        # A lost response can follow acceptance. Never silently replay an
+        # uncertain non-idempotent Slack/webhook send.
+        status_code = getattr(exc, "status_code", getattr(exc, "code", None))
+        try:
+            status_code = int(status_code)
+        except (TypeError, ValueError):
+            status_code = None
+        if getattr(exc, "error_type", None) == "HttpClientError":
+            record.status, record.error = "unknown", "Email provider acceptance could not be confirmed. Check the destination before retrying."
+        elif isinstance(status_code, int):
+            record.status = "failed" if status_code == 429 or status_code >= 500 else "unavailable"
+            record.error = f"Email provider returned HTTP {status_code}."
+        elif isinstance(exc, ConnectionRefusedError):
+            record.status, record.error = "failed", "The notification endpoint could not be reached."
+        else:
+            record.status, record.error = "unknown", "Provider acceptance could not be confirmed. Check the destination before retrying."
+        logger.warning("Notification acceptance not confirmed; channel=%s status=%s", channel, record.status)
     return record
-
-
-# ---------------------------------------------------------------------------
-# Channel drivers
-# ---------------------------------------------------------------------------
-
-def _send_email(target: str, subject: str, body: str) -> None:
-    from app.services.transactional_email import send_alert_email
-
-    sent = send_alert_email(to=target, subject=subject, body=body)
-    if not sent:
-        raise RuntimeError(
-            "Email provider is not configured or rejected the alert email."
-        )
-
-
-def _is_development() -> bool:
-    return os.getenv("ENVIRONMENT", "production").lower() == "development"
-
-
-def _send_sms(target: str, body: str) -> None:
-    sid = os.getenv("TWILIO_ACCOUNT_SID")
-    token = os.getenv("TWILIO_AUTH_TOKEN")
-    sender = os.getenv("TWILIO_FROM")
-    if not (sid and token and sender):
-        if _is_development():
-            logger.info("[dev-sms] to=%s body=%s", target, body[:80])
-            return
-        # Never pretend a production alert was sent when it wasn't.
-        raise RuntimeError(
-            "SMS delivery is not configured on the server (Twilio credentials "
-            "missing). Use email or Slack until SMS is enabled."
-        )
-
-    url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
-    data = f"From={sender}&To={target}&Body={body[:1400]}".encode("utf-8")
-    req = urllib_request.Request(url, data=data, method="POST")
-    basic = f"{sid}:{token}".encode("utf-8")
-    import base64
-
-    req.add_header("Authorization", b"Basic " + base64.b64encode(basic))
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    try:
-        with urllib_request.urlopen(req, timeout=10):
-            pass
-    except URLError as exc:
-        raise RuntimeError(f"Twilio request failed: {exc}") from exc
-
-
-def _send_slack(webhook_url: str, subject: str, body: str) -> None:
-    if not webhook_url:
-        webhook_url = os.getenv("SLACK_WEBHOOK_URL", "")
-    if not webhook_url:
-        if _is_development():
-            logger.info("[dev-slack] subject=%s", subject)
-            return
-        raise RuntimeError(
-            "No Slack webhook URL is configured for this alert. Paste your "
-            "Slack incoming-webhook URL into the channel target."
-        )
-
-    payload = {
-        "text": f"*{subject}*\n{body}",
-        "attachments": [
-            {
-                "color": "#e43d3d",
-                "fields": [{"title": subject, "value": body, "short": False}],
-            }
-        ],
-    }
-    req = urllib_request.Request(
-        webhook_url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib_request.urlopen(req, timeout=10):
-            pass
-    except URLError as exc:
-        raise RuntimeError(f"Slack webhook failed: {exc}") from exc
-
-
-def _send_webhook(target: str, subject: str, body: str) -> None:
-    payload = {
-        "subject": subject,
-        "body": body,
-        "emitted_at": datetime.now(timezone.utc).isoformat(),
-        "source": "skubase",
-    }
-    timeout = int(os.getenv("GENERIC_WEBHOOK_TIMEOUT", "10"))
-    req = urllib_request.Request(
-        target,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib_request.urlopen(req, timeout=timeout):
-            pass
-    except URLError as exc:
-        raise RuntimeError(f"Webhook delivery failed: {exc}") from exc

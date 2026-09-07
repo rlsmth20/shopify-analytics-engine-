@@ -22,6 +22,11 @@ def build(history):
 
 
 class DashboardForecastVarianceTests(unittest.TestCase):
+    def setUp(self):
+        history_patch = patch.object(dashboard, "list_recent_events", return_value=[])
+        history_patch.start()
+        self.addCleanup(history_patch.stop)
+
     def test_matching_held_out_week_is_zero_variance_even_when_monthly_average_differs(self):
         training = [10] * 83
         forecast = SimpleNamespace(
