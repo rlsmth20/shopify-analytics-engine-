@@ -1,6 +1,6 @@
 # Second outreach batch — explicit app benefits
 
-Owner authorized continued outreach September 7 and requested clearer app benefits and collaboration on missing features. Follow [messaging revision 2](outreach-messaging.md). Preserve [batch 1](campaign-2026-09-07.md) as ten contacts with its original messages. This batch targets up to ten additional distinct merchants, twenty total; do not treat targets as achieved users. Currently two new contacts, twelve overall; no merchant response observed at the latest check around 14:20 UTC.
+Owner authorized continued outreach September 7 and requested clearer app benefits and collaboration on missing features. Follow [messaging revision 2](outreach-messaging.md). Preserve [batch 1](campaign-2026-09-07.md) as ten contacts with its original messages. This batch targets up to ten additional distinct merchants, twenty total; do not treat targets as achieved users. Currently three new contacts, thirteen overall; no merchant response observed at the latest check around 14:28 UTC.
 
 Experiment: `app-benefit-outreach-v2-20260907`, ID `18a70fab05194d88a0e0358e15d22efa`. Owner-direction evidence 4196; outreach skill version 2 activated after schema/tool validation. This is a message hypothesis, not evidence of higher conversion. Prioritize merchant-reported pain, retain channel distinctions, and record unknowns. Advertising $0, no new paid services, three free-check slots still available.
 
@@ -32,13 +32,28 @@ Receipt: [Skubase reply 15](https://community.shopify.com/t/what-are-the-best-pr
 >
 > Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store.
 
+### 13. VBUstore — sent
+
+Source: [merchant requests forecasting and reorder tools](https://community.shopify.com/t/good-inventory-forecasting-tools-on-shopify/579849). Merchant requests demand planning/reorder suggestions and avoiding overselling; sells on other channels and calls cross-platform sync a bonus. Original request December 2025; current need and adoption UNKNOWN. Live page had no selected solution, with vendor replies through August 31. Stored opportunity evidence 808 existed; no contact, suppression or previous sent evidence found. Fit is conditional for reorder planning; marketplace stock synchronization is explicitly unverified.
+
+Receipt: [Skubase reply 25](https://community.shopify.com/t/good-inventory-forecasting-tools-on-shopify/579849/25). Published September 7 around 14:27 UTC under Skubase, replying to original merchant post. Verified new post heading and full submitted text. No response observed at publication. Exact submitted body:
+
+> @VBUstore If you're still evaluating the reorder side, Skubase is our inventory-planning app for Shopify merchants. It uses recent sales, stock on hand and supplier lead-time settings to estimate days of cover and prioritize which products need replenishing.
+>
+> For your multi-channel setup, first check that the sales used for planning include every channel drawing from the same stock. Otherwise even a sensible reorder formula can underestimate demand. Skubase is not a verified cross-channel inventory-sync solution, so I wouldn't claim it fixes overselling caused by delayed marketplace updates.
+>
+> Would a free health check on five regularly replenished products help you compare reorder priorities with your current process? If a required workflow is missing, we can work with you to understand it and explore a practical solution. The check has no purchase obligation; ongoing app subscriptions are separate.
+>
+> Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store.
+
 ## Exclusions and next action
 
 - dr_anderson's slow-stock thread 677382 shifts into repeated willingness-to-pay research for a proposed tool; merchant identity unverified. No pitch.
 - REBRecords thread 639374 is closed. No reply attempted and no private-message workaround.
 - woysanstore thread 628799 has a marked solution and needs Amazon/FBA synchronization beyond the verified Skubase capability. No pitch.
 - petgrocer thread 589102: merchant reports leaving Shopify POS; skip. rangerstation2 already chose SupplyWatch; skip. General lead-time thread 675803 is dominated by app builders; original poster's merchant identity remains unverified, so no pitch.
-- Current batch has two contacts; continue up to eight more with evidence-backed fit. Check responses first. Do not send repeated generic pitches or follow up on first-batch forms that promised none.
+- Sambelina thread 414578 / stored opportunity 750: live page explicitly marks Inventory Planner answer SOLVED, despite its AI topic summary claiming no selection. No outreach. Prioritize the actual solution marker and latest merchant statements over generated summaries.
+- Current batch has three contacts; continue up to seven more with evidence-backed fit. Check responses first. Do not send repeated generic pitches or follow up on first-batch forms that promised none. Retrieve existing bounded opportunities before repeating broad keyword searches; this wake rediscovered two already stored sources. Prefer recent merchant-authored activity when choosing the next candidate.
 
 Record feature requests as product feedback with a concrete workflow, sample data needs, commercial evidence and confidence. A request to discuss a missing feature is not a promised implementation or proof of willingness to pay. Continue the current heartbeat and carry messaging revision 2 into the restored daily review and subsequent outreach.
 
@@ -47,3 +62,7 @@ First batch2 receipt: evidence 4219; initial session usage `e65060e1974f41c29115
 Continuation check September 7 around 14:20 UTC: community notification list showed no merchant replies; dedicated info@skubase.io inbox showed only setup tests and Google messages; persistent inbound records likewise contained only Workspace messages. No qualified-user or revenue outcome is inferred from publication. Search results repeatedly mixed merchants with app vendors and resolved problems; apply those exclusions before future research. Model tokens/cost are UNKNOWN; advertising and new paid services remain $0.
 
 Durable import confirmed: new contact receipt evidence 4293, response-check evidence 4296, continuation usage `730c8fdce3a54a2da82868a478241f12`. Campaign memory records twelve contacts, two in batch2, eight remaining. Existing continuation heartbeat verified ACTIVE; no duplicate automation created.
+
+Heartbeat September 7, 14:24 UTC: one new merchant contacted above. Community notifications showed only the existing system welcome; bounded persistent inbound remained Workspace messages. Business inbox checked again around 14:28 UTC showed system/setup messages only. Five focused search/page reads plus live candidate validation were used; no further discovery this wake. No qualified users, requests or revenue inferred from a sent reply. Advertising $0, no new paid services; model tokens and cost UNKNOWN. Next wake should reuse stored opportunities, validate current relevance, and continue the seven remaining contacts while prioritizing responses.
+
+Heartbeat durable receipts verified: VBUstore send evidence 4354; solved-opportunity exclusion 4357; response-check evidence 4359; usage `dab91e1fd3a24859943056c2b5d47044`. Campaign and working memory record thirteen contacts and seven remaining. The 08:00 Pacific schedule-restoration condition has not yet been reached.
