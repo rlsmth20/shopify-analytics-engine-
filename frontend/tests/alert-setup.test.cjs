@@ -20,6 +20,13 @@ const setup = load("../lib/alert-setup.ts");
 const channel = { channel: "email", target: "inventory@merchant.test", enabled: true, verified: true, available: true, configured: true };
 const rule = { id: "rule", name: "Inventory rule", trigger: "stockout_risk", enabled: true, channels: ["email"], target_skus: [], categories: [], tags: [], collections: [], locations: [], suppliers: [] };
 
+test("network failures give merchants a recovery step without internal URLs", () => {
+  const message = setup.alertError(new Error("Could not reach the Skubase API for /alerts/events. Browser origin: http://localhost:3010. API URL: http://localhost:8010/alerts/events. Failed to fetch"), "Unavailable");
+  assert.match(message, /Check your connection and retry/);
+  assert.doesNotMatch(message, /localhost|API URL|Browser origin/);
+  assert.equal(setup.alertError(new Error("Enter a valid destination."), "Unavailable"), "Enter a valid destination.");
+});
+
 test("enabled does not imply a ready delivery channel", () => {
   for (const change of [{ available: false }, { available: undefined }, { configured: false }, { verified: false }, { enabled: false }, { target: "" }, { target: "alerts@example.com" }]) {
     assert.equal(setup.channelState({ ...channel, ...change }, true).ready, false);
@@ -84,6 +91,7 @@ function renderChannel(config = channel, { testResult, failSave = false, failTes
     react: { useEffect() {}, useState(initial) { const key = cursor++; if (!states.has(key)) states.set(key, initial); return [states.get(key), (value) => states.set(key, typeof value === "function" ? value(states.get(key)) : value)]; } },
     "next/link": { __esModule: true, default: "a" },
     "@/components/data-quality-note": { DataQualityNote: "DataQualityNote" },
+    "@/components/alert-destination-help": { AlertDestinationHelp: "AlertDestinationHelp" },
     "@/components/auth-guard": {}, "@/lib/entitlements": {}, "@/lib/plans": {},
     "@/lib/api-v2": api, "@/lib/alert-setup": setup,
     "./page.module.css": { __esModule: true, default: {} },

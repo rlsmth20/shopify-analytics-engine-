@@ -37,7 +37,7 @@ function harness({ status = 200, body = valid } = {}) {
   };
   vm.runInNewContext(compiled, {
     exports, Number, Array, Error, encodeURIComponent,
-    FormData: class { append() {} },
+    FormData: class { constructor() { this.values = new Map(); } append(name, value) { this.values.set(name, value); } get(name) { return this.values.get(name); } },
     require(name) { if (!(name in dependencies)) throw new Error(`Unexpected import ${name}`); return dependencies[name]; },
   });
   function render() {
@@ -52,8 +52,9 @@ function harness({ status = 200, body = valid } = {}) {
     walk(exports.default());
     return { nodes, text: texts.join(" ") };
   }
-  async function submit(file = { name: "shipments.csv", size: 100 }) {
+  async function submit(file = { name: "shipments.csv", size: 100 }, sourceScope) {
     render().nodes.find(node => node.type === "input" && node.props.type === "file").props.onChange({ target: { files: [file] } });
+    if (sourceScope) render().nodes.find(node => node.type === "select" && node.props.id === "shipment-source-scope").props.onChange({ target: { value: sourceScope } });
     await render().nodes.find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
     return render();
   }
@@ -77,6 +78,8 @@ test("a partial successful import retains row issues and hands off to current in
   assert.match(ui.text, /Imported 2 shipment line items/);
   assert.match(ui.text, /Row 4: unparseable date/);
   assert.match(ui.text, /Shipment history does not include stock on hand/);
+  assert.match(ui.text, /does not report duplicate or overlap checks/);
+  assert.equal(ui.nodes.some(node => node.type === "li" && Array.isArray(node.props.children) && node.props.children.includes(" already recorded")), false);
   assert.ok(ui.nodes.some(node => node.type === "a" && node.props.href === "/import-stocky" && node.props.children === "Add current inventory"));
   assert.ok(ui.nodes.some(node => node.type === "a" && node.props.href === "/actions"));
 });
@@ -104,4 +107,57 @@ test("expired access has a billing recovery link and signed-out uploads preserve
   const signedOut = harness({ status: 401, body: {} });
   await signedOut.submit();
   assert.deepEqual(signedOut.redirects, ["/login?return_to=%2Fimport-shipstation"]);
+});
+
+const ledgerResult = {
+  ...valid, batch_id: "shipment-batch-7", replayed: false, source_scope: "unknown", rows_processed: 9,
+  line_items_inserted: 2, rows_skipped: 7, duplicate_rows: 2, rows_held: 3,
+  shopify_rows_excluded: 1, invalid_rows: 1, hold_reasons: ["Row 5: sales channel is unknown"],
+};
+
+test("the source defaults unknown and only an explicit choice submits the non-Shopify confirmation", async () => {
+  const unknown = harness();
+  await unknown.submit();
+  assert.equal(unknown.calls[0].options.body.get("source_scope"), "unknown");
+  const confirmed = harness();
+  await confirmed.submit(undefined, "non_shopify");
+  assert.equal(confirmed.calls[0].options.body.get("source_scope"), "non_shopify");
+  confirmed.render().nodes.find(node => node.type === "input" && node.props.type === "file").props.onChange({ target: { files: [{ name: "another.csv", size: 5 }] } });
+  assert.equal(confirmed.render().nodes.find(node => node.type === "select").props.value, "unknown");
+});
+
+test("partial imports show disjoint counts and do not present held rows as added sales", async () => {
+  const ui = await harness({ body: ledgerResult }).submit();
+  assert.match(ui.text, /Imported 2 shipment line items/);
+  for (const text of ["newly imported", "already recorded", "held for review", "Shopify rows excluded", "invalid rows", "Row 5: sales channel is unknown", "Held rows have not been added"]) assert.ok(ui.text.includes(text), text);
+  assert.match(ui.text, /Only non-Shopify orders/);
+  assert.match(ui.text, /newly imported rows/);
+});
+
+test("an exact replay is a no-op, not a failed import or a repeat success claim", async () => {
+  const body = { ...ledgerResult, replayed: true, line_items_inserted: 0, rows_processed: 9, rows_skipped: 9,
+    duplicate_rows: 9, rows_held: 0, shopify_rows_excluded: 0, invalid_rows: 0, hold_reasons: [], skip_reasons: [] };
+  const ui = await harness({ body }).submit();
+  assert.match(ui.text, /already checked. No new shipment rows were added/);
+  assert.equal(ui.nodes.some(node => node.props?.role === "alert"), false);
+  assert.equal(ui.nodes.some(node => node.type === "table"), false);
+  assert.doesNotMatch(ui.text, /Imported 2 shipment|Add current inventory/);
+  assert.ok(ui.nodes.some(node => node.type === "a" && node.props.href === "/actions"));
+});
+
+test("held-only replays keep the review action and cannot imply useful data was imported", async () => {
+  const body = { ...ledgerResult, replayed: true, rows_processed: 9, line_items_inserted: 0, rows_skipped: 9,
+    duplicate_rows: 0, rows_held: 9, shopify_rows_excluded: 0, invalid_rows: 0 };
+  const ui = await harness({ body }).submit();
+  assert.match(ui.text, /Held rows have not been added/);
+  assert.equal(ui.nodes.some(node => node.type === "table"), false);
+  assert.equal(ui.nodes.some(node => node.type === "a" && node.props.href === "/actions"), false);
+});
+
+test("contradictory duplicate counts and replay success cannot become confirmed results", async () => {
+  for (const body of [{ ...ledgerResult, duplicate_rows: -1 }, { ...ledgerResult, rows_skipped: 1 }, { ...ledgerResult, replayed: true }, { ...ledgerResult, hold_reasons: [false] }]) {
+    const ui = await harness({ body }).submit();
+    assert.match(ui.text, /result could not be confirmed/);
+    assert.doesNotMatch(ui.text, /Imported 2 shipment/);
+  }
 });

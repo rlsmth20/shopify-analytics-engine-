@@ -22,10 +22,26 @@ type ImportResult = {
   inventory_rows_inserted: number;
   rows_skipped: number;
   skip_reasons: string[];
+  inventory_source?: "shopify" | "csv";
+  inventory_rows_skipped?: number;
+  warnings?: string[];
 };
 
 const API_BASE = APP_API_BASE_URL;
 const MAX_CSV_BYTES = 25 * 1024 * 1024;
+
+function isImportResult(value: unknown): value is ImportResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  const counts = ["shop_id", "products_processed", "products_inserted", "products_updated", "inventory_rows_inserted", "rows_skipped"];
+  if (!counts.every((key) => typeof result[key] === "number" && Number.isSafeInteger(result[key]) && Number(result[key]) >= 0) ||
+    typeof result.shopify_domain !== "string" || !Array.isArray(result.skip_reasons) ||
+    !result.skip_reasons.every((reason) => typeof reason === "string")) return false;
+  if (result.inventory_source !== undefined && !["shopify", "csv"].includes(String(result.inventory_source))) return false;
+  if (result.inventory_rows_skipped !== undefined && (!Number.isSafeInteger(result.inventory_rows_skipped) || Number(result.inventory_rows_skipped) < 0)) return false;
+  if (result.warnings !== undefined && (!Array.isArray(result.warnings) || !result.warnings.every((warning) => typeof warning === "string"))) return false;
+  return true;
+}
 
 export default function ImportStockyPage() {
   const router = useRouter();
@@ -42,6 +58,7 @@ export default function ImportStockyPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
     setError(null);
     setUpgradeNeeded(false);
     setResult(null);
@@ -77,7 +94,8 @@ export default function ImportStockyPage() {
         return;
       }
       if (!res.ok) throw new Error(body?.detail || `Import failed (${res.status}).`);
-      setResult(body as ImportResult);
+      if (!isImportResult(body)) throw new Error("The import result could not be confirmed. Check your catalog before uploading again, or contact info@skubase.io for help.");
+      setResult(body);
     } catch (err) {
       setError(importErrorMessage(err));
     } finally {
@@ -105,7 +123,7 @@ export default function ImportStockyPage() {
         <p className="marketing-eyebrow">Stocky migration</p>
         <h1 className="marketing-hero-title">Move your Stocky catalog to skubase.</h1>
         <p className="marketing-hero-sub">
-          Upload your Stocky products CSV and we&apos;ll import your SKUs, vendors, and inventory into your skubase workspace.
+          Import product details from your Stocky CSV. If Shopify is connected or its catalog is already synced, Shopify remains the source for stock on hand.
         </p>
       </section>
 
@@ -120,7 +138,7 @@ export default function ImportStockyPage() {
                 type="file"
                 accept=".csv,text/csv"
                 className="input-control import-input"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => { setFile(e.target.files?.[0] ?? null); setResult(null); setError(null); }}
                 disabled={submitting}
                 required
               />
@@ -141,7 +159,7 @@ export default function ImportStockyPage() {
 
           {error ? (
             <div className="import-error" role="alert">
-              <strong>Import failed.</strong> {error}
+                <strong>Import needs attention.</strong> {error}
               {upgradeNeeded ? (
                 <>
                   {" "}
@@ -154,22 +172,32 @@ export default function ImportStockyPage() {
           ) : null}
 
           {result ? (
-            <div className="import-success" role="status">
+            <div className="import-success" role={result.products_inserted + result.products_updated > 0 ? "status" : "alert"}>
               <p className="import-success-title">
-                Imported {result.products_inserted + result.products_updated} products.
+                {result.products_inserted + result.products_updated > 0
+                  ? `Imported or updated ${result.products_inserted + result.products_updated} product records.`
+                  : "No product records changed."}
               </p>
+              {result.inventory_source === "shopify" ? <p className="import-help">Shopify stock on hand was preserved. This CSV can update matching product details, such as costs and lead times, but does not add another inventory count.</p> : null}
+              {result.inventory_source === "csv" ? <p className="import-help">Stock on hand comes from this CSV snapshot. Keep it up to date; this file does not include sales history.</p> : null}
               <ul className="import-success-stats">
                 <li><strong>{result.products_processed}</strong> rows processed</li>
                 <li><strong>{result.products_inserted}</strong> new products</li>
                 <li><strong>{result.products_updated}</strong> updated</li>
-                <li><strong>{result.inventory_rows_inserted}</strong> inventory rows</li>
+                <li><strong>{result.inventory_rows_inserted}</strong> new inventory records</li>
+                {typeof result.inventory_rows_skipped === "number" && result.inventory_rows_skipped > 0 ? <li><strong>{result.inventory_rows_skipped}</strong> inventory rows kept unchanged</li> : null}
                 {result.rows_skipped > 0 ? (
                   <li><strong>{result.rows_skipped}</strong> rows skipped</li>
                 ) : null}
               </ul>
-              <Link href="/dashboard" className="button button-primary button-lg">
-                Open my dashboard →
-              </Link>
+              {result.warnings?.length ? <ul className="import-help">{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : null}
+              {result.skip_reasons.length ? <details className="import-help" open={result.products_inserted + result.products_updated === 0}><summary>Review skipped rows</summary><ul>{result.skip_reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul></details> : null}
+              <div className="button-row">
+                <Link href={result.inventory_source === "shopify" ? "/store-sync" : "/dashboard"} className="button button-primary button-lg">
+                  {result.inventory_source === "shopify" ? "Check Shopify sync" : "Review my inventory"}
+                </Link>
+                <a href="mailto:info@skubase.io" className="button button-secondary">Get import help</a>
+              </div>
             </div>
           ) : null}
         </form>
@@ -177,8 +205,8 @@ export default function ImportStockyPage() {
         <aside className="import-side">
           <h3 className="import-side-title">What happens next</h3>
           <ol className="import-side-list">
-            <li>Your products land in skubase&apos;s catalog.</li>
-            <li>The action engine ranks them within seconds.</li>
+            <li>Review which products were imported, updated, or skipped.</li>
+            <li>Reorder recommendations also need usable sales history. A stock snapshot alone cannot establish demand.</li>
             <li>Set vendor lead times on the <Link href="/lead-time-settings">Lead Times</Link> page.</li>
             <li>Connect Shopify on the <Link href="/store-sync">Store Sync</Link> page when ready.</li>
           </ol>
@@ -200,30 +228,15 @@ export default function ImportStockyPage() {
 async function postStockyImport(formData: FormData): Promise<Response> {
   const embedded = getEmbeddedShopifyContext() !== null;
   const primaryUrl = embedded ? "/api/stocky-import" : `${API_BASE}/integrations/stocky/import`;
-  const fallbackUrl = embedded ? `${API_BASE}/integrations/stocky/import` : "/api/stocky-import";
-
-  try {
-    return await authenticatedFetch(primaryUrl, {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-  } catch (error) {
-    if (!isNetworkFetchError(error)) throw error;
-    return authenticatedFetch(fallbackUrl, {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-  }
+  return authenticatedFetch(primaryUrl, { method: "POST", body: formData, credentials: "include" });
 }
 
 function importErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (isNetworkFetchError(error)) {
     return (
-      "Could not reach the Skubase import service. Refresh the page and try again. " +
-      "If this keeps happening, contact support with your browser, store domain, and CSV file size."
+      "The connection ended before we could confirm the import result. It may already have been saved. " +
+      "Check your catalog before uploading again, or contact info@skubase.io with your store domain and CSV file size."
     );
   }
   return message;

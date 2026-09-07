@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { GatedFeature } from "@/components/gated-feature";
@@ -23,6 +23,8 @@ import {
   type VendorLeadTimeEntry
 } from "@/lib/api";
 import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
+import { useAuth } from "@/components/auth-guard";
+import styles from "./page.module.css";
 
 type OverrideRow = {
   id: string;
@@ -39,6 +41,12 @@ type SkuOverrideRow = OverrideRow & {
 type LeadTimeSource = "sku" | "supplier" | "category" | "global";
 const SKU_SEARCH_MIN_LENGTH = 2;
 const SKU_OVERRIDE_PAGE_SIZE = 25;
+const WRITE_SECTIONS = ["defaults", "suppliers", "categories", "skus"] as const;
+const LOAD_SECTIONS = [...WRITE_SECTIONS, "catalog"] as const;
+type WriteSection = typeof WRITE_SECTIONS[number];
+type LoadSection = typeof LOAD_SECTIONS[number];
+type LoadStatus = { status: "loading" | "ready" | "error"; error?: string };
+const SECTION_LABELS: Record<LoadSection, string> = { defaults: "Global defaults", suppliers: "Supplier rules", categories: "Category rules", skus: "SKU rules", catalog: "Product lookup" };
 
 export default function LeadTimeSettingsPage() {
   return (
@@ -53,9 +61,12 @@ export default function LeadTimeSettingsPage() {
 }
 
 function LeadTimeSettingsContent() {
+  const { user } = useAuth();
+  const demo = user.id === 0;
   const { shopifyDomain, setShopifyDomain, hasHydrated } = useStoredShopDomain();
   const [defaultLeadTimeDays, setDefaultLeadTimeDays] = useState("14");
   const [safetyBufferDays, setSafetyBufferDays] = useState("7");
+  // Preserve the compatibility field exactly as loaded; it is not a live-data control.
   const [allowMockFallback, setAllowMockFallback] = useState(true);
   const [supplierRows, setSupplierRows] = useState<OverrideRow[]>([]);
   const [categoryRows, setCategoryRows] = useState<OverrideRow[]>([]);
@@ -68,6 +79,13 @@ function LeadTimeSettingsContent() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [loadStates, setLoadStates] = useState<Record<LoadSection, LoadStatus>>(() => Object.fromEntries(LOAD_SECTIONS.map(key => [key, { status: "loading" }])) as Record<LoadSection, LoadStatus>);
+  const savedSignatures = useRef<Partial<Record<WriteSection, string>>>({});
+  const loadController = useRef<AbortController | null>(null);
+  const saveController = useRef<AbortController | null>(null);
+  const catalogRef = useRef<SkuDetail[]>([]);
+  const settingsConfirmed = WRITE_SECTIONS.every(key => loadStates[key].status === "ready");
+  const failedLoads = LOAD_SECTIONS.filter(key => loadStates[key].status === "error");
 
   const supplierNames = useMemo(
     () => uniqueValues(syncedSkus.map((sku) => sku.vendor)),
@@ -113,9 +131,21 @@ function LeadTimeSettingsContent() {
     Math.ceil(skuRows.length / SKU_OVERRIDE_PAGE_SIZE)
   );
 
+  const draftValid = useMemo(() => {
+    try {
+      if (!defaultLeadTimeDays.trim() || !safetyBufferDays.trim()
+        || !Number.isSafeInteger(Number(defaultLeadTimeDays)) || Number(defaultLeadTimeDays) < 1
+        || !Number.isSafeInteger(Number(safetyBufferDays)) || Number(safetyBufferDays) < 0) return false;
+      parseOverrideRows(supplierRows, "Supplier");
+      parseOverrideRows(categoryRows, "Category");
+      parseOverrideRows(skuRows, "SKU");
+      return true;
+    } catch { return false; }
+  }, [defaultLeadTimeDays, safetyBufferDays, supplierRows, categoryRows, skuRows]);
+
   const effectivePreview = useMemo(
     () =>
-      syncedSkus.slice(0, 8).map((sku) =>
+      (draftValid ? syncedSkus.slice(0, 8) : []).map((sku) =>
         resolveEffectiveLeadTime({
           sku,
           defaultLeadTimeDays,
@@ -124,83 +154,93 @@ function LeadTimeSettingsContent() {
           categoryMap
         })
       ),
-    [categoryMap, defaultLeadTimeDays, skuMap, supplierMap, syncedSkus]
+    [categoryMap, defaultLeadTimeDays, skuMap, supplierMap, syncedSkus, draftValid]
   );
 
-  async function loadSettings(domain: string) {
+  async function loadSettings(domain: string, sections: readonly LoadSection[] = LOAD_SECTIONS) {
+    if (demo) return;
     const targetDomain = domain.trim() || "current-shop";
-
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
     setIsLoadingSettings(true);
     setSettingsError(null);
     setSettingsNotice(null);
-
-    try {
-      const [settings, vendorLeadTimes, categoryLeadTimes, skuLeadTimes, skus] =
-        await Promise.all([
-          fetchShopSettings(targetDomain),
-          fetchVendorLeadTimes(targetDomain),
-          fetchCategoryLeadTimes(targetDomain),
-          fetchSkuLeadTimes(targetDomain),
-          fetchSkus()
-        ]);
-      applyShopSettings(settings);
-      setShopifyDomain(settings.shopify_domain);
-      setSyncedSkus(skus);
-      setSupplierRows(
-        withEmptyFallback(
-          vendorLeadTimes.items.map((item) =>
-            buildOverrideRow(item.vendor, item.lead_time_days)
-          )
-        )
-      );
-      setCategoryRows(
-        withEmptyFallback(
-          categoryLeadTimes.items.map((item) =>
-            buildOverrideRow(item.category, item.lead_time_days)
-          )
-        )
-      );
-      setSkuRows(
-        skuLeadTimes.items.map((item) => {
-          const sku = skus.find((candidate) => candidate.sku_id === item.sku_id);
-          return buildSkuRow(item.sku_id, item.lead_time_days ?? "", sku);
-        })
-      );
-      setSkuOverridePage(1);
-      setSettingsNotice(
-        settings.is_persisted
-          ? "Loaded saved lead-time rules. SKU overrides beat supplier and category defaults."
-          : "Loaded default lead-time rules. Add supplier, category, or SKU overrides as needed."
-      );
-    } catch (error) {
-      setSettingsError(
-        error instanceof Error
-          ? error.message
-          : "The shop settings could not be loaded."
-      );
-    } finally {
-      setIsLoadingSettings(false);
-    }
+    setLoadStates(previous => ({ ...previous, ...Object.fromEntries(sections.map(key => [key, { status: "loading" }])) }));
+    const loaders: Record<LoadSection, () => Promise<void>> = {
+      defaults: async () => {
+        const settings = confirmSettings(await fetchShopSettings(targetDomain, controller.signal));
+        if (controller.signal.aborted) return;
+        applyShopSettings(settings);
+        setShopifyDomain(settings.shopify_domain);
+        savedSignatures.current.defaults = settingsSignature(settings);
+      },
+      suppliers: async () => {
+        const items = confirmOverrides(await fetchVendorLeadTimes(targetDomain, controller.signal), "vendor");
+        if (controller.signal.aborted) return;
+        setSupplierRows(withEmptyFallback(items.map(item => buildOverrideRow(item.name, item.lead_time_days))));
+        savedSignatures.current.suppliers = overrideSignature(items);
+      },
+      categories: async () => {
+        const items = confirmOverrides(await fetchCategoryLeadTimes(targetDomain, controller.signal), "category");
+        if (controller.signal.aborted) return;
+        setCategoryRows(withEmptyFallback(items.map(item => buildOverrideRow(item.name, item.lead_time_days))));
+        savedSignatures.current.categories = overrideSignature(items);
+      },
+      skus: async () => {
+        const items = confirmOverrides(await fetchSkuLeadTimes(targetDomain, controller.signal), "sku_id");
+        if (controller.signal.aborted) return;
+        setSkuRows(items.map(item => buildSkuRow(item.name, item.lead_time_days, catalogRef.current.find(sku => sku.sku_id === item.name))));
+        savedSignatures.current.skus = overrideSignature(items);
+        setSkuOverridePage(1);
+      },
+      catalog: async () => {
+        const skus = await fetchSkus(controller.signal);
+        if (!Array.isArray(skus) || !skus.every(sku => sku && [sku.sku_id, sku.name, sku.vendor, sku.category].every(value => typeof value === "string"))) throw new Error("Product lookup response is incomplete.");
+        if (controller.signal.aborted) return;
+        catalogRef.current = skus;
+        setSyncedSkus(skus);
+        setSkuRows(rows => rows.map(row => {
+          const sku = skus.find(item => item.sku_id === row.name);
+          return sku ? { ...row, productName: sku.name, supplier: sku.vendor, category: sku.category } : row;
+        }));
+      },
+    };
+    await Promise.allSettled(sections.map(async key => {
+      try {
+        await loaders[key]();
+        if (!controller.signal.aborted) setLoadStates(previous => ({ ...previous, [key]: { status: "ready" } }));
+      } catch (error) {
+        if (!controller.signal.aborted) setLoadStates(previous => ({ ...previous, [key]: { status: "error", error: error instanceof Error ? error.message : "Could not load saved settings." } }));
+      }
+    }));
+    if (!controller.signal.aborted) setIsLoadingSettings(false);
   }
 
   async function handleLoadSettings() {
-    await loadSettings(shopifyDomain);
+    if (isSavingSettings) return;
+    await loadSettings(shopifyDomain, failedLoads.length ? failedLoads : LOAD_SECTIONS);
   }
 
   async function handleSaveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (demo || !settingsConfirmed || isLoadingSettings || isSavingSettings) {
+      if (!demo) setSettingsError("Load all saved rule sections before saving. Existing rules have not been replaced.");
+      return;
+    }
     const targetDomain = shopifyDomain.trim() || "current-shop";
 
-    const nextDefaultLeadTimeDays = Number.parseInt(defaultLeadTimeDays, 10);
-    const nextSafetyBufferDays = Number.parseInt(safetyBufferDays, 10);
+    const nextDefaultLeadTimeDays = Number(defaultLeadTimeDays);
+    const nextSafetyBufferDays = Number(safetyBufferDays);
 
     if (
-      Number.isNaN(nextDefaultLeadTimeDays) ||
+      !defaultLeadTimeDays.trim() || !safetyBufferDays.trim() ||
+      !Number.isSafeInteger(nextDefaultLeadTimeDays) ||
       nextDefaultLeadTimeDays < 1 ||
-      Number.isNaN(nextSafetyBufferDays) ||
+      !Number.isSafeInteger(nextSafetyBufferDays) ||
       nextSafetyBufferDays < 0
     ) {
-      setSettingsError("Lead time must be at least 1 day and safety buffer cannot be negative.");
+      setSettingsError("Use whole numbers: lead time must be at least 1 day and safety buffer cannot be negative.");
       return;
     }
 
@@ -230,67 +270,54 @@ function LeadTimeSettingsContent() {
       return;
     }
 
-    setIsSavingSettings(true);
-    setSettingsError(null);
-    setSettingsNotice(null);
-
-    try {
-      const [settings, savedSupplierLeadTimes, savedCategoryLeadTimes, savedSkuLeadTimes] =
-        await Promise.all([
-          saveShopSettings({
-            shopify_domain: targetDomain,
-            global_default_lead_time_days: nextDefaultLeadTimeDays,
-            global_safety_buffer_days: nextSafetyBufferDays,
-            allow_mock_fallback: allowMockFallback
-          }),
-          saveVendorLeadTimes({
-            shopify_domain: targetDomain,
-            items: supplierLeadTimes
-          }),
-          saveCategoryLeadTimes({
-            shopify_domain: targetDomain,
-            items: categoryLeadTimes
-          }),
-          saveSkuLeadTimes({
-            shopify_domain: targetDomain,
-            items: skuLeadTimes
-          })
-        ]);
-      applyShopSettings(settings);
-      setShopifyDomain(settings.shopify_domain);
-      setSupplierRows(
-        withEmptyFallback(
-          savedSupplierLeadTimes.items.map((item) =>
-            buildOverrideRow(item.vendor, item.lead_time_days)
-          )
-        )
-      );
-      setCategoryRows(
-        withEmptyFallback(
-          savedCategoryLeadTimes.items.map((item) =>
-            buildOverrideRow(item.category, item.lead_time_days)
-          )
-        )
-      );
-      setSkuRows(
-        savedSkuLeadTimes.items.map((item) => {
-          const sku = syncedSkus.find((candidate) => candidate.sku_id === item.sku_id);
-          return buildSkuRow(item.sku_id, item.lead_time_days ?? "", sku);
-        })
-      );
-      setSkuOverridePage(1);
-      setSettingsNotice(
-        `Saved ${savedSkuLeadTimes.items.length} SKU, ${savedSupplierLeadTimes.items.length} supplier, and ${savedCategoryLeadTimes.items.length} category lead-time rules.`
-      );
-    } catch (error) {
-      setSettingsError(
-        error instanceof Error
-          ? error.message
-          : "The shop settings could not be saved."
-      );
-    } finally {
-      setIsSavingSettings(false);
-    }
+    const defaults = { shopify_domain: targetDomain, global_default_lead_time_days: nextDefaultLeadTimeDays,
+      global_safety_buffer_days: nextSafetyBufferDays, allow_mock_fallback: allowMockFallback };
+    const signatures: Record<WriteSection, string> = {
+      defaults: settingsSignature(defaults),
+      suppliers: overrideSignature(supplierLeadTimes.map(item => ({ name: item.vendor, lead_time_days: item.lead_time_days }))),
+      categories: overrideSignature(categoryLeadTimes.map(item => ({ name: item.category, lead_time_days: item.lead_time_days }))),
+      skus: overrideSignature(skuLeadTimes.map(item => ({ name: item.sku_id, lead_time_days: item.lead_time_days! }))),
+    };
+    const changed = WRITE_SECTIONS.filter(key => signatures[key] !== savedSignatures.current[key] || (key === "defaults" && !settingsPersisted));
+    if (!changed.length) { setSettingsError(null); setSettingsNotice("No unsaved rule changes."); return; }
+    const controller = new AbortController();
+    saveController.current = controller;
+    setIsSavingSettings(true); setSettingsError(null); setSettingsNotice(null);
+    const writers: Record<WriteSection, () => Promise<void>> = {
+      defaults: async () => {
+        const saved = confirmSettings(await saveShopSettings(defaults, controller.signal));
+        if (!saved.is_persisted || settingsSignature(saved) !== signatures.defaults) throw new Error("The stored defaults were not confirmed with the requested values.");
+        if (!controller.signal.aborted) applyShopSettings(saved);
+      },
+      suppliers: async () => {
+        const saved = confirmOverrides(await saveVendorLeadTimes({ shopify_domain: targetDomain, items: supplierLeadTimes }, controller.signal), "vendor");
+        if (overrideSignature(saved) !== signatures.suppliers) throw new Error("The saved supplier rules did not match the requested values.");
+        if (!controller.signal.aborted) setSupplierRows(withEmptyFallback(saved.map(item => buildOverrideRow(item.name, item.lead_time_days))));
+      },
+      categories: async () => {
+        const saved = confirmOverrides(await saveCategoryLeadTimes({ shopify_domain: targetDomain, items: categoryLeadTimes }, controller.signal), "category");
+        if (overrideSignature(saved) !== signatures.categories) throw new Error("The saved category rules did not match the requested values.");
+        if (!controller.signal.aborted) setCategoryRows(withEmptyFallback(saved.map(item => buildOverrideRow(item.name, item.lead_time_days))));
+      },
+      skus: async () => {
+        const saved = confirmOverrides(await saveSkuLeadTimes({ shopify_domain: targetDomain, items: skuLeadTimes }, controller.signal), "sku_id");
+        if (overrideSignature(saved) !== signatures.skus) throw new Error("The saved SKU rules did not match the requested values.");
+        if (!controller.signal.aborted) setSkuRows(saved.map(item => buildSkuRow(item.name, item.lead_time_days, catalogRef.current.find(sku => sku.sku_id === item.name))));
+      },
+    };
+    const results = await Promise.allSettled(changed.map(async key => {
+      await writers[key]();
+      if (!controller.signal.aborted) savedSignatures.current[key] = signatures[key];
+    }));
+    if (controller.signal.aborted) return;
+    const succeeded = changed.filter((_, index) => results[index].status === "fulfilled");
+    const failed = changed.flatMap((key, index) => {
+      const result = results[index];
+      return result.status === "rejected" ? [`${SECTION_LABELS[key]}: ${result.reason instanceof Error ? result.reason.message : "Save was not confirmed."}`] : [];
+    });
+    setIsSavingSettings(false);
+    if (succeeded.length) setSettingsNotice(`Saved: ${succeeded.map(key => SECTION_LABELS[key]).join(", ")}.`);
+    if (failed.length) setSettingsError(`Not confirmed: ${failed.join(" ")} Your edits are retained. Some requests may have reached the server. Save again to retry only sections with unsaved changes, or reload saved rules to check the stored values.`);
   }
 
   function applyShopSettings(settings: ShopSettingsResponse) {
@@ -320,16 +347,22 @@ function LeadTimeSettingsContent() {
   }
 
   useEffect(() => {
-    if (!hasHydrated) {
+    if (!hasHydrated || demo) {
       return;
     }
 
+    setIsSavingSettings(false);
+    savedSignatures.current = {};
+    catalogRef.current = [];
     void loadSettings(shopifyDomain.trim() || "current-shop");
+    return () => { loadController.current?.abort(); saveController.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasHydrated]);
+  }, [hasHydrated, user.id]);
+
+  if (demo) return <SectionCard><h2 className="section-title">Lead-time settings in the sample workspace</h2><p className="section-copy">Sample recommendations use example lead times. No store settings are loaded or changed here. Sign in to configure your own supplier, category, and SKU rules.</p><Link className="button button-primary" href="/login">Sign in to set up lead times</Link></SectionCard>;
 
   return (
-    <div className="page-stack">
+    <div className={`page-stack ${styles.page}`}>
       <SectionCard>
         <div className="section-heading">
           <div>
@@ -351,15 +384,22 @@ function LeadTimeSettingsContent() {
           <button
             type="button"
             className="button button-secondary"
-            disabled={isLoadingSettings}
+            disabled={isLoadingSettings || isSavingSettings}
             onClick={() => void handleLoadSettings()}
           >
-            {isLoadingSettings ? "Loading..." : "Refresh rules"}
+            {isLoadingSettings ? "Loading..." : failedLoads.length ? "Retry failed reads" : "Reload saved rules"}
           </button>
         </div>
       </SectionCard>
 
+      <SectionCard>
+        <p className="section-copy" role="status">{settingsConfirmed ? "Saved rule sections are loaded. Only sections with changes will be saved." : "Waiting for saved rule sections. Saving is disabled to protect your existing overrides."}</p>
+        <ul className="section-copy">{LOAD_SECTIONS.map(key => <li key={key}><strong>{SECTION_LABELS[key]}:</strong> {loadStates[key].status === "ready" ? "Loaded" : loadStates[key].status === "loading" ? "Loading…" : `Unavailable — ${loadStates[key].error}`}</li>)}</ul>
+        {failedLoads.length > 0 ? <p className="section-copy">Retry failed reads to keep the sections already loaded. A missing product lookup does not erase saved SKU overrides.</p> : <p className="section-copy">Reloading saved rules replaces unsaved edits with the stored values.</p>}
+      </SectionCard>
+
       <form className="page-stack" onSubmit={handleSaveSettings}>
+        <fieldset className="page-stack" disabled={!settingsConfirmed || isLoadingSettings || isSavingSettings} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <SectionCard>
           <div className="section-heading">
             <div>
@@ -386,7 +426,7 @@ function LeadTimeSettingsContent() {
                 <h2 className="section-title section-title-small">Baseline assumptions</h2>
               </div>
               <span className="status-badge status-neutral">
-                {settingsPersisted ? "Saved" : "Default"}
+                {loadStates.defaults.status !== "ready" ? "Not confirmed" : settingsPersisted ? "Saved" : "Default"}
               </span>
             </div>
 
@@ -416,23 +456,6 @@ function LeadTimeSettingsContent() {
               </label>
             </div>
 
-            <details className="advanced-settings">
-              <summary>Advanced settings</summary>
-              <label className="toggle-row">
-                <div>
-                  <span className="toggle-title">Use sample data when live data is unavailable</span>
-                  <p className="toggle-copy">
-                    Keeps the app explorable before Shopify sync has enough product,
-                    inventory, and order history. Turn off only when testing live-data requirements.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={allowMockFallback}
-                  onChange={(event) => setAllowMockFallback(event.target.checked)}
-                />
-              </label>
-            </details>
           </SectionCard>
 
           <SectionCard>
@@ -442,7 +465,7 @@ function LeadTimeSettingsContent() {
                 <h2 className="section-title section-title-small">Which rule will apply</h2>
               </div>
             </div>
-            {effectivePreview.length ? (
+            {!settingsConfirmed ? <p className="section-copy">Load all rule sections before previewing which lead time applies.</p> : !draftValid ? <p className="section-copy">Enter valid whole-day lead times and complete each override before previewing these changes.</p> : loadStates.catalog.status !== "ready" ? <p className="section-copy">Product lookup is unavailable. Retry it to preview how the saved rules apply to products.</p> : effectivePreview.length ? (
               <div className="lead-time-preview-list">
                 {effectivePreview.map((item) => (
                   <div className="lead-time-preview-row" key={item.sku.sku_id}>
@@ -496,7 +519,7 @@ function LeadTimeSettingsContent() {
               <h2 className="section-title section-title-small">SKU-specific lead times</h2>
             </div>
             <span className="status-badge status-neutral">
-              {skuRows.length} overrides
+              {loadStates.skus.status === "ready" ? `${skuRows.length} overrides` : "Overrides not confirmed"}
             </span>
           </div>
           <p className="section-copy">
@@ -517,10 +540,10 @@ function LeadTimeSettingsContent() {
             </label>
             <div className="lead-time-sku-counts">
               <span className="status-badge status-neutral">
-                {syncedSkus.length} synced SKUs
+                {loadStates.catalog.status === "ready" ? `${syncedSkus.length} synced SKUs` : "Product lookup unavailable"}
               </span>
               <span className="status-badge status-neutral">
-                {skuRows.length} overrides
+                {loadStates.skus.status === "ready" ? `${skuRows.length} overrides` : "Overrides not confirmed"}
               </span>
             </div>
           </div>
@@ -583,7 +606,7 @@ function LeadTimeSettingsContent() {
                   </div>
                 ) : null}
               </div>
-              <div className="lead-time-table-wrap">
+              <div className="lead-time-table-wrap" role="region" aria-label="SKU lead-time overrides; scroll horizontally to view all columns" tabIndex={0}>
                 <table className="lead-time-table">
                   <thead>
                     <tr>
@@ -643,29 +666,30 @@ function LeadTimeSettingsContent() {
             </div>
           ) : (
             <EmptyState
-              title="No SKU overrides yet"
-              description="Add SKU overrides only for products whose lead time is different from supplier or category defaults."
+              title={loadStates.skus.status === "ready" ? "No SKU overrides yet" : "SKU overrides are not confirmed"}
+              description={loadStates.skus.status === "ready" ? "Add SKU overrides only for products whose lead time is different from supplier or category defaults." : "Load the saved SKU rules before changing them. Existing overrides have not been removed."}
             />
           )}
         </SectionCard>
 
         <div className="button-row sticky-action-row">
-          <button type="submit" className="button button-primary" disabled={isSavingSettings}>
+          <button type="submit" className="button button-primary" disabled={!settingsConfirmed || isLoadingSettings || isSavingSettings}>
             {isSavingSettings ? "Saving lead-time rules..." : "Save lead-time rules"}
           </button>
         </div>
+        </fieldset>
       </form>
 
       {settingsError ? (
         <EmptyState
-          title="Settings unavailable"
+          title="Settings update needs attention"
           description={settingsError}
           tone="error"
         />
       ) : null}
 
       {settingsNotice ? (
-        <EmptyState title="Settings ready" description={settingsNotice} />
+        <EmptyState title="Settings update" description={settingsNotice} />
       ) : null}
     </div>
   );
@@ -742,7 +766,7 @@ function LeadTimeTable({
         </div>
       ) : null}
 
-      <div className="lead-time-table-wrap">
+      <div className="lead-time-table-wrap" role="region" aria-label={`${nameLabel} lead-time rules; scroll horizontally to view all columns`} tabIndex={0}>
         <table className="lead-time-table">
           <thead>
             <tr>
@@ -844,11 +868,11 @@ function parseOverrideRows(rows: OverrideRow[], label: string) {
 
   return normalized.map((row) => {
     const name = row.name.trim();
-    const leadTimeDays = Number.parseInt(row.lead_time_days, 10);
+    const leadTimeDays = Number(row.lead_time_days);
     if (!name) {
       throw new Error(`${label} lead-time rows need a name.`);
     }
-    if (Number.isNaN(leadTimeDays) || leadTimeDays < 1) {
+    if (!row.lead_time_days.trim() || !Number.isSafeInteger(leadTimeDays) || leadTimeDays < 1) {
       throw new Error(`${label} lead-time rows need a whole number of at least 1 day.`);
     }
     const key = name.toLowerCase();
@@ -907,4 +931,36 @@ function sourceLabel(source: LeadTimeSource): string {
   if (source === "supplier") return "Supplier rule";
   if (source === "category") return "Category rule";
   return "Global default";
+}
+
+function confirmSettings(value: unknown): ShopSettingsResponse {
+  if (!value || typeof value !== "object") throw new Error("Global defaults response is incomplete.");
+  const settings = value as ShopSettingsResponse;
+  if (!Number.isSafeInteger(settings.global_default_lead_time_days) || settings.global_default_lead_time_days < 1
+    || !Number.isSafeInteger(settings.global_safety_buffer_days) || settings.global_safety_buffer_days < 0
+    || typeof settings.allow_mock_fallback !== "boolean" || typeof settings.is_persisted !== "boolean"
+    || typeof settings.shopify_domain !== "string") throw new Error("Global defaults response is incomplete.");
+  return settings;
+}
+
+function confirmOverrides(value: unknown, key: "vendor" | "category" | "sku_id"): { name: string; lead_time_days: number }[] {
+  if (!value || typeof value !== "object" || !("items" in value) || !Array.isArray(value.items)) throw new Error("Saved override response is incomplete.");
+  const seen = new Set<string>();
+  return value.items.flatMap(item => {
+    if (!item || typeof item !== "object" || typeof item[key] !== "string" || !item[key].trim()) throw new Error("A saved override has no valid name.");
+    if (key === "sku_id" && item.lead_time_days === null) return [];
+    if (!Number.isSafeInteger(item.lead_time_days) || item.lead_time_days < 1) throw new Error("A saved override has no valid whole-day lead time.");
+    const name = item[key].trim();
+    if (seen.has(name.toLowerCase())) throw new Error("The saved response has duplicate override names.");
+    seen.add(name.toLowerCase());
+    return [{ name, lead_time_days: item.lead_time_days }];
+  });
+}
+
+function settingsSignature(settings: Pick<ShopSettingsResponse, "global_default_lead_time_days" | "global_safety_buffer_days" | "allow_mock_fallback">): string {
+  return JSON.stringify([settings.global_default_lead_time_days, settings.global_safety_buffer_days, settings.allow_mock_fallback]);
+}
+
+function overrideSignature(items: { name: string; lead_time_days: number }[]): string {
+  return JSON.stringify(items.map(item => [item.name, item.lead_time_days]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
 }

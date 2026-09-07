@@ -53,4 +53,7 @@ async def import_stocky_csv(
         "inventory_rows_inserted": result.inventory_rows_inserted,
         "rows_skipped": result.rows_skipped,
         "skip_reasons": result.skip_reasons,
+        "inventory_source": result.inventory_source,
+        "inventory_rows_skipped": result.inventory_rows_skipped,
+        "warnings": result.warnings,
     }

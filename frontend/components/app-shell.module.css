@@ -1,5 +1,5 @@
 .shell :global(.sidebar) { min-width: 0; }
-.shell :global(.app-main) { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.shell :global(.app-main) { padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
 .mobileHeader { min-width: 0; }
 .navigationToggle { display: none; }
 .navigationSearch { display: grid; gap: 7px; min-width: 0; }

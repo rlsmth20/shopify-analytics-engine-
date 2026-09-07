@@ -53,6 +53,10 @@ Each claim also has a unique lease token. Recovery and explicit retry invalidate
 
 ## Verification
 
+Forecast alert precision follow-up: the model's numeric risk still selects incidents against the saved threshold, but messages with fewer than 30 usable history days or low confidence omit a precise percentage. They preserve the possible-stockout warning, disclose the usable history/confidence limitation, and ask the merchant to verify recent sales, available stock and incoming orders before ordering. Better-supported forecasts explicitly describe an estimate and use "over 99%" instead of rounding to a certainty label. Product names are used when available. Forecast algorithms, probabilities and trigger thresholds are unchanged.
+
+A synthetic reproduction with one observed day of 30 sales and 10 units on hand previously sent "100% stockout probability" while the forecast itself said low confidence. Focused regression coverage now verifies that warning is retained with its one-day limitation, longer low-confidence histories still disclose uncertainty, supported estimates retain their estimated likelihood, and below-threshold risk does not fire.
+
 `python -m unittest tests.test_alert_delivery` exercises mocked provider acceptance, partial failure, bounded retry, committed-lease crash recovery, restart/session continuity, unknown acknowledgement and ownership, new-SKU cooldown scope, old cooldown migration, resolved/newer incident guards, fresh lease clocks, saved-target verification, concurrent first-time seeding, real targeting metadata, unsupported filters, private destination blocking, Resend receipt/idempotency use, disabled-destination cheap skips, scheduler rollback and daily retry cadence.
 
 All provider calls are mocked and all database fixtures are local/temporary. Production configuration inspection and any explicitly scoped deployment smoke are separate from these tests. Multiple-worker correctness relies on PostgreSQL row locking; the local SQLite delivery tests do not establish cross-process SQLite dispatch guarantees.

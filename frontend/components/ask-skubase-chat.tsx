@@ -53,6 +53,7 @@ export function AskSkubaseChat() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const launcherRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => message.content.trim()),
@@ -62,6 +63,11 @@ export function AskSkubaseChat() {
   function openChat() {
     setIsOpen(true);
     window.setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  function closeChat() {
+    setIsOpen(false);
+    launcherRef.current?.focus({ preventScroll: true });
   }
 
   async function submitQuestion(question: string) {
@@ -139,7 +145,8 @@ export function AskSkubaseChat() {
   return (
     <div className={`ask-skubase${isOpen ? " ask-skubase-open" : ""}`}>
       {isOpen ? (
-        <section className="ask-panel" aria-label="Ask Skubase inventory chat">
+        <section id="ask-skubase-panel" className="ask-panel" aria-label="Ask Skubase inventory chat"
+          onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeChat(); } }}>
           <div className="ask-panel-header">
             <div>
               <p className="ask-eyebrow">Inventory copilot</p>
@@ -149,7 +156,7 @@ export function AskSkubaseChat() {
               type="button"
               className="ask-icon-button"
               aria-label="Close Ask Skubase"
-              onClick={() => setIsOpen(false)}
+              onClick={closeChat}
             >
               x
             </button>
@@ -232,9 +239,10 @@ export function AskSkubaseChat() {
 
       <button
         type="button"
+        ref={launcherRef}
         className="ask-launcher"
         aria-expanded={isOpen}
-        aria-controls="ask-skubase-input"
+        aria-controls={isOpen ? "ask-skubase-panel" : undefined}
         onClick={openChat}
       >
         Ask Skubase

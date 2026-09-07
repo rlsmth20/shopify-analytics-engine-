@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
+import { AlertDestinationHelp } from "@/components/alert-destination-help";
 import { useAuth } from "@/components/auth-guard";
 import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
 import {
@@ -134,12 +135,19 @@ function listToText(values: string[]): string {
   return values.join(", ");
 }
 
+type AlertSection = "rules" | "channels" | "history";
+type SectionLoad = { status: "loading" | "ready" | "error"; error?: string };
+const ALERT_SECTIONS: AlertSection[] = ["rules", "channels", "history"];
+
 export default function AlertsPage() {
   const { user } = useAuth();
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [channels, setChannels] = useState<NotificationChannelConfig[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sectionLoads, setSectionLoads] = useState<Record<AlertSection, SectionLoad>>({
+    rules: { status: "loading" }, channels: { status: "loading" }, history: { status: "loading" },
+  });
+  const requests = useRef<Partial<Record<AlertSection, AbortController>>>({});
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -152,47 +160,80 @@ export default function AlertsPage() {
   const unlockAll = user.id === 0;
   const isChannelAllowed = (channel: NotificationChannel) =>
     unlockAll || user.is_admin || Boolean(entitlements?.capabilities.includes(CHANNEL_MIN_TIER[channel] === "growth" ? "alerts_advanced" : "alerts_basic"));
+  const rulesKnown = sectionLoads.rules.status === "ready";
+  const channelsKnown = sectionLoads.channels.status === "ready";
+  const planKnown = unlockAll || user.is_admin || entitlements !== null;
+  const setupKnown = rulesKnown && channelsKnown && planKnown;
+  const loading = sectionLoads.rules.status === "loading" || sectionLoads.channels.status === "loading";
 
   useEffect(() => {
-    refresh();
-  }, []);
-
-  useEffect(() => {
-    if (user.id === 0) return;
-
-    void fetchEntitlements()
-      .then((data) => setEntitlements(data))
-      .catch(() => { setEntitlements(null); setEntitlementError("We couldn't check your plan. Reload this page before changing channel settings."); });
+    void refresh();
+    return () => { for (const request of Object.values(requests.current)) request?.abort(); };
   }, [user.id]);
 
-  async function refresh() {
-    setLoading(true);
-    try {
-      const [r, c, e] = await Promise.all([
-        fetchAlertRules(),
-        fetchChannels(),
-        fetchAlertEvents(),
-      ]);
-      setRules(r.rules);
-      setChannels(c.channels);
-      setSchedulerEnabled(typeof c.scheduler_enabled === "boolean" ? c.scheduler_enabled : null);
-      setEvaluationInterval(c.evaluation_interval_seconds ?? null);
-      setEvents(e.events);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let active = true;
+    setEntitlements(null);
+    setEntitlementError(null);
+    if (user.id === 0 || user.is_admin) return;
+    void fetchEntitlements()
+      .then((data) => { if (active) setEntitlements(data); })
+      .catch(() => { if (active) { setEntitlements(null); setEntitlementError("We couldn't check your plan. Reload this page before changing channel settings."); } });
+    return () => { active = false; };
+  }, [user.id, user.is_admin]);
+
+  async function refresh(sections: AlertSection[] = ALERT_SECTIONS) {
+    await Promise.all(sections.map(async (section) => {
+      requests.current[section]?.abort();
+      const request = new AbortController();
+      requests.current[section] = request;
+      const current = () => !request.signal.aborted && requests.current[section] === request;
+      setSectionLoads((previous) => ({ ...previous, [section]: { status: "loading" } }));
+      try {
+        if (section === "rules") {
+          const response = await fetchAlertRules(request.signal);
+          if (!Array.isArray(response?.rules) || response.rules.some((rule) => !rule ||
+            typeof rule.id !== "string" || typeof rule.enabled !== "boolean" ||
+            ![rule.channels, rule.target_skus, rule.categories, rule.suppliers, rule.tags, rule.collections, rule.locations].every(Array.isArray))) {
+            throw new Error("Saved rules could not be confirmed. Retry before changing them.");
+          }
+          if (current()) setRules(response.rules);
+        } else if (section === "channels") {
+          const response = await fetchChannels(request.signal);
+          if (!Array.isArray(response?.channels) || response.channels.some((channel) => !channel ||
+            !CHANNEL_OPTIONS.includes(channel.channel) || typeof channel.target !== "string" ||
+            typeof channel.enabled !== "boolean" || typeof channel.verified !== "boolean")) {
+            throw new Error("Saved destinations could not be confirmed. Retry before changing them.");
+          }
+          if (current()) {
+            setChannels(response.channels);
+            setSchedulerEnabled(typeof response.scheduler_enabled === "boolean" ? response.scheduler_enabled : null);
+            setEvaluationInterval(response.evaluation_interval_seconds ?? null);
+          }
+        } else {
+          const response = await fetchAlertEvents(request.signal);
+          if (!Array.isArray(response?.events)) throw new Error("Recent activity could not be confirmed. Please retry.");
+          if (current()) setEvents(response.events);
+        }
+        if (current()) setSectionLoads((previous) => ({ ...previous, [section]: { status: "ready" } }));
+      } catch (cause) {
+        if (current()) setSectionLoads((previous) => ({ ...previous, [section]: {
+          status: "error", error: alertError(cause, "This section is unavailable. Please retry."),
+        } }));
+      }
+    }));
   }
 
   async function runEvaluation(dryRun: boolean) {
+    if (!setupKnown || evaluating) return;
     setEvaluating(true);
     setError(null);
     setNotice(null);
     try {
       const result = await evaluateAlertsNow(dryRun);
+      requests.current.history?.abort();
       setEvents(result.events);
+      setSectionLoads((previous) => ({ ...previous, history: { status: "ready" } }));
       setTab("history");
       if (result.events.length === 0) {
         setNotice(dryRun
@@ -230,12 +271,12 @@ export default function AlertsPage() {
       <section className={styles.setupSummary} aria-labelledby="alerts-setup-title">
         <div><p className="section-eyebrow">Alert setup</p><h2 id="alerts-setup-title">Get stock alerts where you work</h2>
           <p>Save a destination, send a test, then choose the inventory problems you want to hear about.</p></div>
-        <div className={styles.setupStatus} aria-live="polite"><strong>{loading ? "Checking setup…" : unlockAll ? "Sample workspace" : `${readyChannels.length} tested channel${readyChannels.length === 1 ? "" : "s"} enabled`}</strong>
-          <span>{loading ? "Loading saved settings." : `${rulesNeedingSetup.length} of ${enabledRules.length} enabled rules need channel setup or a test.`}</span>
-          <span>{schedulerEnabled === null ? "Automatic-check status unavailable" : schedulerEnabled ? `Automatic checks enabled${evaluationInterval ? ` · about every ${Math.max(1, Math.round(evaluationInterval / 60))} minutes` : ""}` : "Automatic checks are currently paused"}</span>
+        <div className={styles.setupStatus} aria-live="polite"><strong>{loading ? "Checking setup…" : !setupKnown ? "Setup status unavailable" : unlockAll ? "Sample workspace" : `${readyChannels.length} tested channel${readyChannels.length === 1 ? "" : "s"} enabled`}</strong>
+          <span>{loading ? "Loading saved settings." : !setupKnown ? "We couldn't confirm all saved settings. Retry the unavailable section before changing it." : `${rulesNeedingSetup.length} of ${enabledRules.length} enabled rules need channel setup or a test.`}</span>
+          <span>{!channelsKnown || schedulerEnabled === null ? "Automatic-check status unavailable" : schedulerEnabled ? `Automatic checks enabled${evaluationInterval ? ` · about every ${Math.max(1, Math.round(evaluationInterval / 60))} minutes` : ""}` : "Automatic checks are currently paused"}</span>
         </div>
       </section>
-      {!loading && rulesNeedingSetup.length > 0 ? <p className={styles.setupWarning}>Enabled rules need a saved, enabled destination to send. Test the receiving inbox, Slack channel, or workflow before relying on notifications.</p> : null}
+      {setupKnown && rulesNeedingSetup.length > 0 ? <p className={styles.setupWarning}>Enabled rules need a saved, enabled destination to send. Test the receiving inbox, Slack channel, or workflow before relying on notifications.</p> : null}
       <details className={styles.help}><summary>How inventory signals and targeting work</summary>
       <div className="content-grid content-grid-2-1 alert-context-grid">
         <DataQualityNote title="Choose broad or targeted alerts">
@@ -287,37 +328,44 @@ export default function AlertsPage() {
         <button
           type="button"
           className="button-ghost tab-bar-trailing"
-          disabled={evaluating || loading || enabledRules.length === 0}
+          disabled={evaluating || !setupKnown || enabledRules.length === 0}
           onClick={() => void runEvaluation(true)}
         >
           {evaluating ? "Evaluating..." : "Preview evaluation"}
         </button>
       </nav>
 
-      {loading ? <p className="page-loading">Loading...</p> : null}
+      {sectionLoads[tab].status === "loading" ? <p className="page-loading" role="status">Loading {tab === "history" ? "recent activity" : tab}…</p> : null}
+      {ALERT_SECTIONS.filter((section) => sectionLoads[section].status === "error").map((section) => (
+        <div key={section} className="page-error-copy" role="alert">
+          <p>{section === "history" ? "Recent activity is unavailable. Your saved channel and rule settings are separate." : `${section === "channels" ? "Channel settings" : "Saved rules"} are unavailable.`} {sectionLoads[section].error}</p>
+          <button type="button" className="button button-secondary button-sm" onClick={() => void refresh([section])}>Retry {section === "history" ? "recent activity" : section}</button>
+        </div>
+      ))}
       {error ? <p className="page-error-copy" role="alert">{error}</p> : null}
       {entitlementError ? <p className="page-error-copy" role="alert">{entitlementError}</p> : null}
       {notice ? <p className={styles.message} role="status">{notice}</p> : null}
 
-      {tab === "rules" ? (
+      {tab === "rules" && setupKnown ? (
         <RulesPanel
           rules={rules}
-          onChange={refresh}
+          onChange={() => void refresh(["rules", "channels"])}
           isChannelAllowed={isChannelAllowed}
           channels={channels}
           demo={unlockAll}
           onSetup={() => setTab("channels")}
         />
       ) : null}
-      {tab === "channels" ? (
+      {tab === "rules" && rulesKnown && !setupKnown ? <p className="muted">Load channel settings and plan access before changing rules.</p> : null}
+      {tab === "channels" && channelsKnown && planKnown ? (
         <ChannelsPanel
           channels={channels}
-          onChange={refresh}
+          onChange={() => void refresh(["channels"])}
           isChannelAllowed={isChannelAllowed}
           demo={unlockAll}
         />
       ) : null}
-      {tab === "history" ? <EventsPanel events={events} onChange={refresh} demo={unlockAll} /> : null}
+      {tab === "history" && sectionLoads.history.status === "ready" ? <EventsPanel events={events} onChange={() => void refresh(["history"])} demo={unlockAll || !channelsKnown} /> : null}
     </div>
   );
 }
@@ -830,8 +878,7 @@ function ChannelCard({
         ? "Use one inbox your team checks. Skubase sends alert emails through its business email service."
         : channel.channel === "slack" ? "Create an incoming webhook for the Slack channel where your team wants alerts, then paste its URL here."
         : "Use a public HTTPS endpoint from your automation tool or internal system."}</p>
-      {channel.channel === "slack" ? <a className={styles.guideLink} href="https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks" target="_blank" rel="noopener noreferrer">Open Slack's webhook setup guide ↗</a> : null}
-      {channel.channel === "webhook" ? <details className={styles.help}><summary>What the endpoint receives</summary><p>Skubase posts JSON containing <code>subject</code>, <code>body</code>, <code>emitted_at</code>, and <code>source</code>. The endpoint should return a successful HTTP response.</p></details> : null}
+      {channel.channel === "slack" || channel.channel === "webhook" ? <AlertDestinationHelp channel={channel.channel} className={styles.help} /> : null}
       {channel.available === false ? <p className={styles.setupWarning}>{channel.availability_reason || "This delivery service is currently unavailable. You can prepare its destination while service setup is completed."}</p> : null}
       {locked ? <p className={styles.setupWarning}>{channel.channel === "webhook" ? "Growth or Scale" : "Starter or above"} includes this channel. <Link href="/billing">View plans</Link></p> : null}
         <label className="switch-inline">

@@ -91,7 +91,11 @@ export function eventDeliveryLabel(event: AlertEvent): string {
 }
 
 export function alertError(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
+  if (!(error instanceof Error) || !error.message) return fallback;
+  if (/Could not reach the Skubase API|Failed to fetch|NetworkError|Load failed/i.test(error.message)) {
+    return "We couldn't reach Skubase. Check your connection and retry. If this continues, contact info@skubase.io.";
+  }
+  return error.message;
 }
 
 export function parseTargetList(value: string): string[] {

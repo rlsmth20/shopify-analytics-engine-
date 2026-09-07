@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     });
   } catch {
     return NextResponse.json(
-      { detail: "Could not reach the Skubase import service from the web app." },
+      { detail: "The import result could not be confirmed. It may already have been saved. Check your catalog before uploading again, or contact info@skubase.io for help." },
       { status: 502 },
     );
   }

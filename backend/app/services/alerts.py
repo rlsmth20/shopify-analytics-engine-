@@ -478,11 +478,28 @@ def _forecast_events(rule, context, now, deliver_channels, channels_by_key, allo
             continue
         if forecast.stockout_probability_30d * 100 < rule.threshold:
             continue
-        msg = (
-            f"Forecast flags {forecast.sku_id} with {forecast.stockout_probability_30d*100:.0f}% "
-            "stockout probability in the next 30 days."
-        )
-        events.append(_fire(rule, forecast.sku_id, forecast.sku_id, msg, now, deliver_channels, channels_by_key, allowed_channels, context.delivery_cooldown_seconds))
+        name = context.sku_metadata.get(forecast.sku_id, {}).get("name") or forecast.sku_id
+        limited_history = forecast.history_days < 30
+        if limited_history or forecast.confidence == "low":
+            limitation = (
+                f"Only {forecast.history_days} day{'s' if forecast.history_days != 1 else ''} of usable sales history; "
+                f"forecast confidence is {forecast.confidence}."
+                if limited_history else "Forecast confidence is low, so the likelihood is uncertain."
+            )
+            msg = (
+                f"Stockout estimate: {name} may run out of current on-hand stock in the next 30 days. "
+                f"{limitation} Verify recent sales, available stock and incoming orders before ordering."
+            )
+        else:
+            probability_pct = forecast.stockout_probability_30d * 100
+            probability_label = ("over 99%" if probability_pct > 99 else
+                                 "under 1%" if 0 < probability_pct < 1 else f"{probability_pct:.0f}%")
+            msg = (
+                f"Forecast estimates a {probability_label} chance that 30-day demand for {name} "
+                f"will exceed current on-hand stock ({forecast.confidence} confidence). "
+                "Check available stock and incoming orders before ordering."
+            )
+        events.append(_fire(rule, forecast.sku_id, name, msg, now, deliver_channels, channels_by_key, allowed_channels, context.delivery_cooldown_seconds))
     return events
 
 

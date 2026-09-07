@@ -3,15 +3,17 @@ from __future__ import annotations
 
 import csv
 import io
+from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy import select
 
-from app.db.models import Inventory, Product, Shop
+from app.db.models import Inventory, Product, Shop, ShopifyConnection
 from app.db.session import session_scope
 from app.services.shop_settings import ShopSettingsInputError, normalize_shopify_domain
+from app.services.shopify_oauth import shopify_connection_lock
 
 
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
@@ -41,6 +43,9 @@ class StockyImportResult:
     inventory_rows_inserted: int = 0
     rows_skipped: int = 0
     skip_reasons: list[str] = field(default_factory=list)
+    inventory_source: str = "csv"
+    inventory_rows_skipped: int = 0
+    warnings: list[str] = field(default_factory=list)
 
 
 def _norm_key(s: str) -> str:
@@ -78,9 +83,34 @@ def _to_int(raw: Any, default: int = 0) -> int:
     if not s:
         return default
     try:
-        return int(float(s.replace(",", "")))
-    except (ValueError, TypeError):
+        value = Decimal(s.replace(",", ""))
+        if not value.is_finite() or value != value.to_integral_value() or not -2_147_483_648 <= value <= 2_147_483_647:
+            return default
+        return int(value)
+    except (InvalidOperation, ValueError, TypeError, OverflowError):
         return default
+
+
+def _optional_inventory(raw: str) -> int | None:
+    if not raw:
+        return None
+    try:
+        value = Decimal(raw.replace(",", ""))
+        if not value.is_finite() or value != value.to_integral_value() or not -2_147_483_648 <= value <= 2_147_483_647:
+            raise ValueError()
+        return int(value)
+    except (InvalidOperation, ValueError, OverflowError):
+        raise ValueError("inventory must be a finite whole number within the supported stock range") from None
+
+
+def _optional_price(raw: str) -> Decimal | None:
+    if not raw:
+        return None
+    value = _to_decimal(raw, default="NaN")
+    if (not value.is_finite() or not 0 <= value <= Decimal("99999999.99")
+            or value != value.quantize(Decimal("0.01"))):
+        raise ValueError("price must be a finite non-negative amount with at most two decimal places")
+    return value
 
 
 def import_stocky_products_csv(
@@ -126,7 +156,7 @@ def import_stocky_products_csv(
 
     result = StockyImportResult(shop_id=0, shopify_domain=domain)
 
-    with session_scope() as session:
+    with session_scope() as session, shopify_connection_lock(session, domain):
         shop = session.scalar(select(Shop).where(Shop.shopify_domain == domain))
         if shop is None:
             shop = Shop(shopify_domain=domain)
@@ -134,10 +164,22 @@ def import_stocky_products_csv(
             session.flush()
         result.shop_id = shop.id
 
-        existing_by_sku: dict[str, Product] = {}
-        for p in session.scalars(select(Product).where(Product.shop_id == shop.id)).all():
+        existing_by_sku: dict[str, list[Product]] = defaultdict(list)
+        products = session.scalars(select(Product).where(Product.shop_id == shop.id)).all()
+        for p in products:
             if p.sku:
-                existing_by_sku[p.sku] = p
+                existing_by_sku[p.sku].append(p)
+        connected = session.scalar(select(ShopifyConnection.id).where(
+            ShopifyConnection.shop_id == shop.id, ShopifyConnection.uninstalled_at.is_(None),
+            ShopifyConnection.access_token != "").limit(1)) is not None
+        shopify_owned = connected or any(str(p.shopify_variant_id).isdigit() for p in products)
+        if shopify_owned:
+            result.inventory_source = "shopify"
+            result.warnings.append(
+                "Shopify remains the inventory source: CSV quantities are ignored. Only costs and lead times "
+                "can update an unambiguous Shopify variant. Sync Shopify first for missing products; "
+                "duplicate SKUs require mapping review. No historical products or sales are merged."
+            )
 
         for row_num, row in enumerate(reader, start=2):
             if not any((cell or "").strip() for cell in row):
@@ -161,10 +203,19 @@ def import_stocky_products_csv(
             variant = cell("variant")
             vendor = cell("vendor") or None
             category = cell("category") or None
-            price = _to_decimal(cell("price"))
+            if shopify_owned and cell("inventory"):
+                result.inventory_rows_skipped += 1
+            try:
+                price = _optional_price(cell("price"))
+                inventory_qty = _optional_inventory(cell("inventory"))
+            except ValueError as exc:
+                result.rows_skipped += 1
+                if len(result.skip_reasons) < 10:
+                    result.skip_reasons.append(f"Row {row_num}: {exc}")
+                continue
             cost = _to_decimal(cell("cost"), default="NaN")
-            cost_value = cost if cost.is_finite() and cost >= 0 else None
-            inventory_qty = _to_int(cell("inventory"))
+            cost_value = cost if (cost.is_finite() and 0 <= cost <= Decimal("99999999.99")
+                                  and cost == cost.quantize(Decimal("0.01"))) else None
             lead_time = _to_int(cell("lead_time_days"))
             lead_time_value = lead_time if lead_time > 0 else None
 
@@ -172,13 +223,33 @@ def import_stocky_products_csv(
             shopify_variant_id = f"stocky:{sku or display_name}"
             shopify_product_id = f"stocky:{display_name}"
 
-            existing = existing_by_sku.get(sku) if sku else None
+            candidates = existing_by_sku.get(sku, []) if sku else []
+            if len(candidates) > 1:
+                result.rows_skipped += 1
+                if len(result.skip_reasons) < 10:
+                    result.skip_reasons.append(f"Row {row_num}: SKU matches multiple catalog products; review variant mapping before importing")
+                continue
+            existing = candidates[0] if candidates else None
+            if shopify_owned:
+                if existing is None or not str(existing.shopify_variant_id).isdigit():
+                    result.rows_skipped += 1
+                    if len(result.skip_reasons) < 10:
+                        result.skip_reasons.append(f"Row {row_num}: no unambiguous Shopify variant for this SKU; sync Shopify and review the mapping")
+                    continue
+                changed = False
+                if cost_value is not None and existing.cost != cost_value:
+                    existing.cost, changed = cost_value, True
+                if lead_time_value is not None and existing.sku_lead_time_days != lead_time_value:
+                    existing.sku_lead_time_days, changed = lead_time_value, True
+                result.products_updated += int(changed)
+                continue
             if existing is not None:
                 existing.name = display_name
                 existing.variant_name = variant or existing.variant_name
                 existing.vendor = vendor or existing.vendor
                 existing.category = category or existing.category
-                existing.price = price if price > 0 else existing.price
+                if price is not None:
+                    existing.price = price
                 if cost_value is not None:
                     existing.cost = cost_value
                 if lead_time_value is not None:
@@ -195,16 +266,21 @@ def import_stocky_products_csv(
                     variant_name=variant or None,
                     vendor=vendor,
                     category=category,
-                    price=price,
+                    price=price if price is not None else Decimal("0"),
                     cost=cost_value,
                     sku_lead_time_days=lead_time_value,
                 )
                 session.add(product)
                 session.flush()
                 if sku:
-                    existing_by_sku[sku] = product
+                    existing_by_sku[sku].append(product)
                 result.products_inserted += 1
 
+            if inventory_qty is None:
+                warning = "Rows without an inventory quantity update catalog details only; existing stock counts are unchanged."
+                if warning not in result.warnings:
+                    result.warnings.append(warning)
+                continue
             inv = session.scalar(
                 select(Inventory).where(
                     Inventory.shop_id == shop.id,
@@ -224,5 +300,8 @@ def import_stocky_products_csv(
                 result.inventory_rows_inserted += 1
             else:
                 inv.quantity = inventory_qty
+        # The connection lock also protects first install. Commit before its
+        # process lock is released, so a first sync sees this CSV snapshot.
+        session.commit()
 
     return result

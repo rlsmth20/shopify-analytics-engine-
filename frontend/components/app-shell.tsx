@@ -478,6 +478,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="header-meta">
+            <AskSkubaseChat />
             <span className="header-chip header-chip-tone">
               {user.id === 0 ? "Sample workspace" : !storeLoaded ? "Loading store..." : connectionStatusFailed ? "Connection status unavailable" : shopifyDomain || "No store connected"}
             </span>
@@ -525,7 +526,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className={appContainerClassName}>{children}</main>
       </div>
-      <AskSkubaseChat />
     </div>
   );
 }

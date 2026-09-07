@@ -89,6 +89,39 @@ class OrderLineItem(Base):
     product: Mapped[Product] = relationship(back_populates="order_line_items")
 
 
+class ShipmentImportBatchRecord(Base):
+    """Atomic CSV import receipt. Raw CSV and customer/address columns are not stored."""
+
+    __tablename__ = "shipment_import_batches"
+    __table_args__ = (UniqueConstraint("shop_id", "content_hash", name="uq_shipment_import_batch"),)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    source_scope: Mapped[str] = mapped_column(String(24))
+    result: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
+
+
+class ShipmentImportRowRecord(Base):
+    """Selected shipment facts and the exact created sales line, for review/rollback."""
+
+    __tablename__ = "shipment_import_rows"
+    __table_args__ = (
+        UniqueConstraint("shop_id", "source_identity", name="uq_shipment_import_source_line"),
+        UniqueConstraint("batch_id", "row_number", name="uq_shipment_import_batch_row"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    batch_id: Mapped[str] = mapped_column(ForeignKey("shipment_import_batches.id", ondelete="CASCADE"), index=True)
+    row_number: Mapped[int] = mapped_column(Integer)
+    source_identity: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sku: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(24))
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    facts: Mapped[dict] = mapped_column(JSON, default=dict)
+    order_line_item_id: Mapped[int | None] = mapped_column(ForeignKey("order_line_items.id", ondelete="SET NULL"), nullable=True, index=True)
+
+
 class Shop(Base):
     __tablename__ = "shops"
 

@@ -19,6 +19,7 @@ from app.api.deps import get_current_user
 from app.api.routes import shopify_privacy_webhooks as routes
 from app.db.models import (
     AlertDeliveryAttemptRecord, AlertEventRecord, ScheduledEmailDeliveryRecord,
+    ShipmentImportBatchRecord, ShipmentImportRowRecord,
     AuditLogRecord, Base, InventoryRiskSnapshotLead, MagicLinkToken, NotificationChannelRecord,
     OrderLineItem, Session as LoginSession, Shop, ShopifyConnection, Subscription, User, WaitlistSignup,
 )
@@ -99,6 +100,10 @@ class PrivacyTests(unittest.TestCase):
             if table.name in {"alert_events", "scheduled_email_deliveries"}:
                 values["payload"] = {"subject": f"Private inventory report for shop {shop.id}",
                                      "to": [f"owner-{shop.id}@example.test"]}
+            if table.name == "shipment_import_batches":
+                values["result"] = {"batch_id": f"fixture-{shop.id}", "source_scope": "non_shopify", "line_items_inserted": 1}
+            if table.name == "shipment_import_rows":
+                values["facts"] = {"sku": f"private-sku-{shop.id}", "shipment_id": f"private-shipment-{shop.id}"}
             result = self.db.execute(table.insert().values(**values))
             ids[table.name] = result.inserted_primary_key[0]
         self.db.add_all([
@@ -166,6 +171,8 @@ class PrivacyTests(unittest.TestCase):
                          f"provider-{self.one}")
         scheduled = self.db.scalar(select(ScheduledEmailDeliveryRecord).where(ScheduledEmailDeliveryRecord.shop_id == self.one))
         self.assertIn(f"shop {self.one}", scheduled.payload["subject"])
+        shipment = self.db.scalar(select(ShipmentImportRowRecord).where(ShipmentImportRowRecord.shop_id == self.one))
+        self.assertEqual(shipment.facts["shipment_id"], f"private-shipment-{self.one}")
 
     def test_alert_attempts_and_frozen_email_payloads_are_purged_without_sqlite_cascades(self):
         # Production uses FK cascades too, but our explicit tenant purge must
@@ -182,6 +189,10 @@ class PrivacyTests(unittest.TestCase):
         payloads = self.db.scalars(select(ScheduledEmailDeliveryRecord)).all()
         self.assertEqual([row.shop_id for row in payloads], [self.two])
         self.assertIn(f"shop {self.two}", payloads[0].payload["subject"])
+        for model in (ShipmentImportBatchRecord, ShipmentImportRowRecord):
+            self.assertEqual([row.shop_id for row in self.db.scalars(select(model)).all()], [self.two])
+        shipment = self.db.scalar(select(ShipmentImportRowRecord))
+        self.assertEqual(shipment.facts["sku"], f"private-sku-{self.two}")
 
     def test_reinstalled_shop_survives_old_uninstall_and_redact_deliveries(self):
         conn = self.conn(self.one)

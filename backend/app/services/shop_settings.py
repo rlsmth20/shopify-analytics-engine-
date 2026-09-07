@@ -4,9 +4,8 @@ from urllib.parse import urlparse
 from sqlalchemy import select
 
 from app.config.lead_time import (
-    MOCK_LEAD_TIME_CONFIG,
+    DEFAULT_SHOP_LEAD_TIME_CONFIG,
     LeadTimeConfig,
-    build_lead_time_config,
 )
 from app.db.models import CategoryLeadTime, Product, Shop, ShopSettings, VendorLeadTime
 from app.db.session import session_scope
@@ -35,19 +34,14 @@ class ResolvedShopSettings:
     uses_file_defaults: bool
 
     def to_lead_time_config(self) -> LeadTimeConfig:
-        if self.uses_file_defaults:
-            return build_lead_time_config(
-                global_default_lead_time_days=self.global_default_lead_time_days,
-                global_safety_buffer_days=self.global_safety_buffer_days,
-                allow_mock_fallback=self.allow_mock_fallback,
-            )
-
+        # Always use the resolved maps, including empty maps for a new shop.
+        # Rebuilding from fixture defaults here would introduce unsaved rules.
         return LeadTimeConfig(
             global_default_lead_time_days=self.global_default_lead_time_days,
             global_safety_buffer_days=self.global_safety_buffer_days,
             allow_mock_fallback=self.allow_mock_fallback,
-            vendor_lead_times=self.vendor_lead_times,
-            category_lead_times=self.category_lead_times,
+            vendor_lead_times=dict(self.vendor_lead_times),
+            category_lead_times=dict(self.category_lead_times),
         )
 
 
@@ -150,12 +144,12 @@ def build_default_shop_settings(shopify_domain: str = "defaults") -> ResolvedSho
     return ResolvedShopSettings(
         shop_id=None,
         shopify_domain=shopify_domain,
-        global_default_lead_time_days=MOCK_LEAD_TIME_CONFIG.global_default_lead_time_days,
-        global_safety_buffer_days=MOCK_LEAD_TIME_CONFIG.global_safety_buffer_days,
-        allow_mock_fallback=MOCK_LEAD_TIME_CONFIG.allow_mock_fallback,
+        global_default_lead_time_days=DEFAULT_SHOP_LEAD_TIME_CONFIG.global_default_lead_time_days,
+        global_safety_buffer_days=DEFAULT_SHOP_LEAD_TIME_CONFIG.global_safety_buffer_days,
+        allow_mock_fallback=DEFAULT_SHOP_LEAD_TIME_CONFIG.allow_mock_fallback,
         is_persisted=False,
-        vendor_lead_times=dict(MOCK_LEAD_TIME_CONFIG.vendor_lead_times),
-        category_lead_times=dict(MOCK_LEAD_TIME_CONFIG.category_lead_times),
+        vendor_lead_times=dict(DEFAULT_SHOP_LEAD_TIME_CONFIG.vendor_lead_times),
+        category_lead_times=dict(DEFAULT_SHOP_LEAD_TIME_CONFIG.category_lead_times),
         uses_file_defaults=True,
     )
 

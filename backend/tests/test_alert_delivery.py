@@ -18,6 +18,7 @@ from app.schemas import SkuDetail
 from app.schemas_v2 import TestAlertRequest
 from app.services import alert_delivery, alert_evaluation, alert_scheduler, alerts, notifications, transactional_email
 from app.services.inventory_engine import build_inventory_actions
+from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.notification_targets import NotificationHttpError, post_public_json, validate_target
 
 
@@ -270,6 +271,50 @@ class DurableAlertTests(unittest.TestCase):
             config = db.get(NotificationChannelRecord, f"{self.shop_id}:email")
             self.assertEqual(config.target, "new@example.invalid")
             self.assertFalse(config.verified)
+
+    def test_one_observed_sales_day_keeps_risk_warning_without_false_precision(self):
+        forecast = forecast_sku(ForecastInputs(sku_id="SKU-A", daily_history=[0] * 89 + [30],
+                                              on_hand=10, start_weekday=0))
+        self.assertEqual((forecast.history_days, forecast.confidence, forecast.stockout_probability_30d), (1, "low", 1))
+        context = alerts.EvaluationContext(actions=[], forecasts=[forecast], supplier_scores=[],
+                                           sku_metadata={"SKU-A": {"name": "Fixture product"}})
+        rule = self.rule.model_copy(update={"trigger": "forecast_miss", "threshold": 70})
+        events = alerts._forecast_events(rule, context, self.now, False, {}, {"email"})
+        self.assertEqual(len(events), 1)
+        self.assertIn("Fixture product may run out", events[0].message)
+        self.assertIn("Only 1 day of usable sales history", events[0].message)
+        self.assertIn("confidence is low", events[0].message)
+        self.assertIn("incoming orders before ordering", events[0].message)
+        self.assertNotIn("%", events[0].message)
+        self.assertTrue(events[0].preview)
+
+    def test_forecast_precision_and_threshold_preserved_for_supported_estimates(self):
+        forecast = forecast_sku(ForecastInputs(sku_id="SKU-A", daily_history=[30] * 90,
+                                              on_hand=10, start_weekday=0))
+        self.assertEqual(forecast.confidence, "high")
+        rule = self.rule.model_copy(update={"trigger": "forecast_miss", "threshold": 70})
+        for probability, phrase in [(1.0, "over 99%"), (0.996, "over 99%"), (0.764, "76%")]:
+            with self.subTest(probability=probability):
+                context = alerts.EvaluationContext(actions=[], forecasts=[forecast.model_copy(
+                    update={"stockout_probability_30d": probability})], supplier_scores=[])
+                events = alerts._forecast_events(rule, context, self.now, False, {}, {"email"})
+                self.assertEqual(len(events), 1)
+                self.assertIn(f"Forecast estimates a {phrase} chance", events[0].message)
+                self.assertIn("high confidence", events[0].message)
+                self.assertNotIn("100%", events[0].message)
+        context = alerts.EvaluationContext(actions=[], forecasts=[forecast.model_copy(
+            update={"stockout_probability_30d": 0.6999})], supplier_scores=[])
+        self.assertEqual(alerts._forecast_events(rule, context, self.now, False, {}, {"email"}), [])
+
+    def test_long_but_low_confidence_forecast_keeps_uncertainty_visible(self):
+        forecast = forecast_sku(ForecastInputs(sku_id="SKU-A", daily_history=[30] * 90,
+                                              on_hand=10, start_weekday=0)).model_copy(update={"confidence": "low"})
+        context = alerts.EvaluationContext(actions=[], forecasts=[forecast], supplier_scores=[])
+        rule = self.rule.model_copy(update={"trigger": "forecast_miss", "threshold": 70})
+        events = alerts._forecast_events(rule, context, self.now, False, {}, {"email"})
+        self.assertEqual(len(events), 1)
+        self.assertIn("Forecast confidence is low", events[0].message)
+        self.assertNotIn("%", events[0].message)
 
     def test_stale_worker_cannot_overwrite_an_acknowledged_retry_receipt(self):
         def delayed_original(**kwargs):

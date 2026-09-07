@@ -1,0 +1,62 @@
+/* A table's 620px minimum belongs to its scroll region, not the page grid. */
+.page,
+.page :global(.page-stack) {
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
+}
+
+.page :global(.section-card),
+.page :global(.empty-state),
+.page :global(.content-grid),
+.page :global(.field-label),
+.page :global(.input-control),
+.page :global(.lead-time-override-section),
+.page :global(.lead-time-priority-step) > div,
+.page :global(.lead-time-preview-row) > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.page :global(.lead-time-table-wrap) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.page :global(.lead-time-table-wrap):focus-visible {
+  outline: 2px solid var(--optimize);
+  outline-offset: 3px;
+}
+
+.page :global(.lead-time-suggestion),
+.page :global(.filter-chip),
+.page :global(.status-badge) {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1240px) {
+  .page :global(.content-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .page :global(.lead-time-priority-grid),
+  .page :global(.form-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page :global(.lead-time-sku-counts) {
+    min-width: 0;
+  }
+
+  .page :global(.sticky-action-row) > button {
+    width: 100%;
+    min-width: 0;
+  }
+}

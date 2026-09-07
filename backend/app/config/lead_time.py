@@ -49,6 +49,18 @@ def build_lead_time_config(
     )
 
 
+# Real workspaces start with global assumptions only. Supplier/category rules
+# are merchant data and must come from saved rows, never example names.
+DEFAULT_SHOP_LEAD_TIME_CONFIG = LeadTimeConfig(
+    global_default_lead_time_days=14,
+    global_safety_buffer_days=7,
+    # Retained for API/storage compatibility; authenticated feeds do not use it.
+    allow_mock_fallback=True,
+    vendor_lead_times={},
+    category_lead_times={},
+)
+
+
 MOCK_LEAD_TIME_CONFIG = LeadTimeConfig(
     global_default_lead_time_days=14,
     global_safety_buffer_days=7,

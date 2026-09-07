@@ -1,0 +1,19 @@
+# Stocky import: keep one inventory source
+
+A synthetic CSV → Shopify → CSV sequence exposed two different issues. The first complete Shopify catalog sync correctly retires the CSV inventory location, but creates a separate native variant record. Historical external sales and CSV lead-time overrides remain attached to the old CSV record. Reimporting Stocky previously selected one matching SKU arbitrarily and added a CSV inventory location beside the Shopify aggregate: 10 actual units displayed as 20.
+
+This change prevents new duplicate inventory without merging historical products or sales:
+
+- An active Shopify connection or any previously synced native Shopify variant makes Shopify the inventory source. CSV stock counts are ignored, including before the first catalog sync.
+- Only a single, exact SKU match to a native Shopify variant can receive CSV cost and lead-time updates. Shopify product names, prices, variant identities and quantities remain unchanged.
+- Unknown SKUs, missing SKUs and multiple catalog matches are skipped with row-level reasons. Real variants that share a SKU are never merged or arbitrarily chosen.
+- CSV-only workspaces retain their existing product/inventory import behavior. A later successful Shopify sync replaces that CSV inventory snapshot.
+- The importer uses the existing connection lock and commits before releasing it, so first-install grants cannot overtake a CSV transaction and start a sync against an uncommitted snapshot.
+
+Existing numeric response fields are preserved. Additive fields are `inventory_source` (`csv` or `shopify`), `inventory_rows_skipped` and `warnings`. `products_processed` counts nonblank data rows, including skipped rows. In Shopify mode, `products_updated` counts actual cost/lead-time changes; a repeated matching import can correctly report zero changes. `inventory_rows_skipped` counts nonempty quantity cells ignored in Shopify mode, including rows whose product mapping was also skipped. `rows_skipped` means the row was not applied; `skip_reasons` explains why.
+
+This does not migrate old CSV history, choose an identity for duplicated SKUs, or delete legacy product rows. Existing mixed inventory locations are reconciled by the existing complete Shopify sync. Historical sales should be reassigned only after explicit variant mapping and source review. In the reproduction, shop-level revenue correctly included 12 sold units while current-variant demand saw only 2; that historical mapping issue remains separate from the prevented stock double-count.
+
+CSV numeric validation also prevents missing or malformed values from overwriting stock. Absent/blank inventory updates catalog details only and does not create a zero-stock row. Provided quantities must be finite whole signed 32-bit values; negative values remain supported for oversold inventory. Invalid quantities skip the entire row with an explanation. Optional prices preserve an existing value when blank; provided prices must be finite, non-negative, within the database money range and have at most two decimal places. Explicit zero prices/costs remain valid. Missing or invalid costs remain unknown for new products and do not erase an existing cost. `inventory_rows_inserted` continues to count only newly created inventory rows, not updates or ignored values.
+
+Verification: `python -m unittest tests.test_stocky_inventory_source tests.test_cost_provenance tests.test_shopify_sync` passes 42 tests. Thirteen source/parsing tests cover repeated CSV-only imports, Shopify stock authority and metadata enrichment, preserved old history, duplicate native SKUs, connected-before-sync behavior, unmatched SKUs, tenant isolation, missing stock values, invalid/non-finite numbers, oversold stock, zero prices and valid rows alongside skipped rows. Shopify responses are mocked; all databases are synthetic and local. No production data or external provider was changed by these tests.
