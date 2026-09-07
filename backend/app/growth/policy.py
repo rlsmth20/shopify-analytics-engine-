@@ -21,7 +21,7 @@ def number(name, default=0.0):
 @dataclass(frozen=True)
 class Policy:
     daily_usd: float = 0
-    daily_emails: int = 5
+    daily_emails: int = 20  # Compatibility field; shared first-contact ceiling is fixed at 20.
     email_unit_usd: float = 0
     sender: str = ""
     postal_address: str = ""
@@ -33,7 +33,7 @@ class Policy:
     def from_env(cls):
         # No model-provided text is consulted for authority or resource limits.
         return cls(daily_usd=number("GROWTH_DAILY_USD"),
-                   daily_emails=min(20, int(number("GROWTH_DAILY_EMAILS", 5))),
+                   daily_emails=20,
                    email_unit_usd=number("GROWTH_EMAIL_UNIT_USD"),
                    sender=os.getenv("GROWTH_MAILBOX", "").strip().lower(),
                    postal_address=os.getenv("GROWTH_POSTAL_ADDRESS", "").strip(),

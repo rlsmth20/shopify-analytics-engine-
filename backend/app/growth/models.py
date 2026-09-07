@@ -103,6 +103,22 @@ class Message(Base):
     sent_at: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
+class FirstContact(Base):
+    """Shared first-contact admission ledger, including browser-operated channels."""
+    __tablename__ = "growth_first_contacts"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
+    contact_id: Mapped[str] = mapped_column(String(32), unique=True)
+    action_key: Mapped[str] = mapped_column(String(200), unique=True)
+    channel: Mapped[str] = mapped_column(String(40))
+    experiment_id: Mapped[str] = mapped_column(String(32))
+    cohort: Mapped[dict] = mapped_column(JSON)
+    body_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24), default="reserved", index=True)
+    reserved_at: Mapped[float] = mapped_column(Float, default=time.time)
+    sent_at: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    receipt: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+
 class Usage(Base):
     __tablename__ = "growth_usage"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)

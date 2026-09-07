@@ -52,6 +52,10 @@ def evaluate(db, experiment_id):
         return {}
     if experiment.specification.get("channel") == "organic_search":
         return evaluate_organic(db, experiment)
+    if experiment.specification.get("channel") != "requested_health_check":
+        # External-channel cohorts use retained public/form receipts. Do not
+        # overwrite them with an empty requested-service email evaluation.
+        return experiment.result
     outgoing = list(db.scalars(select(Message).where(Message.experiment_id == experiment_id, Message.direction == "out",
                             Message.reply_to_id.is_(None), Message.sent_at.is_not(None))))
     incoming = list(db.scalars(select(Message).where(Message.experiment_id == experiment_id, Message.direction == "in")))
@@ -132,11 +136,11 @@ def evaluate(db, experiment_id):
                 "last_updated": now, "evaluation_evidence_id": event.id})
         # A leading signal can cautiously influence *future* behavior without claiming victory.
         strategy = get_memory(db, "strategic", "strategy")
-        if min(s["sent"] for s in stats.values()) >= 1 and stats["cash"]["sent"] == stats["reorder"]["sent"] and stats["cash"]["engaged"] != stats["reorder"]["engaged"]:
-            favored = "cash" if stats["cash"]["engaged"] > stats["reorder"]["engaged"] else "reorder"
+        if winner:
+            favored = winner
             strategy = {**strategy, "next_experiment_framing": favored, "learning_evidence_id": event.id,
                         "cash_allocation": .6 if favored == "cash" else .4,
-                        "positioning_confidence": "provisional; response evidence only"}
+                        "positioning_confidence": "mature cohort evidence; responses alone do not establish paid conversion"}
             remember(db, "strategic", "strategy", strategy)
         # Preserve empirical characteristics, with explicit unknown conversions.
         remember(db, "skill_performance", "requested_service:" + experiment.id,

@@ -1,5 +1,7 @@
 # Second outreach batch — explicit app benefits
 
+Latest owner policy: [continuous operation with a hard rolling 20-contact ceiling](continuous-operation.md) supersedes historical lifetime campaign caps and overnight stop instructions below. Preserve cohort/message attribution and use the durable gate before each new contact. A cohort boundary calls for evaluation; it does not stop the growth mission.
+
 Owner authorized continued outreach September 7 and requested clearer app benefits and collaboration on missing features. Follow [messaging revision 2](outreach-messaging.md). Preserve [batch 1](campaign-2026-09-07.md) as ten contacts with its original messages. This batch targets up to ten additional distinct merchants, twenty total; do not treat targets as achieved users. Currently three new contacts, thirteen overall; no merchant response observed at the latest check around 14:28 UTC.
 
 Experiment: `app-benefit-outreach-v2-20260907`, ID `18a70fab05194d88a0e0358e15d22efa`. Owner-direction evidence 4196; outreach skill version 2 activated after schema/tool validation. This is a message hypothesis, not evidence of higher conversion. Prioritize merchant-reported pain, retain channel distinctions, and record unknowns. Advertising $0, no new paid services, three free-check slots still available.

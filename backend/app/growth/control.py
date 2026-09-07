@@ -9,7 +9,7 @@ from .executive import export_packet, import_review
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["review-export", "review-import"])
+    parser.add_argument("action", choices=["review-export", "review-import", "outreach-status", "outreach-reserve", "outreach-complete", "outreach-backfill", "outreach-reconcile"])
     parser.add_argument("--file")
     parser.add_argument("--model", default="codex")
     parser.add_argument("--input-tokens", type=int)
@@ -17,7 +17,14 @@ def main():
     parser.add_argument("--latency-ms", type=int)
     args = parser.parse_args()
     with SessionLocal() as db:
-        if args.action == "review-export":
+        if args.action.startswith("outreach-"):
+            from .outbound import operator_action
+            from .models import FirstContact
+            FirstContact.__table__.create(db.get_bind(), checkfirst=True)
+            payload = json.loads(Path(args.file).read_text(encoding="utf-8-sig")) if args.file else {}
+            result = operator_action(db, args.action, payload)
+            db.commit()
+        elif args.action == "review-export":
             result = export_packet(db)
         else:
             if not args.file:

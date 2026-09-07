@@ -10,6 +10,7 @@ from .store import get_memory
 
 
 def dashboard(db):
+    from .outbound import status as outbound_status
     now = time.time()
     day = int(now // 86400) * 86400
     def count(model, *conditions):
@@ -64,6 +65,7 @@ def dashboard(db):
                       "trial_to_paid": None,
                       "limitations": "Attribution and collected payments must be verified before interpreting CAC. MRR/LTV remain unknown until billing amounts and retention are observed."},
         "agent": {**activity, "next_action": next_work.kind if next_work else "await_scheduled_wake",
+                  "first_contact_capacity": outbound_status(db),
                   "executive": get_memory(db, "working", "executive"),
                   "capabilities": {"requested_service_email": Policy.from_env().email_enabled,
                      "promotional_email": False, "public_research": True, "community_posting": False,

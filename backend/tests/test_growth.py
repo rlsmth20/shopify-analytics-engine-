@@ -98,14 +98,29 @@ class GrowthTests(unittest.TestCase):
         self.dispatch_all(provider)
         with self.factory() as db:
             self.assertEqual(db.get(Contact, cash.contact_id).status, "active_conversation")
-            self.assertEqual(get_memory(db, "strategic", "strategy")["next_experiment_framing"], "cash")
-            self.assertEqual(get_memory(db, "strategic", "strategy")["cash_allocation"], .6)
+            self.assertNotIn("next_experiment_framing", get_memory(db, "strategic", "strategy"))
+            self.assertEqual(get_memory(db, "strategic", "strategy")["cash_allocation"], .5)
             self.assertTrue(get_memory(db, "beliefs", "response:cash")["supporting_evidence"])
             self.assertEqual(db.scalar(select(func.count()).select_from(Message).where(Message.direction == "in")), 1)
             self.assertEqual(db.scalar(select(func.count()).select_from(Message).where(Message.direction == "out")), 3)
             self.assertEqual(dashboard(db)["mission"]["qualified_users"], 0)
             # Prior intent is not represented as an acquired customer.
         self.assertEqual(len(calls), len(set(calls)))
+
+    def test_requested_service_continues_with_twenty_reserved_new_contacts(self):
+        from app.growth.models import FirstContact
+        with self.factory() as db:
+            for n in range(20):
+                db.add(FirstContact(contact_id=f'other-{n}', action_key=f'cap-{n}', channel='contact_form',
+                    experiment_id='fixture', cohort={'message_version':2}, body_hash='fixture'))
+            db.commit()
+        self.contact(401)
+        calls=[]
+        self.dispatch_all(lambda *a,**kw: calls.append(kw) or {'id':'requested-receipt'})
+        self.assertEqual(len(calls),1)
+        with self.factory() as db:
+            from app.growth.outbound import status
+            self.assertEqual(status(db)['remaining'],0)
 
     def test_service_email_needs_no_address_but_rejects_promotion_and_tampering(self):
         from app.growth.service_replies import draft_requested_check

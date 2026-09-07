@@ -75,14 +75,10 @@ def send(factory, work, *, policy=None, provider=resend_request):
         db.refresh(contact)
         if contact.suppressed:
             raise GrowthError("Contact is suppressed")
-        day_start = int(time.time() // 86400) * 86400
-        # Budget row locks in reserve are released; acquire global dispatch row here.
-        from .models import Memory
-        db.execute(update(Memory).where(Memory.namespace == "working", Memory.key == "dispatch_lock")
-                   .values(version=Memory.version + 1))
-        attempted = db.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind == "SEND_INTENT", Evidence.occurred_at >= day_start)) or 0
-        if attempted >= policy.daily_emails:
-            raise GrowthError("Daily outbound limit reached", "configuration")
+        # Exact requested-service permits above are inbound obligations, including
+        # the initial answer to an explicit check request. They are not new outreach.
+        # New unsolicited first contacts use outbound.reserve_contact; Resend still
+        # cannot carry them. Cost, suppression, service scope and dedupe remain enforced.
         if message.reply_to_id:
             parent = db.get(Message, message.reply_to_id)
             if not parent or parent.classification not in ("SUBSTANTIVE_POSITIVE", "QUESTION", "SUBSTANTIVE_NEUTRAL"):
