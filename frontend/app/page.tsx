@@ -113,6 +113,10 @@ export default function HomePage() {
           Forecast the next 90 days, rank every SKU, score every supplier, and recover cash from
           dead stock - in one Shopify-first product, at a price that doesn&apos;t triple at renewal.
         </p>
+        <p className="marketing-hero-trust">
+          Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store.
+          Start with a CSV workspace, or <Link href="/tools/inventory-health-check">try the free browser inventory check</Link> with no account or installation.
+        </p>
         <HeroCta source="home_hero" />
         <p className="marketing-hero-trust">
           14-day free trial - No credit card - <Link href="/dashboard?demo=1">See a live demo</Link> -{" "}
@@ -170,8 +174,8 @@ export default function HomePage() {
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">See what your next reorder should be.</h2>
         <p className="marketing-section-sub">
-          Start free in 30 seconds - no credit card required. The demo is also live if you want to
-          look first.
+          Request a sign-in link for your CSV workspace. New accounts start a 14-day trial with no credit card required.
+          Shopify app access remains subject to the current review process; the browser inventory check works without installation.
         </p>
         <WaitlistForm source="home_footer" />
       </section>

@@ -17,14 +17,14 @@ const compareRows = [
   { capability: "Purchasing", stocky: "Send supplier orders and receive stock.", skubase: "Review reorder plans and record receipts; Shopify stock stays unchanged." },
   { capability: "Transfers", stocky: "Move stock between locations and confirm receipt.", skubase: "Does not execute transfers or update store quantities." },
   { capability: "Dead stock", stocky: "Approve and carry out markdowns or other actions.", skubase: "Review suggested markdown, bundle, wholesale, or write-off plans, depending on your plan." },
-  { capability: "Product data", stocky: "Retain catalog exports and verify stock counts.", skubase: "Import product CSV fields and stock quantities, including vendor names when present on product rows." },
+  { capability: "Product data", stocky: "Retain catalog exports and verify stock counts.", skubase: "CSV-only workspaces can import catalog fields and stock snapshots. When Shopify is connected or its catalog is already synced, CSV quantities are ignored; supported costs and lead times can enrich an unambiguous Shopify variant." },
   { capability: "Historical records", stocky: "Keep supplier, purchase-order, and transfer records for reference.", skubase: "Product CSV import does not migrate standalone vendor lists, PO history, transfers, or sales history." }
 ];
 
 const steps = [
   { number: "1", title: "Preserve your records", body: "Save available exports while read-only access remains. Keep historical records and supplier details for reference." },
-  { number: "2", title: "Import your product catalog", body: "Use the supported Stocky product CSV format for catalog details and stock quantities. Verify the imported fields and counts." },
-  { number: "3", title: "Add sales data and review recommendations", body: "Connect Shopify or import supported sales data for demand analysis. Check lead times and representative products before relying on recommendations." },
+  { number: "2", title: "Import your product catalog", body: "Use a Stocky product CSV for catalog details and a stock snapshot in a CSV-only workspace. Shopify-backed workspaces keep Shopify stock quantities and accept supported cost and lead-time updates for unambiguous variants. Review the reported changes and skipped rows." },
+  { number: "3", title: "Add sales data and review recommendations", body: "Import non-Shopify shipment history through ShipStation, or sync Shopify if Skubase is already installed for your store. Stocky product CSVs do not include sales history. Check lead times and representative products before relying on recommendations." },
   { number: "4", title: "Carry out approved actions", body: "Use Shopify or your operations system for purchasing, receiving, transfers, and inventory adjustments. skubase helps you decide what to do." }
 ];
 
@@ -45,7 +45,11 @@ export default function GoodbyeStockyPage() {
           Shopify provides read-only Stocky exports for at least 90 days after retirement. <a href="https://help.shopify.com/en/manual/products/inventory/transitioning-from-stocky">Check Shopify&apos;s migration guidance</a>.
           {" "}Availability checked September 6, 2026.
         </p>
-        <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Get early access" />
+        <p className="marketing-hero-trust">
+          Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store.
+          Start a CSV workspace now, or <Link href="/tools/inventory-health-check">try the free browser inventory check</Link> without an account or installation.
+        </p>
+        <WaitlistForm source="goodbye_stocky_hero" ctaLabel="Send my sign-in link" />
         <p className="marketing-hero-trust">
           14-day trial - No credit card - <strong>Prices locked at renewal</strong> -{" "}
           <Link href="/inventory-risk-snapshot">Get a free inventory risk snapshot</Link>
@@ -94,9 +98,10 @@ export default function GoodbyeStockyPage() {
       <section className="marketing-section marketing-cta-section">
         <h2 className="marketing-section-title">Explore inventory planning with skubase.</h2>
         <p className="marketing-section-sub">
-          <Link href="/dashboard?demo=1">Try the live demo with sample data</Link>, or join the early-access list for availability updates.
+          <Link href="/dashboard?demo=1">Try the demo with sample data</Link>, or request a sign-in link to start your CSV workspace.
+          New accounts start a 14-day trial; this form does not install the Shopify app.
         </p>
-        <WaitlistForm source="goodbye_stocky_footer" ctaLabel="Get early access" />
+        <WaitlistForm source="goodbye_stocky_footer" ctaLabel="Send my sign-in link" />
       </section>
 
       <MarketingFooter />

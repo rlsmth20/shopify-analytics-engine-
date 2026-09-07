@@ -29,6 +29,62 @@ export type GrowthCohort = {
   outcome_linkage_complete: boolean; substantive_reply_rate: number | null; positive_interest_rate: number | null;
 };
 export type GrowthActivityDay = { day: string; first_contacts: number; substantive_replies: number };
+export type GrowthInboxTransport = {
+  status?: "disabled" | "configuration_required" | "not_checked" | "poll_failed" | "poll_stale" | "verification_unrecorded" | "verification_stale" | "verified";
+  mailbox?: string;
+  label?: string;
+  explanation?: string;
+  last_poll_at?: number | null;
+  last_poll_status?: "success" | "failed" | null;
+  last_successful_poll_at?: number | null;
+  last_approved_receipt_at?: number | null;
+  last_approved_receipt_observed_at?: number | null;
+  last_bridge_verified_at?: number | null;
+  latest_poll_replies_ingested?: number | null;
+  verification_due_after_seconds?: number | null;
+  poll_stale_after_seconds?: number | null;
+};
+
+const inboxTimestamp = (value?: number | null) => typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+/** Polling, copied receipts and delivery verification are independent evidence. */
+export function growthInboxView(inbox?: GrowthInboxTransport | null) {
+  const labels = {
+    disabled: "Inbox monitoring disabled",
+    configuration_required: "Inbox setup needed",
+    not_checked: "Inbox not yet checked",
+    poll_failed: "Latest inbox check failed",
+    poll_stale: "Inbox check overdue",
+    verification_unrecorded: "Reply delivery not yet verified",
+    verification_stale: "Reply delivery verification is old",
+    verified: "Reply delivery recently verified",
+  };
+  const recognized = inbox?.status && Object.hasOwn(labels, inbox.status) ? inbox.status : null;
+  const verifiedAt = inboxTimestamp(inbox?.last_bridge_verified_at);
+  const status = recognized === "verified" && !verifiedAt ? null : recognized;
+  const lastPollAt = inboxTimestamp(inbox?.last_poll_at);
+  const lastSuccessfulPollAt = inboxTimestamp(inbox?.last_successful_poll_at);
+  const latestReplies = typeof inbox?.latest_poll_replies_ingested === "number"
+    && Number.isSafeInteger(inbox.latest_poll_replies_ingested) && inbox.latest_poll_replies_ingested >= 0
+    && lastPollAt && inbox.last_poll_status === "success" && status !== "poll_failed" ? inbox.latest_poll_replies_ingested : null;
+  return {
+    label: status ? inbox?.label || labels[status] : "Inbox status unknown",
+    explanation: status ? inbox?.explanation || "Mailbox checks and delivery verification are recorded separately."
+      : "This snapshot does not contain confirmed inbox monitoring status.",
+    warning: status !== null && status !== "verified",
+    lastPollAt,
+    lastSuccessfulPollAt,
+    lastPollResult: inbox?.last_poll_status === "success" ? "Successful" : inbox?.last_poll_status === "failed" ? "Failed" : "Unknown",
+    lastReceiptAt: inboxTimestamp(inbox?.last_approved_receipt_at),
+    receiptObservedAt: inboxTimestamp(inbox?.last_approved_receipt_observed_at),
+    verifiedAt,
+    latestReplies,
+    verificationWindowDays: typeof inbox?.verification_due_after_seconds === "number"
+      && Number.isFinite(inbox.verification_due_after_seconds) && inbox.verification_due_after_seconds > 0
+      ? inbox.verification_due_after_seconds / 86400 : null,
+  };
+}
+
 export type GrowthSnapshot = {
   generated_at?: number;
   measurement?: { day_timezone: string; mission_started_at: number | null; mission_funnel: Record<string, number>; funnel_scope: string };
@@ -52,6 +108,7 @@ export type GrowthSnapshot = {
     first_contact_capacity?: { limit: number; window_hours: number; used: number; remaining: number; unresolved: number;
       next_slot_at: number | null; is_target: boolean; scope: string; continue_non_outbound: boolean };
     executive?: { last_review?: number; mode?: string };
+    inbox_transport?: GrowthInboxTransport | null;
     capabilities?: { requested_service_email: boolean; community_posting: boolean; payment_receipts: boolean; executive_review: string };
     errors: { id: string; kind: string; error: string; at: number }[] };
   review_queue?: { id: number; kind: string; at: number; data: { reason?: string; body?: string; destination?: string;

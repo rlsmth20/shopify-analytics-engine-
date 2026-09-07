@@ -260,8 +260,10 @@ export default function StoreSyncPage() {
           </div>
         </div>
         <p className="section-copy">
-          Stocky imports supply your catalog and current stock quantities.
-          ShipStation imports supply shipment history. Reorder planning needs
+          In a CSV-only workspace, Stocky imports supply catalog details and a stock snapshot.
+          When Shopify is connected or its catalog is already synced, Shopify remains the stock source:
+          Stocky CSVs can update supported costs and lead times for unambiguous Shopify variants, but do not add inventory quantities.
+          ShipStation imports supply non-Shopify shipment history. Reorder planning needs
           both current inventory and recent sales for matching SKUs, plus supplier
           lead times. Shipment history alone does not tell us how much stock you have.
           These CSV imports do not require a Shopify app installation.

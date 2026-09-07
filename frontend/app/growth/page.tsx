@@ -5,12 +5,32 @@ import Link from "next/link";
 import { API_BASE_URL } from "@/lib/api-base";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 import { chartWidth, FUNNEL_STAGES, growthLabel as label, growthMoney as money, growthNumber as number,
-  growthPercent as percent, growthTime as time, outcomeLabel, type GrowthActivityDay, type GrowthCohort,
-  type GrowthSnapshot } from "@/lib/growth-dashboard";
+  growthPercent as percent, growthTime as time, growthInboxView, outcomeLabel, type GrowthActivityDay, type GrowthCohort,
+  type GrowthInboxTransport, type GrowthSnapshot } from "@/lib/growth-dashboard";
 import styles from "./page.module.css";
 
 function Metric({ name, value, detail }: { name: string; value: string | number; detail?: string }) {
   return <div className={styles.metric}><span>{name}</span><strong>{value}</strong>{detail && <small>{detail}</small>}</div>;
+}
+
+function InboxMonitoring({ transport }: { transport?: GrowthInboxTransport | null }) {
+  const inbox = growthInboxView(transport);
+  const recordedTime = (value: number | null) => value === null ? "Unknown — not recorded" : time(value);
+  return <section className={styles.item} aria-labelledby="inbox-monitoring-title">
+    <h3 id="inbox-monitoring-title">Business inbox · info@skubase.io</h3>
+    <p><strong className={inbox.warning ? styles.warningText : undefined}>{inbox.label}</strong></p>
+    <p>{inbox.explanation}</p>
+    <dl className={styles.operations}>
+      <dt>Last inbox check</dt><dd>{recordedTime(inbox.lastPollAt)} · {inbox.lastPollResult}</dd>
+      <dt>Last successful check</dt><dd>{recordedTime(inbox.lastSuccessfulPollAt)}</dd>
+      <dt>Replies ingested on latest check</dt><dd>{number(inbox.latestReplies)}</dd>
+      <dt>Last copied receipt arrived</dt><dd>{recordedTime(inbox.lastReceiptAt)}</dd>
+      <dt>Copy last observed by agent</dt><dd>{recordedTime(inbox.receiptObservedAt)}</dd>
+      <dt>Last verified reply delivery</dt><dd>{recordedTime(inbox.verifiedAt)}</dd>
+    </dl>
+    <p className={styles.caption}>An empty successful check is normal. It does not prove that Gmail is forwarding replies to the agent. Copied receipts and internal delivery checks are separate from merchant reply metrics.</p>
+    {inbox.verificationWindowDays !== null && <p className={styles.caption}>Delivery verification is considered old after {number(inbox.verificationWindowDays)} days. Old verification calls for another check; it does not establish that delivery has failed.</p>}
+  </section>;
 }
 
 function ActivityChart({ days }: { days: GrowthActivityDay[] }) {
@@ -183,11 +203,12 @@ export default function GrowthPage() {
         <Metric name="Recorded model / API spend" value={money(data.economics.model_api_spend)} detail={unknownCosts ? `${unknownCosts} usage records have unknown cost` : "Known ledger amounts"} />
         <Metric name="Reserved cost exposure" value={money(data.economics.unresolved_cost_reservations)} detail="Unsettled · not confirmed spend" /><Metric name="Advertising spend" value={money(data.economics.advertising_spend)} detail="Paid ads disabled" /><Metric name="Customer acquisition cost" value={money(data.economics.cac)} />
       </div><p className={styles.caption}>{data.economics.limitations} Runtime API ceiling: {money(data.agent.daily_budget_usd)}/day. {unknownCosts > 0 && "Recorded spend is a partial total; unknown costs are not zero."}</p></section>
-      <div className={styles.columns}><section className={styles.card}><h2>Needs attention</h2>{data.agent.errors.length ? data.agent.errors.map(e => <article key={e.id} className={styles.item}><h3>{label(e.kind)}</h3><p>{e.error}</p><small>{time(e.at)}</small></article>) : <p className={styles.muted}>No current execution errors.</p>}
+      <div className={styles.columns}><section className={styles.card}><h2>Needs attention</h2>{data.agent.errors.length ? data.agent.errors.map(e => <article key={e.id} className={styles.item}><h3>{label(e.kind)}</h3><p>{e.error}</p><small>{time(e.at)}</small></article>) : <p className={styles.muted}>No current task errors are recorded. Inbox delivery status is shown separately.</p>}
         {data.review_queue?.map(item => <article key={item.id} className={styles.item}><h3>{label(item.kind)}</h3><p>{item.data.reason || item.data.observation || item.data.body}</p>{item.data.recommended_action && <p>{item.data.recommended_action}</p>}
           {item.data.destination?.startsWith("https://") && <a href={item.data.destination} target="_blank" rel="noreferrer">Review the original conversation ↗</a>}<small>{time(item.at)} · evidence {item.id}</small></article>)}
       </section><section className={styles.card}><h2>Agent operations</h2><dl className={styles.operations}><dt>Queued next</dt><dd>{label(data.agent.next_action)}</dd><dt>Next due</dt><dd>{time(data.agent.next_due)}</dd><dt>Ready work</dt><dd>{number(data.agent.queue_ready)}</dd><dt>Last executive review</dt><dd>{time(data.agent.executive?.last_review)}</dd></dl>
         {data.agent.capabilities && <p className={styles.muted}>Requested-service email: {data.agent.capabilities.requested_service_email ? "active at info@skubase.io" : "disabled"}. Browser outreach follows the shared admission ledger and reviewed channel rules. Payment receipts: {data.agent.capabilities.payment_receipts ? "integration configured" : "integration not configured"}.</p>}
+        <InboxMonitoring transport={data.agent.inbox_transport} />
         <details className={styles.details}><summary>Recent activity and evidence</summary>{data.recent_actions.length ? data.recent_actions.map(a => <div key={a.id} className={styles.activity}><span>{label(a.kind)}<small>Evidence {a.id}</small></span><time dateTime={new Date(a.at * 1000).toISOString()}>{time(a.at)}</time></div>) : <p className={styles.empty}>No activity recorded yet.</p>}</details>
       </section></div>
       <footer className={styles.footer}><p>{data.mission.qualified_definition}</p><span>Snapshot {time(data.generated_at)} · refreshes every 30 seconds while visible.</span></footer>

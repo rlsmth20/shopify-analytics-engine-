@@ -286,8 +286,27 @@ def update_channel_config(
     if enabled:
         target = validate_target(channel, target)
     with SessionLocal() as session:
+        # Serialize initial configuration with seeding, and destination edits
+        # with each other. NO KEY UPDATE also allows the test audit's foreign-key
+        # check while it holds the channel row. SQLite uses a write transaction.
+        if session.get_bind().dialect.name == "sqlite":
+            session.execute(text("BEGIN IMMEDIATE"))
+        shop = session.scalar(select(Shop).where(Shop.id == shop_id).with_for_update(key_share=True))
+        if shop is None:
+            raise ValueError("This workspace is no longer available.")
         key = _channel_storage_key(shop_id, channel)
-        record = session.get(NotificationChannelRecord, key)
+        record = session.scalar(select(NotificationChannelRecord)
+                                .where(NotificationChannelRecord.channel == key).with_for_update())
+        same_target = record is not None and record.target == target
+        # Preserve unchanged destinations that were already live before saved
+        # tests existed. A replacement, new destination or paused untested
+        # destination must not inherit that legacy permission. Reject rather
+        # than silently accepting a stale UI save that claims it enabled alerts.
+        if enabled and not (same_target and (record.verified or record.enabled)):
+            raise ValueError(
+                "Save the destination paused and send a successful test before enabling automatic alerts. "
+                "Refresh settings if the destination changed in another tab."
+            )
         if record is None:
             record = NotificationChannelRecord(
                 channel=key,

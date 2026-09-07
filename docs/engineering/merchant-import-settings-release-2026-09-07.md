@@ -30,6 +30,8 @@ Synthetic browser-to-API verification imported a three-unit shipment once, then 
 
 The combined suite passed 269 backend tests and 175 frontend tests, typecheck and production build. Mobile browser verification confirmed the page width equals its 390px viewport; Save persisted the actual settings through the real route. An intentionally blocked history request left both confirmed alert channels usable; retry restored activity after the block was removed. Network failures use plain recovery copy instead of internal API URLs. The final deployment build also checks the last mobile-layout and chat-placement adjustments. Deployment identifiers are recorded after rollout.
 
+Production rollout: commit `604e854`, Vercel `dpl_DXqzf5iRZPrsT5zVJCvdXgFhN6yV` READY at `www.skubase.io`, Railway `529cce7c-f470-4ee4-a87f-c6faf5fcd6e9` SUCCESS. Both deployments used the same immutable commit snapshot. Health, the live multipart source-scope contract, receipt tables and default settings were verified; release evidence is `5392`. The worker remained running and unpaused, with 13 of 20 rolling first-contact slots used and no unresolved sends. This deployment did not send merchant outreach or configure any live merchant destination.
+
 ## Growth evidence
 
 The afternoon research allowance ended at six primary pages, zero new qualified contacts and zero outbound messages (evidence 5330). Shopify Community notifications showed system onboarding/badges, not merchant replies (5332). Two exact Google Workspace setup notices were reviewed and reclassified from UNKNOWN to AUTOMATED, retaining raw messages and prior audit evidence (5333 and 5334). No outreach cohort or rolling-20 ceiling changed; advertising remains disabled.

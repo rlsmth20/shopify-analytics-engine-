@@ -24,7 +24,7 @@ const faqs = [
   { q: "Is there a free tier?", a: "Every plan starts with a 14-day free trial, no credit card required. After the trial the Starter plan is $29/mo." },
   { q: "Do alerts send automatically?", a: "Yes. Enabled alert rules are evaluated automatically and delivered through the channels you configure and enable. You can also preview an evaluation before sending." },
   { q: "Which alert channels are included?", a: "Starter includes email and Slack alert channels. Growth and Scale add webhook channels. Channels must be configured before notifications are delivered. SMS alerts are planned and are not currently available." },
-  { q: "What does setup involve?", a: "Connect Shopify, complete the initial sync, then review your inventory signals and reorder assumptions. Setup time depends on your catalog size and available data. The free sample snapshot shows the kind of output you can review before connecting a store." },
+  { q: "What does setup involve?", a: "Skubase is in Shopify's review process and is not yet listed in the Shopify App Store. Start with the free browser inventory check or a CSV workspace. If Skubase is already installed for your store, you can sync Shopify. Review your data coverage and supplier lead times before relying on recommendations." },
   { q: "Can I pay annually?", a: "Yes. Annual plans save about 15% compared with twelve monthly payments. The monthly equivalent is rounded to the nearest cent; the displayed annual total is billed once per year. The same price-lock terms apply." },
   { q: "Which plan fits my workflow?", a: "Starter covers ranked inventory actions, stock alerts, and dead-stock guidance. Growth adds demand forecasts, purchase-order planning, and Excel exports. Scale adds scheduled reports and supplier scorecards, which require purchase-order receipt history." },
   { q: "Does SKUbase execute inventory changes in Shopify?", a: "SKUbase provides read-only Shopify analysis and planning. Purchase-order drafts, receipt records, and transfer recommendations do not change stock in Shopify. The current sync imports total stock per SKU without a location breakdown, so it does not yet populate location-level transfer recommendations." },
@@ -51,6 +51,10 @@ export default function PricingPage() {
         <h1 className="marketing-hero-title">Clear plans for your next inventory decision.</h1>
         <p className="marketing-hero-sub">
           Start with ranked stock risks and alerts. Add forecasting, purchase plans, and reports as your workflow grows. Every plan has published pricing and a written price-lock commitment.
+        </p>
+        <p className="marketing-hero-trust">
+          Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store.
+          CSV workspaces are available now. <Link href="/tools/inventory-health-check">Try the free browser inventory check</Link> without an account or installation.
         </p>
         <div className="marketing-hero-ctas">
           <Link href="/inventory-risk-snapshot" className="button button-secondary button-lg">

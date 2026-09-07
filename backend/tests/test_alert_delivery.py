@@ -9,13 +9,14 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from fastapi import HTTPException
 from sqlalchemy import create_engine, select, delete
 from sqlalchemy.orm import sessionmaker
 
 from app.api.routes import alerts as alert_routes
 from app.db.models import Base, Shop, User, AlertRuleRecord, NotificationChannelRecord, AlertEventRecord, AlertDeliveryAttemptRecord, AuditLogRecord
 from app.schemas import SkuDetail
-from app.schemas_v2 import TestAlertRequest
+from app.schemas_v2 import TestAlertRequest, UpdateNotificationChannelRequest
 from app.services import alert_delivery, alert_evaluation, alert_scheduler, alerts, notifications, transactional_email
 from app.services.inventory_engine import build_inventory_actions
 from app.services.forecasting import ForecastInputs, forecast_sku
@@ -137,9 +138,75 @@ class DurableAlertTests(unittest.TestCase):
         self.assertFalse(alerts.record_channel_test(shop_id=self.shop_id, channel="email", target=target, delivery=delivery("email", status="failed")))
         self.assertFalse(next(c for c in alerts.list_channel_configs(self.shop_id) if c.channel == "email").verified)
         alerts.record_channel_test(shop_id=self.shop_id, channel="email", target=target, delivery=delivery("email"))
-        changed = alerts.update_channel_config(shop_id=self.shop_id, channel="email", target="new@example.invalid", enabled=True)
+        changed = alerts.update_channel_config(shop_id=self.shop_id, channel="email", target="new@example.invalid", enabled=False)
         self.assertFalse(changed.verified)
         self.assertFalse(alerts.record_channel_test(shop_id=self.shop_id, channel="email", target=target, delivery=delivery("email")))
+
+    def test_replacement_cannot_enable_until_its_saved_target_passes_a_test(self):
+        target = "new@example.invalid"
+        original = "fixture@example.invalid"
+        alerts.record_channel_test(shop_id=self.shop_id, channel="email", target=original, delivery=delivery("email"))
+        with self.assertRaisesRegex(ValueError, "successful test"):
+            alerts.update_channel_config(shop_id=self.shop_id, channel="email", target=target, enabled=True)
+        self.assertEqual(next(c for c in alerts.list_channel_configs(self.shop_id) if c.channel == "email").target, original)
+        saved = alerts.update_channel_config(shop_id=self.shop_id, channel="email", target=target, enabled=False)
+        self.assertEqual((saved.enabled, saved.verified), (False, False))
+        for requested in [target, original]:
+            with self.subTest(requested=requested), self.assertRaisesRegex(ValueError, "successful test"):
+                alerts.update_channel_config(shop_id=self.shop_id, channel="email", target=requested, enabled=True)
+        with patch.object(alert_delivery, "deliver", side_effect=lambda **kwargs: delivery(kwargs["channel"])) as provider:
+            self.fire()
+        self.assertEqual([call.kwargs["channel"] for call in provider.call_args_list], ["slack"])
+        self.assertTrue(alerts.record_channel_test(shop_id=self.shop_id, channel="email", target=target, delivery=delivery("email")))
+        enabled = alerts.update_channel_config(shop_id=self.shop_id, channel="email", target=target, enabled=True)
+        self.assertEqual((enabled.enabled, enabled.verified), (True, True))
+        with patch.object(alert_delivery, "deliver", side_effect=lambda **kwargs: delivery(kwargs["channel"])) as provider:
+            self.fire()
+        self.assertEqual([(call.kwargs["channel"], call.kwargs["target"]) for call in provider.call_args_list], [("email", target)])
+
+    def test_new_channel_and_failed_retest_of_paused_channel_cannot_enable(self):
+        target = "https://hooks.merchant.test/fixture-token"
+        with self.assertRaisesRegex(ValueError, "successful test"):
+            alerts.update_channel_config(shop_id=self.shop_id, channel="webhook", target=target, enabled=True)
+        with self.sessions() as db:
+            self.assertIsNone(db.get(NotificationChannelRecord, f"{self.shop_id}:webhook"))
+        alerts.update_channel_config(shop_id=self.shop_id, channel="webhook", target=target, enabled=False)
+        alerts.record_channel_test(shop_id=self.shop_id, channel="webhook", target=target, delivery=delivery("webhook"))
+        alerts.record_channel_test(shop_id=self.shop_id, channel="webhook", target=target, delivery=delivery("webhook", status="failed"))
+        with self.assertRaisesRegex(ValueError, "successful test"):
+            alerts.update_channel_config(shop_id=self.shop_id, channel="webhook", target=target, enabled=True)
+
+    def test_legacy_enabled_destination_stays_live_but_needs_test_after_pause(self):
+        target = "fixture@example.invalid"
+        unchanged = alerts.update_channel_config(shop_id=self.shop_id, channel="email", target=target, enabled=True)
+        self.assertEqual((unchanged.enabled, unchanged.verified), (True, False))
+        paused = alerts.update_channel_config(shop_id=self.shop_id, channel="email", target=target, enabled=False)
+        self.assertEqual((paused.enabled, paused.verified), (False, False))
+        with self.assertRaisesRegex(ValueError, "successful test"):
+            alerts.update_channel_config(shop_id=self.shop_id, channel="email", target=target, enabled=True)
+
+    def test_channel_test_and_enable_permissions_do_not_cross_tenants(self):
+        with self.sessions() as db:
+            other = Shop(shopify_domain="other-alert-fixture.myshopify.com")
+            db.add(other)
+            db.commit()
+            other_id = other.id
+        target = "fixture@example.invalid"
+        alerts.record_channel_test(shop_id=self.shop_id, channel="email", target=target, delivery=delivery("email"))
+        alerts.update_channel_config(shop_id=other_id, channel="email", target=target, enabled=False)
+        self.assertFalse(alerts.record_channel_test(shop_id=self.shop_id, channel="webhook", target=target, delivery=delivery("email")))
+        with self.assertRaisesRegex(ValueError, "successful test"):
+            alerts.update_channel_config(shop_id=other_id, channel="email", target=target, enabled=True)
+        with self.sessions() as db:
+            ours = db.get(NotificationChannelRecord, f"{self.shop_id}:email")
+            theirs = db.get(NotificationChannelRecord, f"{other_id}:email")
+            self.assertEqual((ours.enabled, ours.verified, theirs.enabled, theirs.verified), (True, True, False, False))
+            user = db.get(User, self.user_id)
+            request = UpdateNotificationChannelRequest(channel="email", enabled=True, target="untested@example.invalid")
+            with patch.object(alert_routes, "_require_alert_channels"), self.assertRaises(HTTPException) as raised:
+                alert_routes.update_channel(request, user, db)
+            self.assertEqual(raised.exception.status_code, 422)
+            self.assertNotIn("untested@example.invalid", raised.exception.detail)
 
     def test_category_and_vendor_scope_receive_actual_sku_metadata(self):
         product = SkuDetail(sku_id="SKU-A", name="Fixture", vendor="Supplier", category="Apparel", price=20, cost=10,
@@ -264,7 +331,7 @@ class DurableAlertTests(unittest.TestCase):
             self.assertEqual(db.get(AlertDeliveryAttemptRecord, delivery_id).attempts, 0)
 
     def test_old_destination_test_cannot_verify_edited_destination(self):
-        alerts.update_channel_config(shop_id=self.shop_id, channel="email", enabled=True, target="new@example.invalid")
+        alerts.update_channel_config(shop_id=self.shop_id, channel="email", enabled=False, target="new@example.invalid")
         self.assertFalse(alerts.record_channel_test(shop_id=self.shop_id, channel="email", target="fixture@example.invalid",
                                                    delivery=delivery("email"), user_id=self.user_id))
         with self.sessions() as db:
@@ -338,6 +405,42 @@ class DurableAlertTests(unittest.TestCase):
 
 
 class ConcurrentSeedTests(unittest.TestCase):
+    def test_destination_replacement_wins_over_a_concurrent_stale_enable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            engine = create_engine("sqlite:///" + os.path.join(directory, "channel-race.db"))
+            sessions = sessionmaker(engine, expire_on_commit=False)
+            Base.metadata.create_all(engine)
+            with sessions() as db:
+                shop = Shop(shopify_domain="concurrent-channel-fixture.myshopify.com")
+                db.add(shop)
+                db.flush()
+                shop_id = shop.id
+                db.add(NotificationChannelRecord(channel=f"{shop_id}:email", target="old@example.invalid",
+                                                 enabled=False, verified=True))
+                db.commit()
+            barrier = threading.Barrier(2)
+
+            def save(target, enabled):
+                barrier.wait(timeout=5)
+                try:
+                    return alerts.update_channel_config(shop_id=shop_id, channel="email", target=target, enabled=enabled)
+                except ValueError:
+                    if not enabled:
+                        raise
+                    return None  # Replacement committed first; stale enable was rejected.
+
+            try:
+                with patch.object(alerts, "SessionLocal", sessions), ThreadPoolExecutor(max_workers=2) as pool:
+                    replacement = pool.submit(save, "new@example.invalid", False)
+                    stale_enable = pool.submit(save, "old@example.invalid", True)
+                    self.assertFalse(replacement.result(timeout=10).enabled)
+                    stale_enable.result(timeout=10)
+                with sessions() as db:
+                    record = db.get(NotificationChannelRecord, f"{shop_id}:email")
+                    self.assertEqual((record.target, record.enabled, record.verified), ("new@example.invalid", False, False))
+            finally:
+                engine.dispose()
+
     def test_simultaneous_initial_reads_seed_one_default_set(self):
         with tempfile.TemporaryDirectory() as directory:
             engine = create_engine("sqlite:///" + os.path.join(directory, "alerts.db"))

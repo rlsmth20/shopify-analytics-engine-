@@ -8,15 +8,15 @@ const STORAGE_KEY = "skubase_stocky_migration_steps";
 const STEPS = [
   {
     id: "connect-shopify",
-    title: "Connect Shopify in read-only mode",
-    body: "Import products, inventory, and orders without writing stock changes back to Shopify.",
+    title: "Choose your data sources",
+    body: "Open Store Sync for CSV import options. If Skubase is already installed for your store, sync Shopify products, inventory, and orders in read-only mode.",
     href: "/store-sync",
     cta: "Open store sync",
   },
   {
     id: "upload-stocky",
-    title: "Upload Stocky or ShipStation exports",
-    body: "Backfill order history so forecasts and ABC/XYZ classifications have enough demand signal.",
+    title: "Import your Stocky catalog",
+    body: "Stocky supplies catalog details and a stock snapshot for CSV-only workspaces. With Shopify connected or already synced, CSVs only enrich supported costs and lead times for unambiguous variants. Add non-Shopify shipment history separately through ShipStation on Store Sync; Stocky CSVs do not supply sales history.",
     href: "/import-stocky",
     cta: "Import Stocky CSV",
   },
@@ -43,8 +43,8 @@ const STEPS = [
   },
   {
     id: "purchase-orders",
-    title: "Create and receive first POs",
-    body: "Save generated PO drafts, mark them sent, and receive them so supplier scorecards become real.",
+    title: "Prepare PO drafts and record receipts",
+    body: "Use your purchasing system to send orders and receive goods. Record those receipts in Skubase for supplier analysis when included in your plan; these records do not change Shopify stock.",
     href: "/purchase-orders",
     cta: "Open purchase orders",
   },
@@ -73,6 +73,10 @@ export default function StockyMigrationPage() {
 
   return (
     <div className="page-stack">
+      <p className="section-copy">
+        Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store.
+        Start with CSV imports, or <Link href="/tools/inventory-health-check">try the free browser inventory check</Link> without installation.
+      </p>
       <div className="kpi-grid kpi-grid-tight">
         <div className="kpi-card">
           <p className="kpi-label">Migration progress</p>
@@ -82,12 +86,12 @@ export default function StockyMigrationPage() {
         <div className="kpi-card">
           <p className="kpi-label">Sync posture</p>
           <p className="kpi-value">Read-only</p>
-          <p className="kpi-note">No Shopify stock writes without explicit approval.</p>
+          <p className="kpi-note">This planning workflow does not change Shopify stock.</p>
         </div>
         <div className="kpi-card">
           <p className="kpi-label">Goal</p>
           <p className="kpi-value">First PO</p>
-          <p className="kpi-note">Use receipt history to unlock supplier performance.</p>
+          <p className="kpi-note">Supplier scorecards require receipt history and an included plan.</p>
         </div>
       </div>
 

@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import load_only
 
 from .funnel import STAGES, bottleneck
+from .inbox_health import projection as inbox_transport
 from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message, Usage, Work
 from .policy import Policy
 from .store import digest, get_memory
@@ -197,6 +198,7 @@ def dashboard(db):
                       "trial_to_paid": None,
                       "limitations": "Attribution and collected payments must be verified before interpreting CAC. MRR/LTV remain unknown until billing amounts and retention are observed."},
         "agent": {**activity, "next_action": next_work.kind if next_work else "await_scheduled_wake",
+                  "inbox_transport": inbox_transport(db, now=now),
                   "first_contact_capacity": outbound_status(db),
                   "executive": get_memory(db, "working", "executive"),
                   "capabilities": {"requested_service_email": Policy.from_env().email_enabled,

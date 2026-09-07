@@ -1,5 +1,6 @@
 """Dedicated business email outbox. Ambiguous effects are never blindly replayed."""
 import json
+import logging
 import os
 import time
 import urllib.error
@@ -15,6 +16,8 @@ from .models import Contact, Evidence, Experiment, Message, Usage, Work
 from .policy import GrowthError, Policy, classify_reply
 from .skills import active_skill
 from .store import digest, enqueue, insert_once, record, require_lease
+
+logger = logging.getLogger(__name__)
 
 
 def reconcile_provider_events(db, message):
@@ -206,7 +209,29 @@ def ingest_reply(db, *, provider_id, sender, recipients, text, subject="", heade
 
 
 def poll_replies(factory, provider=resend_request):
+    from .inbox_health import record_poll
+    try:
+        result = _poll_replies(factory, provider=provider)
+        with factory() as db:
+            record_poll(db, completed_at=time.time(), replies_ingested=result["replies_ingested"])
+            db.commit()
+        return result
+    except Exception as exc:
+        # Keep the original failure/retry classification; health reporting must
+        # neither swallow an ingestion failure nor expose provider error text.
+        try:
+            with factory() as db:
+                record_poll(db, completed_at=time.time(), failure_class=(
+                    exc.category if isinstance(exc, GrowthError) else "transient"))
+                db.commit()
+        except Exception:
+            logger.warning("Could not persist inbox transport failure")
+        raise
+
+
+def _poll_replies(factory, provider=resend_request):
     from .store import get_memory, remember
+    from .inbox_health import observe_receipt
     from .funnel import timestamp
     from datetime import datetime
     if os.getenv("GROWTH_INBOUND_ENABLED") != "true":
@@ -216,9 +241,16 @@ def poll_replies(factory, provider=resend_request):
     # A bounded page per wake; oldest unseen pages drain before restarting at the head.
     suffix = "?limit=20" + ("&after=" + urllib.parse.quote(state["after"], safe="") if state.get("after") else "")
     result = provider("emails/receiving" + suffix)
-    rows = result.get("data", [])
+    if not isinstance(result, dict) or not isinstance(result.get("data"), list):
+        raise GrowthError("Receiving provider returned an invalid inbox page", "transient")
+    rows = result["data"]
     count = 0
     for row in rows:
+        # Store transport evidence before excluding internal checks or already
+        # processed replies. Repeated pages cannot refresh a receipt's age.
+        with factory() as db:
+            observe_receipt(db, row, observed_at=time.time())
+            db.commit()
         with factory() as db:
             if db.scalar(select(Evidence.id).where(Evidence.key == "inbound-seen:" + row["id"])):
                 continue
