@@ -11,6 +11,7 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import DashboardResponse
 from app.services.dashboard import build_dashboard
+from app.growth.funnel import record_view
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import (
     load_daily_history_for_shop_skus,
@@ -47,7 +48,7 @@ def read_dashboard(
     if settings is None:
         settings = build_default_shop_settings()
 
-    return build_dashboard(
+    result = build_dashboard(
         skus,
         shop_id=user.shop_id,
         daily_history_fn=daily_history,
@@ -55,3 +56,5 @@ def read_dashboard(
         start_weekday=start_weekday_for_shop_history(db, user.shop_id),
         lead_time_config=settings.to_lead_time_config(),
     )
+    record_view(db, user, "INVENTORY_ANALYSIS_VIEWED", bool(skus))
+    return result

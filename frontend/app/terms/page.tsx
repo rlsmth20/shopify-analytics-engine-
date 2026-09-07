@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
@@ -127,8 +127,8 @@ export default function TermsPage() {
 
         <h2 className="blog-article-h2">12. Contact</h2>
         <p>
-          Questions: <a href="mailto:hello@skubase.io">hello@skubase.io</a>.
-          Legal: <a href="mailto:legal@skubase.io">legal@skubase.io</a>.
+          Questions: <a href="mailto:info@skubase.io">info@skubase.io</a>.
+          Legal: <a href="mailto:info@skubase.io">info@skubase.io</a>.
         </p>
       </article>
 

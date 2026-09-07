@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { trackGrowthEvent } from "@/lib/analytics";
+
 import { ActionFeed } from "@/components/action-feed";
 import { KpiCard } from "@/components/kpi-card";
 import {
@@ -11,6 +14,10 @@ import { useActionFeed } from "@/lib/use-action-feed";
 export default function ActionsPage() {
   const { actions, dataSource, isLoading, errorMessage, errorStatus } =
     useActionFeed();
+
+  useEffect(() => {
+    if (!isLoading && !errorMessage && dataSource === "db" && actions.length > 0) void trackGrowthEvent("KEY_ACTION_VIEWED");
+  }, [isLoading, errorMessage, dataSource, actions.length]);
 
   const urgentProfitAtRisk = actions
     .filter((action) => action.status === "urgent")

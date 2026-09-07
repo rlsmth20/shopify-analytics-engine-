@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session as DbSession
 from app.api.deps import get_current_user
 from app.db.models import User
 from app.db.session import get_db_session
+from app.growth.funnel import product_event
 from app.services.billing import (
     create_portal_session,
     current_entitlements_summary,
@@ -123,6 +124,10 @@ def start_shopify_subscription(
         )
     try:
         url = create_shopify_subscription(db, user=user, plan=payload.plan)
+        if not user.is_admin:
+            from app.growth.store import digest
+            product_event(db, "CHECKOUT_STARTED", user.shop_id, "checkout:" + digest(url), data={"tier": payload.plan})
+            db.commit()
     except ShopifyBillingAuthError as exc:
         # Stored Admin API token went stale (e.g. app reinstalled). The
         # frontend reacts to 409 by sending the merchant back through OAuth.
@@ -157,6 +162,8 @@ async def stripe_webhook(
         raise HTTPException(status_code=400, detail="Invalid Stripe signature.")
     try:
         handle_webhook_event(db, event=event)
+        from app.growth.billing_events import stripe_event
+        stripe_event(db, event)
     except Exception as exc:
         # Log, but return 200 so Stripe doesn't retry indefinitely on bugs.
         import logging

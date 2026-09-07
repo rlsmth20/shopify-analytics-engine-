@@ -14,8 +14,8 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Defaults are safe to ship. Override via env vars on Railway.
-DEFAULT_FROM = os.getenv("WAITLIST_FROM_EMAIL", "skubase <hello@skubase.io>")
-DEFAULT_REPLY_TO = os.getenv("WAITLIST_REPLY_TO", "hello@skubase.io")
+DEFAULT_FROM = os.getenv("WAITLIST_FROM_EMAIL", "skubase <info@skubase.io>")
+DEFAULT_REPLY_TO = os.getenv("WAITLIST_REPLY_TO", "info@skubase.io")
 MAGIC_LINK_FROM = os.getenv("MAGIC_LINK_FROM_EMAIL", DEFAULT_FROM)
 MAGIC_LINK_REPLY_TO = os.getenv("MAGIC_LINK_REPLY_TO", DEFAULT_REPLY_TO)
 DEFAULT_PRODUCT_URL = os.getenv("PRODUCT_URL", "https://skubase.io")
@@ -195,12 +195,12 @@ def send_contact_notification(
     contact_type: str,
     message: str,
 ) -> bool:
-    """Forward a contact form submission to Rainer. Never raises."""
+    """Deliver contact submissions to the dedicated Skubase inbox. Never raises."""
     client = _client()
     if client is None:
         return False
 
-    OWNER_EMAIL = os.getenv("OWNER_EMAIL", "rlsmth20@gmail.com")
+    contact_email = os.getenv("CONTACT_TO_EMAIL", "info@skubase.io")
     label = contact_type.capitalize()
     subject = f"[skubase {label}] from {name} <{email}>"
     html = f"""<!doctype html>
@@ -221,7 +221,7 @@ def send_contact_notification(
     try:
         params = {
             "from": DEFAULT_FROM,
-            "to": [OWNER_EMAIL],
+            "to": [contact_email],
             "reply_to": email,
             "subject": subject,
             "html": html,
@@ -230,6 +230,8 @@ def send_contact_notification(
         }
         result = client.Emails.send(params)
         logger.info("contact notification sent: id=%s from=%s", result.get("id"), email)
+        from app.growth.forms import observe_contact_form
+        observe_contact_form(email=email, contact_type=contact_type, message=message, receipt_id=result.get("id"))
         return True
     except Exception as exc:
         logger.exception("failed to send contact notification from %s: %s", email, exc)

@@ -181,7 +181,7 @@ export default function AccountPage() {
           Self-service team invitations and role management are planned.
         </p>
         <div className="button-row">
-          <a className="button button-ghost" href="mailto:hello@skubase.io">
+          <a className="button button-ghost" href="mailto:info@skubase.io">
             Request workspace change
           </a>
         </div>

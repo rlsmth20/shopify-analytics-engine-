@@ -11,5 +11,5 @@ export function contactResponseError(ok: boolean, body: unknown): string | null 
   if (Array.isArray(response?.detail)) {
     return "Check your name, reply email, and message, then try again.";
   }
-  return "We couldn't confirm your message was sent. Please email hello@skubase.io directly.";
+  return "We couldn't confirm your message was sent. Please email info@skubase.io directly.";
 }

@@ -3,6 +3,7 @@ import logging
 from sqlalchemy import text
 
 from app.db.base import Base
+from app.growth import models as growth_models  # additive growth tables
 from app.db.models import (
     AuditLogRecord,
     AlertRuleRecord,
@@ -353,7 +354,10 @@ def init_db() -> None:
         VendorLeadTime,
         WaitlistSignup,
     )
-    Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        if engine.dialect.name == "postgresql":
+            connection.execute(text("SELECT pg_advisory_xact_lock(739201601)"))
+        Base.metadata.create_all(bind=connection)
     run_safe_migrations()
 
 

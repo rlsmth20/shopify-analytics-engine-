@@ -17,6 +17,7 @@ from app.schemas import ActionDataHealthSummaryResponse, ActionFeedResponse
 from app.services.inventory_engine import build_inventory_actions
 from app.services.shop_settings import build_default_shop_settings, load_effective_shop_settings_map
 from app.services.shop_skus import load_skus_for_shop
+from app.growth.funnel import record_view
 
 
 router = APIRouter(prefix="/actions", tags=["actions"])
@@ -34,6 +35,7 @@ def _build_action_feed(
     if settings is None:
         settings = build_default_shop_settings()
     actions = build_inventory_actions(skus, lead_time_config=settings.to_lead_time_config())
+    record_view(db, user, "KEY_ACTION_VIEWED", bool(actions))
     return ActionFeedResponse(data_source="db", actions=actions)
 
 

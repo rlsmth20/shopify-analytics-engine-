@@ -40,7 +40,7 @@ class ContactTests(unittest.TestCase):
         response = self.client.post("/contact/submit", json=self.payload)
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("ok", response.json())
-        self.assertIn("hello@skubase.io", response.json()["detail"])
+        self.assertIn("info@skubase.io", response.json()["detail"])
         self.send.assert_called_once()
 
     def test_synthetic_shopify_identities_cannot_be_used_as_reply_addresses(self):

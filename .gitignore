@@ -4,6 +4,8 @@ seed_summary.json
 
 # local assistant/tool artifacts
 .claude/
+.vercel/
+.growth-deploy/
 *.bak
 *_tmp.tsx
 run-*.bat

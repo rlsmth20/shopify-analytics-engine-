@@ -1,6 +1,6 @@
 """Contact / bug-report form endpoint.
 
-Public, no auth required. Forwards submissions to Rainer via Resend so
+Public, no auth required. Sends submissions to info@skubase.io via Resend so
 logged-in customers and prospective users can both reach support.
 """
 from __future__ import annotations
@@ -51,6 +51,6 @@ def submit(request: ContactRequest) -> ContactResponse:
     if not delivered:
         raise HTTPException(
             status_code=503,
-            detail="We couldn't send your message. Please try again or email hello@skubase.io directly.",
+            detail="We couldn't send your message. Please try again or email info@skubase.io directly.",
         )
     return ContactResponse(ok=True)

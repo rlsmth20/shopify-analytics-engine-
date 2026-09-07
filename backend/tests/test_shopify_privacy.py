@@ -128,6 +128,10 @@ class PrivacyTests(unittest.TestCase):
         self.db.expire_all()
         for table in Base.metadata.sorted_tables:
             with self.subTest(table=table.name):
+                if table.name.startswith("growth_") and "shop_id" not in table.c:
+                    # Growth operator-wide tables are not tenant fixtures.
+                    self.assertEqual(self.count(table), 0)
+                    continue
                 self.assertEqual(self.count(table), 1)
                 if "shop_id" in table.c:
                     self.assertEqual(self.db.scalar(select(table.c.shop_id)), self.two)
@@ -147,7 +151,8 @@ class PrivacyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Synthetic"):
                 privacy.redact_shop(self.db, shop_domain="one.myshopify.com", triggered_at=None)
         for table in Base.metadata.sorted_tables:
-            self.assertEqual(self.count(table), 2, table.name)
+            expected = 0 if table.name.startswith("growth_") and "shop_id" not in table.c else 2
+            self.assertEqual(self.count(table), expected, table.name)
 
     def test_reinstalled_shop_survives_old_uninstall_and_redact_deliveries(self):
         conn = self.conn(self.one)

@@ -6,6 +6,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Suspense } from "react";
 
 import { EmbeddedShopifyBootstrap } from "@/components/embedded-shopify-bootstrap";
+import { GrowthPageObserver } from "@/components/growth-page-observer";
 import "./globals.css";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://skubase.io";
@@ -95,6 +96,7 @@ export default async function RootLayout({
       <body>
         <Suspense fallback={null}>
           <EmbeddedShopifyBootstrap />
+          <GrowthPageObserver />
         </Suspense>
         {children}
         <Analytics />

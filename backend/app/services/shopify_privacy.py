@@ -116,6 +116,8 @@ def redact_shop(
                 preserved += 1
                 continue
             users = list(db.execute(select(User.id, User.email).where(User.shop_id == shop.id)))
+            from app.growth.privacy import redact_growth
+            redact_growth(db, shop.id, [user.email for user in users])
             if users:
                 db.execute(delete(LoginSession).where(LoginSession.user_id.in_([user.id for user in users])))
                 db.execute(delete(MagicLinkToken).where(MagicLinkToken.email.in_([user.email for user in users])))

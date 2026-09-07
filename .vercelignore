@@ -1,0 +1,14 @@
+backend/
+.growth-deploy/
+.shopify/
+.claude/
+docs/
+marketing/
+frontend/.next-dev/
+frontend/.next/
+frontend/tests/
+**/__pycache__/
+**/*.db
+**/*.sqlite*
+*.xlsx
+*.docx

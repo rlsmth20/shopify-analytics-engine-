@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
+import { trackGrowthEvent } from "@/lib/analytics";
 import {
   AreaLineChart,
   ChartPanel,
@@ -82,6 +83,10 @@ export default function DashboardPage() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [refreshAttempt]);
+
+  useEffect(() => {
+    if (data && !loading && !error) void trackGrowthEvent("INVENTORY_ANALYSIS_VIEWED");
+  }, [data, loading, error]);
 
   useEffect(() => {
     try {

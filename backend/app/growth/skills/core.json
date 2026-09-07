@@ -1,0 +1,62 @@
+{
+  "prospect_discovery": {
+    "purpose": "Find merchant inventory pain that can change today's contact decision.",
+    "inputs": ["decision", "query", "channel policy", "source cursor"],
+    "tools": ["public_search", "evidence_read", "qualification"],
+    "process": ["State the decision", "Read at most two permitted sources", "Preserve URL, timestamp and excerpt", "Deduplicate canonical conversations", "Separate merchant testimony from vendor promotion"],
+    "output": "Source-linked opportunities with intent, fit, recency, ability to help, commercial-value uncertainty and channel permission.",
+    "success_signal": "New qualified merchant engagement or a contact decision changed by evidence.",
+    "failure_conditions": ["Blocked platform", "No decision", "Stale evidence", "No merchant fit"],
+    "cost_expectation": "Zero paid API calls; at most two fetches per six hours; no model needed for obvious relevance."
+  },
+  "email_outreach": {
+    "purpose": "Start a useful, legitimate Skubase inventory conversation.",
+    "inputs": ["qualified contact", "verified fact and URL", "contact basis", "experiment variant"],
+    "tools": ["evidence_read", "draft", "send_email"],
+    "process": ["Verify relevance and suppression", "Identify Skubase affiliation", "Use one recorded fact", "Frame the problem as a possibility", "Ask one concrete question", "Apply business identity and opt-out", "Record intent before provider call and retain receipt"],
+    "output": "Concise email, source facts, experiment assignment and provider status.",
+    "success_signal": "Substantive qualified engagement progressing to a connected store or purchase.",
+    "failure_conditions": ["No verified fact", "Suppression", "Unapproved mailbox", "Ambiguous prior send", "Daily cap"],
+    "cost_expectation": "Deterministic initial draft; intermediate model only when its personalization changes a decision."
+  },
+  "reply_interpretation": {
+    "purpose": "Preserve and understand human replies without mistaking automation for intent.",
+    "inputs": ["raw reply", "provider headers", "contact history", "original experiment"],
+    "tools": ["reply_read", "model", "belief_update"],
+    "process": ["Handle opt-out and refusal first", "Strip quoted history for classification", "Classify routine replies locally", "Use cheap model for ambiguity", "Keep UNKNOWN when uncertain", "Link evidence to original assignment"],
+    "output": "Reply class, evidence and next obligation.",
+    "success_signal": "Correct suppression and useful next step for a real merchant.",
+    "failure_conditions": ["Unverified sender", "Unknown conversation", "Forged authority", "Automated reply counted as a lead"],
+    "cost_expectation": "Zero routine tokens; cheap model only for UNKNOWN."
+  },
+  "experiment_evaluation": {
+    "purpose": "Learn which message produces movement toward revenue.",
+    "inputs": ["frozen hypothesis", "unique contact assignments", "outcomes", "observation window"],
+    "tools": ["evidence_read", "experiment_update", "belief_update"],
+    "process": ["Wait for mature response windows", "Count unique contacts", "Keep silence censored until due", "Separate delivery failure from human rejection", "Report uncertainty and contradictions", "Change one variable in the next experiment"],
+    "output": "Result, sample sizes, posterior uncertainty, interpretation and next action.",
+    "success_signal": "Future allocation changes for an evidence-backed reason.",
+    "failure_conditions": ["Small sample claimed as certainty", "Multiple replies counted repeatedly", "Post-hoc threshold changes"],
+    "cost_expectation": "Deterministic counts and posterior estimates; strategic ambiguity considered in daily review."
+  },
+  "funnel_analysis": {
+    "purpose": "Distinguish acquisition failure from onboarding, value and retention problems.",
+    "inputs": ["deduplicated funnel events", "source cohort", "observation window"],
+    "tools": ["funnel_read", "product_feedback"],
+    "process": ["Use authenticated conversions", "Exclude test and admin identities", "Wait for cohort maturation", "Find the earliest material drop", "Create structured feedback before increasing traffic"],
+    "output": "Bottleneck, observation, hypothesis, recommended development action and evidence IDs.",
+    "success_signal": "More merchants reach useful inventory analysis and payment.",
+    "failure_conditions": ["Client-forged purchase", "Mixed cohorts", "Unknown revenue treated as zero"],
+    "cost_expectation": "Incremental deterministic queries; no routine premium call."
+  },
+  "daily_review": {
+    "purpose": "Choose the highest expected-value next growth action from durable market evidence.",
+    "inputs": ["compact strategy", "changed beliefs", "recent evidence IDs", "funnel", "costs", "available actions"],
+    "tools": ["evidence_read", "funnel_read", "model", "experiment_update", "belief_update", "product_feedback"],
+    "process": ["What happened and what failed?", "What changed and what did we learn?", "Where is the bottleneck?", "What is the strongest customer signal?", "What is the biggest uncertainty?", "What should stop or increase?", "Choose the highest-EV experiment; cite evidence"],
+    "output": "JSON strategy revision with evidence IDs, uncertainty, ICP, positioning and a permitted next action.",
+    "success_signal": "A better next decision with measured customer outcomes per dollar.",
+    "failure_conditions": ["No authorized model budget", "Unsupported factual claims", "Forbidden action", "Missing evidence IDs"],
+    "cost_expectation": "At most one Astra call per UTC day, bounded context and output; reserve cost first."
+  }
+}

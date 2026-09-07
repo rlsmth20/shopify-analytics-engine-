@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
@@ -79,7 +79,7 @@ export default function PrivacyPage() {
         <h2 className="blog-article-h2">Retention and deletion</h2>
         <p>
           You can delete your account and associated data at any time by
-          emailing <a href="mailto:hello@skubase.io">hello@skubase.io</a>.
+          emailing <a href="mailto:info@skubase.io">info@skubase.io</a>.
           We will purge your data from production within 30 days. Aggregated, anonymized
           metrics may be retained for service operation.
         </p>
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
         <p>
           You have the right to access, correct, export, and delete your
           personal data. Contact{" "}
-          <a href="mailto:privacy@skubase.io">privacy@skubase.io</a> for any
+          <a href="mailto:info@skubase.io">info@skubase.io</a> for any
           such request. EU residents have rights under GDPR; California
           residents have rights under CCPA; we honor both equivalently for
           all users.
@@ -105,12 +105,15 @@ export default function PrivacyPage() {
 
         <h2 className="blog-article-h2">Cookies and storage</h2>
         <p>
-          We use the minimum browser storage required to operate the
-          service. Embedded Shopify access uses short-lived Shopify session tokens
+          Embedded Shopify access uses short-lived Shopify session tokens
           and does not require third-party cookies. Browser storage can remember
           interface preferences; standalone website sign-in uses a session cookie.
-          We do not use third-party advertising
-          cookies.
+          To understand where merchants find Skubase and where onboarding needs
+          improvement, first-party storage retains a random visitor identifier,
+          landing-page path and campaign attribution for up to 30 days. These
+          events can be linked to your store after sign-in. This measurement is
+          skipped when your browser sends Do Not Track. We do not store URL
+          query strings or use third-party advertising cookies for this measurement.
         </p>
 
         <h2 className="blog-article-h2">Security</h2>
@@ -131,7 +134,7 @@ export default function PrivacyPage() {
 
         <h2 className="blog-article-h2">Contact</h2>
         <p>
-          Questions about this policy: <a href="mailto:privacy@skubase.io">privacy@skubase.io</a>.
+          Questions about this policy: <a href="mailto:info@skubase.io">info@skubase.io</a>.
         </p>
       </article>
 

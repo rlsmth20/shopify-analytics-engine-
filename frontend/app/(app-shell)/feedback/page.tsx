@@ -55,7 +55,7 @@ export default function FeedbackPage() {
       }
       setSent(true);
     } catch {
-      setError("Network error. Try emailing hello@skubase.io directly.");
+      setError("Network error. Try emailing info@skubase.io directly.");
     } finally {
       setLoading(false);
     }
@@ -82,8 +82,8 @@ export default function FeedbackPage() {
             <p className="section-copy">
               We will use <strong>{email.trim()}</strong> to reply.
               You can also reach us directly at{" "}
-              <a href="mailto:hello@skubase.io" style={{ color: "inherit" }}>
-                hello@skubase.io
+              <a href="mailto:info@skubase.io" style={{ color: "inherit" }}>
+                info@skubase.io
               </a>
               .
             </p>
@@ -175,8 +175,8 @@ export default function FeedbackPage() {
               style={{ marginTop: "12px", fontSize: "13px", color: "var(--text-muted, #64748b)" }}
             >
               Or email us directly at{" "}
-              <a href="mailto:hello@skubase.io" style={{ color: "inherit" }}>
-                hello@skubase.io
+              <a href="mailto:info@skubase.io" style={{ color: "inherit" }}>
+                info@skubase.io
               </a>
               .
             </p>

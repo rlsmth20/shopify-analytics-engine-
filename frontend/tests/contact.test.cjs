@@ -32,7 +32,7 @@ test("success requires an explicit acknowledgement as well as successful HTTP st
 });
 
 test("delivery and validation failures produce readable errors", () => {
-  const detail = "We couldn't send your message. Please email hello@skubase.io directly.";
+  const detail = "We couldn't send your message. Please email info@skubase.io directly.";
   assert.equal(contactResponseError(false, { detail }), detail);
   assert.equal(
     contactResponseError(false, { detail: [{ loc: ["body", "email"], msg: "Invalid email" }] }),

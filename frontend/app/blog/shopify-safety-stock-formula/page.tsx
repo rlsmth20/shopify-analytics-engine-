@@ -33,6 +33,7 @@ export default function SafetyStockFormulaPage() {
           <time dateTime="2026-04-29">April 29, 2026</time> · 10 min read · Forecasting
         </p>
         <h1 className="blog-article-title">The right safety stock formula for Shopify merchants</h1>
+        <p><Link href="/tools/reorder-point-calculator">Try the free reorder-point calculator</Link> to see how daily demand, lead time and safety stock change your ordering trigger.</p>
         <p className="blog-article-lead">
           Most Shopify merchants set a fixed buffer — 30 days of cover on every SKU, or a flat minimum
           quantity — and call it safety stock. It works until it doesn&apos;t: a fast mover stockouts two

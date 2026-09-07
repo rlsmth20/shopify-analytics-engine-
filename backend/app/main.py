@@ -36,6 +36,8 @@ from app.api.routes.transfers import router as transfers_router
 from app.api.routes.waitlist import router as waitlist_router
 from app.api.routes.contact import router as contact_router
 from app.services.alert_scheduler import start_alert_scheduler, stop_alert_scheduler
+from app.api.routes.growth import router as growth_router
+from app.growth.worker import start as start_growth, stop as stop_growth
 
 
 @asynccontextmanager
@@ -48,10 +50,12 @@ async def lifespan(app: FastAPI):
         # so Railway's healthcheck passes and deploy logs are visible.
         logger.exception("init_db failed at startup — DB may not be reachable yet.")
     start_alert_scheduler()
+    start_growth()
     try:
         yield
     finally:
         await stop_alert_scheduler()
+        await stop_growth()
 
 
 def create_app() -> FastAPI:
@@ -121,6 +125,7 @@ def create_app() -> FastAPI:
     app.include_router(shipstation_import_router)
     app.include_router(waitlist_router)
     app.include_router(contact_router)
+    app.include_router(growth_router)
     app.include_router(inventory_risk_snapshot_router)
     app.include_router(shop_settings_router)
     app.include_router(skus_router)
