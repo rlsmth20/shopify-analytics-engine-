@@ -13,6 +13,7 @@ from app.schemas_v2 import (
     InventoryHealthKpi,
     InventoryHealthResponse,
     InventoryHealthSku,
+    InventoryForecastCoverage,
 )
 
 
@@ -23,6 +24,16 @@ def build_inventory_health(
 ) -> InventoryHealthResponse:
     forecast_by_sku = {forecast.sku_id: forecast for forecast in forecasts}
     sku_count = len(skus)
+    available = [forecast_by_sku[sku.sku_id] for sku in skus
+                 if _forecast_available(forecast_by_sku.get(sku.sku_id))]
+    coverage = InventoryForecastCoverage(
+        total_skus=sku_count,
+        available_skus=len(available),
+        unavailable_skus=sku_count - len(available),
+        low_confidence_skus=sum(_limited_forecast(forecast) for forecast in available),
+        no_recent_sales_skus=sum(forecast.demand_signal == "no_recent_sales" for forecast in available),
+    )
+    risk_known = coverage.unavailable_skus == 0 and sku_count > 0
 
     inventory_cost = sum(_inventory_cost(sku) for sku in skus)
     inventory_retail = sum(sku.price * sku.inventory for sku in skus)
@@ -39,20 +50,32 @@ def build_inventory_health(
         _stockout_margin_risk(sku, forecast_by_sku.get(sku.sku_id))
         for sku in skus
     )
-    high_confidence_count = sum(1 for forecast in forecasts if forecast.confidence == "high")
+    high_confidence_count = sum(1 for forecast in available if forecast.confidence == "high" and not _limited_forecast(forecast))
     warning_count = sum(len(forecast.data_quality_warnings) for forecast in forecasts)
 
     dead_stock_pct = dead_stock_cash / inventory_cost if inventory_cost > 0 else 0.0
-    confidence_pct = high_confidence_count / len(forecasts) if forecasts else 0.0
+    confidence_pct = high_confidence_count / sku_count if sku_count else 0.0
     avg_days_of_cover = _average_days_of_cover(skus)
     missing_cost_count = sum(not cost_known(sku) for sku in skus)
     inventory_known = all(cost_known(sku) for sku in skus if sku.inventory > 0)
     dead_known = all(sku.sales_history_complete and (cost_known(sku) or sku.days_since_last_sale < 90)
                      for sku in skus if sku.inventory > 0)
-    margin_known = all(cost_known(sku) for sku in skus if _stockout_revenue_risk(sku, forecast_by_sku.get(sku.sku_id)) > 0)
+    margin_known = risk_known and all(cost_known(sku) for sku in skus if _stockout_revenue_risk(sku, forecast_by_sku.get(sku.sku_id)) > 0)
 
     health_counts = Counter(_health_bucket(sku, forecast_by_sku.get(sku.sku_id)) for sku in skus)
-    confidence_counts = Counter(forecast.confidence for forecast in forecasts)
+    confidence_counts = Counter("low" if _limited_forecast(forecast) else forecast.confidence for forecast in available)
+    if not available:
+        risk_note = "Sales history is unavailable; stockout revenue and gross margin exposure cannot be assessed."
+    elif not risk_known:
+        risk_note = (f"Estimated revenue-risk subtotal: {_currency(stockout_revenue_risk)} from {coverage.available_skus} of {sku_count} SKUs. "
+                     f"{coverage.unavailable_skus} cannot be assessed; total revenue and gross margin exposure are unknown.")
+    else:
+        risk_note = (f"{_currency(stockout_margin_risk)} estimated gross margin exposed."
+                     if margin_known else "Gross margin exposure is unknown because unit costs are missing.")
+    if coverage.low_confidence_skus:
+        risk_note += f" {coverage.low_confidence_skus} available forecasts have limited history or low confidence; verify demand before ordering."
+    if coverage.no_recent_sales_skus:
+        risk_note += " Observed zero sales do not guarantee zero future demand."
 
     return InventoryHealthResponse(
         kpis=[
@@ -69,10 +92,11 @@ def build_inventory_health(
             InventoryHealthKpi(
                 label="Stockout revenue risk",
                 value=round(stockout_revenue_risk, 0),
+                value_known=risk_known,
+                known_value=round(stockout_revenue_risk, 0) if risk_known else None,
                 unit="currency",
-                tone="negative" if stockout_revenue_risk > 0 else "positive",
-                note=(f"{_currency(stockout_margin_risk)} estimated gross margin exposed."
-                      if margin_known else "Gross margin exposure is unknown because unit costs are missing."),
+                tone="neutral" if not risk_known or coverage.low_confidence_skus else "negative" if stockout_revenue_risk > 0 else "positive",
+                note=risk_note,
             ),
             InventoryHealthKpi(
                 label="Dead-stock capital",
@@ -89,14 +113,17 @@ def build_inventory_health(
                 value=round(confidence_pct, 3),
                 unit="percent",
                 tone="positive" if confidence_pct >= 0.6 else "neutral",
-                note=f"{warning_count} forecast data-quality notes need review.",
+                note=f"{coverage.available_skus} of {sku_count} SKUs can be assessed; {warning_count} forecast data-quality notes need review.",
             ),
             InventoryHealthKpi(
                 label="Average days of cover",
-                value=round(avg_days_of_cover, 1),
+                value=round(avg_days_of_cover, 1) if avg_days_of_cover is not None else 0.0,
+                value_known=avg_days_of_cover is not None,
+                known_value=round(avg_days_of_cover, 1) if avg_days_of_cover is not None else None,
                 unit="days",
                 tone="neutral",
-                note="Based on current 30-day sales velocity.",
+                note=("Average across SKUs with positive recorded 30-day sales velocity; excludes zero or missing demand."
+                      if avg_days_of_cover is not None else "No positive recorded demand is available to calculate days of cover."),
             ),
         ],
         health_buckets=[
@@ -110,6 +137,7 @@ def build_inventory_health(
             InventoryHealthBucket(label="High", value=confidence_counts["high"], tone="positive"),
             InventoryHealthBucket(label="Medium", value=confidence_counts["medium"], tone="neutral"),
             InventoryHealthBucket(label="Low", value=confidence_counts["low"], tone="negative"),
+            InventoryHealthBucket(label="Unavailable", value=coverage.unavailable_skus, tone="neutral"),
         ],
         top_cash_trapped=_top_cash_trapped(skus),
         top_stockout_risk=_top_stockout_risk(skus, forecast_by_sku),
@@ -120,9 +148,11 @@ def build_inventory_health(
             confidence_pct=confidence_pct,
             warning_count=warning_count,
             health_counts=health_counts,
+            risk_complete=risk_known,
         ) + ([InventoryHealthInsight(title="Add unit costs", severity="info",
               description="Cost-based profit, capital and purchasing estimates remain unknown until unit costs are recorded.",
               metric_label="SKUs missing unit cost", metric_value=str(missing_cost_count))] if missing_cost_count else []),
+        forecast_coverage=coverage,
         generated_at=datetime.now(timezone.utc),
     )
 
@@ -131,34 +161,46 @@ def _inventory_cost(sku: SkuDetail) -> float:
     return max(sku.cost, 0.0) * max(sku.inventory, 0)
 
 
+def _forecast_available(forecast: ForecastResult | None) -> bool:
+    # Legacy fixtures may omit the additive flag. Zero usable history still
+    # cannot turn the legacy numeric zero placeholders into measured risk.
+    return forecast is not None and forecast.forecast_available and forecast.history_days > 0
+
+
+def _limited_forecast(forecast: ForecastResult) -> bool:
+    return forecast.confidence == "low" or forecast.history_days < 30
+
+
 def _stockout_revenue_risk(sku: SkuDetail, forecast: ForecastResult | None) -> float:
-    if forecast is None:
+    if not _forecast_available(forecast):
         return 0.0
     shortage_units = max(forecast.projected_30_day_demand - sku.inventory, 0.0)
     return shortage_units * sku.price * forecast.stockout_probability_30d
 
 
 def _stockout_margin_risk(sku: SkuDetail, forecast: ForecastResult | None) -> float:
-    if forecast is None:
+    if not _forecast_available(forecast):
         return 0.0
     shortage_units = max(forecast.projected_30_day_demand - sku.inventory, 0.0)
     gross_margin = max(sku.price - sku.cost, 0.0)
     return shortage_units * gross_margin * forecast.stockout_probability_30d
 
 
-def _average_days_of_cover(skus: list[SkuDetail]) -> float:
+def _average_days_of_cover(skus: list[SkuDetail]) -> float | None:
     values: list[float] = []
     for sku in skus:
         velocity = sku.last_30_day_sales / 30
         if velocity > 0:
             values.append(min(sku.inventory / velocity, 365))
-    return sum(values) / len(values) if values else 0.0
+    return sum(values) / len(values) if values else None
 
 
 def _health_bucket(sku: SkuDetail, forecast: ForecastResult | None) -> str:
     if sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= 90:
         return "dead"
-    if forecast is not None and forecast.stockout_probability_30d >= 0.6:
+    if not _forecast_available(forecast):
+        return "no_signal"
+    if forecast.stockout_probability_30d >= 0.6:
         return "stockout"
     if not sku.sales_history_complete:
         return "no_signal"
@@ -199,7 +241,7 @@ def _top_stockout_risk(
         (
             (sku, forecast_by_sku.get(sku.sku_id))
             for sku in skus
-            if forecast_by_sku.get(sku.sku_id) is not None
+            if _forecast_available(forecast_by_sku.get(sku.sku_id))
         ),
         key=lambda pair: _stockout_revenue_risk(pair[0], pair[1]),
         reverse=True,
@@ -217,14 +259,23 @@ def _top_stockout_risk(
                 name=sku.name,
                 vendor=sku.vendor,
                 value=round(value, 0),
-                note=(
-                    f"{forecast.stockout_probability_30d * 100:.0f}% stockout risk, "
-                    f"{forecast.projected_30_day_demand:.0f} units forecast."
-                ),
+                note=_stockout_note(forecast),
                 severity="critical" if forecast.stockout_probability_30d >= 0.75 else "warning",
             )
         )
     return rows
+
+
+def _stockout_note(forecast: ForecastResult) -> str:
+    if _limited_forecast(forecast):
+        history_note = (f"Only {forecast.history_days} day{'s' if forecast.history_days != 1 else ''} of usable sales history. "
+                        if forecast.history_days < 30 else "")
+        limitation = "Low-confidence stockout estimate. " if forecast.confidence == "low" else "Limited-history stockout estimate. "
+        return (f"{limitation}{history_note}"
+                "Verify recent sales, current stock and incoming orders before ordering.")
+    percentage = forecast.stockout_probability_30d * 100
+    probability = "over 99%" if percentage > 99 else "under 1%" if 0 < percentage < 1 else f"{percentage:.0f}%"
+    return f"{probability} estimated stockout risk, {forecast.projected_30_day_demand:.0f} units forecast ({forecast.confidence} confidence)."
 
 
 def _build_insights(
@@ -235,6 +286,7 @@ def _build_insights(
     confidence_pct: float,
     warning_count: int,
     health_counts: Counter,
+    risk_complete: bool = True,
 ) -> list[InventoryHealthInsight]:
     insights: list[InventoryHealthInsight] = []
     if stockout_revenue_risk > 0:
@@ -246,7 +298,7 @@ def _build_insights(
                     "Several SKUs are forecast to sell more units than are currently on hand. "
                     "Review the stockout-risk list before placing broad replenishment orders."
                 ),
-                metric_label="Revenue exposed",
+                metric_label="Estimated revenue exposed" if risk_complete else "Estimated revenue-risk subtotal",
                 metric_value=_currency(stockout_revenue_risk),
             )
         )
@@ -275,7 +327,7 @@ def _build_insights(
                 metric_value=f"{confidence_pct * 100:.0f}%",
             )
         )
-    if health_counts["healthy"] == 0 and sum(health_counts.values()) > 0:
+    if health_counts["healthy"] == 0 and any(health_counts[key] > 0 for key in ("stockout", "dead", "overstock")):
         insights.append(
             InventoryHealthInsight(
                 title="Catalog needs triage",

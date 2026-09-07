@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import {
   ChartPanel,
@@ -10,15 +11,16 @@ import {
 import { GatedFeature } from "@/components/gated-feature";
 import {
   fetchForecasts,
-  percent,
   type ForecastResult,
 } from "@/lib/api-v2";
+import { filterForecasts, forecastNumber, forecastPercent, forecastRiskPercent, forecastView, rankForecastsByStockoutRisk,
+  type ForecastQuickView } from "@/lib/forecast-presentation";
 
 export default function ForecastPage() {
   return (
     <GatedFeature
       capability="forecast"
-      title="Restock on time, every time"
+      title="Plan reorders with demand forecasts"
       description="Upgrade to Growth to forecast demand, calculate reorder quantities, and plan replenishment from sales velocity and lead time."
     >
       <ForecastContent />
@@ -31,37 +33,41 @@ function ForecastContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [quickView, setQuickView] = useState<"all" | "week" | "at-risk" | "high-confidence">("all");
+  const [quickView, setQuickView] = useState<ForecastQuickView>("all");
   const [search, setSearch] = useState("");
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     fetchForecasts(controller.signal)
       .then((res) => {
+        if (controller.signal.aborted) return;
+        if (!Array.isArray(res.forecasts)) throw new Error("Invalid forecast response");
         const rankedForecasts = rankForecastsByStockoutRisk(res.forecasts);
         setForecasts(rankedForecasts);
         setSelectedId(rankedForecasts[0]?.sku_id ?? null);
         setError(null);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!controller.signal.aborted) setError("Forecasts could not be loaded. Please try again."); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, []);
+  }, [retry]);
 
-  const selected = useMemo(
-    () => forecasts.find((f) => f.sku_id === selectedId) ?? null,
-    [forecasts, selectedId]
-  );
   const visibleForecasts = useMemo(
     () => filterForecasts(forecasts, quickView, search),
     [forecasts, quickView, search],
   );
+  const selected = useMemo(
+    () => visibleForecasts.find((f) => f.sku_id === selectedId) ?? visibleForecasts[0] ?? null,
+    [visibleForecasts, selectedId]
+  );
+  const selectedView = selected ? forecastView(selected) : null;
 
   if (loading && forecasts.length === 0) {
     return <div className="page-loading">Computing forecasts...</div>;
   }
-  if (error) return <p className="page-error-copy">{error}</p>;
+  if (error) return <div className="empty-state" role="alert"><p className="page-error-copy">{error}</p><button type="button" className="button button-secondary" disabled={loading} onClick={() => setRetry(value => value + 1)}>{loading ? "Retrying…" : "Retry forecasts"}</button></div>;
 
   if (forecasts.length === 0) {
     return (
@@ -70,6 +76,7 @@ function ForecastContent() {
         <p className="empty-state-copy">
           Import products, inventory, and recent order history before skubase can project demand.
         </p>
+        <SalesHistoryLinks />
       </div>
     );
   }
@@ -78,7 +85,7 @@ function ForecastContent() {
     <div className="forecast-page">
       <aside className="forecast-list">
         <h3 className="panel-section-title">SKUs</h3>
-        <p className="panel-section-subtitle">Highest stockout risk first</p>
+        <p className="panel-section-subtitle">Highest estimated stockout risk first. Missing history stays unknown.</p>
         <label className="forecast-search">
           <span>Search</span>
           <input
@@ -90,13 +97,14 @@ function ForecastContent() {
         <div className="quick-filter-row quick-filter-row-compact">
           {[
             ["all", "All"],
-            ["week", "Running out this week"],
+            ["high-risk", "High 30-day risk"],
             ["at-risk", "At risk"],
             ["high-confidence", "High confidence"],
           ].map(([key, label]) => (
             <button
               key={key}
               type="button"
+              aria-pressed={quickView === key}
               className={`quick-filter-chip${quickView === key ? " quick-filter-chip-active" : ""}`}
               onClick={() => setQuickView(key as typeof quickView)}
             >
@@ -105,15 +113,16 @@ function ForecastContent() {
           ))}
         </div>
         <ul className="sku-list">
-          {visibleForecasts.map((f) => (
+          {visibleForecasts.map((f) => { const view = forecastView(f); return (
             <li
               key={f.sku_id}
               className={`sku-list-row${
-                f.sku_id === selectedId ? " sku-list-row-active" : ""
+                f.sku_id === selected?.sku_id ? " sku-list-row-active" : ""
               }`}
             >
               <button
                 type="button"
+                aria-pressed={f.sku_id === selected?.sku_id}
                 onClick={() => setSelectedId(f.sku_id)}
                 className="sku-list-button"
               >
@@ -121,102 +130,100 @@ function ForecastContent() {
                   {f.sku_id.replace(/^sku_/, "")}
                 </div>
                 <div className="sku-list-meta">
-                  <span className={`trend-pill trend-${f.trend}`}>
-                    {f.trend}
-                  </span>
+                  {view.available ? <span className={`trend-pill trend-${f.trend}`}>{view.noRecentSales ? "No recent sales" : f.trend}</span> : <span className="trend-pill">{view.missingHistory ? "Sales history needed" : "Forecast status unknown"}</span>}
                   <span
                     className={`risk-pill risk-${
-                      f.stockout_probability_30d > 0.5
+                      view.risk === null || view.noRecentSales ? "unknown" : view.risk > 0.5
                         ? "high"
-                        : f.stockout_probability_30d > 0.2
+                        : view.risk > 0.2
                         ? "medium"
                         : "low"
                     }`}
                   >
-                    {percent(f.stockout_probability_30d, 0)} risk
+                    {forecastRiskPercent(view.risk)} estimated risk
                   </span>
                 </div>
               </button>
             </li>
-          ))}
+          ); })}
         </ul>
         {visibleForecasts.length === 0 ? (
-          <p className="muted small">No SKUs match this quick view.</p>
+          <div><p className="muted small">No SKUs match this quick view. Forecasts with unknown risk are excluded from risk filters.</p><button type="button" className="button button-secondary button-sm" onClick={() => { setQuickView("all"); setSearch(""); }}>Show all SKUs</button></div>
         ) : null}
       </aside>
 
       <section className="forecast-detail">
-        {selected ? (
+        {selected && selectedView ? (
           <>
+            {!selectedView.available ? <div className="empty-state"><p className="empty-state-title">{selectedView.missingHistory ? "Sales history is needed for this SKU" : "Forecast availability is unknown"}</p><p className="empty-state-copy">{selectedView.missingHistory ? "Inventory counts alone do not establish demand, stockout risk, or forecast accuracy. Add dated sales or shipment history before using this SKU in a purchase plan." : "This response does not confirm whether the forecast uses recorded sales. Its numbers are withheld until that can be confirmed."}</p><SalesHistoryLinks /></div> : selectedView.noRecentSales ? <div className="forecast-warning-list"><p className="forecast-warning">The recorded sales window has no recent sales. Zero estimated demand is not proof that future demand or stockout risk is zero.</p></div> : null}
+            {selected.data_quality_warnings?.length ? <div className="forecast-warning-list" aria-label="Forecast data notes">{selected.data_quality_warnings.map(warning => <p key={warning} className="forecast-warning">{warning}</p>)}</div> : null}
+            {selectedView.available && selectedView.confidence === "low" && !selectedView.noRecentSales ? <p className="forecast-warning">Low confidence: short or sparse sales history can make risk estimates uncertain. Review the recorded demand before a large purchase.</p> : null}
             <div className="forecast-kpis">
-              <Kpi label="30-day demand" value={selected.projected_30_day_demand.toFixed(0)} />
-              <Kpi label="60-day demand" value={selected.projected_60_day_demand.toFixed(0)} />
-              <Kpi label="90-day demand" value={selected.projected_90_day_demand.toFixed(0)} />
+              <Kpi label="30-day demand" value={forecastNumber(selectedView.demand30)} />
+              <Kpi label="60-day demand" value={forecastNumber(selectedView.demand60)} />
+              <Kpi label="90-day demand" value={forecastNumber(selectedView.demand90)} />
               <Kpi
-                label="Stockout risk (30d)"
-                value={percent(selected.stockout_probability_30d, 0)}
+                label="Estimated stockout risk (30d)"
+                value={forecastRiskPercent(selectedView.risk)}
                 tone={
-                  selected.stockout_probability_30d > 0.5
+                  selectedView.risk === null || selectedView.noRecentSales ? "neutral" : selectedView.risk > 0.5
                     ? "negative"
-                    : selected.stockout_probability_30d > 0.2
+                    : selectedView.risk > 0.2
                     ? "neutral"
                     : "positive"
                 }
               />
-              <Kpi label="Confidence" value={selected.confidence} />
+              <Kpi label="Confidence" value={selectedView.confidence} />
               <Kpi
-                label="14d error"
-                value={
-                  selected.backtest_mape_14d == null
-                    ? "n/a"
-                    : percent(selected.backtest_mape_14d, 0)
-                }
+                label="14-day backtest error"
+                value={forecastPercent(selectedView.error)}
                 tone={
-                  selected.backtest_mape_14d != null && selected.backtest_mape_14d <= 0.3
+                  selectedView.error !== null && selectedView.error <= 0.3
                     ? "positive"
-                    : selected.backtest_mape_14d != null && selected.backtest_mape_14d > 0.6
+                    : selectedView.error !== null && selectedView.error > 0.6
                     ? "negative"
                     : "neutral"
                 }
               />
               <Kpi
                 label="Bias"
-                value={(selected.forecast_bias_14d ?? "pending").replace(/_/g, " ")}
+                value={selectedView.bias}
               />
-              <Kpi label="History" value={`${selected.history_days ?? 0}d`} />
+              <Kpi label="Recorded history" value={selectedView.history} />
               <Kpi label="Method" value={
-                selected.method === "holt_double_exponential" ? "Holt DES"
+                !selectedView.available ? "Unavailable" : selected.method === "holt_double_exponential" ? "Holt DES"
                 : selected.method === "moving_average" ? "Moving avg"
                 : selected.method.replace(/_/g, " ")
               } />
             </div>
+            <p className="muted small">Backtest error averages each day’s absolute prediction error divided by the larger of actual sales and one unit. It can exceed 100%. Unknown means no valid percentage comparison is available.</p>
 
-            <section className="planning-preview-grid">
+            {selectedView.available ? <section className="planning-preview-grid">
               <PlanningCard
                 title="Demand Plan"
                 label="Next 90 days"
-                value={`${selected.projected_90_day_demand.toFixed(0)} units`}
-                note={`30d ${selected.projected_30_day_demand.toFixed(0)} / 60d ${selected.projected_60_day_demand.toFixed(0)} / 90d ${selected.projected_90_day_demand.toFixed(0)}`}
+                value={`${forecastNumber(selectedView.demand90)} units`}
+                note={`30d ${forecastNumber(selectedView.demand30)} / 60d ${forecastNumber(selectedView.demand60)} / 90d ${forecastNumber(selectedView.demand90)}`}
               />
               <PlanningCard
                 title="Replenishment Signal"
-                label="30-day stockout risk"
-                value={percent(selected.stockout_probability_30d, 0)}
+                label="Estimated 30-day stockout risk"
+                value={forecastRiskPercent(selectedView.risk)}
                 note="Use purchase orders for quantity and supplier grouping."
               />
-            </section>
+            </section> : null}
 
-            <ChartPanel
+            {selectedView.available ? <ChartPanel
               title={`Forecast - ${selected.sku_id.replace(/^sku_/, "")}`}
               subtitle={selected.explain}
               accent="primary"
             >
               <ForecastBandChart points={selected.points} />
-            </ChartPanel>
+            </ChartPanel> : null}
 
-            <ExplainCard selected={selected} />
+            {selectedView.available ? <ExplainCard selected={selected} /> : null}
 
-            {selected.weekly_index.length > 0 ? (
+            {selectedView.available && selected.weekly_index.length > 0 ? (
               <ChartPanel
                 title="Weekly seasonality"
                 subtitle={`Detected pattern: ${selected.seasonality.replace("_", " ")}`}
@@ -226,35 +233,15 @@ function ForecastContent() {
             ) : null}
           </>
         ) : (
-          <p className="muted">Select a SKU on the left.</p>
+          <p className="muted">{visibleForecasts.length ? "Select a SKU on the left." : "Clear the quick view or search to select a forecast."}</p>
         )}
       </section>
     </div>
   );
 }
 
-function filterForecasts(
-  forecasts: ForecastResult[],
-  quickView: "all" | "week" | "at-risk" | "high-confidence",
-  search: string,
-): ForecastResult[] {
-  const needle = search.trim().toLowerCase();
-  return forecasts.filter((forecast) => {
-    if (needle && !forecast.sku_id.toLowerCase().includes(needle)) return false;
-    if (quickView === "week") return forecast.stockout_probability_30d >= 0.5;
-    if (quickView === "at-risk") return forecast.stockout_probability_30d >= 0.2;
-    if (quickView === "high-confidence") return forecast.confidence === "high";
-    return true;
-  });
-}
-
-function rankForecastsByStockoutRisk(forecasts: ForecastResult[]): ForecastResult[] {
-  return [...forecasts].sort(
-    (left, right) =>
-      right.stockout_probability_30d - left.stockout_probability_30d ||
-      right.projected_30_day_demand - left.projected_30_day_demand ||
-      left.sku_id.localeCompare(right.sku_id)
-  );
+function SalesHistoryLinks() {
+  return <div className="button-row"><Link className="button button-secondary" href="/store-sync">Review Shopify order sync</Link><Link className="button button-secondary" href="/import-shipstation">Import non-Shopify shipments</Link></div>;
 }
 
 function Kpi({
@@ -297,6 +284,7 @@ function PlanningCard({
 
 function ExplainCard({ selected }: { selected: ForecastResult }) {
   const [open, setOpen] = useState(false);
+  const view = forecastView(selected);
   return (
     <section className={`explain-card${open ? " explain-card-open" : ""}`}>
       <button
@@ -316,24 +304,17 @@ function ExplainCard({ selected }: { selected: ForecastResult }) {
       {open ? (
         <div className="explain-card-body">
           <p className="explain-card-lead">
-            skubase uses <strong>Holt double-exponential smoothing</strong> with a weekly seasonality factor.
+            {selected.method === "naive" || selected.method === "moving_average"
+              ? "This estimate uses a simple average because the recorded history cannot support a stronger trend or seasonal model."
+              : "This estimate smooths recorded demand and applies the detected weekly pattern. Short or sparse history reduces confidence."}
           </p>
           <dl className="explain-card-grid">
             <div><dt>Method</dt><dd>{selected.method.replace(/_/g, " ")}</dd></div>
-            <div><dt>Confidence</dt><dd>{selected.confidence}</dd></div>
+            <div><dt>Confidence</dt><dd>{view.confidence}</dd></div>
             <div><dt>Seasonality</dt><dd>{selected.seasonality.replace(/_/g, " ")}</dd></div>
-            <div><dt>30d stockout risk</dt><dd>{percent(selected.stockout_probability_30d, 0)}</dd></div>
+            <div><dt>Estimated 30-day stockout risk</dt><dd>{forecastRiskPercent(view.risk)}</dd></div>
           </dl>
           <p className="explain-card-explain">{selected.explain}</p>
-          {selected.data_quality_warnings?.length ? (
-            <div className="forecast-warning-list">
-              {selected.data_quality_warnings.map((warning) => (
-                <p key={warning} className="forecast-warning">
-                  {warning}
-                </p>
-              ))}
-            </div>
-          ) : null}
           {selected.trust_reasons?.length ? (
             <div className="forecast-warning-list">
               {selected.trust_reasons.map((reason) => (

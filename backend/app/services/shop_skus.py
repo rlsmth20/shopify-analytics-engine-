@@ -131,6 +131,12 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
 
         sku_id = (p.sku or _slugify(p.name, p.variant_name, str(p.id)))[:128]
         history_warnings = _sales_history_warnings(sales.get("first_sale_at"), now, latest_finished_sync)
+        first_sale = sales.get("first_sale_at")
+        if first_sale is not None and first_sale.tzinfo is not None:
+            first_sale = first_sale.astimezone(timezone.utc)
+        # Daily forecast buckets end yesterday in UTC. A sale yesterday evening
+        # is one observed bucket even when fewer than 24 hours have elapsed.
+        observed_days = max(0, (now.date() - first_sale.date()).days) if first_sale is not None else 0
 
         skus.append(
             SkuDetail(
@@ -146,6 +152,7 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
                 last_7_day_sales=sales.get("sales_7d", 0),
                 days_since_last_sale=days_since,
                 sku_lead_time_days=p.sku_lead_time_days,
+                observed_history_days=observed_days,
                 sales_history_complete=not history_warnings,
                 sales_history_warnings=history_warnings,
             )

@@ -39,15 +39,44 @@ class ForecastInputs:
     daily_history: list[float]  # chronologically ordered, oldest first
     on_hand: int
     start_weekday: int  # 0=Mon ... 6=Sun, the weekday for history[0]
+    observed_history_days: int | None = None
+    source_warnings: tuple[str, ...] = ()
+
+
+def observed_history(inputs: ForecastInputs) -> tuple[list[float], int]:
+    """Exclude loader padding without discarding known zero-sales windows."""
+    history = _clean_history(inputs.daily_history)
+    if inputs.observed_history_days is None:
+        first_sale = next((i for i, value in enumerate(history) if value > 0), len(history))
+        usable = history[first_sale:]
+    else:
+        days = min(len(history), max(0, inputs.observed_history_days))
+        usable = history[-days:] if days else []
+    shift = len(inputs.daily_history) - len(usable)
+    return usable, (inputs.start_weekday + shift) % 7
 
 
 def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> ForecastResult:
-    raw_history = _clean_history(inputs.daily_history)
+    raw_history, observed_start_weekday = observed_history(inputs)
+    source_warnings = list(dict.fromkeys(inputs.source_warnings))
+    if not raw_history:
+        return ForecastResult(sku_id=inputs.sku_id, forecast_available=False, demand_signal="missing_history",
+            horizon_days=horizon_days, method="naive", trend="steady", seasonality="unknown", confidence="low",
+            projected_30_day_demand=0, projected_60_day_demand=0, projected_90_day_demand=0,
+            stockout_probability_30d=0, history_days=0, adjusted_stockout_days=0,
+            explain="No completed sales-history days are available for this forecast. Import earlier matching shipment history or sync earlier orders; newly recorded sales may still appear in recent-sales metrics.",
+            data_quality_warnings=["Demand, stockout likelihood and coverage cannot yet be estimated from completed sales-history days.", *source_warnings])
+    if not any(raw_history):
+        result = _naive_forecast(inputs, raw_history, horizon_days, 0,
+            [*source_warnings, "The observed window has no recorded sales; a zero-demand estimate has low confidence."])
+        return result.model_copy(update={"demand_signal": "no_recent_sales",
+            "explain": "No sales are recorded in the observed window. The demand estimate is zero with low confidence; stock coverage and a stockout date cannot be inferred from zero recent demand."})
     history, start_weekday, adjusted_days, warnings = _prepare_history_for_forecast(
         raw_history,
         on_hand=inputs.on_hand,
-        start_weekday=inputs.start_weekday,
+        start_weekday=observed_start_weekday,
     )
+    warnings = list(dict.fromkeys([*source_warnings, *warnings]))
     if len(history) < MIN_HISTORY_DAYS:
         return _naive_forecast(inputs, history, horizon_days, adjusted_days, warnings)
 
@@ -102,6 +131,8 @@ def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> Fo
 
     trend_label = _classify_trend(trend, level, residuals, sigma)
     confidence = _classify_confidence(len(history), sigma, level)
+    if source_warnings or len(history) < 30 or sum(value > 0 for value in history) / len(history) < 0.2:
+        confidence = "low"
     stockout_prob = _stockout_probability(
         on_hand=inputs.on_hand,
         mean_30d=projected_30,
@@ -128,6 +159,7 @@ def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> Fo
             on_hand=inputs.on_hand,
             stockout_prob=stockout_prob,
             sigma=sigma,
+            confidence=confidence,
             warnings=warnings,
         ),
         history_days=len(history),
@@ -157,13 +189,8 @@ def _prepare_history_for_forecast(
             "No demand signal yet; all imported sales-history days are zero."
         ]
 
-    if first_sale_idx > 7:
-        warnings.append(
-            f"Ignored {first_sale_idx} leading zero-sales days before the first observed sale."
-        )
-        history = history[first_sale_idx:]
-        start_weekday = (start_weekday + first_sale_idx) % 7
-
+    # observed_history already removed unobserved padding. Remaining leading
+    # zero-sales days belong to a proven window and must not be discarded.
     non_zero_days = sum(1 for value in history if value > 0)
     if len(history) < 30:
         warnings.append("Limited history: fewer than 30 days are available for this SKU.")
@@ -393,6 +420,7 @@ def _build_explanation(
     on_hand: int,
     stockout_prob: float,
     sigma: float,
+    confidence: str,
     warnings: list[str],
 ) -> str:
     trend_text = {
@@ -409,12 +437,12 @@ def _build_explanation(
         "unknown": "",
     }[seasonality]
 
-    coverage_msg = (
-        f"On-hand of {on_hand} covers ~{on_hand / max(projected_30 / 30, 0.01):.1f} days of expected demand."
-    )
-    risk_msg = (
-        f"Stockout probability in the next 30 days is {stockout_prob * 100:.0f}%."
-    )
+    coverage_msg = (f"On-hand of {on_hand} covers ~{on_hand / (projected_30 / 30):.1f} days of expected demand."
+                    if projected_30 > 0 else "A stock-coverage duration cannot be inferred from zero projected demand.")
+    probability_label = ("over 99%" if stockout_prob > 0.99 else "under 1%" if stockout_prob < 0.01
+                         else f"{stockout_prob * 100:.0f}%")
+    risk_msg = ("Stockout likelihood is uncertain because observed demand is limited or variable; check stock and incoming orders before acting."
+                if confidence == "low" else f"The model estimates {probability_label} stockout likelihood over the next 30 days.")
     warning_msg = f"Data note: {warnings[0]}" if warnings else ""
     return " ".join(
         s

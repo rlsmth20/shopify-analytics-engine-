@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.services.forecasting import ForecastInputs, forecast_sku
+from app.services.forecasting import ForecastInputs, forecast_sku, observed_history
 
 
 @dataclass(frozen=True)
@@ -15,13 +15,13 @@ class ForecastBacktest:
 
 
 def backtest_forecast(inputs: ForecastInputs, days: int = 14) -> ForecastBacktest:
-    history = [max(0.0, float(value)) for value in inputs.daily_history]
+    history, start_weekday = observed_history(inputs)
     if len(history) < days + 21:
         return ForecastBacktest(
             mae_14d=None,
             mape_14d=None,
             bias_14d=None,
-            trust_reasons=["Backtest needs at least 35 days of sales history."],
+            trust_reasons=[f"Backtest needs at least {days + 21} days of observed sales history; unobserved days are not zero-sales evidence."],
         )
 
     training = history[:-days]
@@ -31,12 +31,14 @@ def backtest_forecast(inputs: ForecastInputs, days: int = 14) -> ForecastBacktes
             sku_id=inputs.sku_id,
             daily_history=training,
             on_hand=inputs.on_hand,
-            start_weekday=inputs.start_weekday,
+            start_weekday=start_weekday,
+            observed_history_days=len(training),
+            source_warnings=inputs.source_warnings,
         ),
         horizon_days=days,
     )
     predicted = [point.expected_units for point in forecast.points[:days]]
-    if not predicted:
+    if not forecast.forecast_available or not predicted:
         return ForecastBacktest(
             mae_14d=None,
             mape_14d=None,
@@ -48,6 +50,9 @@ def backtest_forecast(inputs: ForecastInputs, days: int = 14) -> ForecastBacktes
     abs_errors = [abs(error) for error in errors]
     mae = sum(abs_errors) / len(abs_errors)
     total_actual = sum(actual)
+    if total_actual <= 0:
+        return ForecastBacktest(mae_14d=round(mae, 2), mape_14d=None, bias_14d=None,
+            trust_reasons=["The observed comparison window has no recorded sales. Absolute error is descriptive; percentage accuracy and directional bias are unavailable."])
     mape = sum(abs(error) / max(act, 1.0) for error, act in zip(errors, actual)) / len(errors)
     net_error = sum(errors)
     bias = "balanced"
@@ -59,7 +64,12 @@ def backtest_forecast(inputs: ForecastInputs, days: int = 14) -> ForecastBacktes
             bias = "under_forecast"
 
     reasons: list[str] = []
-    if mape <= 0.25:
+    if inputs.source_warnings:
+        reasons.extend(inputs.source_warnings)
+        reasons.append("Backtest uses imported history whose coverage needs review; these errors do not verify current demand.")
+    elif sum(value > 0 for value in history) / len(history) < 0.2:
+        reasons.append("Observed demand is sparse; these errors do not establish reliable forecast accuracy.")
+    elif mape <= 0.25:
         reasons.append("Backtest error is low over the last 14 days.")
     elif mape <= 0.5:
         reasons.append("Backtest error is moderate; review larger buys.")

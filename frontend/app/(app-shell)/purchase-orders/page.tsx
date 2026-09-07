@@ -325,10 +325,10 @@ function PurchaseOrdersContent() {
 
       {visibleDrafts.length === 0 && !loading ? (
         <div className="empty-state">
-          <p className="empty-state-title">{drafts.length === 0 ? "All caught up" : "No PO drafts match"}</p>
+          <p className="empty-state-title">{drafts.length === 0 ? "No purchase order recommendations available" : "No PO drafts match"}</p>
           <p className="empty-state-copy">
             {drafts.length === 0
-              ? "No supplier currently needs a purchase order at this service level."
+              ? "The current data and service level produced no purchase order recommendations. Check that sales history, inventory and lead times are complete before deciding no stock is needed."
               : "Clear search or quick filters to see more draft purchase orders."}
           </p>
         </div>
@@ -1420,7 +1420,7 @@ function BuyingCalendarPanel({
         <div className="empty-state empty-state-compact">
           <p className="empty-state-title">No planned buys in this horizon</p>
           <p className="empty-state-copy">
-            SKUs with demand are still above their reorder point for the selected window.
+            The current data produced no planned buys for the selected window. Check sales-history coverage, current stock and lead times; an empty calendar does not confirm that no purchases are needed.
           </p>
         </div>
       )}

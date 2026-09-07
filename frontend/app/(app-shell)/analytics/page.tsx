@@ -146,6 +146,7 @@ export default function AnalyticsPage() {
     label: leadTimeSourceLabel[source],
     value: actions.filter((action) => action.lead_time_source === source).length,
   }));
+  const forecastCoverage = health?.forecast_coverage;
 
   return (
     <div className="page-stack">
@@ -171,6 +172,13 @@ export default function AnalyticsPage() {
               />
             ))}
       </div>
+
+      {forecastCoverage ? <div className="data-quality-note" role="note" aria-label="Forecast coverage">
+        <p><strong>{forecastCoverage.available_skus} of {forecastCoverage.total_skus} SKUs can be assessed for stockout risk.</strong></p>
+        {forecastCoverage.unavailable_skus > 0 ? <p>SKUs needing sales history: {forecastCoverage.unavailable_skus}. Total stockout exposure is unknown; any subtotal and ranked estimates cover the available forecasts only. <Link href="/store-sync">Review imported history</Link>.</p> : null}
+        {forecastCoverage.low_confidence_skus > 0 ? <p>Forecasts with limited history or low confidence: {forecastCoverage.low_confidence_skus}. Verify demand before placing an order. <Link href="/forecast">Review forecast evidence</Link>.</p> : null}
+        {forecastCoverage.no_recent_sales_skus > 0 ? <p>SKUs with an observed window of zero sales: {forecastCoverage.no_recent_sales_skus}. Their zero-demand estimates do not guarantee zero future demand.</p> : null}
+      </div> : null}
 
       <InventoryValueChart />
 
@@ -218,8 +226,10 @@ export default function AnalyticsPage() {
           >
             <RiskList
               items={health.top_stockout_risk}
-              emptyTitle="No stockout exposure found"
-              emptyDescription="Current forecasts do not show meaningful revenue at risk from stockouts."
+              emptyTitle={forecastCoverage?.unavailable_skus ? "Stockout exposure is not fully assessed" : "No exposure estimated in available forecasts"}
+              emptyDescription={forecastCoverage?.unavailable_skus
+                ? "Some SKUs cannot be assessed without sales history. An empty list does not mean there is no stockout risk."
+                : "No positive revenue exposure is estimated from the available sales history. Check forecast confidence and stock availability before making purchasing decisions."}
             />
           </ChartCard>
 

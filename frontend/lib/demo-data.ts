@@ -462,7 +462,7 @@ export const DEMO_FORECASTS = {
       points: buildForecastPoints(1.3),
       explain: "Post-season slowdown. 90+ days of cover. Consider markdown to free capital.",
     },
-  ],
+  ].map(forecast => ({ ...forecast, forecast_available: true, demand_signal: "observed" as const })),
 };
 
 // ── Analytics (ABC × XYZ scorecards) ────────────────────────────────────────

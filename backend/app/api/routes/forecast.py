@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DbSession
 
 from app.api.deps import require_plan_feature
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/forecast", tags=["forecast"])
 def list_forecasts(
     user: Annotated[User, Depends(require_plan_feature("forecast"))],
     db: Annotated[DbSession, Depends(get_db_session)],
-    horizon_days: int = 30,
+    horizon_days: int = Query(30, ge=1, le=90),
 ) -> ForecastFeedResponse:
     skus = load_skus_for_shop(db, user.shop_id)
     if not skus:
@@ -43,6 +43,8 @@ def list_forecasts(
             sku_id=sku.sku_id,
             daily_history=history,
             on_hand=sku.inventory,
+            observed_history_days=sku.observed_history_days,
+            source_warnings=tuple(sku.sales_history_warnings),
             start_weekday=start_weekday,
         )
         forecast = forecast_sku(inputs, horizon_days=horizon_days)
@@ -66,7 +68,7 @@ def get_forecast(
     sku_id: str,
     user: Annotated[User, Depends(require_plan_feature("forecast"))],
     db: Annotated[DbSession, Depends(get_db_session)],
-    horizon_days: int = 30,
+    horizon_days: int = Query(30, ge=1, le=90),
 ) -> ForecastResult:
     skus = load_skus_for_shop(db, user.shop_id)
     sku = next((s for s in skus if s.sku_id == sku_id), None)
@@ -77,6 +79,8 @@ def get_forecast(
         sku_id=sku_id,
         daily_history=history,
         on_hand=sku.inventory,
+        observed_history_days=sku.observed_history_days,
+        source_warnings=tuple(sku.sales_history_warnings),
         start_weekday=start_weekday_for_shop_history(db, user.shop_id, 90),
     )
     forecast = forecast_sku(inputs, horizon_days=horizon_days)

@@ -88,6 +88,8 @@ class ForecastPoint(ApiModel):
 
 class ForecastResult(ApiModel):
     sku_id: str
+    forecast_available: bool = True
+    demand_signal: Literal["observed", "no_recent_sales", "missing_history"] = "observed"
     horizon_days: int
     method: Literal["moving_average", "exponential_smoothing", "seasonal_ema", "naive"]
     trend: TrendDirection
@@ -178,7 +180,16 @@ class InventoryHealthInsight(ApiModel):
     metric_value: str
 
 
+class InventoryForecastCoverage(ApiModel):
+    total_skus: int = Field(ge=0)
+    available_skus: int = Field(ge=0)
+    unavailable_skus: int = Field(ge=0)
+    low_confidence_skus: int = Field(ge=0)
+    no_recent_sales_skus: int = Field(ge=0)
+
+
 class InventoryHealthResponse(ApiModel):
+    forecast_coverage: InventoryForecastCoverage | None = None
     kpis: list[InventoryHealthKpi]
     health_buckets: list[InventoryHealthBucket]
     forecast_confidence: list[InventoryHealthBucket]

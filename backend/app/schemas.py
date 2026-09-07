@@ -224,6 +224,8 @@ class SkuDetail(ApiModel):
     last_7_day_sales: int
     days_since_last_sale: int
     sku_lead_time_days: int | None = None
+    observed_history_days: int | None = Field(default=None, ge=0,
+        description="Days since the first recorded sale; zero means no completed observed history, null means legacy provenance unavailable.")
     sales_history_complete: bool = Field(
         default=True,
         description="Whether available order history supports stale/excess-stock conclusions; legacy inputs default to known history.",

@@ -98,6 +98,8 @@ export type ForecastPoint = {
 
 export type ForecastResult = {
   sku_id: string;
+  forecast_available?: boolean;
+  demand_signal?: "observed" | "no_recent_sales" | "missing_history";
   horizon_days: number;
   method: string;
   trend: TrendDirection;
@@ -168,6 +170,7 @@ export type InventoryHealthInsight = {
 };
 
 export type InventoryHealthResponse = {
+  forecast_coverage?: { total_skus: number; available_skus: number; unavailable_skus: number; low_confidence_skus: number; no_recent_sales_skus: number } | null;
   kpis: InventoryHealthKpi[];
   health_buckets: InventoryHealthBucket[];
   forecast_confidence: InventoryHealthBucket[];

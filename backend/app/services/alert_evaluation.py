@@ -130,6 +130,8 @@ def build_evaluation_context(db: DbSession, shop_id: int) -> EvaluationContext |
                 sku_id=sku.sku_id,
                 daily_history=histories.get(sku.sku_id, []),
                 on_hand=sku.inventory,
+                observed_history_days=sku.observed_history_days,
+                source_warnings=tuple(sku.sales_history_warnings),
                 start_weekday=start_weekday,
             )
         )

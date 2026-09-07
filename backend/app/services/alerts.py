@@ -493,6 +493,8 @@ def _supplier_events(rule, context, now, deliver_channels, channels_by_key, allo
 def _forecast_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for forecast in context.forecasts:
+        if not forecast.forecast_available:
+            continue
         if not _sku_matches(rule, context, forecast.sku_id, forecast.sku_id):
             continue
         if forecast.stockout_probability_30d * 100 < rule.threshold:

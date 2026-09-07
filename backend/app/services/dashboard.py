@@ -176,6 +176,9 @@ def build_dashboard(
                 sku_id=sku.sku_id,
                 daily_history=history[:-7],  # forecast using all but last 7 days
                 on_hand=sku.inventory,
+                observed_history_days=max(0, sku.observed_history_days - 7)
+                    if sku.observed_history_days is not None else None,
+                source_warnings=tuple(sku.sales_history_warnings),
                 start_weekday=start_weekday,
             ),
             horizon_days=7,
