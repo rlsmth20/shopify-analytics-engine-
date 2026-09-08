@@ -187,6 +187,8 @@ def execute(factory, owner, task, *, codex, repo):
         runs = list(db.scalars(select(Usage).where(Usage.result["task_id"].as_string() == task["id"])))
         spent = sum(min(budget * 1000, (time.time() - r.created_at) * 1000) if r.outcome == "running"
                     else (r.latency_ms or r.result.get("budget_charged_ms", 0)) for r in runs)
+    if task.get("stage") in {"send", "outreach", "reply"}:
+        spent = 0  # Transport recovery is bounded by MAX_ATTEMPTS; research is cumulative.
     budget -= spent / 1000
     if budget <= 0:
         raise GrowthError("RESEARCH_BUDGET_EXHAUSTED", "budget")

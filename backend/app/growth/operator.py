@@ -139,6 +139,35 @@ def export_packet(db):
 
 
 def operator_action(db, action, payload):
+    if action == "operator-monitor":
+        from urllib.parse import urlparse
+        now = time.time()
+        task = get_memory(db, NAMESPACE, payload.get("task_id", ""))
+        observed_at = payload.get("checked_at", 0)
+        observations = payload.get("observations", [])
+        if (task.get("status") != "running" or task.get("lease_token") != payload.get("lease_token")
+            or task.get("lease_until", 0) <= now or not isinstance(observed_at, (int, float))
+            or not now - 300 <= observed_at <= now + 5):
+            raise GrowthError("Fresh browser observations and a current task lease are required")
+        if (payload.get("mailbox") != "info@skubase.io" or not isinstance(observations, list)
+            or not 2 <= len(observations) <= 5 or
+            any(not isinstance(o.get("observation"), str) or not 1 <= len(o["observation"]) <= 800
+                or urlparse(o.get("source", "")).scheme != "https" for o in observations)):
+            raise GrowthError("Bounded actual business-mailbox and Reddit observations required")
+        hosts = {urlparse(o["source"]).hostname for o in observations}
+        if "mail.google.com" not in hosts or not hosts.intersection({"www.reddit.com", "reddit.com"}):
+            raise GrowthError("Both dedicated Gmail and Reddit must be checked")
+        from .store import digest
+        attention = payload.get("requires_attention")
+        if not isinstance(attention, bool):
+            raise GrowthError("Explicit reply/incident attention state required")
+        event = record(db, "browser-monitor:" + digest([payload["task_id"], observed_at, observations]),
+            "CHANNEL_MONITOR", payload["task_id"], {"observations": observations, "mailbox": payload["mailbox"],
+                "requires_attention": attention, "lease_token": payload["lease_token"]},
+            source="authenticated_browser_executor", occurred_at=observed_at)
+        remember(db, "working", "browser_safety_check", {"checked_at": observed_at,
+            "evidence_id": event.id, "requires_attention": attention})
+        return {"evidence_id": event.id, "checked_at": observed_at, "requires_attention": attention}
     if action == "operator-assess":
         from .eligibility import assess
         return assess(db, payload)

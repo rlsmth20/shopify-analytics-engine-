@@ -73,6 +73,23 @@ class EligibilityTests(unittest.TestCase):
             with self.assertRaisesRegex(GrowthError, "Fresh essential"):
                 operator_action(db, "outreach-reserve", {})
 
+    def test_monitor_bridge_requires_real_time_window_and_task_lease(self):
+        from app.growth.operator import offer, claim, operator_action as operator_cli
+        with self.factory() as db:
+            e = record(db, "source", "OBSERVATION", "merchant", {})
+            task = offer(db, key="monitor-fixture", source="https://example.test",
+                         decision="Fixture check", evidence_id=e.id)
+            task = claim(db, task["id"])
+            payload = {"task_id": task["id"], "lease_token": task["lease_token"], "checked_at": time.time(),
+                       "mailbox": "info@skubase.io", "requires_attention": False,
+                       "observations": [{"source": "https://mail.google.com/mail/u/4/", "observation": "Fixture business mailbox"},
+                                        {"source": "https://www.reddit.com/notifications", "observation": "Fixture notifications"}]}
+            proof = operator_cli(db, "operator-monitor", payload)
+            self.assertEqual(db.get(Evidence, proof["evidence_id"]).kind, "CHANNEL_MONITOR")
+            for changed in ({"checked_at": time.time()-301}, {"lease_token": "stale"}, {"mailbox": "personal@example.test"}):
+                with self.assertRaises(GrowthError):
+                    operator_cli(db, "operator-monitor", {**payload, **changed})
+
     def test_medium_without_pain_can_reserve_but_cannot_resend(self):
         with self.factory() as db:
             remember(db, "strategic", "qualification_policy", {"version": POLICY, "started_at": time.time()})

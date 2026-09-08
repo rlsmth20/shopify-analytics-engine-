@@ -68,6 +68,14 @@ Retain CHANNEL_MONITOR evidence and working/browser_safety_check
 check. Prioritize substantive replies/incidents and create reply successors when
 appropriate. No promotional response to Shopify review mail. Monitoring alone
 does not complete acquisition.
+To retain actual browser checks, use `scripts/growth-review.ps1 -Action operator-monitor
+-File <absolute JSON path>` with task_id, lease_token (from your assigned task),
+checked_at (actual UTC Unix seconds observed, not a renewed old timestamp),
+mailbox="info@skubase.io", requires_attention boolean, and observations containing
+2–5 {source: HTTPS URL, observation: concise actual observation} objects covering
+business Gmail and Reddit. It writes to the same production DB as admission and
+returns the evidence ID. Do not use ad-hoc Python/SQLite or old safety-write helpers.
+Keep payload files in .growth-deploy, not the repository root.
 
 ## Stages
 
