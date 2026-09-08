@@ -1,4 +1,5 @@
 """Isolated browser verification fixture. Never imported by the production app."""
+import atexit
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,6 +18,8 @@ from app.growth.seed_live import seed
 
 temp = tempfile.TemporaryDirectory(prefix="skubase-growth-preview-")
 engine = create_engine("sqlite:///" + str(Path(temp.name) / "preview.sqlite"), connect_args={"check_same_thread": False})
+# Close pooled SQLite handles before TemporaryDirectory cleanup on Windows.
+atexit.register(engine.dispose)
 Base.metadata.create_all(engine)
 factory = sessionmaker(engine, expire_on_commit=False)
 bootstrap(factory)

@@ -13,6 +13,7 @@ from .service_replies import answer_request, current_request
 from .model_router import call_model
 from .models import Contact, Evidence, Experiment, Memory, Message, SkillRevision, Usage, Work
 from .policy import GrowthError, Policy, REPLY_CLASSES
+from .review_calendar import completed_review, review_day
 from .skills import active_skill, bootstrap_skills, propose_revision
 from .store import claim, context, digest, enqueue, finish, get_memory, heartbeat, record, remember, require_lease
 
@@ -49,7 +50,28 @@ def schedule(factory):
         enqueue(db, f"observe:{int(now // 300)}", "observe", priority=75)
         if os.getenv("GROWTH_INBOUND_ENABLED") == "true":
             enqueue(db, f"inbox:{int(now // 300)}", "inbox", priority=100)
-        enqueue(db, f"review:{int(now // 86400)}", "daily_review", priority=60)
+        window = review_day(now)
+        review_key = "review:" + window.key
+        completed = completed_review(db, window)
+        if not completed:
+            enqueue(db, review_key, "daily_review", priority=60, due_at=window.due)
+        # Retire legacy UTC jobs and missed days, including blocked jobs. Never
+        # repay downtime with a backlog of expensive reviews.
+        obsolete = select(Work.id).where(Work.kind == "daily_review",
+            Work.status.in_(["ready", "blocked"]))
+        if not completed:
+            obsolete = obsolete.where(Work.key != review_key)
+        db.execute(update(Work).where(Work.id.in_(obsolete)).values(
+            status="superseded", error="Pacific review schedule supersedes this wake"))
+        executive = {key: value for key, value in get_memory(db, "working", "executive").items()
+                     if key != "pending_day"}
+        executive.update(timezone="America/Los_Angeles",
+                         next_due=window.next_due if completed else window.due)
+        if completed:
+            executive.update(day=window.day, last_review=completed.occurred_at)
+        elif now >= window.due:
+            executive["pending_day"] = window.day
+        remember(db, "working", "executive", executive)
         if os.getenv("SHOPIFY_PARTNER_API_TOKEN"):
             enqueue(db, f"payments:{int(now // 3600)}", "payments", priority=65)
         # Two decision-directed searches per six hours, no follow-on research fanout.
@@ -64,7 +86,7 @@ def schedule(factory):
                 enqueue(db, f"discover-slot:{int(now // 21600)}:{index}", "discover",
                         {"query": query, "decision": "Which recent merchant question warrants a useful Skubase health-check offer?"}, priority=10)
         # Supersede overdue periodic wakes; downtime is not a debt of research/model calls.
-        for kind, horizon in (("observe", 600), ("inbox", 600), ("daily_review", 86400), ("discover", 21600)):
+        for kind, horizon in (("observe", 600), ("inbox", 600), ("discover", 21600)):
             db.execute(update(Work).where(Work.kind == kind, Work.status == "ready", Work.created_at < now - horizon)
                        .values(status="superseded", error="Newer periodic wake covers this interval"))
         ready = db.scalar(select(Work).where(Work.status == "ready", Work.due_at <= now)
@@ -171,11 +193,21 @@ def insert_once_message(db, original, contact):
 
 
 def daily_review(factory, work, model=call_model):
+    now = time.time()
+    window = review_day(now)
+    if work.key != "review:" + window.key:
+        return {"superseded": True, "day": window.day}
+    if now < window.due:
+        return {"not_due": True, "next_due": window.due}
+    with factory() as db:
+        prior = completed_review(db, window)
+        if prior:
+            return {"already_reviewed": True, "evidence_id": prior.id}
     if os.getenv("GROWTH_REVIEW_MODE") == "codex":
         from .executive import export_packet
         with factory() as db:
             packet = export_packet(db)
-            if packet.get("already_reviewed"):
+            if packet.get("already_reviewed") or packet.get("not_due"):
                 return packet
             remember(db, "working", "executive", {**get_memory(db, "working", "executive"),
                      "mode": "codex", "pending_day": packet["day"]})
@@ -201,7 +233,18 @@ def daily_review(factory, work, model=call_model):
         raise GrowthError("Review requested an unavailable action", "policy")
     with factory() as db:
         require_lease(db, work)
+        if review_day(time.time()).day != window.day:
+            return {"superseded": True, "reason": "Review crossed the Pacific day boundary"}
+        prior = completed_review(db, window)
+        if prior:
+            return {"already_reviewed": True, "evidence_id": prior.id}
         # Free-form reasoning is stored as an inference. It never changes limits or permissions.
+        event = record(db, "executive-review:" + window.key, "EXECUTIVE_REVIEW", "mission",
+                       {**result, "day": window.day, "timezone": "America/Los_Angeles"},
+                       source="daily_model_review", epistemic="INFERENCE")
+        remember(db, "working", "executive", {"last_review": event.occurred_at,
+                 "next_due": window.next_due, "day": window.day,
+                 "timezone": "America/Los_Angeles", "mode": "api"})
         remember(db, "strategic", "review", result, source="daily_model_review")
         revised = {**strategy, "icp": str(result.get("icp", strategy["icp"]))[:800],
                    "positioning": str(result.get("positioning", strategy["positioning"]))[:400],

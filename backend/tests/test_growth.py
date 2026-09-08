@@ -160,7 +160,8 @@ class GrowthTests(unittest.TestCase):
             self.assertTrue(db.scalar(select(Contact).where(Contact.email == "support@example.test")).suppressed)
             self.assertEqual(db.scalar(select(func.count()).select_from(Message)), 1)
 
-    def test_daily_codex_review_is_bounded_cited_idempotent_and_changes_next_action(self):
+    @patch("app.growth.executive.time.time", return_value=datetime(2026, 9, 7, 18, tzinfo=timezone.utc).timestamp())
+    def test_daily_codex_review_is_bounded_cited_idempotent_and_changes_next_action(self, _clock):
         from app.growth.executive import export_packet, import_review, REVIEW_FIELDS
         with self.factory() as db:
             packet = export_packet(db)

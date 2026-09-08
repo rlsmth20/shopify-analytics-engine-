@@ -4,6 +4,17 @@ Owner policy, September 7, 2026: operate persistently with a **hard ceiling of 2
 
 The Railway worker continuously handles inexpensive observation, inbox ingestion, classification, delivery failures, requested service, experiments and funnel work. The Codex operator wakes every two hours for bounded qualified outreach and obligations; it performs the deeper executive review once per day after 9 a.m. Pacific. Desktop/Codex availability is necessary for browser actions. Reaching capacity never pauses the worker or the operator's independent work.
 
+The daily-review helper and worker use `America/Los_Angeles` calendar dates,
+including daylight-saving changes. `review-export` returns `not_due` before
+9 a.m. or `already_reviewed` when a review exists for that Pacific date. Skip
+only the executive review in either case and continue other permitted work.
+Otherwise copy the exported ISO `day` exactly into `review-import`; a packet
+cannot be imported on another Pacific date. UTC midnight does not expire it.
+Historical UTC-keyed reviews remain unchanged and are recognized by their actual
+timestamps. The worker retires obsolete pending review jobs after downtime and
+never runs a backlog of deep reviews. Its next-review time is the next local
+9 a.m., independently of UTC-based model-spend windows and the rolling contact cap.
+
 Priority: substantive replies and requested health checks → suppression/delivery failures → product/funnel problems → experiment evaluation → qualified prospect preparation and permitted organic acquisition. Respect existing no-follow-up promises. No silent-prospect follow-up automation. Suppress declines, opt-outs, bounces and channel restrictions immediately. Advertising remains $0 and no new paid services are authorized. The current Resend integration remains requested-service-only; this limit does not authorize prohibited cold email or bypass via Gmail.
 
 ## Required admission before every new merchant contact
