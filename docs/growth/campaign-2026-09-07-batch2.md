@@ -135,3 +135,19 @@ remain available; no new advertising or paid API/service spend. Subscription
 tokens/cost UNKNOWN. Wake audit 6000; usage
 `5078e3a60fbd45b5983d327b2ea492c1`. Next: replies and requested checks first,
 then fresh merchant-authored needs, applying the stored exclusions.
+
+## Owner priority — unattended outreach
+
+Owner direction 6209 makes qualified outreach and merchant conversations the
+primary work; optional upgrades are deferred. The existing two-hour heartbeat
+was updated and verified ACTIVE, with a receipt-backed overnight report on the
+first morning wake at/after 9 a.m. Pacific. No routine permission questions.
+
+This preparation pass added no contacts. Six bounded reads retained exclusions
+6210–6211: topic 637085 lacks verified current merchant intent; topic 66719's
+original merchant need is from 2021. Search recency again reflected vendor
+activity. Sourcing adjustment 6212 selects the existing `cash_exposure` query
+set for the next normal discovery window, with the same two-query/six-hour
+budget. No extra wave was queued, and no message, ICP or cohort was changed.
+Capacity: 13 used, seven available, zero unresolved. Wake 6214; usage
+`c30e6e5003bf481ea9ac3360617adcac`; no paid API calls or advertising spend.

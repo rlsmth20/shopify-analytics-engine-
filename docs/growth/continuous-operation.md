@@ -15,7 +15,17 @@ timestamps. The worker retires obsolete pending review jobs after downtime and
 never runs a backlog of deep reviews. Its next-review time is the next local
 9 a.m., independently of UTC-based model-spend windows and the rolling contact cap.
 
-Priority: substantive replies and requested health checks → suppression/delivery failures → product/funnel problems → experiment evaluation → qualified prospect preparation and permitted organic acquisition. Respect existing no-follow-up promises. No silent-prospect follow-up automation. Suppress declines, opt-outs, bounces and channel restrictions immediately. Advertising remains $0 and no new paid services are authorized. The current Resend integration remains requested-service-only; this limit does not authorize prohibited cold email or bypass via Gmail.
+Owner's latest priority: focus autonomous work on outreach and customer acquisition.
+Handle substantive replies, requested health checks and suppression/delivery
+failures first, then qualified prospect preparation and permitted outreach.
+Use experiment and funnel evidence to improve acquisition. Defer optional UI
+upgrades and speculative product work; investigate product issues when observed
+evidence shows they block acquisition or customer use. Work unattended within
+existing authorization and provide a concise, receipt-backed overnight report
+on the first morning wake at or after 9 a.m. Pacific. Do not ask routine
+permission questions or count research/drafts as completed outreach.
+
+Respect existing no-follow-up promises. No silent-prospect follow-up automation. Suppress declines, opt-outs, bounces and channel restrictions immediately. Advertising remains $0 and no new paid services are authorized. The current Resend integration remains requested-service-only; this limit does not authorize prohibited cold email or bypass via Gmail.
 
 ## Required admission before every new merchant contact
 
