@@ -74,6 +74,30 @@ existing authorization and provide a concise, receipt-backed overnight report
 on the first morning wake at or after 9 a.m. Pacific. Do not ask routine
 permission questions or count research/drafts as completed outreach.
 
+September 8 multi-channel update: use the owner's signed-in Chrome account
+`u/skubase` for permitted Reddit outreach. Monitor the existing public offer
+and individual conversation in [today's ledger](campaign-2026-09-08.md); never
+repost or resend them. General business forms and merchants' own explicit
+inventory statements are additional discovery/contact paths. A clearance sale
+alone is not proof of an inventory problem. Preserve source age and uncertainty.
+
+The owner explicitly authorized messaging individuals who describe their own
+Shopify inventory problems. This supersedes blanket local prohibitions on all
+community private messages. It does not override platform, subreddit or recipient
+restrictions. Check the source, relevance, contact preferences, existing chat
+history and shared admission before a single tailored invitation. Do not use
+private messages to bypass explicit solicitation restrictions or turn this into
+mass messaging. No repeated invitations or follow-ups to silence. Every newly
+contacted person counts against the same ceiling across channels. The owner's
+question about the merits of twenty per day did not authorize a cap increase.
+
+Keep Reddit broadcasts, individual chat invitations and business forms in
+separate experiments. Form acceptance and a sent invitation do not establish
+delivery, readership, substantive interest or an acquired qualified user. The
+hourly operator checks the existing Reddit offer and chat, merchant email replies,
+and Shopify review correspondence before new acquisition. Automation remains
+active; durable receipts and a first-response monitoring task retain continuity.
+
 Respect existing no-follow-up promises. No silent-prospect follow-up automation. Suppress declines, opt-outs, bounces and channel restrictions immediately. Advertising remains $0 and no new paid services are authorized. The current Resend integration remains requested-service-only; this limit does not authorize prohibited cold email or bypass via Gmail.
 
 ## Required admission before every new merchant contact
