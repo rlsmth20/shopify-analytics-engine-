@@ -60,9 +60,9 @@ def take(factory, owner):
             tasks = [t for t in tasks if t.get("stage") == "reply"]
         if not packet["capacity"]["remaining"]:
             tasks = [t for t in tasks if t.get("stage") == "reply"]
-        from .acquisition_planner import MAX_DISCOVERIES
+        from .acquisition_planner import MAX_DISCOVERIES, research_budget_since
         starts = list(db.scalars(select(Evidence).where(Evidence.kind == "ACQUISITION_DISCOVERY_STARTED",
-            Evidence.occurred_at > time.time() - 86400)))
+            Evidence.occurred_at > research_budget_since(db, time.time()))))
         if len(starts) >= MAX_DISCOVERIES:
             tasks = [t for t in tasks if t.get("stage") not in {"discover", "plan"}]
             remember(db, "working", "acquisition_planner", {"status": "exploration_budget_wait",

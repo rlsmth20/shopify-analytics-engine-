@@ -228,3 +228,11 @@ premium defaults. No retrospective reprocessing. Preserve 20/rolling24h and all
 suppression/channel gates. Older narrow qualification instructions below are
 superseded. Usage records retain actual completed-turn tokens and unknown dollar
 allocation; the dashboard economics API exposes acquisition_efficiency ratios.
+
+An explicit owner request to resume a research-budget wait may renew the bounded
+research allowance once. Record `ACQUISITION_RESEARCH_RESUMED` from `owner_operator`
+and reference its evidence ID in `strategic/acquisition_research_resume`; clear
+only the planner's budget wait. Both planner and executor count research since
+that authorization or the rolling 24-hour boundary, whichever is later. Retain
+all prior evidence, outreach counts, retry limits, suppressions and per-task time
+limits. Workers must never renew their own allowance.

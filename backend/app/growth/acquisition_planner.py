@@ -204,6 +204,17 @@ def admit_hypotheses(db, task, result, event):
     return admitted
 
 
+def research_budget_since(db, now):
+    """Only an audited owner resume can renew the bounded research allowance."""
+    since = now - 86400
+    reset = get_memory(db, "strategic", "acquisition_research_resume")
+    authorization = db.get(Evidence, reset["evidence_id"]) if reset.get("evidence_id") else None
+    if (authorization and authorization.kind == "ACQUISITION_RESEARCH_RESUMED"
+            and authorization.source == "owner_operator" and authorization.occurred_at <= now):
+        since = max(since, authorization.occurred_at)
+    return since
+
+
 def replenish(db, capacity, now=None):
     """Called under existing outbound lock by the persistent supervisor only."""
     from .operator import offer
@@ -228,9 +239,12 @@ def replenish(db, capacity, now=None):
     state = get_memory(db, "working", "acquisition_planner")
     if state.get("retry_at", 0) > now:
         return None
-    recent = list(db.scalars(select(Evidence).where(Evidence.kind == "ACQUISITION_PLANNER_QUEUED", Evidence.occurred_at > now - 86400)))
+    # An explicit owner resume renews the bounded allowance once. Preserve all
+    # prior research evidence and ordinary rolling limits after that point.
+    budget_since = research_budget_since(db, now)
+    recent = list(db.scalars(select(Evidence).where(Evidence.kind == "ACQUISITION_PLANNER_QUEUED", Evidence.occurred_at > budget_since)))
     discoveries = list(db.scalars(select(Memory).where(Memory.namespace == "operator_task",
-        Memory.value["stage"].as_string() == "discover", Memory.value["created_at"].as_float() > now - 86400)))
+        Memory.value["stage"].as_string() == "discover", Memory.value["created_at"].as_float() > budget_since)))
     if len(discoveries) >= MAX_DISCOVERIES or len(recent) >= MAX_PLANS:
         retry = min([e.occurred_at + 86400 for e in recent] if len(recent) >= MAX_PLANS else
                     [r.value["created_at"] + 86400 for r in discoveries]) + 1

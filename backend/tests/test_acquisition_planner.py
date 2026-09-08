@@ -121,6 +121,26 @@ class PlannerTests(unittest.TestCase):
             db.commit()
         self.assertIsNone(executor.take(self.factory,'new-process'))
 
+    def test_owner_resume_renews_once_without_deleting_history_or_removing_limits(self):
+        with self.factory() as db:
+            for n in range(planner.MAX_PLANS):
+                record(db,f'old-plan:{n}','ACQUISITION_PLANNER_QUEUED','acquisition',{},occurred_at=time.time()-10)
+            self.assertIsNone(planner.replenish(db,{'remaining':15}))
+            event=record(db,'owner-resume','ACQUISITION_RESEARCH_RESUMED','acquisition',{},source='owner_operator')
+            remember(db,'strategic','acquisition_research_resume',{'evidence_id':event.id})
+            remember(db,'working','acquisition_planner',{})
+            db.commit()
+        task=executor.take(self.factory,'resumed')
+        self.assertEqual(task['stage'],'plan')
+        with self.factory() as db:
+            self.assertEqual(len(list(db.scalars(select(Evidence).where(Evidence.kind=='ACQUISITION_PLANNER_QUEUED')))),planner.MAX_PLANS+1)
+            remember(db,'operator_task',task['id'],{**task,'status':'done'})
+            for n in range(planner.MAX_PLANS-1):
+                record(db,f'new-plan:{n}','ACQUISITION_PLANNER_QUEUED','acquisition',{})
+            remember(db,'working','acquisition_planner',{})
+            self.assertIsNone(planner.replenish(db,{'remaining':15}))
+            self.assertEqual(get_memory(db,'working','acquisition_planner')['status'],'exploration_budget_wait')
+
     def test_unsupported_idle_cannot_end_mission_or_restart_immediately(self):
         task=executor.take(self.factory,'one')
         executor.accept(self.factory,'one',task,{**self.result([]),'stop_reason':'TRUE_IDLE',
