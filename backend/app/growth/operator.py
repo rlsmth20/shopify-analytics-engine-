@@ -20,7 +20,7 @@ MAX_ATTEMPTS = 3
 
 def offer(db, *, key, source, decision, evidence_id, contact_id=None, priority=50, stage=None):
     stage = stage or ("outreach" if contact_id else "discover")
-    if stage not in {"discover", "qualify", "prepare", "send", "outreach", "monitor", "reply"}:
+    if stage not in {"plan", "discover", "qualify", "prepare", "send", "outreach", "monitor", "reply"}:
         raise GrowthError("Unknown acquisition stage")
     if not isinstance(key, str) or not key.strip() or len(key) > 200:
         raise GrowthError("Operator task requires a stable bounded key")

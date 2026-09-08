@@ -1,22 +1,226 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["outcome", "observation", "sources", "next_step", "stop_reason", "successors"],
+  "required": [
+    "outcome",
+    "observation",
+    "sources",
+    "next_step",
+    "stop_reason",
+    "successors",
+    "hypotheses",
+    "search_result",
+    "idle"
+  ],
   "properties": {
-    "outcome": {"type": "string", "enum": ["done", "excluded", "blocked"]},
-    "observation": {"type": "string"},
-    "sources": {"type": "array", "items": {"type": "string"}},
-    "next_step": {"type": "string"},
-    "stop_reason": {"type": ["string", "null"], "enum": [null, "DAILY_CAP_REACHED", "NO_CURRENT_QUALIFIED_PROSPECTS", "DISCOVERY_EXHAUSTED_FOR_CURRENT_SEARCH_SPACE", "REPLY_REQUIRES_PRIORITY_ATTENTION", "CHANNEL_BLOCKED", "SAFETY_BLOCKED", "BUDGET_BLOCKED", "PROVIDER_BLOCKED", "TRUE_IDLE"]},
-    "successors": {"type": "array", "items": {
-      "type": "object", "additionalProperties": false,
-      "required": ["key", "source", "decision", "contact_id", "priority", "stage"],
-      "properties": {
-        "key": {"type": "string"}, "source": {"type": ["string", "null"]},
-        "decision": {"type": "string"}, "contact_id": {"type": ["string", "null"]},
-        "priority": {"type": "number"},
-        "stage": {"type": "string", "enum": ["discover", "qualify", "prepare", "send", "outreach", "reply"]}
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "done",
+        "excluded",
+        "blocked"
+      ]
+    },
+    "observation": {
+      "type": "string"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
       }
-    }}
+    },
+    "next_step": {
+      "type": "string"
+    },
+    "stop_reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        null,
+        "DAILY_CAP_REACHED",
+        "NO_CURRENT_QUALIFIED_PROSPECTS",
+        "DISCOVERY_EXHAUSTED_FOR_CURRENT_SEARCH_SPACE",
+        "REPLY_REQUIRES_PRIORITY_ATTENTION",
+        "CHANNEL_BLOCKED",
+        "SAFETY_BLOCKED",
+        "BUDGET_BLOCKED",
+        "PROVIDER_BLOCKED",
+        "TRUE_IDLE"
+      ]
+    },
+    "successors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "source",
+          "decision",
+          "contact_id",
+          "priority",
+          "stage"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decision": {
+            "type": "string"
+          },
+          "contact_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": "number"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "discover",
+              "qualify",
+              "prepare",
+              "send",
+              "outreach",
+              "reply"
+            ]
+          }
+        }
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis",
+          "channel",
+          "problem",
+          "segment",
+          "query",
+          "decision",
+          "rationale",
+          "source",
+          "expected_value",
+          "confidence"
+        ],
+        "properties": {
+          "hypothesis": {
+            "type": "string",
+            "maxLength": 350
+          },
+          "channel": {
+            "type": "string",
+            "maxLength": 350
+          },
+          "problem": {
+            "type": "string",
+            "maxLength": 350
+          },
+          "segment": {
+            "type": "string",
+            "maxLength": 350
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 350
+          },
+          "decision": {
+            "type": "string",
+            "maxLength": 900
+          },
+          "rationale": {
+            "type": "string",
+            "maxLength": 1200
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expected_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "search_result": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "result_count",
+        "qualified_count",
+        "rejection_reasons"
+      ],
+      "properties": {
+        "result_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "qualified_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "rejection_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "idle": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "attempted_evidence_ids",
+        "external_condition"
+      ],
+      "properties": {
+        "attempted_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "external_condition": {
+          "type": "string"
+        }
+      }
+    }
   }
 }

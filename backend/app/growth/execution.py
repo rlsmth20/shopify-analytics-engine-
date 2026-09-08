@@ -33,6 +33,7 @@ def state(db, now=None):
                      .order_by(Evidence.id.desc()).limit(1))
     sent = db.scalar(select(func.max(FirstContact.sent_at)))
     executor = get_memory(db, "working", "browser_executor")
+    planner = get_memory(db, "working", "acquisition_planner")
     ready = db.scalar(select(Work).where(Work.status == "ready", Work.due_at <= now)
                       .order_by(priority_order(), Work.priority.desc(), Work.due_at).limit(1))
     permitted = (capacity["remaining"] > 0 and not get_memory(db, "working", "control").get("paused")
@@ -48,6 +49,8 @@ def state(db, now=None):
             and w.get("retry_at", 0) <= now for w in active_browser):
         fault = "ACQUISITION_STARVED"
     if permitted and active_browser and now - executor.get("heartbeat_at", 0) > 120:
+        fault = "ACQUISITION_EXECUTOR_OFFLINE"
+    if permitted and not active_browser and planner.get("status") in {"planning", "hypotheses_ready", "executing_hypothesis"} and now - executor.get("heartbeat_at", 0) > 120:
         fault = "ACQUISITION_EXECUTOR_OFFLINE"
     if any(w.get("attempts", 0) >= 3 and w.get("lease_until", 0) <= now for w in browser):
         fault = "ACQUISITION_RETRIES_EXHAUSTED"
@@ -71,7 +74,7 @@ def state(db, now=None):
         "next_action": "execute_" + next((w.get("stage", "discover") for w in active_browser if w["status"] == "running"), "acquisition")
             if executor.get("task_id") else "claim_browser_acquisition" if pending_browser and not blocker else ready.kind if ready else "await_retry",
         "next_wake_retry": capacity["next_slot_at"] if blocker == "DAILY_CAP_REACHED" else next_at,
-        "executor": executor}
+        "executor": executor, "planner": planner}
 
 
 def watchdog(db):

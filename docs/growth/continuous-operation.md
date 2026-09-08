@@ -1,5 +1,38 @@
 # Continuous growth and first-contact ceiling
 
+## Autonomous queue replenishment
+
+The local persistent supervisor now invokes `acquisition_planner.replenish` when
+the browser acquisition queue is empty. It checks the existing verified mission
+count, rolling contact capacity, unresolved work/retries, holds and reply priority.
+An exhausted search is evidence for selecting another hypothesis, never a request
+for the owner or hourly Codex wake to seed work.
+
+The planner ranks retained candidate hypotheses using observed source yield and
+vendor/no-result penalties. When none remain, it creates a leased `plan` stage on
+the existing Codex subscription. That stage receives bounded strategy, beliefs,
+ICP/channel knowledge, experiments, funnel and search history and may propose at
+most two new hypotheses. Deterministic admission rejects near-identical queries,
+including date-only changes and common inventory synonyms. A selected hypothesis
+creates discovery work automatically and retains lineage through qualification.
+Raw evidence and observed result counts/rejection reasons are preserved in
+`acquisition_search`; unknown costs/counts stay null. Failed searches remain
+available to future planning. Terminal exclusions and send receipts are unchanged.
+
+Planning is limited to six synthesis stages per rolling 24 hours. Browser
+discovery is limited to 24 stages per rolling 24 hours, with at most two discovery
+branches per stage and two searches/four source reads per discovery. These are
+research cost bounds, not outreach targets. Budget waits have durable retry times
+and never count as TRUE_IDLE. Qualified work and replies retain priority. TRUE_IDLE
+requires concrete attempted evidence and an external condition; it is reconsidered
+after six hours. Duplicate-only plans back off 15 minutes within the daily bound.
+
+`operator-state` exposes planner status alongside executor health. The read-only
+`scripts/verify-growth-planner.py` reports queue-empty triggers, autonomous planning,
+hypothesis selection, executor ownership, raw results and task lineage. It never
+creates a task. The hourly automation provides oversight only; no queue seeding
+or manual batch is needed.
+
 ## Current execution architecture — September 8 repair
 
 The persistent pull executor in `app.growth.browser_executor` now consumes the

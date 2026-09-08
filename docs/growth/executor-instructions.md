@@ -34,6 +34,15 @@ record the real blocker; do not invent observations or bypass channel restrictio
 
 Stage behavior:
 
+Return `search_result` for discovery/qualification with observed result_count,
+qualified_count and explicit rejection reasons. Use null for unknown counts; do
+not infer a count from a snippet. Set `hypotheses` to [] and `idle` to null for
+ordinary stages. The supervisor retains counts, cost uncertainty, exact searches,
+evidence, and hypothesis lineage. Qualified_count means verified qualification,
+not discovery candidates. Do not add more than two discovery branches. An empty
+queue now invokes the autonomous acquisition planner; do not ask an owner/Codex
+wake to assign the next search. Exhaustion is local to the exact source space.
+
 - discover: execute the pending discovery decision, retaining exact real source
   URLs and excerpts. Produce qualify successors for plausible candidates. Discovery
   is not qualification. A storefront or clearance alone is insufficient.
