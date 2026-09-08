@@ -4,8 +4,12 @@ Ask Skubase now supports `gpt-5.6-luna` through the Responses API, with reasonin
 set to `none`. The verified model rates are $0.20 input, $0.02 cached input and
 $1.20 output per million tokens. See the [official Luna model documentation](https://developers.openai.com/api/docs/models/gpt-5.6-luna).
 
-The feature remains disabled until the owner supplies `OPENAI_API_KEY`, sets
-`AI_CHAT_ENABLED=true`, and explicitly authorizes a positive `AI_CHAT_DAILY_USD`.
+The feature remains disabled until the owner supplies `AI_CHAT_OPENAI_API_KEY`, sets
+`AI_CHAT_ENABLED=true`, and configures positive `AI_CHAT_DAILY_USD` and
+`AI_CHAT_MONTHLY_USD` ceilings. Both default to zero. The owner has authorized
+at most $50 per UTC calendar month; the proposed production settings are $2
+daily and $50 monthly. This is permission to configure those ceilings, not a
+claim that a paid API key has been activated.
 It has separate permissions and accounting from growth-agent model usage.
 The default global ceiling is $0. Default per-shop limits are $0.05, 30 model
 attempts per UTC day, and 3 attempts per minute. These limits are admission
@@ -20,7 +24,11 @@ transaction lock or SQLite write transaction. Verified usage settles the
 reservation, including cached input. Timeouts, crashes and missing usage keep
 the maximum charged; they never silently release uncertain spend. A global
 daily total has no merchant identity, so tenant deletion cannot refill money
-already spent. Per-attempt tenant metadata records model, tokens, cost, latency
+already spent. Monthly admission sums those totals from the first UTC day of
+the month up to the next month's first day under the same reservation lock.
+Uncertain attempts on prior days remain charged; a daily reset cannot bypass
+the monthly ceiling. A new UTC calendar month receives its own allowance.
+Per-attempt tenant metadata records model, tokens, cost, latency
 and outcome, without raw prompts, answers, catalog text or credentials.
 
 `store:false` disables Responses storage; it is not a claim that the provider
@@ -73,10 +81,13 @@ conversation retained the separate local and Luna source labels. No external
 model calls were made; this proves the integration flow, not live model quality
 or account access. At a 390px viewport the document stayed 390px wide.
 
-For initial activation, add a dedicated OpenAI project key as `OPENAI_API_KEY`
-in Railway's backend service variables, outside source control. After the owner
-sets a spending ceiling, set `AI_CHAT_DAILY_USD` to that authorized amount and
-`AI_CHAT_ENABLED=true`. Keep `GROWTH_MODEL_ENABLED` independent. Validate one
+For initial activation, add a dedicated OpenAI project key as `AI_CHAT_OPENAI_API_KEY`
+in Railway's backend service variables, outside source control. The authorized
+monthly ceiling is $50: set `AI_CHAT_MONTHLY_USD=50`, the proposed stricter daily
+limit `AI_CHAT_DAILY_USD=2`, and `AI_CHAT_ENABLED=true`. Chat reads only its
+dedicated key and never falls back to `OPENAI_API_KEY`. Growth cannot use the
+chat key; its credentials, permissions and spending controls stay separate.
+Keep growth model activation unchanged. Validate one
 synthetic inventory question against the live provider and inspect its usage
 record before claiming live Luna replies have been verified. Turning
 `AI_CHAT_ENABLED=false` immediately restores rule-based answers without removing

@@ -56,7 +56,7 @@ export function chatFallbackExplanation(reply: ChatReply): string | null {
   switch (reply.fallback_reason) {
     case "disabled": case "missing_api_key": case "budget_disabled": case "invalid_configuration":
       return "Model replies are not enabled for this chat. This reply uses Skubase’s inventory rules.";
-    case "global_budget_exhausted": case "shop_budget_exhausted": case "shop_rate_limited":
+    case "global_budget_exhausted": case "monthly_budget_exhausted": case "shop_budget_exhausted": case "shop_rate_limited":
       return "Model usage is currently limited. This reply uses Skubase’s inventory rules.";
     case "provider_unavailable": case "invalid_response": case "budget_unavailable":
       return "A model reply was unavailable. This reply uses Skubase’s inventory rules.";

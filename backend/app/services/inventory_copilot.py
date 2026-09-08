@@ -92,7 +92,7 @@ def answer_inventory_question(*, messages, context, shop_id=None, factory=None):
         return local(exc.reason)
     if not policy.enabled:
         return local("disabled")
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    api_key = os.getenv("AI_CHAT_OPENAI_API_KEY", "").strip()
     if not api_key:
         return local("missing_api_key")
     if policy.daily_usd <= 0 or policy.shop_daily_usd <= 0:

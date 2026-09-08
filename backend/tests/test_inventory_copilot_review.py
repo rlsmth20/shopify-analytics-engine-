@@ -41,7 +41,8 @@ class InventoryCopilotReviewTests(unittest.TestCase):
             self.shop_id, self.other_id = [shop.id for shop in shops]
         self.maximum = Decimal("0.00086000")  # 1,000 input tokens plus bounded 550 output.
         self.policy = budget.ChatPolicy(enabled=True, daily_usd=Decimal("1"),
-            shop_daily_usd=Decimal("1"), shop_daily_requests=30, shop_per_minute=30)
+            shop_daily_usd=Decimal("1"), shop_daily_requests=30, shop_per_minute=30,
+            monthly_usd=Decimal("50"))
 
     def tearDown(self):
         self.engine.dispose()
@@ -89,6 +90,63 @@ class InventoryCopilotReviewTests(unittest.TestCase):
         budget.finish(self.sessions, key, usage={"input_tokens": 1, "output_tokens": 1},
             outcome="completed", latency_ms=1)
         self.assertEqual(self.state(key), (self.maximum, 1, ("transport_unknown", None)))
+
+    def test_two_shops_cannot_each_claim_the_last_monthly_allowance_after_daily_reset(self):
+        with self.sessions() as db:
+            db.add(CopilotBudgetDay(day="2026-09-06", charged_usd=Decimal("50") - self.maximum))
+            db.commit()
+        barrier = Barrier(2)
+
+        def attempt(shop_id):
+            barrier.wait(timeout=5)
+            try:
+                self.reserve(shop_id=shop_id)
+                return "reserved"
+            except budget.BudgetError as error:
+                return error.reason
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(attempt, shop_id) for shop_id in (self.shop_id, self.other_id)]
+            results = [future.result(timeout=15) for future in futures]
+        self.assertCountEqual(results, ["reserved", "monthly_budget_exhausted"])
+        self.assertEqual(self.state()[:2], (self.maximum, 1))
+        with self.sessions() as db:
+            self.assertEqual(db.scalar(select(func.sum(CopilotBudgetDay.charged_usd))), Decimal("50"))
+
+    def test_prior_day_unknown_and_privacy_deleted_usage_blocks_until_the_next_month(self):
+        policy = replace(self.policy, monthly_usd=self.maximum)
+        key = self.reserve(policy=policy)
+        budget.finish(self.sessions, key, usage=None, outcome="transport_unknown", latency_ms=15000)
+        with self.sessions() as db:
+            redact_shop(db, shop_domain="copilot-review-0.myshopify.com", triggered_at=None)
+        tomorrow = self.now + timedelta(days=1)
+        with patch.object(budget, "utc_now", return_value=tomorrow):
+            with self.assertRaises(budget.BudgetError) as error:
+                self.reserve(shop_id=self.other_id, policy=policy)
+            self.assertEqual(error.exception.reason, "monthly_budget_exhausted")
+        with self.sessions() as db:
+            self.assertIsNone(db.get(CopilotUsage, key))
+            self.assertIsNone(db.get(CopilotBudgetDay, tomorrow.date().isoformat()))
+            self.assertEqual(db.get(CopilotBudgetDay, self.now.date().isoformat()).charged_usd, self.maximum)
+        with patch.object(budget, "utc_now", return_value=datetime(2026, 10, 1, tzinfo=timezone.utc)):
+            self.reserve(shop_id=self.other_id, policy=policy)
+        with self.sessions() as db:
+            self.assertEqual(db.get(CopilotBudgetDay, "2026-09-07").charged_usd, self.maximum)
+            self.assertEqual(db.get(CopilotBudgetDay, "2026-10-01").charged_usd, self.maximum)
+
+    def test_late_settlement_of_last_month_does_not_refill_this_month(self):
+        policy = replace(self.policy, monthly_usd=self.maximum)
+        previous_key = self.reserve(policy=policy)
+        with patch.object(budget, "utc_now", return_value=datetime(2026, 10, 1, tzinfo=timezone.utc)):
+            self.reserve(policy=policy)
+            budget.finish(self.sessions, previous_key, usage={"input_tokens": 100, "output_tokens": 10},
+                outcome="completed", latency_ms=50)
+            with self.assertRaises(budget.BudgetError) as error:
+                self.reserve(shop_id=self.other_id, policy=policy)
+            self.assertEqual(error.exception.reason, "monthly_budget_exhausted")
+        with self.sessions() as db:
+            self.assertEqual(db.get(CopilotBudgetDay, "2026-09-07").charged_usd, Decimal("0.00003200"))
+            self.assertEqual(db.get(CopilotBudgetDay, "2026-10-01").charged_usd, self.maximum)
 
     def test_verified_cost_settles_once_and_malformed_usage_never_refunds(self):
         key = self.reserve()

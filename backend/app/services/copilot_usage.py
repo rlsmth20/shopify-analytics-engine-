@@ -32,18 +32,20 @@ class ChatPolicy:
     shop_daily_usd: Decimal = Decimal("0.05")
     shop_daily_requests: int = 30
     shop_per_minute: int = 3
+    monthly_usd: Decimal = Decimal("0")
 
     @classmethod
     def from_env(cls):
         try:
             daily = Decimal(os.getenv("AI_CHAT_DAILY_USD", "0"))
+            monthly = Decimal(os.getenv("AI_CHAT_MONTHLY_USD", "0"))
             shop = Decimal(os.getenv("AI_CHAT_SHOP_DAILY_USD", "0.05"))
             count = int(os.getenv("AI_CHAT_SHOP_DAILY_REQUESTS", "30"))
             minute = int(os.getenv("AI_CHAT_SHOP_PER_MINUTE", "3"))
             model = os.getenv("AI_CHAT_MODEL", MODEL).strip()
-            if not daily.is_finite() or not shop.is_finite() or daily < 0 or shop < 0 or count < 1 or minute < 1 or model != MODEL:
+            if not daily.is_finite() or not monthly.is_finite() or not shop.is_finite() or daily < 0 or monthly < 0 or shop < 0 or count < 1 or minute < 1 or model != MODEL:
                 raise ValueError()
-            return cls(os.getenv("AI_CHAT_ENABLED", "false").lower() == "true", model, daily, shop, count, minute)
+            return cls(os.getenv("AI_CHAT_ENABLED", "false").lower() == "true", model, daily, shop, count, minute, monthly)
         except (ValueError, InvalidOperation):
             raise BudgetError("invalid_configuration") from None
 
@@ -67,7 +69,7 @@ def reserve(factory, *, shop_id, input_token_bound, policy):
         raise BudgetError("disabled")
     if policy.model != MODEL:
         raise BudgetError("invalid_configuration")
-    if policy.daily_usd <= 0 or policy.shop_daily_usd <= 0:
+    if policy.daily_usd <= 0 or policy.monthly_usd <= 0 or policy.shop_daily_usd <= 0:
         raise BudgetError("budget_disabled")
     maximum = ((input_token_bound * INPUT_RATE + MAX_OUTPUT_TOKENS * OUTPUT_RATE) / 1_000_000).quantize(MONEY_UNIT, rounding=ROUND_CEILING)
     with factory() as db:
@@ -78,6 +80,14 @@ def reserve(factory, *, shop_id, input_token_bound, policy):
         charged = daily.charged_usd if daily else Decimal("0")
         if charged + maximum > policy.daily_usd:
             raise BudgetError("global_budget_exhausted")
+        # Anonymous charged totals survive tenant privacy deletion. Include
+        # reservations and uncertain attempts across every UTC day this month.
+        month_start = now.strftime("%Y-%m-01")
+        next_month = (now.replace(day=28) + timedelta(days=4)).strftime("%Y-%m-01")
+        monthly_charged = db.scalar(select(func.coalesce(func.sum(CopilotBudgetDay.charged_usd), 0)).where(
+            CopilotBudgetDay.day >= month_start, CopilotBudgetDay.day < next_month))
+        if monthly_charged + maximum > policy.monthly_usd:
+            raise BudgetError("monthly_budget_exhausted")
         spent, count = db.execute(select(func.coalesce(func.sum(func.coalesce(CopilotUsage.estimated_usd, CopilotUsage.reserved_usd)), 0),
             func.count(CopilotUsage.id)).where(CopilotUsage.shop_id == shop_id, CopilotUsage.day == day)).one()
         if spent + maximum > policy.shop_daily_usd or count >= policy.shop_daily_requests:

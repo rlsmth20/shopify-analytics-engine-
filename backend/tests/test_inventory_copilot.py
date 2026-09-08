@@ -29,8 +29,8 @@ class InventoryCopilotTests(unittest.TestCase):
         with self.factory() as db:
             shop = Shop(shopify_domain="copilot-fixture.myshopify.com")
             db.add(shop); db.commit(); self.shop_id = shop.id
-        self.env = dict(AI_CHAT_ENABLED="true", AI_CHAT_DAILY_USD="1", AI_CHAT_SHOP_DAILY_USD="1",
-                        OPENAI_API_KEY="fixture-not-a-real-key")
+        self.env = dict(AI_CHAT_ENABLED="true", AI_CHAT_DAILY_USD="1", AI_CHAT_MONTHLY_USD="50", AI_CHAT_SHOP_DAILY_USD="1",
+                        AI_CHAT_OPENAI_API_KEY="fixture-not-a-real-key")
         self.context = self.context_for([sku()])
         self.messages = [AiChatMessage(role="user", content="What should I reorder?")]
 
@@ -45,8 +45,11 @@ class InventoryCopilotTests(unittest.TestCase):
             context=kwargs.get("context", self.context), shop_id=self.shop_id, factory=self.factory)
 
     def test_disabled_missing_key_zero_budget_and_unknown_model_never_call_provider(self):
-        cases = [(dict(AI_CHAT_ENABLED="false"), "disabled"), (dict(OPENAI_API_KEY=""), "missing_api_key"),
-                 (dict(AI_CHAT_DAILY_USD="0"), "budget_disabled"), (dict(AI_CHAT_MODEL="premium-unknown"), "invalid_configuration")]
+        cases = [(dict(AI_CHAT_ENABLED="false"), "disabled"), (dict(AI_CHAT_OPENAI_API_KEY=""), "missing_api_key"),
+                 (dict(AI_CHAT_OPENAI_API_KEY="", OPENAI_API_KEY="generic-key-must-not-be-used"), "missing_api_key"),
+                 (dict(AI_CHAT_DAILY_USD="0"), "budget_disabled"), (dict(AI_CHAT_MONTHLY_USD="0"), "budget_disabled"),
+                 (dict(AI_CHAT_MONTHLY_USD="NaN"), "invalid_configuration"),
+                 (dict(AI_CHAT_MODEL="premium-unknown"), "invalid_configuration")]
         for change, reason in cases:
             with self.subTest(reason=reason), patch.dict("os.environ", {**self.env, **change}, clear=True), \
                  patch.object(copilot, "_call_openai_responses_api") as provider:
