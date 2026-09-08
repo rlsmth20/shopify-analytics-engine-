@@ -117,3 +117,21 @@ calls or services; subscription tokens/cost UNKNOWN. Existing experiments were
 queued for evaluation by the daily review. Next wake: prioritize replies and
 requested checks, then other recent merchant-authored opportunities already
 captured by the worker. Continue the two-hour schedule and the shared ceiling.
+
+## Routine wake — September 8, 03:13 UTC / September 7 Pacific evening
+
+No new merchant replies, requests, customer events or failures since the prior
+wake. Refreshed business inbox and community notifications remain system/test
+only. Worker running; mailbox polling verified. Daily review correctly skipped
+as already completed (5742), with the next review due September 8 at 9 a.m.
+Pacific. Calendar fix release 5909 is live; older UTC-helper caveats above are
+historical. Capacity remains 13 used / seven available / zero unresolved.
+
+Three decision-focused reads screened two merchants in topic 639364. Exclude
+RunninWildKids.co; defer carriec228. Preserve screening evidence 5996–5997 and
+product-feedback evidence 5998 for the reasons and source. No new contacts,
+follow-ups, cohort changes or product modifications. Three free-check slots
+remain available; no new advertising or paid API/service spend. Subscription
+tokens/cost UNKNOWN. Wake audit 6000; usage
+`5078e3a60fbd45b5983d327b2ea492c1`. Next: replies and requested checks first,
+then fresh merchant-authored needs, applying the stored exclusions.
