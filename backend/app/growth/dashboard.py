@@ -58,10 +58,11 @@ def outreach_projection(db, now):
     groups = {}
     for row in rows:
         snapshot = row.cohort or {}
-        cohort_key = digest([row.experiment_id, row.channel, snapshot.get("icp"), snapshot.get("offer"), snapshot.get("message_version")])
+        cohort_key = digest([row.experiment_id, row.channel, snapshot.get("icp"), snapshot.get("offer"), snapshot.get("message_version"), snapshot.get("qualification_policy")])
         group = groups.setdefault(cohort_key, {"id": cohort_key, "experiment_id": row.experiment_id,
             "channel": row.channel, "icp": snapshot.get("icp") if isinstance(snapshot.get("icp"), str) else None,
             "offer": snapshot.get("offer"), "message_version": snapshot.get("message_version"),
+            "qualification_policy": snapshot.get("qualification_policy", "legacy"),
             "sent": 0, "pending": 0, "mature": 0, "email_delivered": 0 if row.channel == "email" else None,
             "email_bounced": 0 if row.channel == "email" else None, "delivery_unknown": 0,
             "substantive_replies": 0, "positive_interest": 0, "linked_contacts": 0,

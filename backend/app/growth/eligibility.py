@@ -4,7 +4,7 @@ import time
 from sqlalchemy import func, or_, select
 
 from .identity import INELIGIBLE, prospect_identity, existing_contact, matching_contacts, owned_identity
-from .models import Contact, FirstContact, Message
+from .models import Contact, Evidence, FirstContact, Message
 from .policy import GrowthError
 from .store import digest, record
 
@@ -79,7 +79,9 @@ def assess(db, payload):
         db.flush()
     assessment = {**result, "policy": POLICY, "checks": checks,
                   "qualified": result["eligible"] is True, "qualified_user": contact.qualification.get("qualified_user", False)}
-    event = record(db, "eligibility:" + digest([identity, assessment, signals]), "PROSPECT_ELIGIBILITY", contact.id,
+    key = "eligibility:" + digest([identity, assessment, signals])
+    cached = db.scalar(select(Evidence.id).where(Evidence.key == key)) is not None
+    event = record(db, key, "PROSPECT_ELIGIBILITY", contact.id,
                    {**result, "policy": POLICY, "checks": checks, "signals": signals}, source=contact.source)
     contact.qualification = {**assessment, "evidence_id": event.id, "verified_at": event.occurred_at}
     contact.characteristics = signals
@@ -87,5 +89,5 @@ def assess(db, payload):
                      for f in checks.values() if f.get("value") is True and f.get("source") and f.get("text")]
     db.flush()
     return {**result, "contact_id": contact.id, "evidence_id": event.id, "policy": POLICY,
-            "cached": event.occurred_at < time.time() - 1,
+            "cached": cached,
             "research_budget": {"pages": MAX_PAGES, "searches": MAX_SEARCHES, "seconds": MAX_SECONDS}}

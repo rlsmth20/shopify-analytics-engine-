@@ -59,6 +59,7 @@ def efficiency(db):
     unknown = any(c.estimated_usd is None for c in costs)
     dollars = None if unknown or not costs else sum(c.estimated_usd for c in costs)
     tokens = sum((c.input_tokens or 0) + (c.output_tokens or 0) for c in costs)
+    cached = sum(c.result.get("cached_input_tokens", 0) for c in costs)
     # Every screened identity is retained, including compact rejection records.
     base = (Evidence.kind == "PROSPECT_ELIGIBILITY", Evidence.occurred_at >= since,
             Evidence.data["policy"].as_string() == POLICY)
@@ -78,6 +79,7 @@ def efficiency(db):
               "email_sent": sum(s.channel == "email" for s in sends), "first_contact_sent": len(sends),
               "substantive_reply": responses, "qualified_user": qualified}
     return {"policy": POLICY, "since": since, "model_spend_usd": dollars, "reported_tokens": tokens,
+            "cached_input_tokens": cached, "uncached_input_tokens": sum(c.input_tokens or 0 for c in costs) - cached,
             "unknown_cost_runs": sum(c.estimated_usd is None for c in costs),
             "runs_by_model": {m: sum(c.model == m for c in costs) for m in sorted({c.model for c in costs})},
             "metrics": {k: {"count": n, "model_cost_usd": dollars / n if dollars is not None and n else None,

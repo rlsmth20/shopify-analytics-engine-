@@ -47,6 +47,8 @@ class EligibilityTests(unittest.TestCase):
         with self.factory() as db:
             first = assess(db, {"identity": "merchant:test", "checks": checks()})
             second = assess(db, {"identity": "merchant:test"})
+            self.assertFalse(first["cached"])
+            self.assertTrue(second["cached"])
             self.assertEqual(first["evidence_id"], second["evidence_id"])
             db.get(Contact, first["contact_id"]).suppressed = True
             db.flush()

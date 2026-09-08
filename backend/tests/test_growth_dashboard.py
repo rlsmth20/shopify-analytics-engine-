@@ -3,7 +3,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
@@ -46,6 +46,17 @@ class GrowthDashboardTests(unittest.TestCase):
             self.assertIsNone(result["economics"]["mrr"])
             self.assertEqual(result["economics"]["unknown_cost_records"], 1)
             self.assertEqual(result["agent"]["first_contact_capacity"]["limit"], 20)
+
+    def test_qualification_policy_does_not_mix_identical_message_cohorts(self):
+        with self.factory() as db:
+            self.contact(db, "legacy")
+            c = self.contact(db, "market")
+            row = db.scalar(select(FirstContact).where(FirstContact.contact_id == c.id))
+            row.cohort = {**row.cohort, "qualification_policy": "market_discovery_v1"}
+            db.flush()
+            groups = outreach_projection(db, self.now)["cohorts"]
+            self.assertEqual(len(groups), 2)
+            self.assertEqual({g["qualification_policy"] for g in groups}, {"legacy", "market_discovery_v1"})
 
     def test_cohorts_keep_channel_offer_version_and_experiment_separate(self):
         with self.factory() as db:
