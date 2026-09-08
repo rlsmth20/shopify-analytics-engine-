@@ -183,3 +183,33 @@ Wake evidence **6484**, usage `2587abe7ddae4f379abfa1fba554875a`.
 Advertising and new paid services/API calls $0; subscription tokens/cost UNKNOWN.
 No production changes or extra research wave. Persistent memory retains the
 prospect, channel check, source evidence and next action.
+
+## Routine wake — September 8, 09:17 UTC / 02:17 Pacific
+
+No new sends, merchant replies, requests, customer events or failures. Refreshed
+business inbox and Shopify notifications remain system/test only. Worker and
+mailbox polling healthy. Rolling capacity: six used, 14 available, zero
+unresolved; total contacts remain 13. Review not due until 9 a.m. Pacific.
+
+Resolved the retained Reddit channel check in the live browser. AutomateShopify
+requires moderator approval for relevant app promotion and authorized links,
+and disallows AI-generated content. No generated reply or app pitch; mark
+jadedjayedess's opportunity channel-ineligible (6708). InventoryManagement
+prohibits promotional content and service links, while allowing helpful public
+discussion (6711). Do not send the planned app offer there or use an unsolicited
+DM workaround. Earlier empty web retrievals did not represent the actual rules.
+Only revisit these checks after changed rules or authorization evidence.
+
+Live account menu verifies **u/skubase** (6714); no new account or credentials.
+Its visible notifications contain recommendations, with no merchant response
+observed. This identity verification does not override channel restrictions.
+The Warehousing topic 1tr0yf9 has a question-like title but a body recommending
+vendors and stale replies; exclude from the send queue (6717).
+
+Six decision-focused source reads. Existing broad search phrases continue to
+return vendors, contacted threads and old merchant activity. Next bounded pass:
+check replies first, then inspect fresh merchant-authored Shopify Community
+activity through its live search UI, preserving qualification and cohort rules.
+No ICP or message rewrite. Three free-check slots available, ads and new paid
+services/API calls $0; subscription tokens/cost UNKNOWN. No production changes.
+Wake **6719**, usage `7bbf80395a694a6db18485709f228057`.
