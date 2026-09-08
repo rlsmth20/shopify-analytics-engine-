@@ -1,5 +1,9 @@
 # Continuous growth and first-contact ceiling
 
+Current policy **market_discovery_v1** supersedes older qualification language in
+this document: basic physical-product Shopify merchant eligibility is sufficient;
+public pain and unknown ICP fields are not gates. See executor-instructions.md.
+
 ## Autonomous queue replenishment
 
 The local persistent supervisor now invokes `acquisition_planner.replenish` when
@@ -212,3 +216,14 @@ Keep the historical campaign cohorts and original messages; attribute new revisi
 Before recommending a higher ceiling, report delivered/bounced denominators, substantive reply rate, positive interest, signup, Shopify connection, activation and paid conversion separately by segment and offer/version. Keep missing or unlinked outcomes UNKNOWN. Preserve delivery status separately from public publication/form acceptance. A recommendation requires a mature cohort and reliable outcome linkage; the cap can only change after explicit owner authorization and an audited implementation change.
 
 When an experiment ends, evaluate its observation window and open obligations. Continue research and existing conversations. A subsequent experiment may use the same stable offer/ICP; create new attribution when a variable changes. Neither a cohort boundary nor the 20-contact ceiling is an instruction to stop the persistent mission.
+# Current qualification override — market_discovery_v1
+
+For new discovery, real physical-product ecommerce merchants with confirmed or
+probable Shopify use and permitted business contact are eligible. Public pain,
+SKU count, revenue and other ICP attributes rank; unknowns never reject. Use the
+deterministic operator-assess command and executor-instructions.md budgets. Routine
+CLI work explicitly uses Luna/low; planning/replies use Terra/low, never inherited
+premium defaults. No retrospective reprocessing. Preserve 20/rolling24h and all
+suppression/channel gates. Older narrow qualification instructions below are
+superseded. Usage records retain actual completed-turn tokens and unknown dollar
+allocation; the dashboard economics API exposes acquisition_efficiency ratios.

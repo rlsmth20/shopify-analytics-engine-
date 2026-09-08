@@ -1,5 +1,13 @@
 # Skubase outreach messaging — revision 4
 
+Current qualification policy: **market_discovery_v1** supersedes all older
+public-pain/perfect-ICP requirements below. A basic eligible Shopify merchant can
+be contacted with unknown inventory pain, SKU count and revenue. Cite a verified
+store/product fact, describe a supported benefit and ask whether inventory or
+reordering is currently a problem. Do not imply it is known. Copy remains revision
+4; retain qualification_policy=market_discovery_v1 in immutable cohort attribution.
+MEDIUM fit/confidence is sufficient. Keep suppression, relevance and channel rules.
+
 Owner direction, September 8, 2026: remove unnecessary negative caveats from
 advertising. Lead with the merchant's verified issue, the relevant Skubase
 capability and its benefit, then one concise offer. Do not add statements such as

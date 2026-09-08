@@ -9,7 +9,7 @@ import time
 from sqlalchemy import func, or_, select, update
 
 from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message
-from .identity import INELIGIBLE, canonical_identity, existing_contact, identity_match, matching_contacts, owned_identity
+from .identity import INELIGIBLE, canonical_identity, prospect_identity, existing_contact, identity_match, matching_contacts, owned_identity
 from .policy import GrowthError
 from .store import digest, get_memory, record
 
@@ -48,6 +48,11 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
         raise GrowthError("Contact is suppressed or ineligible")
     if get_memory(db, "working", "acquisition_hold"):
         raise GrowthError("Product/funnel hold blocks new acquisition, not existing conversations")
+    from .eligibility import POLICY
+    if get_memory(db, "strategic", "qualification_policy").get("version") == POLICY:
+        if contact.qualification.get("policy") != POLICY or contact.qualification.get("eligible") is not True:
+            raise GrowthError("Basic merchant eligibility required")
+        cohort = {**cohort, "qualification_policy": POLICY}
     if not contact.qualification.get("qualified") or not any(f.get("verified") and f.get("source") for f in contact.facts):
         raise GrowthError("Verified merchant relevance and a sourced fact are required")
     experiment = db.get(Experiment, experiment_id)
@@ -167,7 +172,7 @@ def operator_action(db, action, payload):
         raise GrowthError("Current channel-rule and merchant relevance evidence required")
     if payload.get("channel") == "email":
         raise GrowthError("Promotional email transport remains disabled; use permitted channels")
-    identity = canonical_identity(payload["identity"])
+    identity = prospect_identity(payload["identity"], payload.get("source"))
     if not identity or len(identity) > 320:
         raise GrowthError("Canonical merchant identity required")
     lock(db)
@@ -180,11 +185,22 @@ def operator_action(db, action, payload):
     facts = payload["facts"]
     if not facts or not all(f.get("verified") is True and f.get("source") and f.get("text") for f in facts):
         raise GrowthError("At least one verified public personalization fact required")
-    # This assertion must follow actual source review, not storefront fit alone.
-    if payload.get("qualified") is not True:
-        raise GrowthError("Do not contact weak or unverified prospects to fill capacity")
+    from .eligibility import POLICY, assess
+    if payload.get("checks"):
+        assess(db, payload)
+    baseline = contact.qualification.get("policy") == POLICY
+    if get_memory(db, "strategic", "qualification_policy").get("version") == POLICY and not baseline:
+        raise GrowthError("Basic merchant eligibility assessment required")
+    if baseline:
+        if contact.qualification.get("eligible") is not True:
+            raise GrowthError(contact.qualification.get("reason") or "Basic merchant evidence required")
+        if contact.qualification.get("priority") == "LOW" and not payload.get("exploration_hypothesis"):
+            raise GrowthError("Low-priority outreach requires a deliberate exploration hypothesis")
+    elif payload.get("qualified") is not True:
+        raise GrowthError("Verified basic merchant relevance required")
     contact.facts = facts
-    contact.qualification = {"qualified": True, "qualified_user": False, "evidence": payload["relevance_evidence"],
+    contact.qualification = {**contact.qualification, "qualified": True,
+                             "qualified_user": contact.qualification.get("qualified_user", False), "evidence": payload["relevance_evidence"],
                              "verified_at": time.time()}
     db.flush()
     result = reserve_contact(db, contact, action_key=payload["action_key"], channel=payload["channel"],

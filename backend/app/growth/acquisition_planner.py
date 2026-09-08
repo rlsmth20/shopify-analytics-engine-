@@ -15,7 +15,7 @@ from .store import digest, get_memory, record, remember
 
 MAX_PLANS = 6                 # rolling 24 hours, including unsuccessful plans
 MAX_DISCOVERIES = 24          # rolling 24 hours across browser discovery branches
-CONTEXT_LIMIT = 24000
+CONTEXT_LIMIT = 12000
 HYPOTHESES = "acquisition_hypothesis"
 SEARCHES = "acquisition_search"
 
@@ -75,7 +75,8 @@ def retain_result(db, task, result, event, now=None):
         "source": task.get("source"), "queries": queries(result.get("sources", [])),
         "result_count": reported.get("result_count"), "qualified_count": qualified,
         "reported_qualified_count": reported.get("qualified_count"),
-        "rejection_reasons": reported.get("rejection_reasons") or [result.get("observation", "")[:900]],
+        "rejection_reasons": reported.get("rejection_reasons") or [],
+        "qualification_policy": get_memory(db, "strategic", "qualification_policy").get("version", "legacy"),
         "cost": {"estimated_usd": None, "tokens": None, "basis": "existing Codex subscription; allocation unknown"},
         "date": now, "evidence_id": event.id, "outcome": result.get("outcome"),
         "value": "qualified_successor" if qualified else "candidate_successor" if result.get("successors") else "no_successor",
@@ -104,10 +105,11 @@ def retain_result(db, task, result, event, now=None):
 
 
 def history(db):
-    # Legacy results keep UNKNOWN metrics; never invent counts from prose.
-    for row in db.scalars(select(Memory).where(Memory.namespace == "operator_task",
+    # Legacy import stops when the market-discovery policy is activated. Existing
+    # retained evidence remains available; no retrospective prospect processing.
+    for row in ([] if get_memory(db, "strategic", "qualification_policy") else db.scalars(select(Memory).where(Memory.namespace == "operator_task",
             Memory.value["status"].as_string().in_(["done", "excluded"]))
-            .order_by(Memory.id.desc()).limit(200)):
+            .order_by(Memory.id.desc()).limit(200))):
         task = row.value
         if task.get("stage") not in {"discover", "qualify"} or get_memory(db, SEARCHES, row.key):
             continue

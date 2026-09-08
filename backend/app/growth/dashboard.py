@@ -11,6 +11,7 @@ from .inbox_health import projection as inbox_transport
 from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message, Usage, Work
 from .policy import Policy
 from .store import digest, get_memory
+from .acquisition_usage import efficiency
 
 SUBSTANTIVE = {"SUBSTANTIVE_POSITIVE", "SUBSTANTIVE_NEUTRAL", "SUBSTANTIVE_NEGATIVE", "QUESTION"}
 CONVERSIONS = ("SIGNUP", "SHOPIFY_CONNECTION", "INVENTORY_ANALYSIS_VIEWED", "SUBSCRIPTION_PURCHASED")
@@ -190,6 +191,7 @@ def dashboard(db):
         "strategy": {**get_memory(db, "strategic", "strategy"), "bottleneck": bottleneck(db),
                      "review": get_memory(db, "strategic", "review"), "acquisition_hold": get_memory(db, "working", "acquisition_hold")},
         "economics": {"mrr": mrr, "customers": len(contracts) if contracts else None, "model_api_spend": known_cost,
+                      "acquisition_efficiency": efficiency(db),
                       "unknown_cost_records": count(Usage, Usage.estimated_usd.is_(None)),
                       "unresolved_cost_reservations": reserved_unknown, "advertising_spend": 0, "acquisition_spend": acquisition_cost,
                       "cac": None,

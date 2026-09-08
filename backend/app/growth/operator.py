@@ -101,15 +101,17 @@ def export_packet(db):
                   decision=item["decision"] + " " + item.get("next_step", ""), evidence_id=evidence_id)
     now = time.time()
     # Retire an invalid historical handoff without spending another browser wake.
-    from .identity import owned_identity
+    from .identity import owned_identity, INELIGIBLE
     from .models import Contact
     for row in db.scalars(select(Memory).where(Memory.namespace == NAMESPACE,
-            Memory.value["status"].as_string() == "pending")):
+            Memory.value["status"].as_string().in_(["pending", "running"]),
+            func.coalesce(Memory.value["lease_until"].as_float(), 0) <= now)):
         candidate = db.get(Contact, row.value.get("contact_id")) if row.value.get("contact_id") else None
-        if candidate and owned_identity(candidate.identity):
+        if candidate and (owned_identity(candidate.identity) or candidate.suppressed or candidate.status in INELIGIBLE):
             lock(db)
             proof = record(db, "owned-account-exclusion:" + row.key, "PROSPECT_EXCLUDED", candidate.id,
-                {"reason": "Owned business account, not a merchant prospect", "identity": candidate.identity})
+                {"reason": "OBVIOUSLY_INAPPROPRIATE_TARGET" if owned_identity(candidate.identity) else
+                    candidate.qualification.get("reason") or "SUPPRESSED", "identity": candidate.identity})
             remember(db, NAMESPACE, row.key, {**row.value, "status": "excluded",
                 "result_evidence_id": proof.id, "completed_at": now,
                 "next_step": "Select the next independently sourced merchant"})
@@ -137,6 +139,9 @@ def export_packet(db):
 
 
 def operator_action(db, action, payload):
+    if action == "operator-assess":
+        from .eligibility import assess
+        return assess(db, payload)
     if action == "operator-state":
         from .execution import state
         return state(db)

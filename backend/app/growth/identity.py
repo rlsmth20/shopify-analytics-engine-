@@ -1,5 +1,6 @@
 """Compare historical community identities without rewriting their audit history."""
-from sqlalchemy import func, select
+from urllib.parse import urlparse
+from sqlalchemy import func, select, or_, and_
 
 from .models import Contact
 
@@ -18,12 +19,29 @@ def owned_identity(identity):
         "info@skubase.io", "support@skubase.io", "email:info@skubase.io", "email:support@skubase.io"}
 
 
+def prospect_identity(identity, source):
+    value = canonical_identity(identity)
+    host = urlparse(source or "").hostname or ""
+    if ":" not in value and "@" not in value:
+        if host == "community.shopify.com":
+            value = "shopify-community:" + value
+        elif host in {"reddit.com", "www.reddit.com"}:
+            value = "reddit:" + value.removeprefix("u/")
+    return value
+
+
 def identity_match(identity):
     canonical = canonical_identity(identity)
     variants = [canonical]
     if canonical.startswith("shopify-community:"):
         variants.append("shopify_community:" + canonical.split(":", 1)[1])
-    return func.lower(Contact.identity).in_(variants)
+    exact = func.lower(Contact.identity).in_(variants)
+    for prefix, host in (("shopify-community:", "community.shopify.com"), ("reddit:", "reddit.com")):
+        if canonical.startswith(prefix):
+            bare = canonical.split(":", 1)[1]
+            return or_(exact, and_(func.lower(Contact.identity) == bare,
+                or_(Contact.source.like("https://" + host + "/%"), Contact.source.like("https://www." + host + "/%"))))
+    return exact
 
 
 def matching_contacts(db, identity):

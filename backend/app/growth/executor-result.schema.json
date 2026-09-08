@@ -22,7 +22,8 @@
       ]
     },
     "observation": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 800
     },
     "sources": {
       "type": "array",
@@ -31,7 +32,8 @@
       }
     },
     "next_step": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 1000
     },
     "stop_reason": {
       "type": [
@@ -194,8 +196,10 @@
         },
         "rejection_reasons": {
           "type": "array",
+          "maxItems": 8,
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 120
           }
         }
       }
