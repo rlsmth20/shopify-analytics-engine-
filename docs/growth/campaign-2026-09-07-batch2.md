@@ -76,3 +76,44 @@ Durable import confirmed: new contact receipt evidence 4293, response-check evid
 Heartbeat September 7, 14:24 UTC: one new merchant contacted above. Community notifications showed only the existing system welcome; bounded persistent inbound remained Workspace messages. Business inbox checked again around 14:28 UTC showed system/setup messages only. Five focused search/page reads plus live candidate validation were used; no further discovery this wake. No qualified users, requests or revenue inferred from a sent reply. Advertising $0, no new paid services; model tokens and cost UNKNOWN. Next wake should reuse stored opportunities, validate current relevance, and continue the seven remaining contacts while prioritizing responses.
 
 Heartbeat durable receipts verified: VBUstore send evidence 4354; solved-opportunity exclusion 4357; response-check evidence 4359; usage `dab91e1fd3a24859943056c2b5d47044`. Campaign and working memory record thirteen contacts and seven remaining. The 08:00 Pacific schedule-restoration condition has not yet been reached.
+
+## Routine wake — September 8, 01:13 UTC / September 7 Pacific evening
+
+No new contacts or follow-ups. Refreshed info@skubase.io contains seven system
+and internal-test messages; community notifications contain badges and the
+system welcome. The inbox bridge is verified, its latest poll succeeded with
+zero newly ingested replies, and the worker remains active. Rolling capacity:
+13 used, seven available, zero unresolved. Three requested-check slots remain
+available. No new qualified users or customer requests observed.
+
+Revisited the retained [900-SKU prospect](https://www.reddit.com/r/InventoryManagement/comments/1uib7tx/looking_for_inventory_forecasting_for_shopify/).
+Their visible comments question forecast backtesting and distortion from
+stockouts and BFCM, but are about two months old. Current need and adoption
+remain unknown. The public profile exposes no current activity feed, and the
+retrieved community-rules page provides no usable rule content. Defer contact;
+do not reread the same thread/profile on every wake without changed evidence.
+No account created, message drafted for submission, or send reserved. Screening
+evidence 5763 preserves sources and capability limits.
+
+Verified `inventory-health-check-v1` is enrolled and active. A sample-only run
+on the live browser tool led to the request form with its campaign/source tags
+intact and the Shopify review disclosure present. No request was submitted,
+and sample use is not acquisition. This verifies the visible handoff, not a
+real merchant conversion. Evidence 5764 retains the distinction. Existing
+outreach and tool cohorts remain separate and inconclusive; no offer/ICP
+rewrite or attribution reassignment.
+
+Calendar correction: review 307 occurred **September 6 at 19:39 Pacific**,
+despite earlier ledger entries treating it as September 7 completion. Today's
+Pacific review is now recorded as **5742**. The current helper uses UTC day
+keys; inspect the actual latest review timestamp and the explicit
+`working/operator_daily_review` Pacific date before repeating a review.
+Operational finding 5765 records the mismatch for a tested development change;
+no production code changed during this wake.
+
+Wake evidence **5767**, usage `ca8d054d075149ffb1527f98ecb01767`. Six bounded
+source reads, no additional review research, advertising $0, no new paid API
+calls or services; subscription tokens/cost UNKNOWN. Existing experiments were
+queued for evaluation by the daily review. Next wake: prioritize replies and
+requested checks, then other recent merchant-authored opportunities already
+captured by the worker. Continue the two-hour schedule and the shared ceiling.
