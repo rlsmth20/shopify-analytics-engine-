@@ -1,16 +1,42 @@
-# Skubase outreach messaging — revision 2
+# Skubase outreach messaging — revision 3
+
+Owner direction, September 8, 2026: make the promotional purpose unmistakable
+and respond to relevant participants throughout a discussion, not only its
+original poster. Retain previously published messages and their attribution.
+
+Open with a brief disclosure such as **"Skubase promotion:"**, then explain the
+specific app capability that addresses the participant's own stated workflow.
+Do not bury the commercial purpose in a footer or disguise an app offer as
+independent advice. Keep the reply useful and contextual; disclosure does not
+permit generic advertisements, prohibited links or thread hijacking.
+
+A comment describing the participant's own store, desired inventory capability
+or purchasing problem may support a first contact. A store URL or merchant badge
+is not mandatory for a low-friction public reply. Do not exclude someone merely
+because they are not the original poster or have mostly posted replies. Record
+their verified public statement, label unknown business details UNKNOWN, and
+distinguish an outreach prospect from an acquired qualified user. Disclosed
+vendors, unrelated advice and unsupported fit remain exclusions. Every new
+participant still requires admission, duplicate/suppression checks and counts
+against the shared rolling cap.
+
+Use revision 3 and separate cohort attribution for future messages. The owner
+requested both clearer promotion and broader participant consideration; this is
+not evidence of conversion uplift and cannot isolate either change's effect.
+The September 7 direction below remains part of the current message process;
+revision 3 adds explicit promotional disclosure and broader participant coverage.
 
 Owner direction, September 7, 2026: make it clear that Skubase is an app, explain how it can remedy the merchant's specific inventory issue, and offer to work with the merchant on unmet needs. Continue outreach beyond the completed first ten-contact batch.
 
 ## Message process
 
-1. Identify Skubase as an inventory-planning app for Shopify merchants early in the message.
+1. Start with explicit promotional disclosure and identify Skubase as an inventory-planning app for Shopify merchants.
 2. Cite one verified merchant fact or public problem. If the problem is inferred from a storefront, frame it conditionally.
 3. Explain one relevant app capability and its practical benefit. A useful diagnostic can introduce the app, but should not obscure why Skubase is contacting them.
 4. Where a feature is missing or unverified, say: "If your workflow needs something Skubase doesn't yet support, we can work with you to understand the gap and explore a practical solution." This offers collaboration, not guaranteed custom development or a delivery date. Record the requirement as product feedback.
 5. State: "Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store."
 6. Ask one concrete, low-friction question: offer a free check on 5–10 products, or ask for the workflow detail that determines fit. Keep ongoing subscriptions separate from the free check.
-7. Use Skubase and info@skubase.io where the channel permits contact details. Do not invent a human identity or claim private store access. Keep affiliation clear. No unsolicited follow-up to recipients promised none.
+7. Use Skubase and info@skubase.io where the channel permits contact details. Shopify Community replies must not include email/contact details or external promotional links; keep the initial conversation public. Do not invent a human identity or claim private store access. No unsolicited follow-up to recipients promised none.
 
 ## Verified capability boundaries
 
@@ -24,10 +50,10 @@ Reviewed `backend/app/services/inventory_engine.py` on September 7:
 
 ## Example for a merchant reporting slow stock
 
-"Skubase is an inventory-planning app for Shopify merchants. It uses sales and stock data to flag potential slow/dead stock and estimate how much inventory may be tying up cash, helping you decide what to review before buying more. If your workflow needs something Skubase doesn't yet support, we can work with you to understand the gap and explore a practical solution. Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store. Would a free check on 5–10 products be useful?"
+"Skubase promotion: our inventory-planning app for Shopify merchants uses sales and stock data to flag potential slow/dead stock and estimate how much inventory may be tying up cash. That helps you decide what to review before buying more. If your workflow needs something Skubase doesn't yet support, we can work with you to understand the gap and explore a practical solution. Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store. Would a free check on five regularly restocked products be useful? No purchase obligation; ongoing app subscriptions are separate."
 
 Adapt the example to the actual evidence and channel. General app offers belong in Shopify Community's Ask & Offer area; responses elsewhere must address the discussion and follow current rules. Do not paste this example repeatedly into threads.
 
 ## Experiment and continuation
 
-Revision 2 is an owner-directed message change, not a proven conversion winner. Preserve the first ten contacts and their original messages as revision 1 and keep batch2 separately attributed. The latest [continuous-operation policy](continuous-operation.md) replaces lifetime contact caps with a hard ceiling of twenty new merchants per rolling 24 hours, not a target. At most three new contacts and six decision-focused source reads per wake; prefer stored opportunities to repeated searches. Replies and three available free-check slots take priority. Reserve durable capacity before each new contact. Preserve $0 advertising and existing channel restrictions. Record revision, evidence, exact sent message, receipt and response for every action. Broader segment changes confound comparisons, so do not claim causal uplift from raw response rates or rewrite positioning after a handful of sends.
+Revision 3 is an owner-directed change, not a proven conversion winner. Preserve the first ten contacts and their original messages as revision 1, batch2 as revision 2, and the [September 8 cohort](campaign-2026-09-08.md) as revision 3. The latest [continuous-operation policy](continuous-operation.md) replaces lifetime contact caps with a hard ceiling of twenty new merchants per rolling 24 hours, not a target. At most three new contacts and six decision-focused source reads per wake; prefer stored opportunities to repeated searches. Replies and three available free-check slots take priority. Reserve durable capacity before each new contact. Preserve $0 advertising and existing channel restrictions. Record revision, evidence, exact sent message, receipt and response for every action. Broader segment changes confound comparisons, so do not claim causal uplift from raw response rates or rewrite positioning after a handful of sends.

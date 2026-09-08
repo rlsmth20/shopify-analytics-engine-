@@ -45,12 +45,12 @@ Before clicking any first-contact Submit/Reply/Send, prepare an exact JSON paylo
   "relevance_evidence": "Verified merchant need, current relevance and supported Skubase capability",
   "facts": [{"text": "One verified public fact", "source": "https://observed-source", "verified": true}],
   "experiment_id": "existing-active-experiment-id",
-  "cohort": {"icp": "stable segment label", "offer": "free_inventory_health_check", "message_version": 2},
+  "cohort": {"icp": "stable segment label", "offer": "free_inventory_health_check", "message_version": 3},
   "body": "Exact final submitted message"
 }
 ```
 
-Check existing identities, organizations, email aliases and source history first; reuse the merchant's canonical identity across channels. Storefront fit alone does not establish a strong inventory prospect. Do not claim unobserved pain or private data access. Use [messaging revision 2](outreach-messaging.md), one sourced fact, one question/offer, honest feature limits and the Shopify App Store review disclosure. Keep messages concise.
+Check existing identities, organizations, email aliases and source history first; reuse the merchant's canonical identity across channels. Storefront fit alone does not establish a strong inventory prospect. A relevant participant's own stated inventory need can qualify a contextual reply even without a store URL; do not restrict outreach to original posters. Do not claim unobserved pain or private data access. Use [messaging revision 3](outreach-messaging.md), explicit promotional disclosure, one sourced fact, one question/offer, honest feature limits and the Shopify App Store review disclosure. Keep messages concise. Attribute new sends to revision 3 separately from historical cohorts.
 
 A successful reservation supplies an ID and a ten-minute submit-before timestamp. **Only that invocation may submit that exact message once.** A retry or duplicate reservation does not permit another submission. If blocked by capacity or eligibility, do other work. If the deadline passes before submission, do not send: retain it for reconciliation. Never bypass the gate because a script or database is unavailable.
 
@@ -62,7 +62,7 @@ For a verified failure before any external effect, retain an `OUTREACH_NOT_SENT_
 
 ## Learning and cohort stability
 
-Keep the two existing campaign cohorts and original messages. Every new admission snapshots experiment, ICP segment, offer, message version, qualification and fact sources. Do not change positioning after a handful of sends or mix versions without attribution. Requested-service comparisons require at least ten contacts per arm with seven days of observation and posterior superiority of at least 0.95 before changing future allocation. Strong negative evidence can justify an earlier stop, never an automatic increase in send volume.
+Keep the historical campaign cohorts and original messages; attribute new revision 3 messages separately in the [September 8 ledger](campaign-2026-09-08.md). Every new admission snapshots experiment, ICP segment, offer, message version, qualification and fact sources. Do not change positioning after a handful of sends or mix versions without attribution. Requested-service comparisons require at least ten contacts per arm with seven days of observation and posterior superiority of at least 0.95 before changing future allocation. Strong negative evidence can justify an earlier stop, never an automatic increase in send volume.
 
 Before recommending a higher ceiling, report delivered/bounced denominators, substantive reply rate, positive interest, signup, Shopify connection, activation and paid conversion separately by segment and offer/version. Keep missing or unlinked outcomes UNKNOWN. Preserve delivery status separately from public publication/form acceptance. A recommendation requires a mature cohort and reliable outcome linkage; the cap can only change after explicit owner authorization and an audited implementation change.
 
