@@ -16,6 +16,7 @@ import time
 from . import operator
 from .models import Contact, Evidence, Usage, uid
 from sqlalchemy import select, func
+from sqlalchemy.engine import make_url
 from .outbound import lock, status
 from .policy import GrowthError
 from .store import get_memory, record, remember
@@ -28,6 +29,15 @@ STOP_REASONS = {"DAILY_CAP_REACHED", "NO_CURRENT_QUALIFIED_PROSPECTS",
 
 def redact_log(line):
     # Diagnostic logs must not retain database credentials emitted by a child.
+    try:
+        password = make_url(os.environ.get("DATABASE_URL", "")).password
+        if password:
+            line = line.replace(password, "[REDACTED_SECRET]")
+    except (ValueError, TypeError):
+        pass
+    except Exception:
+        # Malformed/missing deployment configuration must not break log draining.
+        pass
     return re.sub(r"(?:postgres(?:ql)?(?:\+psycopg)?://)[^\s\"'\\]+", "[REDACTED_DATABASE_URL]", line)
 
 
