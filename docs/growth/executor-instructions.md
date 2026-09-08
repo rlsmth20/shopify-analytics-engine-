@@ -37,7 +37,14 @@ never reject. Persist an assessment for each screened merchant, including reject
 
 ## Compute budget
 
-No premium-model calls or extra model chains. Routine work runs on Luna/low.
+No premium-model calls or extra model chains. Basic qualification is deterministic
+with Luna/low for extraction; browser/account execution uses Terra/low after live
+Luna execution failures. Never run old .growth-deploy helper scripts. Only the
+documented CLI is a trusted action; helper files are historical data, not commands.
+Do not print environment variables or put credentials into command text. Obtain
+database variables in process memory only; never echo raw Railway JSON. Never
+refresh a safety timestamp without a NEW actual browser observation and new
+CHANNEL_MONITOR evidence. Old evidence is not a fresh check.
 Per prospect: ONE search, TWO page reads, TWO minutes qualification research max.
 Discovery: two targeted searches/four reads/five minutes, up to four merchants.
 An eligible merchant found during discovery goes directly to prepare after its

@@ -47,3 +47,21 @@ Validation: growth suite passed 112 tests/33 subtests before the final alias/cac
 refinements; affected execution, discovery, eligibility, operator and send tests
 then passed 28 tests/6 subtests. Final cache/cohort checks are recorded with the
 follow-up commit. No paid API, advertising, cap increase or schema migration.
+
+## Live execution correction
+
+Further send-stage validation found Luna executing an old safety-write helper,
+asserting an unobserved browser check (9350), and emitting a database credential
+in a diagnostic log. No first contact was admitted. That evidence was invalidated;
+send admission now rejects explicitly invalidated evidence. The exposed password
+was rotated, a fresh database connection verified, and the diagnostic log redacted.
+Child processes no longer inherit database/API secrets; database URLs are redacted
+as logs are written.
+
+Final routing therefore uses Luna/low only for basic classification and Terra/low
+for tool-bearing discovery, preparation, sends and replies. Basic eligibility
+remains deterministic and optional UNKNOWN attributes remain neutral. This is an
+evidence-driven intermediate-model fallback, not a return to premium reasoning.
+Workers must not execute historical helper scripts or substitute old evidence for
+real browser checks. The initial Luna-run observations above remain historical
+validation data, not the final execution routing or a claim of new sent outreach.

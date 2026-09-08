@@ -13,7 +13,8 @@ from app.growth.acquisition_usage import retain, route, efficiency
 from app.growth.models import Contact, Evidence, Experiment, Usage
 from app.growth.outbound import operator_action
 from app.growth.policy import GrowthError
-from app.growth.store import remember
+from app.growth.store import remember, record
+from app.growth.browser_executor import redact_log
 
 
 def checks(**overrides):
@@ -63,6 +64,15 @@ class EligibilityTests(unittest.TestCase):
             self.assertFalse(result["eligible"])
             self.assertEqual(result["reason"], "BOUNCED_SUPPRESSED")
 
+    def test_invalidated_browser_check_cannot_authorize_send_even_if_fresh(self):
+        with self.factory() as db:
+            e = record(db, "monitor", "CHANNEL_MONITOR", "browser", {})
+            record(db, "invalid", "EVIDENCE_INVALIDATED", str(e.id), {"reason": "unobserved"})
+            remember(db, "working", "browser_executor", {"owner": "executor"})
+            remember(db, "working", "browser_safety_check", {"checked_at": time.time(), "evidence_id": e.id})
+            with self.assertRaisesRegex(GrowthError, "Fresh essential"):
+                operator_action(db, "outreach-reserve", {})
+
     def test_medium_without_pain_can_reserve_but_cannot_resend(self):
         with self.factory() as db:
             remember(db, "strategic", "qualification_policy", {"version": POLICY, "started_at": time.time()})
@@ -83,7 +93,10 @@ class EligibilityTests(unittest.TestCase):
 
     def test_explicit_cheap_route_and_idempotent_usage_unknown_dollars(self):
         self.assertEqual(route("qualify"), ("gpt-5.6-luna", "low"))
-        self.assertEqual(route("discover"), ("gpt-5.6-luna", "low"))
+        self.assertEqual(route("discover"), ("gpt-5.6-terra", "low"))
+        log = json.dumps({"command": "DATABASE_URL='postgresql://user:fixture-secret@host/db'"})
+        self.assertNotIn("fixture-secret", redact_log(log))
+        self.assertIn("REDACTED_DATABASE_URL", json.loads(redact_log(log))["command"])
         path = Path(self.temp.name) / "result.jsonl"
         path.write_text(json.dumps({"type": "turn.completed", "usage": {"input_tokens": 100, "output_tokens": 20}}))
         with self.factory() as db:

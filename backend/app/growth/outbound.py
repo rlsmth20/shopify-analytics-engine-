@@ -165,7 +165,9 @@ def operator_action(db, action, payload):
     if executor.get("owner"):
         safety = get_memory(db, "working", "browser_safety_check")
         evidence = db.get(Evidence, safety.get("evidence_id")) if safety.get("evidence_id") else None
-        if safety.get("requires_attention") or time.time() - safety.get("checked_at", 0) > 300 or not evidence or evidence.kind != "CHANNEL_MONITOR" or time.time() - evidence.occurred_at > 300:
+        invalidated = evidence and db.scalar(select(Evidence.id).where(Evidence.kind == "EVIDENCE_INVALIDATED",
+            Evidence.subject == str(evidence.id)).limit(1))
+        if invalidated or safety.get("requires_attention") or time.time() - safety.get("checked_at", 0) > 300 or not evidence or evidence.kind != "CHANNEL_MONITOR" or time.time() - evidence.occurred_at > 300:
             raise GrowthError("Fresh essential browser reply/safety checks required before first contact")
     # Channel rules are reviewed by the authenticated operator, not guessed from keywords.
     if not payload.get("channel_rules_source") or not payload.get("relevance_evidence"):

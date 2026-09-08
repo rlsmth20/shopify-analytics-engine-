@@ -10,7 +10,9 @@ from .store import get_memory, insert_once
 def route(stage):
     # Explicit overrides prevent the interactive owner's Astra setting leaking
     # into routine work. No automatic premium escalation or fallback.
-    return ("gpt-5.6-terra" if stage in {"plan", "reply"} else "gpt-5.6-luna", "low")
+    # Live validation showed Luna mishandling shell/browser state. Keep it for
+    # isolated basic classification; use intermediate tool execution, never Astra.
+    return ("gpt-5.6-luna" if stage == "qualify" else "gpt-5.6-terra", "low")
 
 
 def begin(factory, task, model):

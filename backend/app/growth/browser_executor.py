@@ -9,6 +9,8 @@ import logging
 import os
 from pathlib import Path
 import subprocess
+import re
+import threading
 import time
 
 from . import operator
@@ -22,6 +24,11 @@ from .process_job import ProcessJob
 STOP_REASONS = {"DAILY_CAP_REACHED", "NO_CURRENT_QUALIFIED_PROSPECTS",
     "DISCOVERY_EXHAUSTED_FOR_CURRENT_SEARCH_SPACE", "REPLY_REQUIRES_PRIORITY_ATTENTION",
     "CHANNEL_BLOCKED", "SAFETY_BLOCKED", "BUDGET_BLOCKED", "PROVIDER_BLOCKED", "TRUE_IDLE"}
+
+
+def redact_log(line):
+    # Diagnostic logs must not retain database credentials emitted by a child.
+    return re.sub(r"(?:postgres(?:ql)?(?:\+psycopg)?://)[^\s\"'\\]+", "[REDACTED_DATABASE_URL]", line)
 
 
 def take(factory, owner):
@@ -169,7 +176,7 @@ def execute(factory, owner, task, *, codex, repo):
     with factory() as db:
         runs = list(db.scalars(select(Usage).where(Usage.result["task_id"].as_string() == task["id"])))
         spent = sum(min(budget * 1000, (time.time() - r.created_at) * 1000) if r.outcome == "running"
-                    else (r.latency_ms or 0) for r in runs)
+                    else (r.latency_ms or r.result.get("budget_charged_ms", 0)) for r in runs)
     budget -= spent / 1000
     if budget <= 0:
         raise GrowthError("RESEARCH_BUDGET_EXHAUSTED", "budget")
@@ -186,8 +193,17 @@ def execute(factory, owner, task, *, codex, repo):
             str(repo / "backend/app/growth/executor-result.schema.json"), "--output-last-message", str(output), "-"]
     with log.open("w", encoding="utf-8") as stream:
         job = ProcessJob()
-        child = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=stream, stderr=stream,
-                                 text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        child_env = {k: v for k, v in os.environ.items() if k not in
+                     {"DATABASE_URL", "PGPASSWORD", "POSTGRES_PASSWORD", "OPENAI_API_KEY"}}
+        child = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 env=child_env, text=True, encoding="utf-8", errors="replace",
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        def forward():
+            for line in child.stdout:
+                stream.write(redact_log(line))
+                stream.flush()
+        reader = threading.Thread(target=forward, daemon=True)
+        reader.start()
         started = time.monotonic()
         deadline = started + budget
         outcome = "failed"
@@ -210,6 +226,7 @@ def execute(factory, owner, task, *, codex, repo):
             if child.poll() is None:
                 child.kill()
                 child.wait(timeout=15)
+            reader.join(timeout=5)
             stream.flush()
             retain(factory, task, model, log, time.monotonic() - started, outcome)
 

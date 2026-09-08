@@ -222,7 +222,8 @@ For new discovery, real physical-product ecommerce merchants with confirmed or
 probable Shopify use and permitted business contact are eligible. Public pain,
 SKU count, revenue and other ICP attributes rank; unknowns never reject. Use the
 deterministic operator-assess command and executor-instructions.md budgets. Routine
-CLI work explicitly uses Luna/low; planning/replies use Terra/low, never inherited
+Basic extraction uses Luna/low; tool-bearing CLI work uses Terra/low after live
+Luna execution failures. Neither inherits
 premium defaults. No retrospective reprocessing. Preserve 20/rolling24h and all
 suppression/channel gates. Older narrow qualification instructions below are
 superseded. Usage records retain actual completed-turn tokens and unknown dollar
