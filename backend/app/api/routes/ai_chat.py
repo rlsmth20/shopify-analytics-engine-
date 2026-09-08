@@ -44,16 +44,20 @@ def chat_with_inventory_copilot(
         shopify_domain=shop_domain,
         data_source="db",
         actions=actions,
+        skus=skus,
     )
-    answer, mode, links = answer_inventory_question(
+    result = answer_inventory_question(
         messages=payload.messages,
         context=context,
+        shop_id=user.shop_id,
     )
 
     return AiChatResponse(
-        answer=answer,
-        mode=mode,
+        answer=result.answer,
+        mode=result.mode,
         data_source="db",
         context_summary=context.summary,
-        related_links=links,
+        related_links=result.links,
+        model=result.model,
+        fallback_reason=result.fallback_reason,
     )

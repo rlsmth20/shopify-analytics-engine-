@@ -142,8 +142,8 @@ class PrivacyTests(unittest.TestCase):
         self.db.expire_all()
         for table in Base.metadata.sorted_tables:
             with self.subTest(table=table.name):
-                if table.name.startswith("growth_") and "shop_id" not in table.c:
-                    # Growth operator-wide tables are not tenant fixtures.
+                if (table.name.startswith("growth_") or table.name == "copilot_budget_days") and "shop_id" not in table.c:
+                    # Anonymous global accounting and operator-wide tables are not tenant fixtures.
                     self.assertEqual(self.count(table), 0)
                     continue
                 self.assertEqual(self.count(table), 1)
@@ -165,7 +165,7 @@ class PrivacyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Synthetic"):
                 privacy.redact_shop(self.db, shop_domain="one.myshopify.com", triggered_at=None)
         for table in Base.metadata.sorted_tables:
-            expected = 0 if table.name.startswith("growth_") and "shop_id" not in table.c else 2
+            expected = 0 if (table.name.startswith("growth_") or table.name == "copilot_budget_days") and "shop_id" not in table.c else 2
             self.assertEqual(self.count(table), expected, table.name)
         self.assertEqual(self.db.get(AlertDeliveryAttemptRecord, f"delivery-{self.one}").provider_receipt,
                          f"provider-{self.one}")

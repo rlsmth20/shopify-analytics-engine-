@@ -34,3 +34,10 @@ browser missing the submission ID receives an actionable reload error. Do not
 roll back the backend to an unprotected receiver while clients use recovery IDs.
 The new table is created through the existing database initializer and requires
 no alteration of historical receipt rows.
+
+Production verification: release `065858f` is live on Railway
+`a67bdc6c-a5ce-4155-a292-cb749df81696` and Vercel
+`dpl_ELwroVtXzrb7tSd6m9kh58RqrFnn` at `www.skubase.io`. Health, the public
+receipt response contract and the deployed submission table passed. Durable
+growth evidence is `5653`; the worker remains running, with 13 first contacts
+inside its rolling 20-merchant ceiling and no unresolved outbound sends.

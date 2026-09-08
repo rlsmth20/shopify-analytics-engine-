@@ -224,6 +224,12 @@ class AiChatMessage(ApiModel):
 class AiChatRequest(ApiModel):
     messages: list[AiChatMessage] = Field(min_length=1, max_length=10)
 
+    @model_validator(mode="after")
+    def user_question_required(self):
+        if self.messages[-1].role != "user" or not self.messages[-1].content.strip():
+            raise ValueError("End the conversation with a nonempty user question.")
+        return self
+
 
 class AiChatRelatedLink(ApiModel):
     label: str
@@ -236,6 +242,8 @@ class AiChatResponse(ApiModel):
     data_source: ActionDataSource
     context_summary: str
     related_links: list[AiChatRelatedLink] = Field(default_factory=list)
+    model: str | None = None
+    fallback_reason: str | None = None
 
 
 class SkuDetail(SkuIdentityProjection):
