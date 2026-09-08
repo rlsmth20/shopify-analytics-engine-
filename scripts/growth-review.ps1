@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile')][string]$Action = 'review-export',
+    [ValidateSet('review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile', 'operator-export', 'operator-enqueue', 'operator-claim', 'operator-complete')][string]$Action = 'review-export',
     [string]$File,
     [string]$Model = 'codex'
 )
@@ -22,7 +22,7 @@ try {
         if (-not $File) { throw 'A reviewed JSON file is required.' }
         $growthArguments += @('--file', (Resolve-Path -LiteralPath $File).Path, '--model', $Model)
     }
-    if ($Action -in @('outreach-reserve', 'outreach-complete', 'outreach-reconcile')) {
+    if ($Action -in @('outreach-reserve', 'outreach-complete', 'outreach-reconcile', 'operator-enqueue', 'operator-claim', 'operator-complete')) {
         if (-not $File) { throw 'An exact reviewed JSON payload is required.' }
         $growthArguments += @('--file', (Resolve-Path -LiteralPath $File).Path)
     }

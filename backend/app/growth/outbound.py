@@ -9,13 +9,13 @@ import time
 from sqlalchemy import func, or_, select, update
 
 from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message
+from .identity import INELIGIBLE, canonical_identity, existing_contact, identity_match, matching_contacts
 from .policy import GrowthError
 from .store import digest, get_memory, record
 
 LIMIT = 20
 WINDOW = 86400
 CHANNELS = {"email", "contact_form", "shopify_community", "reddit"}
-INELIGIBLE = {"declined", "unsubscribed", "delivery_failure", "bounced", "ineligible"}
 
 
 def lock(db):
@@ -41,7 +41,8 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
     now = time.time() if now is None else now
     lock(db)  # PostgreSQL row lock / SQLite write lock serializes competing callers.
     db.refresh(contact)
-    if contact.suppressed or contact.status in INELIGIBLE:
+    identity_aliases = matching_contacts(db, contact.identity)
+    if any(row.suppressed or row.status in INELIGIBLE for row in identity_aliases):
         raise GrowthError("Contact is suppressed or ineligible")
     if get_memory(db, "working", "acquisition_hold"):
         raise GrowthError("Product/funnel hold blocks new acquisition, not existing conversations")
@@ -53,13 +54,13 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
     if channel not in CHANNELS or not body.strip() or not all(cohort.get(k) for k in ("icp", "offer", "message_version")):
         raise GrowthError("Channel, exact message and immutable cohort labels are required")
     prior = db.scalar(select(FirstContact).where(FirstContact.contact_id == contact.id))
-    aliases = [Contact.id == contact.id]
+    aliases = [Contact.id == contact.id, identity_match(contact.identity)]
     if contact.email:
         aliases.append(func.lower(Contact.email) == contact.email.lower())
     if contact.organization.lower() not in {"unknown", ""}:
         aliases.append(func.lower(Contact.organization) == contact.organization.lower())
     alias_contact = db.scalar(select(FirstContact.id).join(Contact, Contact.id == FirstContact.contact_id).where(or_(*aliases)))
-    prior_mail = db.scalar(select(Message.id).where(Message.contact_id == contact.id, Message.direction == "out",
+    prior_mail = db.scalar(select(Message.id).where(Message.contact_id.in_([row.id for row in identity_aliases]), Message.direction == "out",
                            or_(Message.sent_at.is_not(None), Message.status.in_(["sending", "unknown"]))))
     if prior or prior_mail or alias_contact:
         raise GrowthError("Merchant was already contacted or has an unresolved intent; reconcile, never resend", "ambiguous")
@@ -158,11 +159,11 @@ def operator_action(db, action, payload):
         raise GrowthError("Current channel-rule and merchant relevance evidence required")
     if payload.get("channel") == "email":
         raise GrowthError("Promotional email transport remains disabled; use permitted channels")
-    identity = payload["identity"].strip().lower()
+    identity = canonical_identity(payload["identity"])
     if not identity or len(identity) > 320:
         raise GrowthError("Canonical merchant identity required")
     lock(db)
-    contact = db.scalar(select(Contact).where(Contact.identity == identity))
+    contact = existing_contact(db, identity)
     if not contact:
         contact = Contact(identity=identity, organization=payload["organization"], source=payload["source"])
         db.add(contact); db.flush()

@@ -7,12 +7,43 @@ The Railway worker continuously handles inexpensive observation, inbox ingestion
 September 8 execution correction: worker health is not evidence of acquisition
 execution. The server cannot publish browser-operated outreach by itself. The
 hourly operator must advance the next unscreened prospect or useful acquisition
-task from `working/operator_pipeline` after handling replies. Maintain source,
+task from the leased `operator_task` queue after handling replies. Maintain source,
 decision to resolve, status, evidence, and next step in that durable backlog.
 An empty inbox or unchanged server-discovery delta alone does not justify ending
 while unprocessed sources remain. Preserve exclusions and move to a different
 source when a discussion repeatedly yields vendors. No progress or send quota
 permits weak prospects, repeated contact, or unnecessary research.
+
+## Durable browser handoff
+
+Run `scripts/growth-review.ps1 -Action operator-export` for the next six available
+tasks, active claims, exhausted recoveries, support-monitor context, recent send
+receipts and shared capacity. It imports pending legacy `working/operator_pipeline`
+entries once. Terminal history cannot hide an older pending task.
+
+Use `operator-enqueue -File <JSON>` to retain a new decision-directed task with
+`key`, `source` (HTTPS or null), `decision`, `evidence_id`, optional `contact_id`
+and `priority`. Keys are stable: repeating a source never resets completed work.
+Claim with `operator-claim -File <JSON>` containing `task_id` before working it.
+Claims last 30 minutes and recover at most three times after crashes. Do not act
+under an expired claim; another invocation may own its replacement.
+
+Complete with `operator-complete -File <JSON>` containing `task_id`, the returned
+`lease_token`, new retained outcome `evidence_id`, `outcome` (`done`, `excluded`
+or `blocked`) and a concrete `next_step`. A task marked done means its stated
+decision was resolved, not that a merchant was contacted. Preserve raw evidence;
+only verified external receipts count as outreach. Enqueue the next useful task
+before ending if work remains. An exhausted task needs diagnosis and a separately
+audited successor if justified, never automatic resetting or unlimited retries.
+
+Server research now retrieves the exact numbered community post and verifies its
+author, including replies beyond the first page. Cache keys include post and
+participant. Qualified, current research creates this handoff instead of leaving
+a stale generic draft. Historical underscore/hyphen and case variants of community
+identities share suppression and prior-contact checks without rewriting history.
+The browser operator still checks live channel rules and product fit. Queue claims
+never authorize submissions: the separate first-contact admission gate below is
+required for each individually addressed first contact.
 
 Check Shopify App Store review mail addressed to `support@skubase.io` in the
 dedicated `info@skubase.io` Gmail account each operator wake, including mail outside
