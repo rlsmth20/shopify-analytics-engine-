@@ -2,7 +2,25 @@
 
 Owner policy, September 7, 2026: operate persistently with a **hard ceiling of 20 new merchants per rolling 24 hours**, never a volume target. This replaces the old ten/twenty lifetime campaign caps and the temporary overnight stop. Apply the shared ceiling conservatively across email, business forms and individually addressed public replies. A public broadcast is not twenty contacts. Legitimate replies to engaged merchants and narrowly requested services do not consume first-contact capacity.
 
-The Railway worker continuously handles inexpensive observation, inbox ingestion, classification, delivery failures, requested service, experiments and funnel work. The Codex operator wakes every two hours for bounded qualified outreach and obligations; it performs the deeper executive review once per day after 9 a.m. Pacific. Desktop/Codex availability is necessary for browser actions. Reaching capacity never pauses the worker or the operator's independent work.
+The Railway worker continuously handles inexpensive observation, inbox ingestion, classification, delivery failures, requested service, experiments and funnel work. The Codex operator wakes every hour for bounded qualified outreach and obligations; it performs the deeper executive review once per day after 9 a.m. Pacific. Desktop/Codex availability is necessary for browser actions. Reaching capacity never pauses the worker or the operator's independent work.
+
+September 8 execution correction: worker health is not evidence of acquisition
+execution. The server cannot publish browser-operated outreach by itself. The
+hourly operator must advance the next unscreened prospect or useful acquisition
+task from `working/operator_pipeline` after handling replies. Maintain source,
+decision to resolve, status, evidence, and next step in that durable backlog.
+An empty inbox or unchanged server-discovery delta alone does not justify ending
+while unprocessed sources remain. Preserve exclusions and move to a different
+source when a discussion repeatedly yields vendors. No progress or send quota
+permits weak prospects, repeated contact, or unnecessary research.
+
+Check Shopify App Store review mail addressed to `support@skubase.io` in the
+dedicated `info@skubase.io` Gmail account each operator wake, including mail outside
+Inbox and spam/trash. Support is an existing alias of that account. Server-side
+dual delivery is verified only for `info@skubase.io`; its empty poll is not a
+support-inbox check. Retain review correspondence as a high-priority operator
+obligation with a message reference, and surface it promptly. Review mail and
+internal delivery tests are not merchant leads or acquisition outcomes.
 
 The daily-review helper and worker use `America/Los_Angeles` calendar dates,
 including daylight-saving changes. `review-export` returns `not_due` before

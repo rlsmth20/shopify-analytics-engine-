@@ -29,6 +29,17 @@ The dedicated business inbox is `info@skubase.io`. It is not the owner's persona
 
 ### Inbox transport observability
 
+September 8 support check: an external application-provider message to the existing
+`support@skubase.io` alias arrived in the `info@skubase.io` Gmail Inbox. Provider
+receipt: `9403b014-6109-433f-9292-e2464e997fb4`. Gmail reference:
+`FMfcgzQhWLQCNlHlngKKZzrNbbcPSRXz`; recipient details explicitly showed support,
+mailed-by `send.skubase.io`, signed-by `skubase.io`, and TLS. This verifies support
+delivery into Gmail, not its ingestion by the server worker. No alias, license,
+DNS or routing changes were required. A preceding Gmail self-test appeared in
+Sent only and was not used as proof of inbound delivery. The hourly operator now
+checks support/review mail in Gmail explicitly; no automatic promotional response
+may be sent to Shopify review correspondence.
+
 The owner dashboard separates three facts: the most recent successfully completed Resend inbox poll, the latest receipt for exact `info@skubase.io`, and the last independently verified Gmail-to-agent delivery path. Successful empty polls are normal; neither a poll nor an arbitrary Resend receipt proves that Google's dual-delivery rule still works. The worker does not read Gmail directly. A 15-minute polling gap is overdue; an independent verification older than seven days is shown as needing review, not as evidence of lost mail. These are dashboard states only, with no automatic test messages, reminders, new credentials or DNS changes.
 
 `agent.inbox_transport` provides owner-readable status/label/explanation, `last_poll_at`, `last_poll_status`, `last_successful_poll_at`, `latest_poll_replies_ingested`, `last_approved_receipt_at`, `last_approved_receipt_observed_at`, and `last_bridge_verified_at`. Timestamps are UTC Unix seconds; unobserved values are null. The latest count is null after a failed check and zero after a successful check with no newly ingested replies. A failure preserves the previous successful check and receipt evidence.
@@ -43,7 +54,14 @@ The `requested_service` skill records the source knowledge, version and observed
 
 ## Daily executive review without a separate model API
 
-September 7 update: the existing automation is now named **Skubase continuous growth**, ACTIVE every two hours indefinitely. It performs the daily review on its first wake at/after 9 a.m. Pacific, skips only an already-recorded review, and continues ordinary growth work. The old overnight expiry/daily-only restoration instruction is retired. Follow [continuous operation](../growth/continuous-operation.md) for shared admission, priorities and stable cohort rules.
+September 8 update: **Skubase continuous growth** is ACTIVE hourly indefinitely,
+updated in place from its earlier two-hour cadence. It must advance the durable
+operator backlog after reply checks, rather than treating an unchanged inbox as
+completion. It performs the daily review on its first wake at/after 9 a.m. Pacific,
+skips only an already-recorded review, and continues ordinary growth work. Follow
+[continuous operation](../growth/continuous-operation.md) for shared admission,
+priorities and stable cohort rules. Desktop/browser availability remains required
+for public outreach; the server worker runs separately.
 
 Set `GROWTH_REVIEW_MODE=codex`. The server prepares one bounded evidence packet per UTC day. The **Skubase daily growth review** Codex heartbeat runs at 9 a.m. local time using the existing subscription allowance, with at most two decision-directed public source reads. It does not require a new OpenAI API key or paid API budget. Codex/local host availability is required; the Railway worker continues independently if the desktop is unavailable. Last-completed review time is visible on the dashboard. Subscription cost allocation and unavailable token counts remain UNKNOWN, rather than being reported as free compute.
 
