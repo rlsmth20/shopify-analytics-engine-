@@ -12,7 +12,8 @@ export function forecastRiskPercent(value: number | null) {
 export function forecastView(forecast: ForecastResult) {
   // Numeric zero is also the legacy placeholder for missing history. Only
   // explicit backend provenance (or an explicit demo fixture) can validate it.
-  const available = forecast.forecast_available === true && forecast.demand_signal !== "missing_history";
+  const identityReview = forecast.identity_ambiguous === true || forecast.demand_signal === "ambiguous_identity";
+  const available = !identityReview && forecast.forecast_available === true && forecast.demand_signal !== "missing_history";
   const measure = (value: unknown) => available ? nonnegative(value) : null;
   const risk = measure(forecast.stockout_probability_30d);
   const history = nonnegative(forecast.history_days);
@@ -22,6 +23,7 @@ export function forecastView(forecast: ForecastResult) {
     ? forecast.forecast_bias_14d : null;
   return {
     available,
+    identityReview,
     missingHistory: forecast.demand_signal === "missing_history",
     noRecentSales: forecast.demand_signal === "no_recent_sales",
     demand30: measure(forecast.projected_30_day_demand),
@@ -29,7 +31,7 @@ export function forecastView(forecast: ForecastResult) {
     demand90: measure(forecast.projected_90_day_demand),
     risk: risk !== null && risk <= 1 ? risk : null,
     confidence: available && ["high", "medium", "low"].includes(forecast.confidence) ? forecast.confidence : "Unknown",
-    history: history !== null && Number.isSafeInteger(history) ? `${history} days` : "Unknown",
+    history: !identityReview && history !== null && Number.isSafeInteger(history) ? `${history} days` : "Unknown",
     error,
     bias: bias?.replaceAll("_", " ") || "Unknown",
   };

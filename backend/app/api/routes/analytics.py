@@ -23,6 +23,7 @@ from app.services.inventory_health import build_inventory_health
 from app.services.shop_skus import (
     load_daily_history_for_shop_skus,
     load_skus_for_shop,
+    sku_identity_issues,
     start_weekday_for_shop_history,
 )
 
@@ -50,6 +51,7 @@ def read_scorecards(
     )
     return ScorecardResponse(
         scorecards=cards,
+        identity_issues=sku_identity_issues(skus),
         a_count=sum(1 for c in cards if c.abc_class == "A"),
         b_count=sum(1 for c in cards if c.abc_class == "B"),
         c_count=sum(1 for c in cards if c.abc_class == "C"),
@@ -103,6 +105,9 @@ def read_inventory_health(
         forecast_sku(
             ForecastInputs(
                 sku_id=sku.sku_id,
+                product_id=sku.product_id,
+                identity_ambiguous=sku.identity_ambiguous,
+                identity_warning=sku.identity_warning,
                 daily_history=histories.get(sku.sku_id, []),
                 on_hand=sku.inventory,
                 observed_history_days=sku.observed_history_days,

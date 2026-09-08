@@ -23,7 +23,7 @@ def build_purchase_order_drafts(
     shipping_cost_per_po = max(shipping_cost_per_po, 0.0)
     by_vendor: dict[str, list[ReorderSuggestion]] = {}
     for s in suggestions:
-        if s.recommended_order_qty <= 0:
+        if s.identity_ambiguous or s.recommended_order_qty <= 0:
             continue
         by_vendor.setdefault(s.vendor, []).append(s)
 
@@ -33,6 +33,7 @@ def build_purchase_order_drafts(
         lines = [
             PurchaseOrderLine(
                 sku_id=item.sku_id,
+                product_id=item.product_id,
                 name=item.name,
                 qty=item.recommended_order_qty,
                 unit_cost=item.unit_cost,

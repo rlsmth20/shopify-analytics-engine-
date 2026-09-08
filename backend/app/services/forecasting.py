@@ -41,10 +41,15 @@ class ForecastInputs:
     start_weekday: int  # 0=Mon ... 6=Sun, the weekday for history[0]
     observed_history_days: int | None = None
     source_warnings: tuple[str, ...] = ()
+    product_id: int | None = None
+    identity_ambiguous: bool = False
+    identity_warning: str | None = None
 
 
 def observed_history(inputs: ForecastInputs) -> tuple[list[float], int]:
     """Exclude loader padding without discarding known zero-sales windows."""
+    if inputs.identity_ambiguous:
+        return [], inputs.start_weekday
     history = _clean_history(inputs.daily_history)
     if inputs.observed_history_days is None:
         first_sale = next((i for i, value in enumerate(history) if value > 0), len(history))
@@ -57,6 +62,17 @@ def observed_history(inputs: ForecastInputs) -> tuple[list[float], int]:
 
 
 def forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> ForecastResult:
+    result = _forecast_sku(inputs, horizon_days)
+    update = {"product_id": inputs.product_id, "identity_ambiguous": inputs.identity_ambiguous,
+              "identity_warning": inputs.identity_warning}
+    if inputs.identity_ambiguous:
+        warning = inputs.identity_warning or "Multiple products share this SKU code; review the mapping before forecasting."
+        update.update(demand_signal="ambiguous_identity", explain=warning,
+                      data_quality_warnings=[warning], trust_reasons=[warning])
+    return result.model_copy(update=update)
+
+
+def _forecast_sku(inputs: ForecastInputs, horizon_days: int = HORIZON_DAYS) -> ForecastResult:
     raw_history, observed_start_weekday = observed_history(inputs)
     source_warnings = list(dict.fromkeys(inputs.source_warnings))
     if not raw_history:

@@ -7,6 +7,7 @@ import { exportFormattedReport } from "@/lib/report-export";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 import { financialValue, financialTotal, type FinancialProvenance } from "@/lib/financial-values";
 import { currency } from "@/lib/api-v2";
+import type { IdentityIssue } from "@/lib/product-identity";
 
 type DeadStockPairing = FinancialProvenance & {
   id: string;
@@ -29,6 +30,7 @@ type DeadStockPairing = FinancialProvenance & {
 };
 
 type PairingsResponse = FinancialProvenance & {
+  identity_issues?: IdentityIssue[];
   pairings: DeadStockPairing[];
   dead_stock_sku_count: number;
   dead_stock_capital: number;
@@ -200,6 +202,7 @@ export function DeadStockPairingsCard() {
         </div>
       </div>
       <p className="section-copy">
+        {data.identity_issues?.length ? "This plan covers safely matched products only. " : ""}
         {data.dead_stock_sku_count} SKU{data.dead_stock_sku_count === 1 ? " has" : "s have"} not
         sold in 45+ days. Attaching them to a fast mover moves volume without a
         visible storewide markdown.

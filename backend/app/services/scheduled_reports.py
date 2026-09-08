@@ -51,6 +51,7 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
             return None
         rows = []
         for action in actions:
+            needs_review = action.identity_ambiguous or not action.planning_values_known
             impact = (
                 getattr(action, "estimated_profit_impact", None)
                 if action.status == "urgent"
@@ -58,11 +59,12 @@ def build_report_email(db: DbSession, *, shop_id: int, report_type: str):
             )
             rows.append([
                 action.name,
-                action.status.upper(),
+                "REVIEW" if needs_review else action.status.upper(),
                 str(action.current_on_hand),
-                f"{action.days_of_inventory:.0f}d",
-                f"${impact:,.0f}" if impact is not None and action.financial_values_known else "Unknown",
-                action.recommended_action,
+                "Unknown" if needs_review else f"{action.days_of_inventory:.0f}d",
+                f"${impact:,.0f}" if impact is not None and action.financial_values_known and not needs_review else "Unknown",
+                (action.identity_warning or "Review SKU identity and planning inputs before ordering or clearing stock.")
+                    if needs_review else action.recommended_action,
             ])
         return (
             REPORT_TITLES[report_type],

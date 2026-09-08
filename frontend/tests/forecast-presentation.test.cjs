@@ -13,6 +13,9 @@ function compile(file, extra = "") {
 const context = { exports: {} };
 vm.runInNewContext(compile("lib/forecast-presentation.ts"), context);
 const view = context.exports;
+const identityContext = { exports: {} };
+vm.runInNewContext(compile("lib/product-identity.ts"), identityContext);
+const identity = identityContext.exports;
 const observed = {
   sku_id: "OBSERVED", forecast_available: true, demand_signal: "observed", horizon_days: 30,
   method: "seasonal_ema", trend: "steady", seasonality: "flat", weekly_index: [1, 1, 1, 1, 1, 1, 1],
@@ -89,7 +92,7 @@ test("risk and confidence filters exclude unavailable rows and preserve known ze
 function harness(fetcher) {
   let cursor = 0;
   const slots = new Map(), effects = [], calls = [], exports = {};
-  const jsx = (type, props) => ({ type, props });
+  const jsx = (type, props, key) => ({ type, props, key });
   const deps = {
     "react/jsx-runtime": { jsx, jsxs: jsx },
     react: {
@@ -104,6 +107,8 @@ function harness(fetcher) {
     "@/components/charts": { ChartPanel: "chart-panel", ForecastBandChart: "forecast-band", WeekdayIndexBars: "weekday-bars" },
     "@/lib/api-v2": { fetchForecasts: async signal => { calls.push(signal); return fetcher(); } },
     "@/lib/forecast-presentation": view,
+    "@/lib/product-identity": identity,
+    "@/components/identity-review-notice": { IdentityReviewNotice: "identity-review" },
   };
   vm.runInNewContext(compile("app/(app-shell)/forecast/page.tsx", "\nexport { ForecastContent as TestContent };"), {
     exports, AbortController, require(name) { assert.ok(name in deps, `Unexpected import ${name}`); return deps[name]; },
@@ -213,4 +218,24 @@ test("explicit sample forecasts retain charts while omitted history and backtest
     assert.equal(result.error, null);
     assert.ok(forecast.points.length > 0);
   }
+});
+
+test("same-SKU variants keep separate forecast selection and withhold ambiguous planning values", async () => {
+  const variants = [1, 2].map(id => ({ ...observed, sku_id: "sku_SHARED", product_id: id,
+    identity_ambiguous: true, demand_signal: "ambiguous_identity", identity_warning: `Variant ${id} needs mapping review.` }));
+  const h = harness(() => ({ forecasts: variants }));
+  let ui = await h.settle();
+  assert.match(ui.text, /sku_SHARED/);
+  assert.match(ui.text, /Variant 1 needs mapping review/);
+  assert.match(ui.text, /30-day demand Unknown/);
+  const rows = ui.nodes.filter(node => node.type === "li" && node.props.className.startsWith("sku-list-row"));
+  assert.equal(new Set(rows.map(row => row.key)).size, 2);
+  const buttons = ui.nodes.filter(node => node.type === "button" && node.props.className === "sku-list-button");
+  buttons[1].props.onClick();
+  ui = h.render();
+  assert.match(ui.text, /Variant 2 needs mapping review/);
+  assert.doesNotMatch(ui.text, /Variant 1 needs mapping review/);
+  assert.equal(ui.nodes.filter(node => node.type === "button" && node.props["aria-pressed"] === true && node.props.className === "sku-list-button").length, 1);
+  assert.equal(ui.nodes.some(node => node.type === "forecast-band"), false);
+  assert.equal(view.forecastView(variants[0]).history, "Unknown");
 });

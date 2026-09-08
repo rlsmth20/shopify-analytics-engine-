@@ -65,6 +65,8 @@ class InventoryTrustTests(unittest.TestCase):
         self.assertIn("Monitor sales", action.recommended_action)
         self.assertTrue(action.data_quality_warnings)
         self.assertFalse(action.sales_history_complete)
+        self.assertFalse(action.planning_values_known)
+        self.assertTrue(all(value is None for value in action.planning_values.values()))
         self.assertEqual(build_liquidation_plan([sku]), [])
         health = build_inventory_health(skus=[sku], forecasts=[])
         buckets = {bucket.label: bucket.value for bucket in health.health_buckets}

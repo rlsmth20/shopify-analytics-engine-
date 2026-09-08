@@ -16,6 +16,7 @@ from app.schemas import (
     SkuDetail,
 )
 from app.services.inventory_engine import build_inventory_actions
+from app.services.shop_skus import SkuAliasIndex, IDENTITY_WARNING, _slugified_sku_id_for_product
 from app.services.cost_provenance import MISSING_COST_WARNING, unit_cost_details
 from app.services.shop_settings import (
     ResolvedShopSettings,
@@ -120,9 +121,15 @@ def load_persisted_sku_snapshot() -> PersistedSkuSnapshot | None:
     except SQLAlchemyError:
         return None
 
+    products_by_shop = defaultdict(list)
+    for product, shop_id, _ in product_rows:
+        products_by_shop[shop_id].append(product)
+    indices = {shop_id: SkuAliasIndex(products, set(inventory_by_product))
+               for shop_id, products in products_by_shop.items()}
     records = [
         _build_prepared_sku_record(
             product=product,
+            identity_ambiguous=indices[shop_id].is_ambiguous(_slugified_sku_id_for_product(product)),
             shop_id=shop_id,
             shopify_domain=shopify_domain,
             inventory=inventory_by_product.get(product.id, 0),
@@ -132,6 +139,7 @@ def load_persisted_sku_snapshot() -> PersistedSkuSnapshot | None:
             now=now,
         )
         for product, shop_id, shopify_domain in product_rows
+        if product.id in inventory_by_product
     ]
 
     return PersistedSkuSnapshot(
@@ -227,7 +235,7 @@ def _build_db_backed_actions(snapshot: PersistedSkuSnapshot) -> list[InventoryAc
             [record.sku for record in shop_records],
             lead_time_config=settings.to_lead_time_config(),
         )
-        quality_by_sku = {record.sku.sku_id: record for record in shop_records}
+        quality_by_sku = {(record.sku.product_id or record.sku.sku_id): record for record in shop_records}
         actions.extend(
             _apply_action_explanations(
                 _apply_data_quality(shop_actions, quality_by_sku)
@@ -284,6 +292,7 @@ def _load_last_sale_by_product(session) -> dict[int, datetime]:
 def _build_prepared_sku_record(
     *,
     product: Product,
+    identity_ambiguous: bool = False,
     shop_id: int,
     shopify_domain: str,
     inventory: int,
@@ -297,6 +306,9 @@ def _build_prepared_sku_record(
         shop_id=shop_id,
         sku=SkuDetail(
             sku_id=_build_sku_id(product, shopify_domain),
+            product_id=product.id,
+            identity_ambiguous=identity_ambiguous,
+            identity_warning=IDENTITY_WARNING if identity_ambiguous else None,
             name=_build_product_name(product),
             vendor=product.vendor or UNKNOWN_VENDOR,
             category=product.category or UNKNOWN_CATEGORY,
@@ -335,6 +347,9 @@ def _calculate_days_since_last_sale(
     if last_sale_at is None:
         return NEVER_SOLD_DAYS
 
+    # SQLite returns naive UTC while PostgreSQL retains the timezone.
+    now = now.astimezone(timezone.utc).replace(tzinfo=None) if now.tzinfo else now
+    last_sale_at = last_sale_at.astimezone(timezone.utc).replace(tzinfo=None) if last_sale_at.tzinfo else last_sale_at
     return max((now - last_sale_at).days, 0)
 
 
@@ -371,8 +386,8 @@ def _apply_data_quality(
 ) -> list[InventoryAction]:
     enriched_actions: list[InventoryAction] = []
     for action in actions:
-        quality = quality_by_sku.get(action.sku_id)
-        if quality is None:
+        quality = quality_by_sku.get(action.product_id or action.sku_id)
+        if quality is None or action.identity_ambiguous:
             enriched_actions.append(action)
             continue
 
@@ -398,6 +413,8 @@ def _apply_action_explanations(
 
 
 def _build_action_explanation(action: InventoryAction) -> str:
+    if action.identity_ambiguous:
+        return action.identity_warning or IDENTITY_WARNING
     if not action.financial_values_known:
         return f"{action.recommended_action} Financial impact is unknown until the required cost and sales data are recorded."
     if action.status == "urgent":

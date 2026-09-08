@@ -18,7 +18,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Inventory, OrderLineItem, Product, ShopifySyncRun
-from app.schemas import SkuDetail
+from app.schemas import SkuDetail, SkuIdentityIssue
 from app.services.transfers import LocationStock
 from app.services.cost_provenance import unit_cost_details
 
@@ -41,6 +41,60 @@ def _slugify(*parts: str | None) -> str:
         if s:
             bits.append(s)
     return "-".join(bits) or "sku-unknown"
+
+
+IDENTITY_WARNING = "Multiple current products share this SKU code. Review and assign distinct SKU codes in the source catalog before forecasting, purchasing, or clearing this stock; recorded stock and sales are preserved."
+
+
+class AmbiguousSkuError(ValueError):
+    def __init__(self, sku_id: str, product_ids: list[int]):
+        self.sku_id = sku_id
+        self.product_ids = sorted(product_ids)
+        super().__init__(f"SKU '{sku_id}' matches multiple products. Review the SKU mapping before changing this item.")
+
+
+class SkuAliasIndex:
+    """Resolve aliases without merging product history or choosing an arbitrary row."""
+    def __init__(self, products: list[Product], active_product_ids: set[int]):
+        self._candidates: dict[str, list[Product]] = {}
+        self._alias_by_product = {product.id: _slugified_sku_id_for_product(product) for product in products}
+        for product in products:
+            for alias in {_slugified_sku_id_for_product(product), product.sku} - {None, ""}:
+                self._candidates.setdefault(alias, []).append(product)
+        # Filter each alias once, including when many variants reuse one code.
+        for alias, candidates in self._candidates.items():
+            active = [product for product in candidates if product.id in active_product_ids]
+            self._candidates[alias] = active or candidates
+
+    def _eligible(self, sku_id: str) -> list[Product]:
+        return self._candidates.get(sku_id, [])
+
+    def is_ambiguous(self, sku_id: str) -> bool:
+        return len(self._eligible(sku_id)) > 1
+
+    def is_authoritative_product(self, product_id: int) -> bool:
+        """Whether this row owns its alias (including a unique history-only row)."""
+        alias = self._alias_by_product.get(product_id)
+        candidates = self._eligible(alias) if alias is not None else []
+        return len(candidates) == 1 and candidates[0].id == product_id
+
+    def resolve(self, sku_id: str) -> Product | None:
+        candidates = self._eligible(sku_id)
+        if len(candidates) > 1:
+            raise AmbiguousSkuError(sku_id, [product.id for product in candidates])
+        return candidates[0] if candidates else None
+
+
+def build_sku_alias_index(db: Session, shop_id: int) -> SkuAliasIndex:
+    products = list(db.scalars(select(Product).where(Product.shop_id == shop_id)).all())
+    active_ids = set(db.scalars(select(Inventory.product_id).where(Inventory.shop_id == shop_id).distinct()).all())
+    return SkuAliasIndex(products, active_ids)
+
+
+def sku_identity_issues(skus: list[SkuDetail]) -> list[SkuIdentityIssue]:
+    return [SkuIdentityIssue(product_id=sku.product_id, sku_id=sku.sku_id, name=sku.name,
+                current_on_hand=sku.inventory, message=sku.identity_warning or IDENTITY_WARNING)
+            for sku in skus if sku.identity_ambiguous and sku.product_id is not None]
 
 
 def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
@@ -114,6 +168,7 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
         .limit(1)
     )
 
+    alias_index = SkuAliasIndex(list(products), set(on_hand_by_product))
     skus: list[SkuDetail] = []
     for p in products:
         if p.id not in on_hand_by_product:
@@ -141,6 +196,9 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
         skus.append(
             SkuDetail(
                 sku_id=sku_id,
+                product_id=p.id,
+                identity_ambiguous=alias_index.is_ambiguous(sku_id),
+                identity_warning=IDENTITY_WARNING if alias_index.is_ambiguous(sku_id) else None,
                 name=p.name + (f" / {p.variant_name}" if p.variant_name else ""),
                 vendor=p.vendor or "Unassigned",
                 category=p.category or "uncategorized",
@@ -198,28 +256,9 @@ def _slugified_sku_id_for_product(p: Product) -> str:
 
 
 def _resolve_product_id_for_sku(db: Session, shop_id: int, sku_id: str) -> int | None:
-    """Find the Product row id for a given external sku_id within one shop.
-
-    Looks up by Product.sku first, then falls back to the slugified id.
-    Returns None if no product matches — callers should treat that as
-    "no history" rather than crashing.
-    """
-    direct = db.scalar(
-        select(Product.id)
-        .where(Product.shop_id == shop_id)
-        .where(Product.sku == sku_id)
-    )
-    if direct is not None:
-        return int(direct)
-
-    # Fallback: scan products for one whose slug matches.
-    products = db.scalars(
-        select(Product).where(Product.shop_id == shop_id)
-    ).all()
-    for p in products:
-        if _slugified_sku_id_for_product(p) == sku_id:
-            return int(p.id)
-    return None
+    """Use current inventory ownership; ambiguous aliases fail explicitly."""
+    product = build_sku_alias_index(db, shop_id).resolve(sku_id)
+    return product.id if product is not None else None
 
 
 def load_daily_history_for_shop_sku(
@@ -271,21 +310,23 @@ def load_daily_history_for_shop_skus(
 ) -> dict[str, List[int]]:
     """Return daily histories for many SKUs with one aggregate query.
 
-    This avoids the per-SKU query loop on forecast, analytics, dashboard, and
-    reorder endpoints. Unknown SKUs still receive an all-zero history so callers
-    can treat the result exactly like repeated load_daily_history_for_shop_sku.
+    This avoids per-SKU queries. Absent aliases keep legacy zero padding, while
+    ambiguous aliases are omitted and must remain explicitly unavailable in the
+    read projection. Single-alias lookup raises AmbiguousSkuError instead.
     """
     if days <= 0 or not sku_ids:
         return {sku_id: [] for sku_id in sku_ids}
 
-    products = db.scalars(
-        select(Product).where(Product.shop_id == shop_id)
-    ).all()
-    product_id_by_sku: dict[str, int] = {}
-    for product in products:
-        product_id_by_sku[_slugified_sku_id_for_product(product)] = int(product.id)
-        if product.sku:
-            product_id_by_sku[product.sku] = int(product.id)
+    index = build_sku_alias_index(db, shop_id)
+    # Ambiguous aliases are omitted, never presented as another variant's history
+    # or as observed zero sales. Feed consumers expose an explicit review hold.
+    eligible_ids = [sku_id for sku_id in dict.fromkeys(sku_ids) if not index.is_ambiguous(sku_id)]
+    product_id_by_sku = {}
+    for sku_id in eligible_ids:
+        product = index.resolve(sku_id)
+        if product is not None:
+            product_id_by_sku[sku_id] = product.id
+    sku_ids = eligible_ids
 
     product_ids = {
         product_id_by_sku[sku_id]
@@ -397,8 +438,11 @@ def load_location_stocks_for_shop(db: Session, shop_id: int) -> list[LocationSto
     for row in inventory_rows:
         by_product.setdefault(row.product_id, []).append(row)
 
+    alias_index = SkuAliasIndex(list(products), set(by_product))
     snapshots: list[LocationStock] = []
     for product in products:
+        if alias_index.is_ambiguous(_slugified_sku_id_for_product(product)):
+            continue
         rows = [row for row in by_product.get(product.id, []) if row.quantity > 0]
         if len(rows) < 2:
             continue

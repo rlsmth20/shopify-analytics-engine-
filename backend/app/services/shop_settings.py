@@ -9,10 +9,15 @@ from app.config.lead_time import (
 )
 from app.db.models import CategoryLeadTime, Product, Shop, ShopSettings, VendorLeadTime
 from app.db.session import session_scope
+from app.services.shop_skus import AmbiguousSkuError, build_sku_alias_index
 
 
 class ShopSettingsInputError(ValueError):
     """Raised when shop settings input is invalid."""
+
+
+class ShopSettingsIdentityError(ShopSettingsInputError):
+    """An alias does not identify a safe SKU override to change."""
 
 
 @dataclass(frozen=True)
@@ -306,7 +311,7 @@ def upsert_category_lead_times(
 
 def get_sku_lead_times(
     shopify_domain: str,
-) -> tuple[int | None, str, list[LeadTimeOverrideValue]]:
+) -> tuple[int | None, str, list[LeadTimeOverrideValue], list[str]]:
     normalized_domain = normalize_shopify_domain(shopify_domain)
 
     with session_scope() as session:
@@ -314,33 +319,22 @@ def get_sku_lead_times(
             select(Shop).where(Shop.shopify_domain == normalized_domain)
         )
         if shop is None:
-            return None, normalized_domain, []
+            return None, normalized_domain, [], []
 
         products = session.scalars(
             select(Product)
             .where(Product.shop_id == shop.id)
-            .where(Product.sku_lead_time_days.is_not(None))
             .order_by(Product.sku.asc(), Product.name.asc())
         ).all()
-        return (
-            shop.id,
-            shop.shopify_domain,
-            [
-                LeadTimeOverrideValue(
-                    name=_sku_id_for_product(product),
-                    lead_time_days=int(product.sku_lead_time_days or 0),
-                )
-                for product in products
-                if product.sku_lead_time_days is not None
-            ],
-        )
+        items, warnings = _sku_override_view(products, build_sku_alias_index(session, shop.id))
+        return shop.id, shop.shopify_domain, items, warnings
 
 
 def upsert_sku_lead_times(
     *,
     shopify_domain: str,
     items: list[LeadTimeOverrideValue],
-) -> tuple[int, str, list[LeadTimeOverrideValue]]:
+) -> tuple[int, str, list[LeadTimeOverrideValue], list[str]]:
     normalized_domain = normalize_shopify_domain(shopify_domain)
     normalized_items = _normalize_lead_time_items(items, kind="SKU")
 
@@ -349,29 +343,67 @@ def upsert_sku_lead_times(
         products = session.scalars(
             select(Product).where(Product.shop_id == shop.id)
         ).all()
-        products_by_sku_id = {_sku_id_for_product(product): product for product in products}
-
-        for product in products:
-            product.sku_lead_time_days = None
-
+        index = build_sku_alias_index(session, shop.id)
+        products_by_id = {product.id: product for product in products}
+        requested = {}
+        # Validate the complete request before clearing any prior override.
         for sku_id, lead_time_days in normalized_items.items():
-            product = products_by_sku_id.get(sku_id)
+            try:
+                product = index.resolve(sku_id)
+            except AmbiguousSkuError as exc:
+                candidates = [products_by_id[product_id] for product_id in exc.product_ids]
+                if candidates and all(product.sku_lead_time_days == lead_time_days for product in candidates):
+                    continue  # Unchanged unresolved rows may accompany an unrelated safe edit.
+                raise ShopSettingsIdentityError(
+                    f"SKU '{sku_id}' matches multiple products. Review its identity before changing this override; no overrides were changed."
+                ) from None
             if product is None:
                 raise ShopSettingsInputError(
                     f"SKU lead time entry '{sku_id}' does not match a synced SKU."
                 )
-            product.sku_lead_time_days = lead_time_days
+            requested[product.id] = lead_time_days
+
+        mutable_ids = set(requested)
+        for sku_id in {_sku_id_for_product(product) for product in products}:
+            try:
+                product = index.resolve(sku_id)
+            except AmbiguousSkuError:
+                continue
+            if product is not None:
+                mutable_ids.add(product.id)
+        # Snapshot replacement applies only to uniquely resolved products.
+        # Retired stubs and unresolved aliases retain their data, with warnings.
+        for product_id in mutable_ids:
+            products_by_id[product_id].sku_lead_time_days = requested.get(product_id)
 
         session.flush()
-        saved_items = [
-            LeadTimeOverrideValue(
-                name=sku_id,
-                lead_time_days=int(product.sku_lead_time_days),
-            )
-            for sku_id, product in sorted(products_by_sku_id.items())
-            if product.sku_lead_time_days is not None
-        ]
-        return shop.id, shop.shopify_domain, saved_items
+        saved_items, warnings = _sku_override_view(products, index)
+        return shop.id, shop.shopify_domain, saved_items, warnings
+
+
+def _sku_override_view(products, index):
+    products_by_id = {product.id: product for product in products}
+    selected_ids, items, warnings = set(), [], []
+    for alias in sorted({_sku_id_for_product(product) for product in products}):
+        try:
+            product = index.resolve(alias)
+        except AmbiguousSkuError as exc:
+            candidates = [products_by_id[product_id] for product_id in exc.product_ids]
+            selected_ids.update(exc.product_ids)
+            values = {product.sku_lead_time_days for product in candidates}
+            if any(value is not None for value in values):
+                warnings.append(f"SKU '{alias}' has unresolved product identities. Its existing overrides were retained; review them before making changes.")
+            if len(values) == 1 and None not in values:
+                items.append(LeadTimeOverrideValue(name=alias, lead_time_days=values.pop()))
+            continue
+        if product is not None:
+            selected_ids.add(product.id)
+            if product.sku_lead_time_days is not None:
+                items.append(LeadTimeOverrideValue(name=alias, lead_time_days=product.sku_lead_time_days))
+    retained = [product for product in products if product.id not in selected_ids and product.sku_lead_time_days is not None]
+    if retained:
+        warnings.append(f"{len(retained)} override(s) on retired or superseded product records were retained. They were not reassigned to current products.")
+    return items, warnings
 
 
 def normalize_shopify_domain(shopify_domain: str) -> str:

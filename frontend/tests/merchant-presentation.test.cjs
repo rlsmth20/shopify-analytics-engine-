@@ -100,3 +100,51 @@ test("history-review table rows distinguish unestablished exposure and display q
   assert.match(html, /1 warning in details/);
   assert.doesNotMatch(html, /May run out before delivery/);
 });
+
+test("ambiguous comparison masks stale purchasing and risk numbers while retaining recorded stock", () => {
+  const held = { ...urgent, identity_ambiguous: true };
+  const metrics = actionTableMetrics(held);
+  assert.equal(metrics.identityReview, true);
+  assert.equal(metrics.stock, 12);
+  for (const key of ["coverage", "impact", "reorderUnits", "leadTime"]) assert.equal(metrics[key], null);
+  const html = renderToStaticMarkup(React.createElement(ActionTable, { actions: [held] }));
+  assert.match(html, /Review SKU mapping/);
+  assert.match(html, /Withheld until mapping review/);
+  assert.doesNotMatch(html, /68 units|May run out before delivery/);
+});
+
+test("table expansion follows product identity when two variants share a SKU and rows reorder", () => {
+  let expanded = null;
+  const jsx = (type, props, key) => ({ type, props, key });
+  const dependencies = {
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    react: { Fragment: "fragment", useId: () => "table", useState: () => [expanded, value => { expanded = value; }] },
+    "@/components/action-card": { ActionCard: "action-card" },
+    "@/lib/action-presentation": { actionTableMetrics },
+    "@/lib/product-identity": load("lib/product-identity.ts"),
+    "@/lib/app-helpers": load("lib/app-helpers.ts"),
+    "./action-table.module.css": { default: {} },
+  };
+  const exports = {};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root, "components/action-table.tsx"), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText, { exports, require: name => { assert.ok(name in dependencies, name); return dependencies[name]; } });
+  const variants = [1, 2].map(product_id => ({ ...urgent, product_id, sku_id: "SHARED", name: `Variant ${product_id}` }));
+  function render(actions) {
+    const nodes = [];
+    function walk(node) {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node?.props) return;
+      nodes.push(node); walk(node.props.children);
+    }
+    walk(exports.ActionTable({ actions }));
+    return nodes;
+  }
+  let nodes = render(variants);
+  const rows = nodes.filter(node => node.type === "fragment");
+  assert.equal(new Set(rows.map(node => node.key)).size, 2);
+  nodes.filter(node => node.type === "button")[1].props.onClick();
+  nodes = render([...variants].reverse());
+  assert.equal(nodes.filter(node => node.type === "button" && node.props["aria-expanded"]).length, 1);
+  assert.equal(nodes.find(node => node.type === "action-card").props.action.product_id, 2);
+});

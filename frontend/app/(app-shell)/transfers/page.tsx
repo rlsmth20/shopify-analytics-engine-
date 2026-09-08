@@ -7,6 +7,8 @@ import { isDemoActive } from "@/lib/shopify-embedded";
 import { useEffect, useMemo, useState } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
+import { IdentityReviewNotice } from "@/components/identity-review-notice";
+import type { IdentityIssue } from "@/lib/product-identity";
 import { GatedFeature } from "@/components/gated-feature";
 import {
   ReportEmptyState,
@@ -58,6 +60,7 @@ export default function TransfersPage() {
 
 function TransfersContent() {
   const [transfers, setTransfers] = useState<TransferRecommendation[]>([]);
+  const [identityIssues, setIdentityIssues] = useState<IdentityIssue[]>([]);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +76,7 @@ function TransfersContent() {
     fetchTransfers(controller.signal)
       .then((r) => {
         setTransfers(r.transfers);
+        setIdentityIssues(r.identity_issues ?? []);
         setError(null);
       })
       .catch((e) => {
@@ -217,8 +221,10 @@ function TransfersContent() {
 
   if (transfers.length === 0) {
     return (
+      <div className="page-stack">
+      <IdentityReviewNotice issues={identityIssues} />
       <DataQualityNote
-        title="Transfer recommendations require location-level inventory"
+        title="No transfer recommendations yet"
         actions={
           <div className="button-row">
             <Link className="button button-secondary" href="/store-sync">
@@ -231,17 +237,18 @@ function TransfersContent() {
         }
       >
         <p>
-          Your current sync is using aggregate inventory, so Skubase cannot safely
-          recommend transfers yet. Confirm Shopify locations are enabled, re-sync
-          inventory if location-level sync is supported, and use Stockout Risk and
-          Reorder Plan reports in the meantime.
+          Skubase needs safely matched products and stock at multiple locations to
+          identify useful transfers. Review product mappings, location stock and
+          demand coverage before planning a transfer.
         </p>
       </DataQualityNote>
+      </div>
     );
   }
 
   return (
     <div className="transfers-page page-stack">
+      <IdentityReviewNotice issues={identityIssues} />
       <section className="section-card transfer-hero">
         <div className="section-heading">
           <div>

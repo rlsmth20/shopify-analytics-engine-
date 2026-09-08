@@ -24,6 +24,7 @@ from app.services.alerts import list_recent_events
 from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.inventory_engine import build_inventory_actions
 from app.services.cost_provenance import cost_known
+from app.services.shop_skus import sku_identity_issues
 
 
 # Type aliases — readability for the function-parameter signatures below.
@@ -61,7 +62,7 @@ def build_dashboard(
     inventory_value = sum(sku.cost * sku.inventory for sku in skus)
     inventory_known = all(cost_known(sku) for sku in skus if sku.inventory != 0)
     cash_known = all(a.financial_values_known for a in optimize + dead)
-    profit_known = all(a.financial_values_known for a in urgent)
+    profit_known = not any(sku.identity_ambiguous for sku in skus) and all(a.financial_values_known for a in urgent)
 
     kpis = [
         DashboardKpi(
@@ -146,16 +147,12 @@ def build_dashboard(
     ]
 
     # Cash at risk by vendor
-    # Preserve the first-match SKU behavior without scanning the entire
-    # catalog twice for every action (quadratic for large assortments).
-    vendor_by_sku: dict[str, str] = {}
-    for sku in skus:
-        vendor_by_sku.setdefault(sku.sku_id, sku.vendor)
+    vendor_by_sku = {(sku.product_id or sku.sku_id): sku.vendor for sku in skus}
     cash_by_vendor: dict[str, float] = {}
     unknown_vendors: set[str] = set()
     for a in actions:
         if a.status in ("optimize", "dead"):
-            vendor = vendor_by_sku.get(a.sku_id, "Unknown")
+            vendor = vendor_by_sku.get(a.product_id or a.sku_id, "Unknown")
             cash_by_vendor[vendor] = cash_by_vendor.get(vendor, 0) + getattr(a, "cash_tied_up", 0)
             if not a.financial_values_known:
                 unknown_vendors.add(vendor)
@@ -170,10 +167,15 @@ def build_dashboard(
     # Backtest the held-out week against that same seven-day forecast horizon.
     forecast_vs_actual: list[DashboardSeriesPoint] = []
     for sku in top_movers[:5]:
+        if sku.identity_ambiguous:
+            continue
         history = daily_history_fn(sku.sku_id, 90)
         forecast = forecast_sku(
             ForecastInputs(
                 sku_id=sku.sku_id,
+                product_id=sku.product_id,
+                identity_ambiguous=sku.identity_ambiguous,
+                identity_warning=sku.identity_warning,
                 daily_history=history[:-7],  # forecast using all but last 7 days
                 on_hand=sku.inventory,
                 observed_history_days=max(0, sku.observed_history_days - 7)
@@ -208,6 +210,7 @@ def build_dashboard(
     ]
 
     return DashboardResponse(
+        identity_issues=sku_identity_issues(list(skus)),
         kpis=kpis,
         revenue_trend_30d=revenue_points,
         stock_health_breakdown=stock_health,

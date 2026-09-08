@@ -10,9 +10,11 @@ from app.schemas_v2 import ForecastFeedResponse, ForecastResult
 from app.services.forecast_accuracy import backtest_forecast
 from app.services.forecasting import ForecastInputs, forecast_sku
 from app.services.shop_skus import (
+    AmbiguousSkuError,
     load_daily_history_for_shop_sku,
     load_daily_history_for_shop_skus,
     load_skus_for_shop,
+    sku_identity_issues,
     start_weekday_for_shop_history,
 )
 
@@ -41,6 +43,9 @@ def list_forecasts(
         history = histories.get(sku.sku_id, [])
         inputs = ForecastInputs(
             sku_id=sku.sku_id,
+            product_id=sku.product_id,
+            identity_ambiguous=sku.identity_ambiguous,
+            identity_warning=sku.identity_warning,
             daily_history=history,
             on_hand=sku.inventory,
             observed_history_days=sku.observed_history_days,
@@ -60,7 +65,7 @@ def list_forecasts(
             )
         )
     forecasts.sort(key=lambda f: f.stockout_probability_30d, reverse=True)
-    return ForecastFeedResponse(forecasts=forecasts)
+    return ForecastFeedResponse(forecasts=forecasts, identity_issues=sku_identity_issues(skus))
 
 
 @router.get("/{sku_id}", response_model=ForecastResult)
@@ -74,9 +79,17 @@ def get_forecast(
     sku = next((s for s in skus if s.sku_id == sku_id), None)
     if sku is None:
         raise HTTPException(status_code=404, detail=f"SKU '{sku_id}' not found.")
-    history = load_daily_history_for_shop_sku(db, user.shop_id, sku_id, 90)
+    if sku.identity_ambiguous:
+        raise HTTPException(status_code=409, detail=sku.identity_warning)
+    try:
+        history = load_daily_history_for_shop_sku(db, user.shop_id, sku_id, 90)
+    except AmbiguousSkuError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     inputs = ForecastInputs(
         sku_id=sku_id,
+        product_id=sku.product_id,
+        identity_ambiguous=sku.identity_ambiguous,
+        identity_warning=sku.identity_warning,
         daily_history=history,
         on_hand=sku.inventory,
         observed_history_days=sku.observed_history_days,

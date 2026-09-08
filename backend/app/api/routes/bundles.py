@@ -7,6 +7,7 @@ from app.api.deps import require_plan_feature
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import BundleOpportunitiesResponse, DeadStockPairingsResponse
+from app.services.shop_skus import load_skus_for_shop, sku_identity_issues
 from app.services.bundle_opportunities import (
     recommend_bundle_opportunities,
     recommend_dead_stock_pairings,
@@ -24,6 +25,7 @@ def read_bundle_health(
     opportunities, orders_analyzed = recommend_bundle_opportunities(db, user.shop_id)
     return BundleOpportunitiesResponse(
         bundles=[],
+        identity_issues=sku_identity_issues(load_skus_for_shop(db, user.shop_id)),
         opportunities=opportunities,
         orders_analyzed=orders_analyzed,
     )

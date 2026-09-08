@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.db.models import OrderLineItem, Product
 from app.schemas_v2 import BundleOpportunity
 from app.services.cost_provenance import cost_known
+from app.services.shop_skus import build_sku_alias_index, sku_identity_issues
 
 
 def recommend_bundle_opportunities(
@@ -23,6 +24,7 @@ def recommend_bundle_opportunities(
     min_co_purchase_count: int = 3,
     limit: int = 25,
 ) -> tuple[list[BundleOpportunity], int]:
+    alias_index = build_sku_alias_index(db, shop_id)
     rows = db.execute(
         select(
             OrderLineItem.shopify_order_id,
@@ -42,14 +44,19 @@ def recommend_bundle_opportunities(
     product_meta: dict[int, dict[str, object]] = {}
 
     for row in rows:
+        # Keep the shop-wide order denominator, but never recommend a retired
+        # alias owner or an ambiguous product as a current bundle component.
+        order_products = orders[str(row.shopify_order_id)]
         product_id = int(row.product_id)
+        if not alias_index.is_authoritative_product(product_id):
+            continue
         line_revenue = float(row.quantity or 0) * float(row.price or 0)
         product_meta[product_id] = {
             "name": row.name,
             "sku": row.sku,
             "category": row.category,
         }
-        current = orders[str(row.shopify_order_id)].setdefault(
+        current = order_products.setdefault(
             product_id,
             {"quantity": 0, "revenue": 0.0},
         )
@@ -79,7 +86,6 @@ def recommend_bundle_opportunities(
     for (left, right), count in pair_counts.items():
         if count < min_co_purchase_count:
             continue
-
         left_count = product_order_counts[left]
         right_count = product_order_counts[right]
         if left_count == 0 or right_count == 0:
@@ -185,14 +191,15 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
     from app.services.shop_skus import load_skus_for_shop
 
     skus = load_skus_for_shop(db, shop_id)
+    issues = sku_identity_issues(skus)
     dead = [
         sku for sku in skus
-        if sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= DEAD_STOCK_DAYS
+        if not sku.identity_ambiguous and sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= DEAD_STOCK_DAYS
     ]
     anchors = sorted(
         (
             sku for sku in skus
-            if sku.inventory > 0
+            if not sku.identity_ambiguous and sku.inventory > 0
             and sku.last_30_day_sales >= MIN_ANCHOR_MONTHLY_UNITS
             and sku.days_since_last_sale < DEAD_STOCK_DAYS
         ),
@@ -205,7 +212,8 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
             pairings=[],
             dead_stock_sku_count=len(dead),
             dead_stock_capital=dead_capital,
-            financial_values_known=all(cost_known(sku) for sku in dead),
+            financial_values_known=not issues and all(cost_known(sku) for sku in dead),
+            identity_issues=issues,
         )
 
     dead.sort(key=lambda sku: (cost_known(sku), sku.inventory * sku.cost if cost_known(sku) else sku.days_since_last_sale), reverse=True)
@@ -280,7 +288,8 @@ def recommend_dead_stock_pairings(db: Session, shop_id: int, limit: int = 12):
         pairings=pairings,
         dead_stock_sku_count=len(dead),
         dead_stock_capital=dead_capital,
-        financial_values_known=all(cost_known(sku) for sku in dead),
+        financial_values_known=not issues and all(cost_known(sku) for sku in dead),
+        identity_issues=issues,
     )
 
 

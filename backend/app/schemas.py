@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 Classification = Literal["urgent", "optimize", "dead", "healthy"]
@@ -18,6 +18,20 @@ AiChatMode = Literal["ai", "local"]
 
 class ApiModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class SkuIdentityProjection(ApiModel):
+    product_id: int | None = None
+    identity_ambiguous: bool = False
+    identity_warning: str | None = None
+
+
+class SkuIdentityIssue(ApiModel):
+    product_id: int
+    sku_id: str
+    name: str
+    current_on_hand: int
+    message: str
 
 
 class HealthResponse(ApiModel):
@@ -106,6 +120,7 @@ class CategoryLeadTimeSettingsResponse(ApiModel):
 
 
 class SkuLeadTimeSettingsResponse(ApiModel):
+    warnings: list[str] = Field(default_factory=list)
     shop_id: int | None = None
     shopify_domain: str
     items: list[SkuLeadTimeEntry]
@@ -126,7 +141,18 @@ class UpdateSkuLeadTimesRequest(ApiModel):
     items: list[SkuLeadTimeEntry] = Field(default_factory=list)
 
 
-class BaseInventoryAction(ApiModel):
+class BaseInventoryAction(SkuIdentityProjection):
+    planning_values_known: bool = True
+    planning_values: dict[str, float | None] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def canonical_planning_values(self):
+        self.planning_values_known = self.planning_values_known and not self.identity_ambiguous
+        fields = ("safety_stock_units", "target_inventory_units", "reorder_point_units",
+                  "days_of_inventory", "lead_time_days_used", "target_coverage_days")
+        self.planning_values = {key: getattr(self, key) if self.planning_values_known else None for key in fields}
+        return self
+
     sku_id: str = Field(description="Internal SKU identifier.")
     name: str
     status: ActionableStatus
@@ -177,6 +203,7 @@ InventoryAction: TypeAlias = Annotated[
 
 
 class ActionFeedResponse(ApiModel):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     data_source: ActionDataSource
     actions: list[InventoryAction]
 
@@ -211,7 +238,7 @@ class AiChatResponse(ApiModel):
     related_links: list[AiChatRelatedLink] = Field(default_factory=list)
 
 
-class SkuDetail(ApiModel):
+class SkuDetail(SkuIdentityProjection):
     sku_id: str = Field(description="Internal SKU identifier.")
     name: str
     vendor: str

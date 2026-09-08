@@ -12,6 +12,16 @@ const finance = {};
 vm.runInNewContext(compile("../lib/financial-values.ts"), { exports: finance });
 const jsx = (type, props) => ({ type, props });
 const currency = value => value === null ? "Unknown" : `$${value.toLocaleString("en-US")}`;
+const identity = {}, identityNotice = {};
+vm.runInNewContext(compile("../lib/product-identity.ts"), { exports: identity });
+vm.runInNewContext(compile("../components/identity-review-notice.tsx"), {
+  exports: identityNotice,
+  require: name => ({
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "next/link": { __esModule: true, default: "a" },
+    "@/lib/product-identity": identity,
+  })[name],
+});
 
 function renderHealth(health) {
   let stateIndex = 0;
@@ -23,6 +33,7 @@ function renderHealth(health) {
     "@/components/inventory-value-chart": { InventoryValueChart: "InventoryValueChart" },
     "@/components/empty-state": { EmptyState: "EmptyState" },
     "@/components/kpi-card": { KpiCard: "KpiCard" },
+    "@/components/identity-review-notice": identityNotice,
     "@/lib/use-action-feed": { useActionFeed: () => ({ actions: [], dataSource: "db", isLoading: false, errorMessage: null }) },
     "@/lib/financial-values": finance,
     "@/lib/api-v2": { currency },
@@ -101,4 +112,20 @@ test("legacy health responses use a qualified empty state without fabricating co
   assert.doesNotMatch(ui.text, /SKUs can be assessed/);
   assert.match(ui.emptyRisk.props.title, /available forecasts/);
   assert.doesNotMatch(ui.emptyRisk.props.description, /no stockout risk|no meaningful revenue/i);
+});
+
+test("duplicate variants remain distinct review items while complete risk stays unknown", () => {
+  const ui = renderHealth(health({
+    identity_issues: [
+      { product_id: 7, sku_id: "SHARED", name: "Fast variant", current_on_hand: 10, message: "Review" },
+      { product_id: 8, sku_id: "SHARED", name: "Slow variant", current_on_hand: 80, message: "Review" },
+    ],
+  }));
+  assert.equal(ui.riskKpi.props.value, "Unknown");
+  assert.match(ui.text, /2 products need mapping review/);
+  assert.match(ui.text, /Fast variant/);
+  assert.match(ui.text, /Slow variant/);
+  assert.match(ui.text, /Forecasts and recommendations for these products are withheld/);
+  assert.match(ui.text, /history or product mapping review/);
+  assert.equal(ui.nodes.filter(node => node.type === "li").length, 2);
 });

@@ -60,6 +60,8 @@ def build_reorder_suggestions(
 ) -> list[ReorderSuggestion]:
     suggestions: list[ReorderSuggestion] = []
     for sku in skus:
+        if sku.identity_ambiguous:
+            continue
         lead_time = _resolve_lead_time(sku, lead_time_config)
         history = history_for_sku(sku.sku_id) or []
         inputs = ReorderInputs(
@@ -125,6 +127,7 @@ def _build_suggestion(inputs: ReorderInputs) -> ReorderSuggestion:
 
     return ReorderSuggestion(
         sku_id=sku.sku_id,
+        product_id=sku.product_id,
         name=sku.name,
         vendor=sku.vendor,
         current_on_hand=sku.inventory,

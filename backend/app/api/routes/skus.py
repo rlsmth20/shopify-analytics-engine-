@@ -43,4 +43,6 @@ def read_sku(
     sku = next((s for s in skus if s.sku_id == sku_id), None)
     if sku is None:
         raise HTTPException(status_code=404, detail=f"SKU '{sku_id}' was not found.")
+    if sku.identity_ambiguous:
+        raise HTTPException(status_code=409, detail=sku.identity_warning)
     return sku

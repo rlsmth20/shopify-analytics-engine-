@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { IdentityReviewNotice } from "@/components/identity-review-notice";
+import type { IdentityIssue } from "@/lib/product-identity";
 
 import {
   currency,
@@ -20,6 +22,7 @@ const NEVER_SOLD_DAYS = 999;
 
 export default function LiquidationPage() {
   const [suggestions, setSuggestions] = useState<LiquidationSuggestion[]>([]);
+  const [identityIssues, setIdentityIssues] = useState<IdentityIssue[]>([]);
   const [totalRecoverable, setTotalRecoverable] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +33,7 @@ export default function LiquidationPage() {
     fetchLiquidation(controller.signal)
       .then((r) => {
         setSuggestions(r.suggestions);
+        setIdentityIssues(r.identity_issues ?? []);
         setTotalRecoverable(financialValue(r, "total_capital_recoverable", r.total_capital_recoverable));
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -44,11 +48,14 @@ export default function LiquidationPage() {
 
   if (suggestions.length === 0) {
     return (
-      <div className="empty-state">
+      <div className="page-stack">
+        <IdentityReviewNotice issues={identityIssues} />
+        <div className="empty-state">
         <p className="empty-state-title">No recovery recommendations</p>
         <p className="empty-state-copy">
-          No SKU with sufficient sales history currently qualifies for a recovery plan.
+          No safely matched SKU with sufficient sales history currently qualifies for a recovery plan.
         </p>
+        </div>
       </div>
     );
   }
@@ -58,6 +65,7 @@ export default function LiquidationPage() {
 
   return (
     <div className="liquidation-page">
+      <IdentityReviewNotice issues={identityIssues} />
       {missingCostCount > 0 && <p className="section-copy">{missingCostCount} SKU{missingCostCount === 1 ? " needs" : "s need"} recorded unit costs before Skubase can suggest a markdown or estimate recovery. Review these items and add costs before choosing a clearance price.</p>}
       <div className="liquidation-summary">
         <div className="kpi-card kpi-tone-negative">

@@ -1,5 +1,6 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import type { FinancialProvenance, KnownValue } from "@/lib/financial-values";
+import type { ProductIdentity, IdentityIssue } from "@/lib/product-identity";
 import type { ScheduledEmailDelivery } from "@/lib/email-schedule";
 // V2 API client for forecast, analytics, reorder, suppliers, bundles, transfers,
 // liquidation, alerts, and dashboard endpoints.
@@ -96,10 +97,10 @@ export type ForecastPoint = {
   upper_bound: number;
 };
 
-export type ForecastResult = {
+export type ForecastResult = ProductIdentity & {
   sku_id: string;
   forecast_available?: boolean;
-  demand_signal?: "observed" | "no_recent_sales" | "missing_history";
+  demand_signal?: "observed" | "no_recent_sales" | "missing_history" | "ambiguous_identity";
   horizon_days: number;
   method: string;
   trend: TrendDirection;
@@ -170,6 +171,7 @@ export type InventoryHealthInsight = {
 };
 
 export type InventoryHealthResponse = {
+  identity_issues?: IdentityIssue[];
   forecast_coverage?: { total_skus: number; available_skus: number; unavailable_skus: number; low_confidence_skus: number; no_recent_sales_skus: number } | null;
   kpis: InventoryHealthKpi[];
   health_buckets: InventoryHealthBucket[];
@@ -203,6 +205,7 @@ export type ReorderSuggestion = FinancialProvenance & {
 };
 
 export type ReorderFeed = FinancialProvenance & {
+  identity_issues?: IdentityIssue[];
   service_level: number;
   suggestions: ReorderSuggestion[];
   total_extended_cost: number;
@@ -223,7 +226,8 @@ export type SupplierScorecard = {
   notes: string[];
 };
 
-export type BundleHealth = FinancialProvenance & {
+export type BundleHealth = FinancialProvenance & ProductIdentity & {
+  planning_values_known?: boolean;
   bundle_sku_id: string;
   bundle_name: string;
   max_bundles_sellable: number;
@@ -288,7 +292,7 @@ export type LiquidationSuggestion = FinancialProvenance & {
   rationale: string;
 };
 
-export type PurchaseOrderLine = FinancialProvenance & {
+export type PurchaseOrderLine = FinancialProvenance & ProductIdentity & {
   sku_id: string;
   name: string;
   qty: number;
@@ -328,7 +332,7 @@ export type PurchaseOrderDraft = FinancialProvenance & {
   receipts?: PurchaseOrderReceipt[];
 };
 
-export type BuyingCalendarLine = FinancialProvenance & {
+export type BuyingCalendarLine = FinancialProvenance & ProductIdentity & {
   sku_id: string;
   name: string;
   qty: number;
@@ -358,6 +362,7 @@ export type BuyingCalendarEvent = FinancialProvenance & {
 };
 
 export type BuyingCalendarResponse = FinancialProvenance & {
+  identity_issues?: IdentityIssue[];
   generated_at: string;
   horizon_days: number;
   events: BuyingCalendarEvent[];
@@ -460,6 +465,7 @@ export type DashboardSeriesPoint = KnownValue & {
 };
 
 export type DashboardResponse = {
+  identity_issues?: IdentityIssue[];
   kpis: DashboardKpi[];
   revenue_trend_30d: DashboardSeriesPoint[];
   stock_health_breakdown: DashboardSeriesPoint[];
@@ -580,7 +586,7 @@ export const fetchDashboard = (signal?: AbortSignal) =>
   get<DashboardResponse>("/dashboard", signal);
 
 export const fetchForecasts = (signal?: AbortSignal) =>
-  get<{ forecasts: ForecastResult[] }>("/forecast", signal);
+  get<{ forecasts: ForecastResult[]; identity_issues?: IdentityIssue[] }>("/forecast", signal);
 
 export const fetchForecastForSku = (skuId: string, signal?: AbortSignal) =>
   get<ForecastResult>(`/forecast/${encodeURIComponent(skuId)}`, signal);
@@ -622,7 +628,7 @@ export const fetchPurchaseOrders = (
     typeof shippingCostOrSignal === "number" ? shippingCostOrSignal : 35;
   const signal =
     typeof shippingCostOrSignal === "number" ? maybeSignal : shippingCostOrSignal;
-  return get<{ drafts: PurchaseOrderDraft[]; total_capital_required: number }>(
+  return get<{ drafts: PurchaseOrderDraft[]; total_capital_required: number; identity_issues?: IdentityIssue[] }>(
     `/reorder/purchase-orders?service_level=${serviceLevel}&shipping_cost=${shippingCost}`,
     signal
   );
@@ -704,13 +710,14 @@ export const fetchSuppliers = (signal?: AbortSignal) =>
   get<{ vendors: SupplierScorecard[] }>("/suppliers", signal);
 
 export const fetchBundles = (signal?: AbortSignal) =>
-  get<{ bundles: BundleHealth[]; opportunities?: BundleOpportunity[]; orders_analyzed?: number }>("/bundles", signal);
+  get<{ bundles: BundleHealth[]; opportunities?: BundleOpportunity[]; orders_analyzed?: number; identity_issues?: IdentityIssue[] }>("/bundles", signal);
 
 export const fetchTransfers = (signal?: AbortSignal) =>
-  get<{ transfers: TransferRecommendation[] }>("/transfers", signal);
+  get<{ transfers: TransferRecommendation[]; identity_issues?: IdentityIssue[] }>("/transfers", signal);
 
 export const fetchLiquidation = (signal?: AbortSignal) =>
   get<FinancialProvenance & {
+    identity_issues?: IdentityIssue[];
     total_capital_recoverable: number;
     suggestions: LiquidationSuggestion[];
   }>("/liquidation", signal);

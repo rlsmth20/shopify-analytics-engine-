@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { useStoredShopDomain } from "@/lib/use-stored-shop-domain";
 import { useAuth } from "@/components/auth-guard";
+import { productRowKey, skuNeedsIdentityReview, uniqueSkuProduct, IDENTITY_REVIEW_MESSAGE } from "@/lib/product-identity";
 import styles from "./page.module.css";
 
 type OverrideRow = {
@@ -71,6 +72,7 @@ function LeadTimeSettingsContent() {
   const [supplierRows, setSupplierRows] = useState<OverrideRow[]>([]);
   const [categoryRows, setCategoryRows] = useState<OverrideRow[]>([]);
   const [skuRows, setSkuRows] = useState<SkuOverrideRow[]>([]);
+  const [skuWarnings, setSkuWarnings] = useState<string[]>([]);
   const [syncedSkus, setSyncedSkus] = useState<SkuDetail[]>([]);
   const [skuSearch, setSkuSearch] = useState("");
   const [skuOverridePage, setSkuOverridePage] = useState(1);
@@ -188,9 +190,11 @@ function LeadTimeSettingsContent() {
         savedSignatures.current.categories = overrideSignature(items);
       },
       skus: async () => {
-        const items = confirmOverrides(await fetchSkuLeadTimes(targetDomain, controller.signal), "sku_id");
+        const response = await fetchSkuLeadTimes(targetDomain, controller.signal);
+        const items = confirmOverrides(response, "sku_id");
         if (controller.signal.aborted) return;
-        setSkuRows(items.map(item => buildSkuRow(item.name, item.lead_time_days, catalogRef.current.find(sku => sku.sku_id === item.name))));
+        setSkuWarnings(response.warnings?.filter(value => typeof value === "string") ?? []);
+        setSkuRows(items.map(item => buildSkuRow(item.name, item.lead_time_days, uniqueSkuProduct(catalogRef.current, item.name))));
         savedSignatures.current.skus = overrideSignature(items);
         setSkuOverridePage(1);
       },
@@ -201,8 +205,8 @@ function LeadTimeSettingsContent() {
         catalogRef.current = skus;
         setSyncedSkus(skus);
         setSkuRows(rows => rows.map(row => {
-          const sku = skus.find(item => item.sku_id === row.name);
-          return sku ? { ...row, productName: sku.name, supplier: sku.vendor, category: sku.category } : row;
+          const sku = uniqueSkuProduct(skus, row.name);
+          return { ...row, productName: sku?.name ?? "", supplier: sku?.vendor ?? "", category: sku?.category ?? "" };
         }));
       },
     };
@@ -300,9 +304,16 @@ function LeadTimeSettingsContent() {
         if (!controller.signal.aborted) setCategoryRows(withEmptyFallback(saved.map(item => buildOverrideRow(item.name, item.lead_time_days))));
       },
       skus: async () => {
-        const saved = confirmOverrides(await saveSkuLeadTimes({ shopify_domain: targetDomain, items: skuLeadTimes }, controller.signal), "sku_id");
-        if (overrideSignature(saved) !== signatures.skus) throw new Error("The saved SKU rules did not match the requested values.");
-        if (!controller.signal.aborted) setSkuRows(saved.map(item => buildSkuRow(item.name, item.lead_time_days, catalogRef.current.find(sku => sku.sku_id === item.name))));
+        const response = await saveSkuLeadTimes({ shopify_domain: targetDomain, items: skuLeadTimes }, controller.signal);
+        const saved = confirmOverrides(response, "sku_id");
+        const warnings = response.warnings?.filter(value => typeof value === "string") ?? [];
+        const allSubmittedConfirmed = skuLeadTimes.every(item => saved.some(row => row.name === item.sku_id && row.lead_time_days === item.lead_time_days));
+        if (overrideSignature(saved) !== signatures.skus && !(warnings.length && allSubmittedConfirmed)) throw new Error("The saved SKU rules did not match the requested values.");
+        if (!controller.signal.aborted) {
+          setSkuRows(saved.map(item => buildSkuRow(item.name, item.lead_time_days, uniqueSkuProduct(catalogRef.current, item.name))));
+          setSkuWarnings(warnings);
+          signatures.skus = overrideSignature(saved);
+        }
       },
     };
     const results = await Promise.allSettled(changed.map(async key => {
@@ -336,6 +347,7 @@ function LeadTimeSettingsContent() {
   }
 
   function addSkuRow(sku: SkuDetail) {
+    if (skuNeedsIdentityReview(syncedSkus, sku.sku_id)) { setSettingsError(IDENTITY_REVIEW_MESSAGE); return; }
     setSkuRows((rows) => {
       if (rows.some((row) => row.name === sku.sku_id)) {
         return rows;
@@ -468,14 +480,14 @@ function LeadTimeSettingsContent() {
             {!settingsConfirmed ? <p className="section-copy">Load all rule sections before previewing which lead time applies.</p> : !draftValid ? <p className="section-copy">Enter valid whole-day lead times and complete each override before previewing these changes.</p> : loadStates.catalog.status !== "ready" ? <p className="section-copy">Product lookup is unavailable. Retry it to preview how the saved rules apply to products.</p> : effectivePreview.length ? (
               <div className="lead-time-preview-list">
                 {effectivePreview.map((item) => (
-                  <div className="lead-time-preview-row" key={item.sku.sku_id}>
+                  <div className="lead-time-preview-row" key={productRowKey(item.sku)}>
                     <div>
                       <strong>{item.sku.name}</strong>
                       <span>{item.sku.sku_id}</span>
                     </div>
                     <div>
-                      <b>{item.days} days</b>
-                      <span>{sourceLabel(item.source)}</span>
+                      <b>{skuNeedsIdentityReview(syncedSkus, item.sku.sku_id) ? "Mapping review needed" : `${item.days} days`}</b>
+                      <span>{skuNeedsIdentityReview(syncedSkus, item.sku.sku_id) ? "SKU rule cannot select a unique product" : sourceLabel(item.source)}</span>
                     </div>
                   </div>
                 ))}
@@ -558,11 +570,13 @@ function LeadTimeSettingsContent() {
                 <button
                   type="button"
                   className="lead-time-suggestion"
-                  key={sku.sku_id}
+                  key={productRowKey(sku)}
+                  disabled={skuNeedsIdentityReview(syncedSkus, sku.sku_id)}
                   onClick={() => addSkuRow(sku)}
                 >
                   <span>{sku.name}</span>
                   <small>{sku.sku_id} - {sku.vendor} - {sku.category}</small>
+                  {skuNeedsIdentityReview(syncedSkus, sku.sku_id) ? <small>Mapping review needed · give distinct variants unique source SKUs, then sync again</small> : null}
                 </button>
               ))}
             </div>
@@ -623,6 +637,7 @@ function LeadTimeSettingsContent() {
                         <td>
                           <strong>{row.productName || row.name}</strong>
                           <span>{row.name}</span>
+                          {skuNeedsIdentityReview(syncedSkus, row.name) ? <small>Mapping review needed; existing override retained</small> : null}
                         </td>
                         <td>{row.supplier || "Unassigned"}</td>
                         <td>{row.category || "Uncategorized"}</td>
@@ -632,6 +647,7 @@ function LeadTimeSettingsContent() {
                             type="number"
                             min={1}
                             value={row.lead_time_days}
+                            disabled={skuNeedsIdentityReview(syncedSkus, row.name)}
                             onChange={(event) =>
                               setSkuRows((rows) =>
                                 updateRow(rows, row.id, "lead_time_days", event.target.value)
@@ -643,6 +659,7 @@ function LeadTimeSettingsContent() {
                           <button
                             type="button"
                             className="button button-secondary button-sm"
+                            disabled={skuNeedsIdentityReview(syncedSkus, row.name)}
                             onClick={() =>
                               setSkuRows((rows) => {
                                 const nextRows = rows.filter((candidate) => candidate.id !== row.id);
@@ -691,6 +708,7 @@ function LeadTimeSettingsContent() {
       {settingsNotice ? (
         <EmptyState title="Settings update" description={settingsNotice} />
       ) : null}
+      {skuWarnings.length ? <aside className="sync-safety-note" aria-label="SKU rules need review"><strong>Some existing SKU rules were retained</strong><ul className="section-copy">{skuWarnings.map(warning => <li key={warning}>{warning}</li>)}</ul><Link href="/store-sync">Review source data & sync</Link></aside> : null}
     </div>
   );
 }

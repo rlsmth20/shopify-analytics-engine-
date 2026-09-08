@@ -6,6 +6,7 @@ import { API_BASE_URL } from "@/lib/api-base";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 import { financialValue, type FinancialProvenance } from "@/lib/financial-values";
 import { currency } from "@/lib/api-v2";
+import type { IdentityIssue } from "@/lib/product-identity";
 
 type CashPlanVendor = FinancialProvenance & {
   vendor: string;
@@ -16,6 +17,7 @@ type CashPlanVendor = FinancialProvenance & {
 };
 
 type CashPlan = FinancialProvenance & {
+  identity_issues?: IdentityIssue[];
   order_now_cost: number;
   deferrable_cost: number;
   total_cost: number;
@@ -65,6 +67,7 @@ export function CashPlanCard({
           <h2 className="section-title section-title-small">Cash your reorder queue needs</h2>
         </div>
       </div>
+      {plan.identity_issues?.length ? <p className="section-copy">This budget covers safely matched products only. {plan.identity_issues.length} products need mapping review before their purchasing needs can be estimated.</p> : null}
       <div className="kpi-grid kpi-grid-tight" style={{ marginTop: "12px" }}>
         <div className="kpi-card">
           <p className="kpi-label">Order this week</p>
@@ -79,7 +82,7 @@ export function CashPlanCard({
         <div className="kpi-card">
           <p className="kpi-label">Total recommended</p>
           <p className="kpi-value">{currency(financialValue(plan, "total_cost", plan.total_cost))}</p>
-          <p className="kpi-note">{financialValue(plan, "total_cost", plan.total_cost) === null ? "Add missing unit costs to calculate the budget" : "At the current service level setting"}</p>
+          <p className="kpi-note">{plan.identity_issues?.length ? "Review product mappings before relying on a complete budget" : financialValue(plan, "total_cost", plan.total_cost) === null ? "Add missing unit costs to calculate the budget" : "At the current service level setting"}</p>
         </div>
       </div>
       {plan.vendors.length > 0 ? (

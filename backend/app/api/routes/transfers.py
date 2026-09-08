@@ -7,7 +7,7 @@ from app.api.deps import require_plan_feature
 from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import TransferRecommendationsResponse
-from app.services.shop_skus import load_location_stocks_for_shop
+from app.services.shop_skus import load_location_stocks_for_shop, load_skus_for_shop, sku_identity_issues
 from app.services.transfers import recommend_transfers
 
 
@@ -20,4 +20,5 @@ def read_transfer_recommendations(
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> TransferRecommendationsResponse:
     snapshots = load_location_stocks_for_shop(db, user.shop_id)
-    return TransferRecommendationsResponse(transfers=recommend_transfers(snapshots))
+    return TransferRecommendationsResponse(transfers=recommend_transfers(snapshots),
+        identity_issues=sku_identity_issues(load_skus_for_shop(db, user.shop_id)))

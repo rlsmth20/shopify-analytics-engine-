@@ -9,6 +9,8 @@ import {
   WeekdayIndexBars,
 } from "@/components/charts";
 import { GatedFeature } from "@/components/gated-feature";
+import { IdentityReviewNotice } from "@/components/identity-review-notice";
+import { productRowKey, IDENTITY_REVIEW_MESSAGE, type IdentityIssue } from "@/lib/product-identity";
 import {
   fetchForecasts,
   type ForecastResult,
@@ -36,6 +38,7 @@ function ForecastContent() {
   const [quickView, setQuickView] = useState<ForecastQuickView>("all");
   const [search, setSearch] = useState("");
   const [retry, setRetry] = useState(0);
+  const [identityIssues, setIdentityIssues] = useState<IdentityIssue[]>([]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,7 +49,8 @@ function ForecastContent() {
         if (!Array.isArray(res.forecasts)) throw new Error("Invalid forecast response");
         const rankedForecasts = rankForecastsByStockoutRisk(res.forecasts);
         setForecasts(rankedForecasts);
-        setSelectedId(rankedForecasts[0]?.sku_id ?? null);
+        setIdentityIssues(res.identity_issues ?? []);
+        setSelectedId(rankedForecasts[0] ? productRowKey(rankedForecasts[0]) : null);
         setError(null);
       })
       .catch(() => { if (!controller.signal.aborted) setError("Forecasts could not be loaded. Please try again."); })
@@ -59,10 +63,13 @@ function ForecastContent() {
     [forecasts, quickView, search],
   );
   const selected = useMemo(
-    () => visibleForecasts.find((f) => f.sku_id === selectedId) ?? visibleForecasts[0] ?? null,
+    () => visibleForecasts.find((f) => productRowKey(f) === selectedId) ?? visibleForecasts[0] ?? null,
     [visibleForecasts, selectedId]
   );
   const selectedView = selected ? forecastView(selected) : null;
+  const selectedWarnings = selected?.data_quality_warnings?.filter(
+    warning => !selectedView?.identityReview || warning !== selected.identity_warning
+  ) ?? [];
 
   if (loading && forecasts.length === 0) {
     return <div className="page-loading">Computing forecasts...</div>;
@@ -72,6 +79,7 @@ function ForecastContent() {
   if (forecasts.length === 0) {
     return (
       <div className="empty-state">
+        <IdentityReviewNotice issues={identityIssues} />
         <p className="empty-state-title">Forecasts need sales history</p>
         <p className="empty-state-copy">
           Import products, inventory, and recent order history before skubase can project demand.
@@ -86,6 +94,7 @@ function ForecastContent() {
       <aside className="forecast-list">
         <h3 className="panel-section-title">SKUs</h3>
         <p className="panel-section-subtitle">Highest estimated stockout risk first. Missing history stays unknown.</p>
+        <IdentityReviewNotice issues={identityIssues} />
         <label className="forecast-search">
           <span>Search</span>
           <input
@@ -115,22 +124,23 @@ function ForecastContent() {
         <ul className="sku-list">
           {visibleForecasts.map((f) => { const view = forecastView(f); return (
             <li
-              key={f.sku_id}
+              key={productRowKey(f)}
               className={`sku-list-row${
-                f.sku_id === selected?.sku_id ? " sku-list-row-active" : ""
+                f === selected ? " sku-list-row-active" : ""
               }`}
             >
               <button
                 type="button"
-                aria-pressed={f.sku_id === selected?.sku_id}
-                onClick={() => setSelectedId(f.sku_id)}
+                aria-pressed={f === selected}
+                onClick={() => setSelectedId(productRowKey(f))}
                 className="sku-list-button"
               >
                 <div className="sku-list-name">
-                  {f.sku_id.replace(/^sku_/, "")}
+                  {f.sku_id}
                 </div>
+                {view.identityReview ? <span className="muted small">{identityIssues.find(issue => issue.product_id === f.product_id)?.name}</span> : null}
                 <div className="sku-list-meta">
-                  {view.available ? <span className={`trend-pill trend-${f.trend}`}>{view.noRecentSales ? "No recent sales" : f.trend}</span> : <span className="trend-pill">{view.missingHistory ? "Sales history needed" : "Forecast status unknown"}</span>}
+                  {view.available ? <span className={`trend-pill trend-${f.trend}`}>{view.noRecentSales ? "No recent sales" : f.trend}</span> : <span className="trend-pill">{view.identityReview ? "Review SKU mapping" : view.missingHistory ? "Sales history needed" : "Forecast status unknown"}</span>}
                   <span
                     className={`risk-pill risk-${
                       view.risk === null || view.noRecentSales ? "unknown" : view.risk > 0.5
@@ -155,8 +165,8 @@ function ForecastContent() {
       <section className="forecast-detail">
         {selected && selectedView ? (
           <>
-            {!selectedView.available ? <div className="empty-state"><p className="empty-state-title">{selectedView.missingHistory ? "Sales history is needed for this SKU" : "Forecast availability is unknown"}</p><p className="empty-state-copy">{selectedView.missingHistory ? "Inventory counts alone do not establish demand, stockout risk, or forecast accuracy. Add dated sales or shipment history before using this SKU in a purchase plan." : "This response does not confirm whether the forecast uses recorded sales. Its numbers are withheld until that can be confirmed."}</p><SalesHistoryLinks /></div> : selectedView.noRecentSales ? <div className="forecast-warning-list"><p className="forecast-warning">The recorded sales window has no recent sales. Zero estimated demand is not proof that future demand or stockout risk is zero.</p></div> : null}
-            {selected.data_quality_warnings?.length ? <div className="forecast-warning-list" aria-label="Forecast data notes">{selected.data_quality_warnings.map(warning => <p key={warning} className="forecast-warning">{warning}</p>)}</div> : null}
+            {!selectedView.available ? <div className="empty-state"><p className="empty-state-title">{selectedView.identityReview ? "Review this SKU’s product mapping" : selectedView.missingHistory ? "Sales history is needed for this SKU" : "Forecast availability is unknown"}</p><p className="empty-state-copy">{selectedView.identityReview ? selected.identity_warning || IDENTITY_REVIEW_MESSAGE : selectedView.missingHistory ? "Inventory counts alone do not establish demand, stockout risk, or forecast accuracy. Add dated sales or shipment history before using this SKU in a purchase plan." : "This response does not confirm whether the forecast uses recorded sales. Its numbers are withheld until that can be confirmed."}</p>{selectedView.identityReview ? <Link className="button button-secondary" href="/store-sync">Review source data & sync</Link> : <SalesHistoryLinks />}</div> : selectedView.noRecentSales ? <div className="forecast-warning-list"><p className="forecast-warning">The recorded sales window has no recent sales. Zero estimated demand is not proof that future demand or stockout risk is zero.</p></div> : null}
+            {selectedWarnings.length ? <div className="forecast-warning-list" aria-label="Forecast data notes">{selectedWarnings.map(warning => <p key={warning} className="forecast-warning">{warning}</p>)}</div> : null}
             {selectedView.available && selectedView.confidence === "low" && !selectedView.noRecentSales ? <p className="forecast-warning">Low confidence: short or sparse sales history can make risk estimates uncertain. Review the recorded demand before a large purchase.</p> : null}
             <div className="forecast-kpis">
               <Kpi label="30-day demand" value={forecastNumber(selectedView.demand30)} />
@@ -214,7 +224,7 @@ function ForecastContent() {
             </section> : null}
 
             {selectedView.available ? <ChartPanel
-              title={`Forecast - ${selected.sku_id.replace(/^sku_/, "")}`}
+              title={`Forecast - ${selected.sku_id}`}
               subtitle={selected.explain}
               accent="primary"
             >

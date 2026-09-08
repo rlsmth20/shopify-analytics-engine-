@@ -44,6 +44,8 @@ def build_buying_calendar_events(
 
     grouped: dict[tuple[str, str], list[BuyingCalendarLineWithTiming]] = {}
     for sku in skus:
+        if sku.identity_ambiguous:
+            continue
         item = _build_recommended_line(
             sku,
             history_for_sku(sku.sku_id) or [],
@@ -134,6 +136,7 @@ def _build_recommended_line(
         inbound_units=inbound_units,
         line=BuyingCalendarLine(
             sku_id=sku.sku_id,
+            product_id=sku.product_id,
             name=sku.name,
             qty=recommended_qty,
             unit_cost=round(sku.cost, 2),
@@ -199,6 +202,9 @@ def _saved_event(po: PurchaseOrderDraft, *, today: date) -> BuyingCalendarEvent:
     lines = [
         BuyingCalendarLine(
             sku_id=line.sku_id,
+            product_id=line.product_id,
+            identity_ambiguous=line.identity_ambiguous,
+            identity_warning=line.identity_warning,
             name=line.name,
             qty=_outstanding_units(line),
             unit_cost=line.unit_cost,
@@ -282,6 +288,8 @@ def _scheduled_inbound(purchase_orders: list[PurchaseOrderDraft], *, today: date
         if issued is None or issued > today or arrival is None or arrival < today or arrival < issued:
             continue
         for line in po.lines:
+            if line.identity_ambiguous:
+                continue
             qty = _outstanding_units(line)
             if qty:
                 result.setdefault(line.sku_id, []).append((arrival, qty))

@@ -39,15 +39,16 @@ class DashboardPerformanceTests(unittest.TestCase):
         history_patch.start()
         self.addCleanup(history_patch.stop)
 
-    def test_vendor_cash_totals_preserve_first_duplicate_match_and_unknown_vendor(self):
+    def test_vendor_cash_totals_keep_product_identity_when_sku_aliases_repeat(self):
         skus = [sku(1, vendor="First"), sku(1, vendor="Second"), sku(2, vendor="Other")]
-        actions = [SimpleNamespace(sku_id=sku_id, status="optimize", cash_tied_up=amount,
+        skus = [item.model_copy(update={"product_id": index}) for index, item in enumerate(skus, 1)]
+        actions = [SimpleNamespace(product_id=product_id, sku_id=sku_id, status="optimize", cash_tied_up=amount,
                                    excess_units=1, financial_values_known=True)
-                   for sku_id, amount in [("SKU-1", 10), ("SKU-1", 5), ("SKU-2", 20), ("missing", 7)]]
+                   for product_id, sku_id, amount in [(1, "SKU-1", 10), (2, "SKU-1", 5), (3, "SKU-2", 20), (None, "missing", 7)]]
         with patch.object(dashboard, "build_inventory_actions", return_value=actions):
             result = build(skus)
         self.assertEqual([(item.label, item.value) for item in result.cash_at_risk_by_vendor],
-                         [("Other", 20), ("First", 15), ("Unknown", 7)])
+                         [("Other", 20), ("First", 10), ("Unknown", 7), ("Second", 5)])
 
     def test_large_catalog_work_does_not_grow_quadratically_per_inventory_action(self):
         skus = CountingCatalog(sku(number) for number in range(1000))

@@ -19,6 +19,8 @@ const fixtures = {
   catalog: [{ sku_id: "SKU-1", name: "Shirt", vendor: "Vendor A", category: "Apparel", sku_lead_time_days: 12 }],
 };
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+const identity = { exports: {} };
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, "../lib/product-identity.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, identity);
 
 function harness({ demo = false, reads = {}, writes = {} } = {}) {
   let cursor = 0, updateCount = 0;
@@ -46,6 +48,7 @@ function harness({ demo = false, reads = {}, writes = {} } = {}) {
     "@/components/gated-feature": { GatedFeature: "gated" },
     "@/lib/use-stored-shop-domain": { useStoredShopDomain: () => ({ shopifyDomain: defaults.shopify_domain, hasHydrated: true, setShopifyDomain() {} }) },
     "@/lib/api": api,
+    "@/lib/product-identity": identity.exports,
     "./page.module.css": { __esModule: true, default: { page: "lead-time-page" } },
   };
   vm.runInNewContext(compiled, { exports, Number, Array, Set, Map, Error, Object, JSON, AbortController, crypto: { randomUUID },
@@ -180,4 +183,53 @@ test("a late load after navigation cannot change the displayed workspace setting
   await new Promise(setImmediate);
   assert.equal(h.updates(), before);
   assert.ok(h.calls.every(call => call[2].aborted));
+});
+
+test("shared-SKU products remain visible but cannot select or edit an ambiguous rule", async () => {
+  const h = harness({ reads: {
+    catalog: async () => [1, 2].map(product_id => ({ ...fixtures.catalog[0], product_id, name: `Variant ${product_id}`, identity_ambiguous: true })),
+    skus: async () => ({ ...fixtures.skus, warnings: ["SKU-1 has multiple active products; existing override retained."] }),
+  } });
+  let ui = await h.settle();
+  assert.match(ui.text, /Mapping review needed/);
+  assert.match(ui.text, /existing override retained/);
+  assert.equal(ui.nodes.find(node => node.type === "input" && node.props.value === "12").props.disabled, true);
+  ui.nodes.find(node => node.type === "input" && node.props.type === "search").props.onChange({ target: { value: "SKU-1" } });
+  ui = h.render();
+  const choices = ui.nodes.filter(node => node.type === "button" && node.props.className === "lead-time-suggestion");
+  assert.equal(choices.length, 2);
+  assert.ok(choices.every(node => node.props.disabled));
+  choices[1].props.onClick(); // The handler also defends against a stale/enabled control.
+  ui = h.render();
+  assert.match(ui.text, /More than one product uses this SKU/);
+  ui.nodes.find(node => node.type === "input" && node.props.value === "21").props.onChange({ target: { value: "26" } });
+  await h.save();
+  const writes = h.calls.filter(call => call[0] === "write");
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0][1], "defaults");
+});
+
+test("saved unresolved rules return with warnings rather than false removals or repeated replacement writes", async () => {
+  const h = harness({ writes: { skus: async payload => ({ items: [...payload.items, { sku_id: "RETAINED", lead_time_days: 20 }],
+    warnings: ["RETAINED was not cleared because its mapping is ambiguous."] }) } });
+  let ui = await h.settle();
+  ui.nodes.find(node => node.type === "input" && node.props.value === "12").props.onChange({ target: { value: "13" } });
+  ui = await h.save();
+  assert.match(ui.text, /Saved: SKU rules/);
+  assert.match(ui.text, /RETAINED was not cleared/);
+  assert.doesNotMatch(ui.text, /Not confirmed/);
+  assert.ok(ui.nodes.some(node => node.type === "input" && node.props.value === "20"));
+  ui = await h.save();
+  assert.match(ui.text, /No unsaved rule changes/);
+  assert.equal(h.calls.filter(call => call[0] === "write").length, 1);
+});
+
+test("a server mapping conflict preserves the precise review explanation and unsaved SKU edit", async () => {
+  const h = harness({ writes: { skus: async () => { throw new Error("SKU-1 matches multiple active variants. Review its mapping before changing this rule."); } } });
+  let ui = await h.settle();
+  ui.nodes.find(node => node.type === "input" && node.props.value === "12").props.onChange({ target: { value: "13" } });
+  ui = await h.save();
+  assert.match(ui.text, /SKU-1 matches multiple active variants/);
+  assert.ok(ui.nodes.some(node => node.type === "input" && node.props.value === "13"));
+  assert.doesNotMatch(ui.text, /Saved: SKU rules/);
 });

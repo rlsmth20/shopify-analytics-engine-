@@ -416,6 +416,8 @@ def _evaluate_rule(
 def _stockout_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
+        if action.identity_ambiguous:
+            continue
         if action.status != "urgent":
             continue
         if not _sku_matches(rule, context, action.sku_id, action.name):
@@ -437,6 +439,8 @@ def _stockout_events(rule, context, now, deliver_channels, channels_by_key, allo
 def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
+        if action.identity_ambiguous:
+            continue
         if action.status != "dead" or not action.financial_values_known:
             continue
         if not _sku_matches(rule, context, action.sku_id, action.name):
@@ -455,6 +459,8 @@ def _dead_stock_events(rule, context, now, deliver_channels, channels_by_key, al
 def _overstock_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for action in context.actions:
+        if action.identity_ambiguous:
+            continue
         if action.status != "optimize" or not action.sales_history_complete:
             continue
         if not _sku_matches(rule, context, action.sku_id, action.name):
@@ -493,7 +499,7 @@ def _supplier_events(rule, context, now, deliver_channels, channels_by_key, allo
 def _forecast_events(rule, context, now, deliver_channels, channels_by_key, allowed_channels):
     events = []
     for forecast in context.forecasts:
-        if not forecast.forecast_available:
+        if forecast.identity_ambiguous or not forecast.forecast_available:
             continue
         if not _sku_matches(rule, context, forecast.sku_id, forecast.sku_id):
             continue

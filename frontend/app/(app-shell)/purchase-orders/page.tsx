@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { BuyListEmailCard } from "@/components/buy-list-email-card";
 import { CashPlanCard } from "@/components/cash-plan-card";
 import { GatedFeature } from "@/components/gated-feature";
+import { IdentityReviewNotice } from "@/components/identity-review-notice";
+import { productRowKey, receiptLineNeedsIdentityReview, type IdentityIssue } from "@/lib/product-identity";
 import {
   fetchBuyingCalendar,
   currency,
@@ -70,6 +72,7 @@ function PurchaseOrdersContent() {
   const [editDrafts, setEditDrafts] = useState<EditablePoDrafts>({});
   const [operationNotice, setOperationNotice] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [identityIssues, setIdentityIssues] = useState<IdentityIssue[]>([]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,6 +89,7 @@ function PurchaseOrdersContent() {
           : r.drafts;
         setDrafts(nextDrafts);
         setCalendar(calendarResponse);
+        setIdentityIssues(r.identity_issues ?? calendarResponse.identity_issues ?? []);
         setTotal(sumPoTotals(nextDrafts));
         setOperationError(null);
       })
@@ -110,6 +114,7 @@ function PurchaseOrdersContent() {
 
   return (
     <div className="po-page">
+      <IdentityReviewNotice issues={identityIssues} />
       <CashPlanCard serviceLevel={serviceLevel} shippingCost={shippingCost} />
       <div className="po-toolbar">
         <div className="po-service-level-control">
@@ -337,7 +342,8 @@ function PurchaseOrdersContent() {
       <div className="po-list">
         {visibleDrafts.map((po) => {
           const remainingUnits = remainingPurchaseOrderUnits(po);
-          const canReceiveUnits = remainingUnits > 0;
+          const hasAmbiguousReceipts = po.lines.some(line => remainingLineQuantity(line) > 0 && receiptLineNeedsIdentityReview(po.lines, line));
+          const canReceiveUnits = po.lines.some(line => remainingLineQuantity(line) > 0 && !receiptLineNeedsIdentityReview(po.lines, line));
           const costsKnown = purchaseOrderCostsKnown(po);
           const detailsId = `po-details-${encodeURIComponent(po.po_id)}`;
           return (
@@ -389,6 +395,7 @@ function PurchaseOrdersContent() {
                 ) : (
                   <>
                     <p className="po-rationale">{po.rationale}</p>
+                    {hasAmbiguousReceipts ? <p className="sync-safety-note">Some remaining lines need SKU mapping review. Receipts for those lines are blocked so stock is not added to the wrong product. You can receive other uniquely matched lines; saved PO history and safe edits remain available.</p> : null}
                     {!costsKnown ? <p className="muted small">Supplier unit costs are missing. Edit this PO and enter the actual costs before saving, approving, or recording a shipment.</p> : null}
                     <table className="po-table">
                       <thead>
@@ -401,11 +408,12 @@ function PurchaseOrdersContent() {
                         </tr>
                       </thead>
                       <tbody>
-                        {po.lines.map((line) => (
-                          <tr key={line.sku_id}>
+                        {po.lines.map((line, index) => (
+                          <tr key={productRowKey(line, index)}>
                             <td>
                               <strong>{line.name}</strong>
                               <span className="po-line-sku">{line.sku_id}</span>
+                              {receiptLineNeedsIdentityReview(po.lines, line) ? <small>SKU mapping needs review</small> : null}
                             </td>
                             <td>{line.qty}</td>
                             <td>
@@ -525,7 +533,7 @@ function PurchaseOrdersContent() {
                     className="button button-ghost"
                     onClick={() => startPartialReceipt(po)}
                     disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || !costsKnown}
-                    title={!canReceiveUnits ? "All units on this PO have already been received." : undefined}
+                    title={!canReceiveUnits ? hasAmbiguousReceipts ? "Review SKU mapping before receiving remaining lines." : "All units on this PO have already been received." : undefined}
                   >
                     Receive partial
                   </button>
@@ -533,8 +541,8 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-ghost"
                     onClick={() => void receiveAll(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || !costsKnown}
-                    title={!canReceiveUnits ? "All units on this PO have already been received." : undefined}
+                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || hasAmbiguousReceipts || !costsKnown}
+                    title={hasAmbiguousReceipts ? "Use partial receipt for uniquely matched lines, then review the remaining SKU mappings." : !canReceiveUnits ? "All units on this PO have already been received." : undefined}
                   >
                     {busyPo === po.po_id ? "Receiving..." : "Receive all"}
                   </button>
@@ -582,16 +590,17 @@ function PurchaseOrdersContent() {
                         </tr>
                       </thead>
                       <tbody>
-                        {po.lines.map((line) => {
+                        {po.lines.map((line, index) => {
                           const remainingQty = remainingLineQuantity(line);
+                          const identityBlocked = receiptLineNeedsIdentityReview(po.lines, line);
                           const draftLine = receiptDrafts[po.po_id]?.lines[line.sku_id] ?? {
                             qty: String(remainingQty),
                             cost: editableUnitCost(line),
                           };
-                          const safeDraftQty = clampReceiptInput(draftLine.qty, remainingQty);
+                          const safeDraftQty = identityBlocked ? "0" : clampReceiptInput(draftLine.qty, remainingQty);
                           return (
-                            <tr key={line.sku_id}>
-                              <td>{line.name}</td>
+                            <tr key={productRowKey(line, index)}>
+                              <td>{line.name}{identityBlocked ? <small>SKU {line.sku_id}: mapping review required</small> : null}</td>
                               <td>{line.qty}</td>
                               <td>{line.received_qty ?? 0}</td>
                               <td>
@@ -602,7 +611,7 @@ function PurchaseOrdersContent() {
                                   max={remainingQty}
                                   step="1"
                                   value={safeDraftQty}
-                                  disabled={remainingQty === 0}
+                                  disabled={remainingQty === 0 || identityBlocked}
                                   onChange={(event) =>
                                     updateReceiptLine(po.po_id, line.sku_id, {
                                       qty: event.target.value,
@@ -617,6 +626,7 @@ function PurchaseOrdersContent() {
                                   min="0"
                                   step="0.01"
                                   value={draftLine.cost}
+                                  disabled={identityBlocked}
                                   onChange={(event) =>
                                     updateReceiptLine(po.po_id, line.sku_id, {
                                       cost: event.target.value,
@@ -670,6 +680,7 @@ function PurchaseOrdersContent() {
       : r.drafts;
     setDrafts(nextDrafts);
     setCalendar(calendarResponse);
+    setIdentityIssues(r.identity_issues ?? calendarResponse.identity_issues ?? []);
     setTotal(sumPoTotals(nextDrafts));
   }
 
@@ -734,6 +745,10 @@ function PurchaseOrdersContent() {
 
   function startPartialReceipt(po: PurchaseOrderDraft) {
     if (!requireRecordedCosts(po)) return;
+    if (remainingPurchaseOrderUnits(po) > 0 && po.lines.every(line => remainingLineQuantity(line) <= 0 || receiptLineNeedsIdentityReview(po.lines, line))) {
+      setOperationError("No uniquely matched lines remain to receive. Review SKU mappings before recording these receipts.");
+      return;
+    }
     if (remainingPurchaseOrderUnits(po) <= 0) {
       setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
       setOperationError(null);
@@ -751,7 +766,7 @@ function PurchaseOrdersContent() {
           lines: Object.fromEntries(
             po.lines.map((line) => [
               line.sku_id,
-              { qty: String(remainingLineQuantity(line)), cost: editableUnitCost(line) },
+              { qty: receiptLineNeedsIdentityReview(po.lines, line) ? "0" : String(remainingLineQuantity(line)), cost: editableUnitCost(line) },
             ])
           ),
         },
@@ -951,6 +966,7 @@ function PurchaseOrdersContent() {
       return;
     }
     const lines = po.lines
+      .filter(line => !receiptLineNeedsIdentityReview(po.lines, line))
       .map((line) => {
         const receiptLine = draft?.lines[line.sku_id];
         const receivedQty = Number(receiptLine?.qty ?? 0);
@@ -1001,6 +1017,10 @@ function PurchaseOrdersContent() {
 
   async function receiveAll(po: PurchaseOrderDraft) {
     if (!requireRecordedCosts(po)) return;
+    if (po.lines.some(line => remainingLineQuantity(line) > 0 && receiptLineNeedsIdentityReview(po.lines, line))) {
+      setOperationError("Review ambiguous SKU mappings before receiving all. Use partial receipt for uniquely matched lines.");
+      return;
+    }
     setBusyPo(po.po_id);
     setOperationError(null);
     setOperationNotice(null);

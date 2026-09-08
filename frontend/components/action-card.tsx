@@ -1,4 +1,6 @@
 import type { InventoryAction } from "@/lib/api";
+import Link from "next/link";
+import { IDENTITY_REVIEW_MESSAGE } from "@/lib/product-identity";
 import { isHistoryReviewAction } from "@/lib/action-quality";
 import { ProjectedStockHealth } from "@/components/projected-stock-health";
 import {
@@ -16,6 +18,14 @@ export function ActionCard({
 }: {
   action: InventoryAction;
 }) {
+  if (action.identity_ambiguous) return <article className="action-card action-card-optimize">
+    <span className="pill pill-optimize">Review SKU mapping</span>
+    <p className="action-sku">{action.sku_id}</p>
+    <h3 className="action-name">{action.name}</h3>
+    <p className="action-explanation">{action.identity_warning || IDENTITY_REVIEW_MESSAGE}</p>
+    <p className="section-copy">Recorded on hand: {formatNumber(action.current_on_hand)} units. Forecasts, reorders and clearance advice are withheld until this product is matched safely.</p>
+    <Link className="button button-secondary" href="/store-sync">Review source data & sync</Link>
+  </article>;
   const historyReview = isHistoryReviewAction(action);
   const daysLeft = historyReview ? null : firstFinite(
     action.status === "urgent" ? action.days_until_stockout : null,

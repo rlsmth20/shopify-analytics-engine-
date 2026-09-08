@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from app.schemas import SkuIdentityIssue, SkuIdentityProjection
 from app.schemas import CostSource
 
 
@@ -86,10 +87,10 @@ class ForecastPoint(ApiModel):
     upper_bound: float = Field(ge=0)
 
 
-class ForecastResult(ApiModel):
+class ForecastResult(SkuIdentityProjection):
     sku_id: str
     forecast_available: bool = True
-    demand_signal: Literal["observed", "no_recent_sales", "missing_history"] = "observed"
+    demand_signal: Literal["observed", "no_recent_sales", "missing_history", "ambiguous_identity"] = "observed"
     horizon_days: int
     method: Literal["moving_average", "exponential_smoothing", "seasonal_ema", "naive"]
     trend: TrendDirection
@@ -118,6 +119,7 @@ class ForecastResult(ApiModel):
 
 
 class ForecastFeedResponse(ApiModel):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     forecasts: list[ForecastResult]
 
 
@@ -125,7 +127,7 @@ class ForecastFeedResponse(ApiModel):
 # ABC / XYZ classification + scorecard
 # ---------------------------------------------------------------------------
 
-class SkuScorecard(CostedProjection):
+class SkuScorecard(CostedProjection, SkuIdentityProjection):
     sku_id: str
     name: str
     vendor: str
@@ -143,6 +145,7 @@ class SkuScorecard(CostedProjection):
 
 
 class ScorecardResponse(ApiModel):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     scorecards: list[SkuScorecard]
     a_count: int
     b_count: int
@@ -164,7 +167,7 @@ class InventoryHealthBucket(ApiModel):
     tone: Literal["positive", "negative", "neutral"] = "neutral"
 
 
-class InventoryHealthSku(KnownValueProjection):
+class InventoryHealthSku(KnownValueProjection, SkuIdentityProjection):
     sku_id: str
     name: str
     vendor: str
@@ -189,6 +192,7 @@ class InventoryForecastCoverage(ApiModel):
 
 
 class InventoryHealthResponse(ApiModel):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     forecast_coverage: InventoryForecastCoverage | None = None
     kpis: list[InventoryHealthKpi]
     health_buckets: list[InventoryHealthBucket]
@@ -203,7 +207,7 @@ class InventoryHealthResponse(ApiModel):
 # Reorder optimizer
 # ---------------------------------------------------------------------------
 
-class ReorderSuggestion(CostedProjection):
+class ReorderSuggestion(CostedProjection, SkuIdentityProjection):
     sku_id: str
     name: str
     vendor: str
@@ -226,6 +230,7 @@ class ReorderSuggestion(CostedProjection):
 
 
 class ReorderFeedResponse(FinancialProjection):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     service_level: float
     suggestions: list[ReorderSuggestion]
     total_extended_cost: float
@@ -263,7 +268,8 @@ class BundleComponent(ApiModel):
     qty_per_bundle: int
 
 
-class BundleHealth(FinancialProjection):
+class BundleHealth(FinancialProjection, SkuIdentityProjection):
+    planning_values_known: bool = True
     bundle_sku_id: str
     bundle_name: str
     max_bundles_sellable: int
@@ -275,6 +281,7 @@ class BundleHealth(FinancialProjection):
 
 
 class BundleHealthResponse(ApiModel):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     bundles: list[BundleHealth]
 
 
@@ -323,6 +330,7 @@ class TransferRecommendation(ApiModel):
 
 
 class TransferRecommendationsResponse(ApiModel):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     transfers: list[TransferRecommendation]
 
 
@@ -330,7 +338,7 @@ class TransferRecommendationsResponse(ApiModel):
 # Purchase orders
 # ---------------------------------------------------------------------------
 
-class PurchaseOrderLine(CostedProjection):
+class PurchaseOrderLine(CostedProjection, SkuIdentityProjection):
     sku_id: str
     name: str
     qty: int
@@ -371,11 +379,12 @@ class PurchaseOrderDraft(FinancialProjection):
 
 
 class PurchaseOrderDraftsResponse(FinancialProjection):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     drafts: list[PurchaseOrderDraft]
     total_capital_required: float
 
 
-class BuyingCalendarLine(CostedProjection):
+class BuyingCalendarLine(CostedProjection, SkuIdentityProjection):
     sku_id: str
     name: str
     qty: int
@@ -405,6 +414,7 @@ class BuyingCalendarEvent(FinancialProjection):
 
 
 class BuyingCalendarResponse(FinancialProjection):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     generated_at: datetime
     horizon_days: int
     events: list[BuyingCalendarEvent]
@@ -508,6 +518,7 @@ class LiquidationSuggestion(CostedProjection):
 
 
 class LiquidationResponse(FinancialProjection):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     total_capital_recoverable: float
     suggestions: list[LiquidationSuggestion]
 
@@ -636,6 +647,7 @@ class DashboardSeriesPoint(KnownValueProjection):
 
 
 class DashboardResponse(ApiModel):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     kpis: list[DashboardKpi]
     revenue_trend_30d: list[DashboardSeriesPoint]
     stock_health_breakdown: list[DashboardSeriesPoint]
@@ -678,6 +690,7 @@ class DeadStockPairing(FinancialProjection):
 
 
 class DeadStockPairingsResponse(FinancialProjection):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     pairings: list[DeadStockPairing]
     dead_stock_sku_count: int
     dead_stock_capital: float
@@ -696,6 +709,7 @@ class CashPlanVendor(FinancialProjection):
 
 
 class CashPlanResponse(FinancialProjection):
+    identity_issues: list[SkuIdentityIssue] = Field(default_factory=list)
     order_now_cost: float
     deferrable_cost: float
     total_cost: float

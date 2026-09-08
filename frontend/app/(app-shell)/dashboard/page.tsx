@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
+import { BrowserHealthCheckOption } from "@/components/browser-health-check-option";
+import { IdentityReviewNotice } from "@/components/identity-review-notice";
 import { trackGrowthEvent } from "@/lib/analytics";
 import {
   AreaLineChart,
@@ -114,6 +116,7 @@ export default function DashboardPage() {
         <p className="page-error-title">Could not load dashboard</p>
         <p className="page-error-copy">{error}</p>
         <button type="button" className="button button-primary" onClick={() => setRefreshAttempt((previous) => previous + 1)} disabled={loading}>{loading ? "Retrying…" : "Try again"}</button>
+        <BrowserHealthCheckOption />
       </div>
     );
   }
@@ -136,10 +139,12 @@ export default function DashboardPage() {
           <h2 className="dashboard-empty-title">Add inventory to start planning.</h2>
           <p className="dashboard-empty-copy">
             Planning needs current stock, recent sales, and supplier lead times.
-            Import current inventory from Stocky and shipment history from ShipStation
+            Import current inventory from Stocky and non-Shopify shipment history from ShipStation
             using matching SKUs. Skubase is in Shopify App Store review and is not listed yet;
-            stores with existing access can also sync through Shopify.
+            Shopify order history requires sync for a store with existing approved access.
           </p>
+          <BrowserHealthCheckOption />
+          <IdentityReviewNotice issues={data.identity_issues} />
           <div className="dashboard-empty-steps">
             <Link href="/store-sync" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">1</span>
@@ -157,8 +162,8 @@ export default function DashboardPage() {
             <Link href="/import-shipstation" className="dashboard-empty-step">
               <span className="dashboard-empty-step-num">3</span>
               <div>
-                <p className="dashboard-empty-step-title">Import shipment history</p>
-                <p className="dashboard-empty-step-body">A ShipStation export supplies demand history. Match its SKUs to your imported inventory.</p>
+                <p className="dashboard-empty-step-title">Import non-Shopify shipment history</p>
+                <p className="dashboard-empty-step-body">ShipStation supplies demand from non-Shopify channels. Match its SKUs to your inventory; Shopify orders come through approved Shopify sync.</p>
               </div>
               <span aria-hidden>→</span>
             </Link>
@@ -185,6 +190,7 @@ export default function DashboardPage() {
 
   return (
     <div className={`dashboard ${styles.dashboard}`}>
+      <IdentityReviewNotice issues={data.identity_issues} />
       <section className="dashboard-kpis">
         {data.kpis.map((kpi) => (
           <div key={kpi.label} className={`kpi-card kpi-tone-${kpi.tone}`}>
@@ -216,7 +222,7 @@ export default function DashboardPage() {
                 </span>
               ) : null}
             </div>
-            <p className={styles.kpiNote}>{knownPointValue(kpi) === null ? "Add missing unit costs to calculate this total" : dashboardKpiNote(kpi.label)}</p>
+            <p className={styles.kpiNote}>{knownPointValue(kpi) === null ? data.identity_issues?.length ? "Review product mapping and any missing unit costs before using this total" : "Add missing unit costs to calculate this total" : dashboardKpiNote(kpi.label)}</p>
           </div>
         ))}
       </section>

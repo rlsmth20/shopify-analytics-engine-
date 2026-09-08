@@ -8,6 +8,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { DataQualityNote } from "@/components/data-quality-note";
+import { IdentityReviewNotice } from "@/components/identity-review-notice";
+import type { IdentityIssue } from "@/lib/product-identity";
 import { DeadStockPairingsCard } from "@/components/dead-stock-pairings-card";
 import { GatedFeature } from "@/components/gated-feature";
 import {
@@ -50,6 +52,7 @@ function BundlesContent() {
   const [bundles, setBundles] = useState<BundleHealth[]>([]);
   const [opportunities, setOpportunities] = useState<BundleOpportunity[]>([]);
   const [ordersAnalyzed, setOrdersAnalyzed] = useState(0);
+  const [identityIssues, setIdentityIssues] = useState<IdentityIssue[]>([]);
   const [activeTab, setActiveTab] = useState<BundleTab>("opportunities");
   const [quickView, setQuickView] = useState<QuickView>("all");
   const [search, setSearch] = useState("");
@@ -68,6 +71,7 @@ function BundlesContent() {
         setBundles(r.bundles ?? []);
         setOpportunities(r.opportunities ?? []);
         setOrdersAnalyzed(r.orders_analyzed ?? 0);
+        setIdentityIssues(r.identity_issues ?? []);
         setError(null);
       })
       .catch((e) => {
@@ -209,6 +213,7 @@ function BundlesContent() {
 
   return (
     <div className="bundles-page page-stack">
+      <IdentityReviewNotice issues={identityIssues} />
       <DeadStockPairingsCard />
       <section className="section-card bundle-hero">
         <div className="section-heading">
@@ -299,8 +304,8 @@ function BundlesContent() {
 
           {opportunities.length === 0 ? (
             <ReportEmptyState
-              title="Bundle recommendations require order-line history"
-              description="Skubase needs enough completed orders to find products that are frequently bought together."
+              title={identityIssues.length ? "No bundle recommendations from safely matched products" : "No bundle recommendations yet"}
+              description="Skubase needs enough completed orders and clear product mappings to find useful pairs. Review source data before treating an empty report as a lack of opportunity."
               actions={<Link className="button button-secondary" href="/store-sync">Check store sync</Link>}
             />
           ) : (
@@ -408,7 +413,7 @@ function BundleMappings({ bundles }: { bundles: BundleHealth[] }) {
       {bundles.map((b) => (
         <article
           key={b.bundle_sku_id}
-          className={`bundle-card${b.max_bundles_sellable === 0 ? " bundle-card-broken" : ""}`}
+          className={`bundle-card${!b.identity_ambiguous && b.planning_values_known !== false && b.max_bundles_sellable === 0 ? " bundle-card-broken" : ""}`}
         >
           <div className="bundle-head">
             <div>
@@ -416,8 +421,8 @@ function BundleMappings({ bundles }: { bundles: BundleHealth[] }) {
               <p className="muted small">{b.bundle_sku_id}</p>
             </div>
             <div className="bundle-capacity">
-              <p className="bundle-capacity-value">{b.max_bundles_sellable}</p>
-              <p className="bundle-capacity-label">sellable now</p>
+              <p className="bundle-capacity-value">{b.identity_ambiguous || b.planning_values_known === false ? "Unknown" : b.max_bundles_sellable}</p>
+              <p className="bundle-capacity-label">{b.identity_ambiguous ? "Review component mapping" : "sellable now"}</p>
             </div>
           </div>
           <div className="bundle-limiting">
@@ -429,7 +434,7 @@ function BundleMappings({ bundles }: { bundles: BundleHealth[] }) {
               <li key={i}>{line}</li>
             ))}
           </ul>
-          {financialValue(b, "total_component_value_at_risk", b.total_component_value_at_risk) === null ? <p className="bundle-risk">Add component unit costs to estimate capital behind this bottleneck.</p> : b.total_component_value_at_risk > 0 ? (
+          {b.identity_ambiguous ? <p className="bundle-risk">{b.identity_warning || "Review duplicate component SKU codes before estimating bundle capacity or capital."}</p> : financialValue(b, "total_component_value_at_risk", b.total_component_value_at_risk) === null ? <p className="bundle-risk">Add component unit costs to estimate capital behind this bottleneck.</p> : b.total_component_value_at_risk > 0 ? (
             <p className="bundle-risk">
               {currency(financialValue(b, "total_component_value_at_risk", b.total_component_value_at_risk))} in component inventory is
               stranded behind this bottleneck.

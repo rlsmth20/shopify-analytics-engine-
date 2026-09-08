@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from app.schemas import SkuDetail
 from app.services.cost_provenance import cost_known
+from app.services.shop_skus import sku_identity_issues
 from app.schemas_v2 import (
     ForecastResult,
     InventoryHealthBucket,
@@ -22,10 +23,10 @@ def build_inventory_health(
     skus: list[SkuDetail],
     forecasts: list[ForecastResult],
 ) -> InventoryHealthResponse:
-    forecast_by_sku = {forecast.sku_id: forecast for forecast in forecasts}
+    forecast_by_sku = {(forecast.product_id or forecast.sku_id): forecast for forecast in forecasts}
     sku_count = len(skus)
-    available = [forecast_by_sku[sku.sku_id] for sku in skus
-                 if _forecast_available(forecast_by_sku.get(sku.sku_id))]
+    available = [forecast_by_sku[sku.product_id or sku.sku_id] for sku in skus
+                 if _forecast_available(forecast_by_sku.get(sku.product_id or sku.sku_id))]
     coverage = InventoryForecastCoverage(
         total_skus=sku_count,
         available_skus=len(available),
@@ -40,14 +41,14 @@ def build_inventory_health(
     dead_stock_cash = sum(
         _inventory_cost(sku)
         for sku in skus
-        if sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= 90
+        if not sku.identity_ambiguous and sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= 90
     )
     stockout_revenue_risk = sum(
-        _stockout_revenue_risk(sku, forecast_by_sku.get(sku.sku_id))
+        _stockout_revenue_risk(sku, forecast_by_sku.get(sku.product_id or sku.sku_id))
         for sku in skus
     )
     stockout_margin_risk = sum(
-        _stockout_margin_risk(sku, forecast_by_sku.get(sku.sku_id))
+        _stockout_margin_risk(sku, forecast_by_sku.get(sku.product_id or sku.sku_id))
         for sku in skus
     )
     high_confidence_count = sum(1 for forecast in available if forecast.confidence == "high" and not _limited_forecast(forecast))
@@ -58,14 +59,14 @@ def build_inventory_health(
     avg_days_of_cover = _average_days_of_cover(skus)
     missing_cost_count = sum(not cost_known(sku) for sku in skus)
     inventory_known = all(cost_known(sku) for sku in skus if sku.inventory > 0)
-    dead_known = all(sku.sales_history_complete and (cost_known(sku) or sku.days_since_last_sale < 90)
+    dead_known = all(not sku.identity_ambiguous and sku.sales_history_complete and (cost_known(sku) or sku.days_since_last_sale < 90)
                      for sku in skus if sku.inventory > 0)
-    margin_known = risk_known and all(cost_known(sku) for sku in skus if _stockout_revenue_risk(sku, forecast_by_sku.get(sku.sku_id)) > 0)
+    margin_known = risk_known and all(cost_known(sku) for sku in skus if _stockout_revenue_risk(sku, forecast_by_sku.get(sku.product_id or sku.sku_id)) > 0)
 
-    health_counts = Counter(_health_bucket(sku, forecast_by_sku.get(sku.sku_id)) for sku in skus)
+    health_counts = Counter(_health_bucket(sku, forecast_by_sku.get(sku.product_id or sku.sku_id)) for sku in skus)
     confidence_counts = Counter("low" if _limited_forecast(forecast) else forecast.confidence for forecast in available)
     if not available:
-        risk_note = "Sales history is unavailable; stockout revenue and gross margin exposure cannot be assessed."
+        risk_note = "Usable sales history or a unique SKU mapping is unavailable; stockout revenue and gross margin exposure cannot be assessed."
     elif not risk_known:
         risk_note = (f"Estimated revenue-risk subtotal: {_currency(stockout_revenue_risk)} from {coverage.available_skus} of {sku_count} SKUs. "
                      f"{coverage.unavailable_skus} cannot be assessed; total revenue and gross margin exposure are unknown.")
@@ -153,6 +154,7 @@ def build_inventory_health(
               description="Cost-based profit, capital and purchasing estimates remain unknown until unit costs are recorded.",
               metric_label="SKUs missing unit cost", metric_value=str(missing_cost_count))] if missing_cost_count else []),
         forecast_coverage=coverage,
+        identity_issues=sku_identity_issues(skus),
         generated_at=datetime.now(timezone.utc),
     )
 
@@ -196,6 +198,8 @@ def _average_days_of_cover(skus: list[SkuDetail]) -> float | None:
 
 
 def _health_bucket(sku: SkuDetail, forecast: ForecastResult | None) -> str:
+    if sku.identity_ambiguous:
+        return "no_signal"
     if sku.sales_history_complete and sku.inventory > 0 and sku.days_since_last_sale >= 90:
         return "dead"
     if not _forecast_available(forecast):
@@ -216,13 +220,14 @@ def _top_cash_trapped(skus: list[SkuDetail]) -> list[InventoryHealthSku]:
     candidates = [
         sku
         for sku in skus
-        if sku.sales_history_complete and cost_known(sku) and sku.inventory > 0
+        if not sku.identity_ambiguous and sku.sales_history_complete and cost_known(sku) and sku.inventory > 0
         and (sku.days_since_last_sale >= 60 or _days_of_cover(sku) >= 120)
     ]
     candidates.sort(key=_inventory_cost, reverse=True)
     return [
         InventoryHealthSku(
             sku_id=sku.sku_id,
+            product_id=sku.product_id,
             name=sku.name,
             vendor=sku.vendor,
             value=round(_inventory_cost(sku), 0),
@@ -239,9 +244,9 @@ def _top_stockout_risk(
 ) -> list[InventoryHealthSku]:
     ranked = sorted(
         (
-            (sku, forecast_by_sku.get(sku.sku_id))
+            (sku, forecast_by_sku.get(sku.product_id or sku.sku_id))
             for sku in skus
-            if _forecast_available(forecast_by_sku.get(sku.sku_id))
+            if _forecast_available(forecast_by_sku.get(sku.product_id or sku.sku_id))
         ),
         key=lambda pair: _stockout_revenue_risk(pair[0], pair[1]),
         reverse=True,
@@ -256,6 +261,7 @@ def _top_stockout_risk(
         rows.append(
             InventoryHealthSku(
                 sku_id=sku.sku_id,
+                product_id=sku.product_id,
                 name=sku.name,
                 vendor=sku.vendor,
                 value=round(value, 0),

@@ -12,6 +12,7 @@ This service computes:
 from __future__ import annotations
 
 import math
+from collections import Counter
 from dataclasses import dataclass
 
 from app.schemas import SkuDetail
@@ -30,10 +31,21 @@ def analyze_bundles(
     bundles: list[BundleDefinition],
     skus: list[SkuDetail],
 ) -> list[BundleHealth]:
-    sku_index = {s.sku_id: s for s in skus}
+    alias_counts = Counter(s.sku_id for s in skus)
+    ambiguous = {s.sku_id for s in skus if s.identity_ambiguous or alias_counts[s.sku_id] > 1}
+    sku_index = {s.sku_id: s for s in skus if s.sku_id not in ambiguous}
     results: list[BundleHealth] = []
 
     for bundle in bundles:
+        held = sorted({comp.component_sku_id for comp in bundle.components} & ambiguous)
+        if held:
+            warning = "Multiple products share component SKU codes: " + ", ".join(held) + ". Review the mapping before relying on bundle quantities."
+            results.append(BundleHealth(bundle_sku_id=bundle.bundle_sku_id, bundle_name=bundle.bundle_name,
+                max_bundles_sellable=0, limiting_component_sku_id="", limiting_component_name="(SKU mapping needs review)",
+                component_status=[warning], total_component_value_at_risk=0.0, financial_values_known=False,
+                identity_ambiguous=True, identity_warning=warning, planning_values_known=False,
+                recommended_action="Review duplicate component SKU codes before buying or assembling bundles."))
+            continue
         per_component_bundles: list[tuple[BundleComponent, int, SkuDetail]] = []
         missing = False
         for comp in bundle.components:
@@ -57,6 +69,7 @@ def analyze_bundles(
                     ],
                     total_component_value_at_risk=0.0,
                     financial_values_known=False,
+                    planning_values_known=False,
                     recommended_action="Map all component SKUs before relying on bundle analytics.",
                 )
             )

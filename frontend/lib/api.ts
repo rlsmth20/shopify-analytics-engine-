@@ -1,5 +1,6 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import type { FinancialProvenance } from "@/lib/financial-values";
+import type { ProductIdentity, IdentityIssue } from "@/lib/product-identity";
 import { authenticatedFetch, isDemoActive } from "@/lib/shopify-embedded";
 
 export type ActionableStatus = "urgent" | "optimize" | "dead";
@@ -96,6 +97,7 @@ export type SkuLeadTimeSettingsResponse = {
   shop_id: number | null;
   shopify_domain: string;
   items: SkuLeadTimeEntry[];
+  warnings?: string[];
 };
 
 export type UpdateVendorLeadTimesRequest = {
@@ -113,7 +115,7 @@ export type UpdateSkuLeadTimesRequest = {
   items: SkuLeadTimeEntry[];
 };
 
-export type SkuDetail = FinancialProvenance & {
+export type SkuDetail = FinancialProvenance & ProductIdentity & {
   sku_id: string;
   name: string;
   vendor: string;
@@ -127,7 +129,7 @@ export type SkuDetail = FinancialProvenance & {
   sku_lead_time_days: number | null;
 };
 
-type BaseInventoryAction = FinancialProvenance & {
+type BaseInventoryAction = FinancialProvenance & ProductIdentity & {
   sku_id: string;
   name: string;
   status: ActionableStatus;
@@ -147,6 +149,8 @@ type BaseInventoryAction = FinancialProvenance & {
   data_quality_confidence: DataQualityConfidence;
   data_quality_warnings: string[];
   sales_history_complete?: boolean;
+  planning_values_known?: boolean;
+  planning_values?: Record<string, number | null>;
 };
 
 export type UrgentInventoryAction = BaseInventoryAction & {
@@ -176,6 +180,7 @@ export type InventoryAction =
 export type ActionFeedResponse = {
   data_source: ActionDataSource;
   actions: InventoryAction[];
+  identity_issues?: IdentityIssue[];
 };
 
 export class ApiError extends Error {

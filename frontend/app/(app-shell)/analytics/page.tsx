@@ -7,6 +7,7 @@ import { ChartCard } from "@/components/chart-card";
 import { InventoryValueChart } from "@/components/inventory-value-chart";
 import { EmptyState } from "@/components/empty-state";
 import { KpiCard } from "@/components/kpi-card";
+import { IdentityReviewNotice } from "@/components/identity-review-notice";
 import {
   confidenceLabel,
   currencyFormatter,
@@ -150,6 +151,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="page-stack">
+      <IdentityReviewNotice issues={health?.identity_issues} />
       {healthError ? (
         <EmptyState
           title="Inventory health unavailable"
@@ -175,7 +177,7 @@ export default function AnalyticsPage() {
 
       {forecastCoverage ? <div className="data-quality-note" role="note" aria-label="Forecast coverage">
         <p><strong>{forecastCoverage.available_skus} of {forecastCoverage.total_skus} SKUs can be assessed for stockout risk.</strong></p>
-        {forecastCoverage.unavailable_skus > 0 ? <p>SKUs needing sales history: {forecastCoverage.unavailable_skus}. Total stockout exposure is unknown; any subtotal and ranked estimates cover the available forecasts only. <Link href="/store-sync">Review imported history</Link>.</p> : null}
+        {forecastCoverage.unavailable_skus > 0 ? <p>SKUs needing history or product mapping review: {forecastCoverage.unavailable_skus}. Total stockout exposure is unknown; any subtotal and ranked estimates cover the available forecasts only. <Link href="/store-sync">Review source data</Link>.</p> : null}
         {forecastCoverage.low_confidence_skus > 0 ? <p>Forecasts with limited history or low confidence: {forecastCoverage.low_confidence_skus}. Verify demand before placing an order. <Link href="/forecast">Review forecast evidence</Link>.</p> : null}
         {forecastCoverage.no_recent_sales_skus > 0 ? <p>SKUs with an observed window of zero sales: {forecastCoverage.no_recent_sales_skus}. Their zero-demand estimates do not guarantee zero future demand.</p> : null}
       </div> : null}
@@ -228,7 +230,7 @@ export default function AnalyticsPage() {
               items={health.top_stockout_risk}
               emptyTitle={forecastCoverage?.unavailable_skus ? "Stockout exposure is not fully assessed" : "No exposure estimated in available forecasts"}
               emptyDescription={forecastCoverage?.unavailable_skus
-                ? "Some SKUs cannot be assessed without sales history. An empty list does not mean there is no stockout risk."
+                ? "Some SKUs need usable sales history or product mapping review. An empty list does not mean there is no stockout risk."
                 : "No positive revenue exposure is estimated from the available sales history. Check forecast confidence and stock availability before making purchasing decisions."}
             />
           </ChartCard>
@@ -239,8 +241,8 @@ export default function AnalyticsPage() {
           >
             <RiskList
               items={health.top_cash_trapped}
-              emptyTitle="No trapped cash found"
-              emptyDescription="No stale or heavily over-covered SKUs are currently visible in the catalog."
+              emptyTitle="No trapped cash identified in assessed products"
+              emptyDescription="No stale or heavily over-covered SKUs were identified among the products Skubase could assess. Review data gaps before making clearance decisions."
             />
           </ChartCard>
         </div>

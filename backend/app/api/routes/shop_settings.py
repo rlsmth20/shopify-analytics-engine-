@@ -23,6 +23,7 @@ from app.schemas import (
 from app.services.shop_settings import (
     LeadTimeOverrideValue,
     ShopSettingsInputError,
+    ShopSettingsIdentityError,
     get_category_lead_times,
     get_shop_settings,
     get_sku_lead_times,
@@ -191,12 +192,13 @@ def read_sku_lead_times(
 ) -> SkuLeadTimeSettingsResponse:
     domain = _user_shop_domain(db, user)
     try:
-        shop_id, normalized_domain, items = get_sku_lead_times(domain)
+        shop_id, normalized_domain, items, warnings = get_sku_lead_times(domain)
     except ShopSettingsInputError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return SkuLeadTimeSettingsResponse(
         shop_id=shop_id,
         shopify_domain=normalized_domain,
+        warnings=warnings,
         items=[
             SkuLeadTimeEntry(sku_id=item.name, lead_time_days=item.lead_time_days)
             for item in items
@@ -212,7 +214,7 @@ def update_sku_lead_times(
 ) -> SkuLeadTimeSettingsResponse:
     domain = _user_shop_domain(db, user)
     try:
-        shop_id, normalized_domain, items = upsert_sku_lead_times(
+        shop_id, normalized_domain, items, warnings = upsert_sku_lead_times(
             shopify_domain=domain,
             items=[
                 LeadTimeOverrideValue(
@@ -223,11 +225,14 @@ def update_sku_lead_times(
                 if item.lead_time_days is not None
             ],
         )
+    except ShopSettingsIdentityError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     except ShopSettingsInputError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return SkuLeadTimeSettingsResponse(
         shop_id=shop_id,
         shopify_domain=normalized_domain,
+        warnings=warnings,
         items=[
             SkuLeadTimeEntry(sku_id=item.name, lead_time_days=item.lead_time_days)
             for item in items

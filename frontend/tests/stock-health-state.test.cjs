@@ -108,6 +108,15 @@ test("ActionCard retains real urgent stockout behavior and bypasses projections 
   assert.doesNotMatch(review, /stock-health-badge-healthy/);
 });
 
+test("ambiguous action keeps actual on-hand stock and raw SKU but never renders a stock projection", () => {
+  const html = renderToStaticMarkup(React.createElement(ActionCard, { action: { ...action, sku_id: "sku_SHARED", identity_ambiguous: true } }));
+  assert.match(html, /sku_SHARED/);
+  assert.match(html, /Recorded on hand/);
+  assert.match(html, /Review SKU mapping/);
+  assert.match(html, /href="\/store-sync"/);
+  assert.doesNotMatch(html, /Recommended qty|stock-health-badge|Stockout risk|Reorder point/);
+});
+
 test("report history rows retain Unknown risk and do not infer inventory value from profit margin", () => {
   const row = reportMappings.actionToRow({ ...action, status: "optimize", sales_history_complete: false, cash_tied_up: 0 }, { profit_per_unit: 12 }, undefined);
   assert.equal(row.status, "Review");

@@ -7154,6 +7154,12 @@ code {
   line-height: 1.5;
 }
 
+.identity-review-note {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
 /* Responsive tweaks --------------------------------------------------------*/
 
 @media (max-width: 980px) {

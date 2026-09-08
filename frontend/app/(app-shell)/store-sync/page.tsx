@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { SectionCard } from "@/components/section-card";
+import { BrowserHealthCheckOption } from "@/components/browser-health-check-option";
 import { getSyncNotice, isSyncResult, unmatchedSyncItems, type SyncResult } from "@/lib/sync-summary";
 import {
   authenticatedFetch,
@@ -242,7 +243,6 @@ export default function StoreSyncPage() {
               </button>
             ) : (
               <div className="button-row">
-                <Link className="button button-primary" href="/tools/inventory-health-check">Try the free inventory health check</Link>
                 <a className="button button-ghost" href="mailto:info@skubase.io?subject=Skubase%20Shopify%20access">Ask about Shopify access</a>
                 <a className="button button-ghost" href="https://admin.shopify.com" target="_top">Open Shopify Admin if already installed</a>
               </div>
@@ -250,6 +250,7 @@ export default function StoreSyncPage() {
             {installError ? <p className="auth-error" role="alert">{installError}</p> : null}
           </>
         )}
+        <BrowserHealthCheckOption />
       </SectionCard>
 
       <SectionCard>

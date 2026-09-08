@@ -39,26 +39,26 @@ def build_scorecards(
     if not skus:
         return []
 
-    revenue_by_sku: dict[str, float] = {}
-    for sku in skus:
-        revenue_by_sku[sku.sku_id] = sku.price * sku.last_30_day_sales
-
-    total_revenue = sum(revenue_by_sku.values()) or 1.0
-    ranked = sorted(skus, key=lambda s: revenue_by_sku[s.sku_id], reverse=True)
+    # Revenue belongs to product rows, not reusable merchant-facing SKU aliases.
+    total_revenue = sum(sku.price * sku.last_30_day_sales for sku in skus) or 1.0
+    ranked = sorted(skus, key=lambda sku: sku.price * sku.last_30_day_sales, reverse=True)
 
     scorecards: list[SkuScorecard] = []
     cumulative = 0.0
     for sku in ranked:
-        contribution = revenue_by_sku[sku.sku_id] / total_revenue
+        contribution = sku.price * sku.last_30_day_sales / total_revenue
         cumulative += contribution
         abc_class = _classify_abc(cumulative, cutoff_a_pct, cutoff_b_pct)
 
-        history = history_for_sku(sku.sku_id) or []
+        history = [] if sku.identity_ambiguous else history_for_sku(sku.sku_id) or []
         xyz_class, cv = _classify_xyz(history)
 
         scorecards.append(
             SkuScorecard(
                 sku_id=sku.sku_id,
+                product_id=sku.product_id,
+                identity_ambiguous=sku.identity_ambiguous,
+                identity_warning=sku.identity_warning,
                 name=sku.name,
                 vendor=sku.vendor,
                 category=sku.category,
@@ -67,7 +67,7 @@ def build_scorecards(
                 contribution_pct=round(contribution * 100, 2),
                 variability_cv=round(cv, 3),
                 avg_daily_units=round(sku.last_30_day_sales / 30, 2),
-                avg_daily_revenue=round(revenue_by_sku[sku.sku_id] / 30, 2),
+                avg_daily_revenue=round(sku.price * sku.last_30_day_sales / 30, 2),
                 profit_per_unit=round(sku.price - sku.cost, 2),
                 cost_source=sku.cost_source,
                 sell_through_30d=round(
@@ -75,7 +75,7 @@ def build_scorecards(
                     3,
                 ),
                 inventory_on_hand=sku.inventory,
-                classification_note=_note_for_class(abc_class, xyz_class),
+                classification_note=(sku.identity_warning or "SKU identity needs review.") if sku.identity_ambiguous else _note_for_class(abc_class, xyz_class),
             )
         )
     return scorecards

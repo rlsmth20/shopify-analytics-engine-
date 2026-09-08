@@ -126,6 +126,9 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
 
     base_payload = {
         "sku_id": metrics.sku.sku_id,
+        "product_id": metrics.sku.product_id,
+        "identity_ambiguous": metrics.sku.identity_ambiguous,
+        "identity_warning": metrics.sku.identity_warning,
         "name": metrics.sku.name,
         "status": status,
         "recommended_action": _build_recommended_action(metrics, status),
@@ -147,11 +150,19 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
                                   *([] if cost_known(metrics.sku) else [MISSING_COST_WARNING])],
         "cost_source": metrics.sku.cost_source,
     }
+    if metrics.sku.identity_ambiguous:
+        base_payload.update(status="optimize", recommended_action="Review duplicate SKU codes before ordering or clearing stock.",
+            explanation=metrics.sku.identity_warning or "Multiple current products share this SKU code.",
+            target_inventory_units=0, reorder_point_units=0, safety_stock_units=0, priority_score=100.0,
+            sales_history_complete=False, data_quality_confidence="low",
+            data_quality_warnings=[metrics.sku.identity_warning or "SKU identity needs review.", *metrics.sku.sales_history_warnings])
+        return OptimizeInventoryAction(**base_payload, excess_units=0, cash_tied_up=0.0,
+            **financial_projection(False, cash_tied_up=0.0))
     if not metrics.sku.sales_history_complete and status == "optimize":
         # The existing optimize contract carries a monitoring task. It must not
         # imply measured excess units, trapped cash, or a purchasing target.
         base_payload.update(target_inventory_units=0, reorder_point_units=0,
-                            safety_stock_units=0, priority_score=10.0)
+                            safety_stock_units=0, priority_score=10.0, planning_values_known=False)
         return OptimizeInventoryAction(**base_payload, excess_units=0, cash_tied_up=0.0,
                                        **financial_projection(False, cash_tied_up=0.0))
 
@@ -185,6 +196,8 @@ def _build_action(metrics: InventoryMetrics) -> InventoryAction | None:
 
 
 def _determine_status(metrics: InventoryMetrics) -> Classification:
+    if metrics.sku.identity_ambiguous:
+        return "optimize"
     if not metrics.sku.sales_history_complete:
         # Recorded demand can still justify a low-confidence stockout warning.
         # Missing coverage cannot justify markdowns, liquidation, or reduced buys.

@@ -8,7 +8,7 @@ from app.db.models import User
 from app.db.session import get_db_session
 from app.schemas_v2 import LiquidationResponse
 from app.services.dead_stock import build_liquidation_plan
-from app.services.shop_skus import load_skus_for_shop
+from app.services.shop_skus import load_skus_for_shop, sku_identity_issues
 
 
 router = APIRouter(prefix="/liquidation", tags=["liquidation"])
@@ -25,7 +25,8 @@ def read_liquidation_plan(
     suggestions = build_liquidation_plan(skus)
     total = sum(s.projected_recovered_capital for s in suggestions)
     return LiquidationResponse(
-        financial_values_known=all(s.financial_values_known for s in suggestions),
+        financial_values_known=not any(sku.identity_ambiguous for sku in skus) and all(s.financial_values_known for s in suggestions),
+        identity_issues=sku_identity_issues(skus),
         total_capital_recoverable=round(total, 2),
         suggestions=suggestions,
     )

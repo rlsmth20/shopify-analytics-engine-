@@ -7,6 +7,8 @@ import { DEFAULT_ACTION_FILTERS, filterInventoryActions, readActionFilters, type
 import { ActionCard } from "@/components/action-card";
 import { ActionTable } from "@/components/action-table";
 import { EmptyState } from "@/components/empty-state";
+import { BrowserHealthCheckOption } from "@/components/browser-health-check-option";
+import { productRowKey } from "@/lib/product-identity";
 import type { ActionDataSource, InventoryAction } from "@/lib/api";
 import {
   statusLabel,
@@ -179,6 +181,8 @@ export function ActionFeed({
         />
       ) : null}
 
+      {!isLoading && (Boolean(errorMessage) || actions.length === 0) ? <BrowserHealthCheckOption /> : null}
+
       {!isLoading && !errorMessage && view === "table" && displayedActions.length > 0 ? <ActionTable actions={displayedActions} /> : null}
 
       {!isLoading && !errorMessage && view === "cards" ? (
@@ -230,8 +234,8 @@ function ActionSection({
         <span className="group-count">{actions.length}</span>
       </div>
       <div className="action-list">
-        {actions.map((action) => (
-          <ActionCard key={`${action.status}-${action.sku_id}`} action={action} />
+        {actions.map((action, index) => (
+          <ActionCard key={`${action.status}-${productRowKey(action, index)}`} action={action} />
         ))}
       </div>
     </section>

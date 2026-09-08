@@ -15,6 +15,8 @@ class ForecastBacktest:
 
 
 def backtest_forecast(inputs: ForecastInputs, days: int = 14) -> ForecastBacktest:
+    if inputs.identity_ambiguous:
+        return ForecastBacktest(None, None, None, [inputs.identity_warning or "SKU identity needs review before backtesting."])
     history, start_weekday = observed_history(inputs)
     if len(history) < days + 21:
         return ForecastBacktest(

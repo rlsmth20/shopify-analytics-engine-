@@ -20,6 +20,9 @@ from app.schemas_v2 import (
 from app.services.buying_calendar import build_buying_calendar_events
 from app.services.purchase_orders import build_purchase_order_drafts
 from app.services.purchase_order_records import (
+    PurchaseOrderIdentityError,
+    PurchaseOrderReceiptError,
+    receipt_lines_by_sku,
     list_saved_purchase_orders,
     receive_purchase_order,
     save_purchase_order,
@@ -31,6 +34,7 @@ from app.services.shop_settings import build_default_shop_settings, load_effecti
 from app.services.shop_skus import (
     load_daily_history_for_shop_skus,
     load_skus_for_shop,
+    sku_identity_issues,
 )
 
 
@@ -79,8 +83,10 @@ def list_reorder_suggestions(
         suggestions=suggestions,
         total_extended_cost=round(sum(s.landed_extended_cost for s in suggestions), 2),
         vendor_totals=totals,
-        financial_values_known=all(s.financial_values_known for s in suggestions),
-        known_vendor_totals=build_known_vendor_totals(suggestions, totals),
+        financial_values_known=not any(sku.identity_ambiguous for sku in skus) and all(s.financial_values_known for s in suggestions),
+        identity_issues=sku_identity_issues(skus),
+        known_vendor_totals={**build_known_vendor_totals(suggestions, totals),
+                             **{sku.vendor: None for sku in skus if sku.identity_ambiguous}},
     )
 
 
@@ -117,7 +123,8 @@ def read_buying_calendar(
         horizon_days=horizon_days,
         events=events,
         total_estimated_cost=round(sum(event.estimated_cost for event in events), 2),
-        financial_values_known=all(event.financial_values_known for event in events),
+        financial_values_known=not any(sku.identity_ambiguous for sku in skus) and all(event.financial_values_known for event in events),
+        identity_issues=sku_identity_issues(skus),
         due_now_count=sum(1 for event in events if event.urgency in {"due_now", "this_week"}),
         future_count=sum(1 for event in events if event.urgency == "future"),
         saved_open_count=sum(1 for event in events if event.source == "saved"),
@@ -165,6 +172,10 @@ def read_cash_plan(
         order_cost=shipping_cost,
     )
     if not suggestions:
+        if any(sku.identity_ambiguous for sku in skus):
+            return CashPlanResponse(**{**empty.model_dump(), "identity_issues": sku_identity_issues(skus),
+                "financial_values_known": False,
+                "explanation": "Purchasing is held for duplicate SKU codes. Review their mapping before relying on a complete cash plan."})
         return empty
 
     vendors: dict[str, dict[str, float | int]] = {}
@@ -210,8 +221,11 @@ def read_cash_plan(
         order_now_items=order_now_items,
         deferrable_items=deferrable_items,
         vendors=vendor_rows,
-        financial_values_known=all(s.financial_values_known for s in suggestions),
+        financial_values_known=not any(sku.identity_ambiguous for sku in skus) and all(s.financial_values_known for s in suggestions),
+        identity_issues=sku_identity_issues(skus),
         explanation=(
+            "Purchasing subtotal excludes products with duplicate SKU codes. Review their mapping before relying on a complete cash plan."
+            if any(sku.identity_ambiguous for sku in skus) else
             f"{order_now_items} SKU(s) are at or below their reorder point. Add missing unit costs to measure purchasing cash requirements."
             if not all(s.financial_values_known for s in suggestions) else
             f"{order_now_items} SKU(s) are at or below their reorder point and need "
@@ -263,7 +277,8 @@ def list_po_drafts(
     return PurchaseOrderDraftsResponse(
         drafts=[*saved, *drafts],
         total_capital_required=round(sum(d.total_cost for d in [*saved, *drafts]), 2),
-        financial_values_known=all(d.financial_values_known for d in [*saved, *drafts]),
+        financial_values_known=not any(sku.identity_ambiguous for sku in skus) and all(d.financial_values_known for d in [*saved, *drafts]),
+        identity_issues=sku_identity_issues(skus),
     )
 
 
@@ -275,7 +290,10 @@ def save_po_draft(
 ) -> PurchaseOrderStatusResponse:
     if not payload.draft.financial_values_known or any(not line.financial_values_known for line in payload.draft.lines):
         raise HTTPException(status_code=422, detail="Record explicit unit costs for every purchase-order line before saving.")
-    saved = save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
+    try:
+        saved = save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
+    except PurchaseOrderIdentityError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     record_audit_event(
         db,
         shop_id=user.shop_id,
@@ -329,16 +347,16 @@ def receive_po(
     user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
-    po = receive_purchase_order(
-        db,
-        shop_id=user.shop_id,
-        po_id=po_id,
-        received_lines={
-            line.sku_id: (line.received_qty, line.received_unit_cost)
-            for line in payload.lines
-        },
-        received_at=payload.received_at,
-    )
+    try:
+        po = receive_purchase_order(
+            db,
+            shop_id=user.shop_id,
+            po_id=po_id,
+            received_lines=receipt_lines_by_sku(payload.lines),
+            received_at=payload.received_at,
+        )
+    except (PurchaseOrderIdentityError, PurchaseOrderReceiptError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     if po is None:
         raise HTTPException(status_code=404, detail="Purchase order not found.")
     record_audit_event(

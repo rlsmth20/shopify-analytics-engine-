@@ -128,6 +128,9 @@ def build_evaluation_context(db: DbSession, shop_id: int) -> EvaluationContext |
         forecast_sku(
             ForecastInputs(
                 sku_id=sku.sku_id,
+                product_id=sku.product_id,
+                identity_ambiguous=sku.identity_ambiguous,
+                identity_warning=sku.identity_warning,
                 daily_history=histories.get(sku.sku_id, []),
                 on_hand=sku.inventory,
                 observed_history_days=sku.observed_history_days,
