@@ -1,4 +1,22 @@
-# Skubase outreach messaging — revision 3
+# Skubase outreach messaging — revision 4
+
+Owner direction, September 8, 2026: remove unnecessary negative caveats from
+advertising. Lead with the merchant's verified issue, the relevant Skubase
+capability and its benefit, then one concise offer. Do not add statements such as
+"it cannot predict every sudden demand spike" to an introductory pitch. Accuracy
+comes from making supported claims; it does not require listing everything the
+app cannot do. Explain a limitation when answering a specific requirement or when
+omitting it would make the actual offer misleading. Keep the owner-requested
+Shopify review / not-yet-listed disclosure and avoid guaranteeing outcomes or
+unbuilt functionality.
+
+Use revision 4 for future messages. Preserve all already-sent text, receipts and
+revision 3 cohorts. This is an owner-directed copy adjustment, not a measured
+conversion improvement. Keep the offer and qualification standards stable; new
+admissions must retain the new message version and separate experiment attribution.
+Earlier directions below remain applicable except where this update supersedes
+their copy-version instructions. Capability boundaries below guide claim checking;
+they are not a checklist of disclaimers to insert into advertising.
 
 Owner direction, September 8, 2026: make the promotional purpose unmistakable
 and respond to relevant participants throughout a discussion, not only its
