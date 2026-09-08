@@ -213,3 +213,33 @@ activity through its live search UI, preserving qualification and cohort rules.
 No ICP or message rewrite. Three free-check slots available, ads and new paid
 services/API calls $0; subscription tokens/cost UNKNOWN. No production changes.
 Wake **6719**, usage `7bbf80395a694a6db18485709f228057`.
+
+## Routine wake — September 8, 11:18 UTC / 04:18 Pacific
+
+No new sends, merchant replies, requests, customer events or failures. Business
+inbox and notifications remain system/test only; worker and polling healthy.
+Capacity: three used, 17 available, zero unresolved. Total contacts still 13.
+Daily review remains due at 9 a.m. Pacific; three free-check slots available.
+
+Six source reads used the live community UI: two original-post searches, one
+merchant thread, two existing-conversation checks and one public profile.
+The inventory query since September 1 returned 19 results; the reorder query
+since August 15 returned 21 overlapping results. These counts are not leads.
+Author/date visibility improved screening, but many results remain disclosed
+builders, own posts, contacted merchants or unrelated workflows. Baseline 6940
+preserves the queries so future wakes inspect incremental changes.
+
+`edwardandirwyn`, topic 676359: verified shared physical/online inventory and
+stock-entry errors, but Skubase planning is not a verified repair for that
+workflow (6937). New topic 673970 reply 13 is Kim267's advice and preference for
+specific stock-risk warnings; public profile does not verify a store, catalog
+or current purchasing need (6938). No byface.shop response. Topic 579849 reply
+26 is disclosed Binly developer advice, not VBUstore interest (6939). No replies
+or repeated pitches sent. Preserve the workflow preference as one observation,
+not evidence that Skubase's offer converts.
+
+Next: replies first, then new worker evidence after its ordinary discovery
+window and incremental merchant-authored activity. Avoid replaying the covered
+search results or resolved Reddit rule checks. Cohorts/ICP unchanged. Ads and
+new paid services/API calls $0; subscription tokens/cost UNKNOWN. No production
+changes. Wake **6943**, usage `6be27b922d2848f19317a13685721db0`.
