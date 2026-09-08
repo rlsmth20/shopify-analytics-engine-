@@ -87,6 +87,13 @@ export function growthInboxView(inbox?: GrowthInboxTransport | null) {
 
 export type GrowthSnapshot = {
   generated_at?: number;
+  execution?: {
+    daily_new_contact_cap: number; sent_today: number; remaining_capacity: number;
+    qualified_ready: number; discovery_pending: number; acquisition_tasks_running: number;
+    oldest_pending_acquisition_age: number | null; last_acquisition_action: { at: number; stage: string } | null;
+    last_successful_send: number | null; current_blocker: string | null; operational_fault: string | null;
+    next_action: string; next_wake_retry: number | null;
+  };
   measurement?: { day_timezone: string; mission_started_at: number | null; mission_funnel: Record<string, number>; funnel_scope: string };
   mission: { qualified_users: number; target: number; qualified_definition: string };
   today: Record<string, number>; funnel: Record<string, number>;

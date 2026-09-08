@@ -60,6 +60,7 @@ def enqueue(db, key, kind, payload=None, priority=0, due_at=None):
 
 
 def claim(factory, lease_seconds=120):
+    from .execution import priority_order
     now = time.time()
     with factory() as db:
         # A crashed task exhausts the same retry allowance as an explicit failure.
@@ -69,7 +70,7 @@ def claim(factory, lease_seconds=120):
         eligible = or_(Work.status == "ready", (Work.status == "running") & (Work.lease_until < now))
         candidates = list(db.scalars(select(Work.id).where(eligible, Work.due_at <= now,
                                    Work.attempts < Work.max_attempts)
-                                   .order_by(Work.priority.desc(), Work.due_at, Work.id).limit(8)))
+                                   .order_by(priority_order(), Work.priority.desc(), Work.due_at, Work.id).limit(8)))
         for work_id in candidates:
             token = uid()
             changed = db.execute(update(Work).where(Work.id == work_id, eligible,
@@ -107,6 +108,8 @@ def finish(factory, work, *, result=None, error=None, failure_class=None):
         now = time.time()
         status = "done"
         due = now
+        if not error and result and result.get("defer_until", 0) > now:
+            status, due = "ready", result["defer_until"]
         if error:
             if failure_class == "transient" and work.attempts < work.max_attempts:
                 status, due = "ready", now + min(3600, 60 * 2 ** work.attempts)
@@ -114,9 +117,14 @@ def finish(factory, work, *, result=None, error=None, failure_class=None):
                 status = "blocked" if failure_class in {"configuration", "policy", "ambiguous"} else "failed"
         db.execute(update(Work).where(Work.id == work.id).values(
             status=status, due_at=due, lease_until=0, result=result or {},
+            attempts=max(0, work.attempts - 1) if result and result.get("defer_until") else work.attempts,
             error=f"{failure_class}: {error}"[:500] if error else None, updated_at=now))
         record(db, f"work:{work.id}:{work.attempts}", "ACTION_RESULT", work.id,
                {"kind": work.kind, "status": status, "result": result or {}, "failure_class": failure_class})
+        from .execution import ACQUISITION
+        if work.kind in ACQUISITION and status == "done" and result and not result.get("cached") and result.get("decision") not in {"research_cap_reached", "discovery_cap_reached"}:
+            record(db, f"acquisition:{work.id}:{work.attempts}", "ACQUISITION_PROGRESS", work.id,
+                   {"executor": "server", "stage": work.kind, "result": result})
         db.commit()
 
 

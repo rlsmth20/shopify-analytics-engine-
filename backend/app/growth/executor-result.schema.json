@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome", "observation", "sources", "next_step", "stop_reason", "successors"],
+  "properties": {
+    "outcome": {"type": "string", "enum": ["done", "excluded", "blocked"]},
+    "observation": {"type": "string"},
+    "sources": {"type": "array", "items": {"type": "string"}},
+    "next_step": {"type": "string"},
+    "stop_reason": {"type": ["string", "null"], "enum": [null, "DAILY_CAP_REACHED", "NO_CURRENT_QUALIFIED_PROSPECTS", "DISCOVERY_EXHAUSTED_FOR_CURRENT_SEARCH_SPACE", "REPLY_REQUIRES_PRIORITY_ATTENTION", "CHANNEL_BLOCKED", "SAFETY_BLOCKED", "BUDGET_BLOCKED", "PROVIDER_BLOCKED", "TRUE_IDLE"]},
+    "successors": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key", "source", "decision", "contact_id", "priority", "stage"],
+      "properties": {
+        "key": {"type": "string"}, "source": {"type": ["string", "null"]},
+        "decision": {"type": "string"}, "contact_id": {"type": ["string", "null"]},
+        "priority": {"type": "number"},
+        "stage": {"type": "string", "enum": ["discover", "qualify", "prepare", "send", "outreach", "reply"]}
+      }
+    }}
+  }
+}

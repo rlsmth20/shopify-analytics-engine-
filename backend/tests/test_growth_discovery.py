@@ -64,6 +64,15 @@ class DiscoveryTests(unittest.TestCase):
             self.assertEqual(db.scalar(select(func.count()).select_from(FirstContact)), 0)
             self.assertEqual(db.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind == "COMMUNITY_RESPONSE_DRAFTED")), 0)
 
+    def test_own_promotional_reply_never_enters_acquisition(self):
+        event = self.opportunity(author="Skubase")
+        with self.factory() as db:
+            contact = db.get(Contact, event.subject)
+            self.assertFalse(contact.qualification["qualified"])
+            self.assertEqual(contact.status, "ineligible")
+        result = self.research(event, lambda url: self.fail("Own-account evidence must not be researched"))
+        self.assertEqual(result["decision"], "do_not_contact")
+
     def test_topic_cache_does_not_hide_second_participant_and_repeated_handoff_dedupes(self):
         first, second = self.opportunity(), self.opportunity("Other_Person", 95)
         with self.factory() as db:

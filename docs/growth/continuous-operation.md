@@ -1,5 +1,44 @@
 # Continuous growth and first-contact ceiling
 
+## Current execution architecture — September 8 repair
+
+The persistent pull executor in `app.growth.browser_executor` now consumes the
+production browser queue continuously. `scripts/install-growth-executor.ps1`
+supervises it at Windows logon and restarts failures; it uses the installed desktop
+Codex executable and existing subscription. The hourly heartbeat retains review
+and oversight duties and is no longer the acquisition execution trigger. The
+computer, signed-in browser and local executor must remain available. A missing
+executor is an operational fault, not healthy acquisition idleness.
+
+The scheduled task launches the Python executor directly. Its Windows job object
+terminates Codex and adapter children if the supervisor stops; a PowerShell parent
+alone does not provide that guarantee. Production database credentials are loaded
+from the existing Railway login into process memory. An expired task lease is
+reclaimed from the database after restart, never reset to zero attempts.
+
+P0 replies/safety checks precede P1 acquisition. Routine reconciliation and review
+cannot outrank acquisition merely through a numerical task score. Each successful
+browser stage atomically retains its evidence and queues concrete successors; the
+supervisor immediately claims the next stage. There is no three-contact-per-wake
+limit. Stages have a 15-minute runtime bound, renewable fenced leases, and bounded
+failure retries. Failed or ambiguous sends still require receipt reconciliation;
+restarting never releases their capacity. Research waiting on its shared provider
+window remains queued with a durable due time rather than being marked complete.
+
+Read `scripts/growth-review.ps1 -Action operator-state` or the dashboard API's
+`execution` field for cap, rolling sent count, reservations, remaining capacity,
+ready prospects, discovery, running tasks, pending age, last acquisition action,
+last send, blocker, fault, next action and retry. Ten minutes of pending acquisition
+without progress is starvation; an absent browser heartbeat is executor offline.
+Task ownership/heartbeat alone is not acquisition progress.
+
+This section and `executor-instructions.md` supersede the older hourly execution,
+per-wake contact and source limits below. Existing source permissions, quality
+requirements, message revision, cohort attribution and the hard 20-contact gate
+remain authoritative. Each discovery stage uses at most two searches/four reads;
+it yields real qualification successors or evidenced exhaustion, not repetitive
+search work. No paid APIs or new services are enabled.
+
 Owner policy, September 7, 2026: operate persistently with a **hard ceiling of 20 new merchants per rolling 24 hours**, never a volume target. This replaces the old ten/twenty lifetime campaign caps and the temporary overnight stop. Apply the shared ceiling conservatively across email, business forms and individually addressed public replies. A public broadcast is not twenty contacts. Legitimate replies to engaged merchants and narrowly requested services do not consume first-contact capacity.
 
 The Railway worker continuously handles inexpensive observation, inbox ingestion, classification, delivery failures, requested service, experiments and funnel work. The Codex operator wakes every hour for bounded qualified outreach and obligations; it performs the deeper executive review once per day after 9 a.m. Pacific. Desktop/Codex availability is necessary for browser actions. Reaching capacity never pauses the worker or the operator's independent work.

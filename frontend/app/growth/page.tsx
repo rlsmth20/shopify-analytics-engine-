@@ -122,7 +122,7 @@ export default function GrowthPage() {
   const capacity = data?.agent.first_contact_capacity;
   const funnel = funnelScope === "all" ? data?.funnel : data?.measurement?.mission_funnel;
   const funnelMax = Math.max(1, ...Object.values(funnel || {}));
-  const healthy = !!data && !data.agent.paused && ["running", "healthy", "idle", "waiting"].includes(data.agent.health);
+  const healthy = !!data && !data.agent.paused && !data.execution?.operational_fault && ["running", "healthy", "idle", "waiting"].includes(data.agent.health);
   const held = !!data && Object.keys(data.strategy.acquisition_hold || {}).length > 0;
   const unknownCosts = data?.economics.unknown_cost_records ?? 0;
 
@@ -142,10 +142,28 @@ export default function GrowthPage() {
     {error && <div className={styles.notice} role="alert">{error} {data ? "The last successful snapshot is shown below." : <Link href="/login">Sign in</Link>} <button onClick={() => void load()}>Retry</button></div>}
     {!data && !error && <div className={styles.loading} role="status"><span className={styles.loadingDot} />Loading the latest retained evidence…</div>}
     {data && <>
-      <section className={styles.hero} aria-labelledby="next-action"><div><p className={styles.eyebrow}>HIGHEST-VALUE NEXT MOVE</p><h2 id="next-action">{label(data.strategy.next_action || data.agent.next_action)}</h2>
+      <section className={styles.hero} aria-labelledby="next-action"><div><p className={styles.eyebrow}>HIGHEST-VALUE NEXT MOVE</p><h2 id="next-action">{label(data.execution?.next_action || data.strategy.next_action || data.agent.next_action)}</h2>
         <p>{data.strategy.bottleneck.recommended_action}</p></div>
         <div className={styles.health}><span className={healthy ? styles.dot : styles.warningDot} />{data.agent.paused ? "Operator paused" : label(data.agent.health || "not started")}<small>Last wake {time(data.agent.last_wake)}</small><small>Current model: {data.agent.model || "No model running"}</small></div>
       </section>
+      {data.execution && <section className={styles.card} aria-labelledby="execution-title">
+        <h2 id="execution-title">Acquisition execution</h2>
+        {data.execution.operational_fault && <p className={styles.notice} role="alert">Operational fault: {label(data.execution.operational_fault)}</p>}
+        <dl className={styles.operations}>
+          <dt>Daily new-contact cap</dt><dd>{data.execution.daily_new_contact_cap} · rolling 24 hours</dd>
+          <dt>Sent in current window</dt><dd>{data.execution.sent_today}</dd>
+          <dt>Remaining capacity</dt><dd>{data.execution.remaining_capacity}</dd>
+          <dt>Qualified ready</dt><dd>{data.execution.qualified_ready}</dd>
+          <dt>Discovery pending</dt><dd>{data.execution.discovery_pending}</dd>
+          <dt>Acquisition tasks running</dt><dd>{data.execution.acquisition_tasks_running}</dd>
+          <dt>Oldest pending acquisition</dt><dd>{data.execution.oldest_pending_acquisition_age === null ? "None" : `${Math.floor(data.execution.oldest_pending_acquisition_age / 60)} minutes`}</dd>
+          <dt>Last acquisition action</dt><dd>{data.execution.last_acquisition_action ? `${label(data.execution.last_acquisition_action.stage)} · ${time(data.execution.last_acquisition_action.at)}` : "No completed stage recorded"}</dd>
+          <dt>Last successful send</dt><dd>{time(data.execution.last_successful_send)}</dd>
+          <dt>Current blocker</dt><dd>{data.execution.current_blocker ? label(data.execution.current_blocker) : "None recorded"}</dd>
+          <dt>Next action</dt><dd>{label(data.execution.next_action)}</dd>
+          <dt>Next wake / retry</dt><dd>{time(data.execution.next_wake_retry)}</dd>
+        </dl>
+      </section>}
       {held && <div className={styles.notice}><strong>New acquisition is on hold.</strong> Existing conversations and product-funnel investigation remain the priority. {data.strategy.bottleneck.observation}</div>}
       <div className={styles.columns}>
         <section className={styles.card} aria-labelledby="capacity-title"><div className={styles.cardHeading}><h2 id="capacity-title">First-contact capacity</h2><span className={styles.tag}>Rolling 24 hours</span></div>

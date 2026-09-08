@@ -18,7 +18,10 @@ LEASE_SECONDS = 1800
 MAX_ATTEMPTS = 3
 
 
-def offer(db, *, key, source, decision, evidence_id, contact_id=None, priority=50):
+def offer(db, *, key, source, decision, evidence_id, contact_id=None, priority=50, stage=None):
+    stage = stage or ("outreach" if contact_id else "discover")
+    if stage not in {"discover", "qualify", "prepare", "send", "outreach", "monitor", "reply"}:
+        raise GrowthError("Unknown acquisition stage")
     if not isinstance(key, str) or not key.strip() or len(key) > 200:
         raise GrowthError("Operator task requires a stable bounded key")
     if source and (urlparse(source).scheme != "https" or not urlparse(source).hostname or len(source) > 1000):
@@ -34,13 +37,13 @@ def offer(db, *, key, source, decision, evidence_id, contact_id=None, priority=5
     item = {"id": task_id, "key": key, "source": source, "decision": decision,
             "evidence_id": evidence_id, "contact_id": contact_id,
             "priority": max(0, min(100, float(priority))), "status": "pending",
-            "attempts": 0, "created_at": time.time(), "send_authorized": False}
+            "stage": stage, "attempts": 0, "created_at": time.time(), "send_authorized": False}
     remember(db, NAMESPACE, task_id, item)
     record(db, "operator-offer:" + task_id, "OPERATOR_TASK_QUEUED", task_id, item)
     return item
 
 
-def claim(db, task_id, *, now=None):
+def claim(db, task_id, *, now=None, executor=None):
     now = time.time() if now is None else now
     lock(db)
     item = dict(get_memory(db, NAMESPACE, task_id))
@@ -48,10 +51,13 @@ def claim(db, task_id, *, now=None):
         raise GrowthError("Task is missing or already resolved")
     if item["status"] == "running" and item.get("lease_until", 0) > now:
         raise GrowthError("Another operator holds this task", "capacity")
+    if item.get("retry_at", 0) > now:
+        raise GrowthError("Task is waiting for its durable retry", "capacity")
     if item["attempts"] >= MAX_ATTEMPTS:
         raise GrowthError("Operator task exhausted recovery attempts; inspect its evidence")
     item.update(status="running", attempts=item["attempts"] + 1,
-                lease_token=uid(), lease_until=now + LEASE_SECONDS)
+                lease_token=uid(), lease_until=now + LEASE_SECONDS,
+                executor=executor or "codex_operator", last_progress_at=now)
     remember(db, NAMESPACE, task_id, item)
     record(db, "operator-claim:" + item["lease_token"], "OPERATOR_TASK_CLAIMED", task_id,
            {"attempt": item["attempts"], "lease_until": item["lease_until"]})
@@ -94,13 +100,30 @@ def export_packet(db):
             offer(db, key="legacy:" + item["id"], source=item.get("source"),
                   decision=item["decision"] + " " + item.get("next_step", ""), evidence_id=evidence_id)
     now = time.time()
+    # Retire an invalid historical handoff without spending another browser wake.
+    from .identity import owned_identity
+    from .models import Contact
+    for row in db.scalars(select(Memory).where(Memory.namespace == NAMESPACE,
+            Memory.value["status"].as_string() == "pending")):
+        candidate = db.get(Contact, row.value.get("contact_id")) if row.value.get("contact_id") else None
+        if candidate and owned_identity(candidate.identity):
+            lock(db)
+            proof = record(db, "owned-account-exclusion:" + row.key, "PROSPECT_EXCLUDED", candidate.id,
+                {"reason": "Owned business account, not a merchant prospect", "identity": candidate.identity})
+            remember(db, NAMESPACE, row.key, {**row.value, "status": "excluded",
+                "result_evidence_id": proof.id, "completed_at": now,
+                "next_step": "Select the next independently sourced merchant"})
     active = (Memory.namespace == NAMESPACE, Memory.value["status"].as_string().in_(["pending", "running"]))
     lease = func.coalesce(Memory.value["lease_until"].as_float(), 0)
     attempts = func.coalesce(Memory.value["attempts"].as_integer(), 0)
     # Filter before bounding retrieval: old pending tasks must never disappear
     # behind newer terminal history or high-priority tasks with live leases.
-    available = [r.value for r in db.scalars(select(Memory).where(*active, lease <= now, attempts < MAX_ATTEMPTS)
-        .order_by(Memory.value["priority"].as_float().desc(), Memory.id).limit(6))]
+    from sqlalchemy import case
+    stage = Memory.value["stage"].as_string()
+    available = [r.value for r in db.scalars(select(Memory).where(*active, lease <= now, attempts < MAX_ATTEMPTS,
+        func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now)
+        .order_by(case((stage == "reply", 0), (stage == "monitor", 4), else_=1),
+                  Memory.value["priority"].as_float().desc(), Memory.id).limit(6))]
     exhausted = [r.key for r in db.scalars(select(Memory).where(*active, lease <= now, attempts >= MAX_ATTEMPTS)
         .order_by(Memory.id).limit(6))]
     claimed = db.scalar(select(func.count()).select_from(Memory).where(*active, lease > now))
@@ -114,6 +137,9 @@ def export_packet(db):
 
 
 def operator_action(db, action, payload):
+    if action == "operator-state":
+        from .execution import state
+        return state(db)
     if action == "operator-export":
         return export_packet(db)
     if action == "operator-enqueue":

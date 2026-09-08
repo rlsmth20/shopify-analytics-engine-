@@ -9,7 +9,7 @@ import time
 from sqlalchemy import func, or_, select, update
 
 from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message
-from .identity import INELIGIBLE, canonical_identity, existing_contact, identity_match, matching_contacts
+from .identity import INELIGIBLE, canonical_identity, existing_contact, identity_match, matching_contacts, owned_identity
 from .policy import GrowthError
 from .store import digest, get_memory, record
 
@@ -41,6 +41,8 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
     now = time.time() if now is None else now
     lock(db)  # PostgreSQL row lock / SQLite write lock serializes competing callers.
     db.refresh(contact)
+    if owned_identity(contact.identity):
+        raise GrowthError("Owned business account is not an acquisition prospect")
     identity_aliases = matching_contacts(db, contact.identity)
     if any(row.suppressed or row.status in INELIGIBLE for row in identity_aliases):
         raise GrowthError("Contact is suppressed or ineligible")
@@ -154,6 +156,12 @@ def operator_action(db, action, payload):
         return reconcile_not_sent(db,payload["reservation_id"],payload["evidence_id"])
     if action != "outreach-reserve":
         raise GrowthError("Unknown outreach operation")
+    executor = get_memory(db, "working", "browser_executor")
+    if executor.get("owner"):
+        safety = get_memory(db, "working", "browser_safety_check")
+        evidence = db.get(Evidence, safety.get("evidence_id")) if safety.get("evidence_id") else None
+        if safety.get("requires_attention") or time.time() - safety.get("checked_at", 0) > 300 or not evidence or evidence.kind != "CHANNEL_MONITOR" or time.time() - evidence.occurred_at > 300:
+            raise GrowthError("Fresh essential browser reply/safety checks required before first contact")
     # Channel rules are reviewed by the authenticated operator, not guessed from keywords.
     if not payload.get("channel_rules_source") or not payload.get("relevance_evidence"):
         raise GrowthError("Current channel-rule and merchant relevance evidence required")

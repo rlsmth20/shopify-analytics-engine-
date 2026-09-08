@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile', 'operator-export', 'operator-enqueue', 'operator-claim', 'operator-complete')][string]$Action = 'review-export',
+    [ValidateSet('review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile', 'operator-export', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-state')][string]$Action = 'review-export',
     [string]$File,
     [string]$Model = 'codex'
 )

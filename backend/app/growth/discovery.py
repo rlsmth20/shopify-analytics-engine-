@@ -11,7 +11,7 @@ from html import unescape
 from sqlalchemy import or_, select, update
 
 from .models import Contact, Evidence, FirstContact, Memory, Message, Work
-from .identity import INELIGIBLE, canonical_identity, existing_contact, matching_contacts
+from .identity import INELIGIBLE, canonical_identity, existing_contact, matching_contacts, owned_identity
 from .policy import GrowthError, qualify
 from .store import digest, enqueue, get_memory, record, remember, require_lease
 
@@ -78,6 +78,8 @@ def ingest_opportunity(db, *, url, text, published_at=None, author=None, channel
     if vendor:
         q = {**q, "qualified": False, "fit": False, "reason": "Vendor promotion is not merchant buying evidence", "vendor_promotion": True}
     identity = canonical_identity(f"{channel}:{author}") if author else canonical
+    if owned_identity(identity):
+        q = {**q, "qualified": False, "fit": False, "reason": "Owned business account is not a prospect"}
     contact = existing_contact(db, identity)
     if not contact:
         contact = Contact(identity=identity, organization=organization, source=canonical,
@@ -87,6 +89,9 @@ def ingest_opportunity(db, *, url, text, published_at=None, author=None, channel
     event = record(db, evidence_key, "OPPORTUNITY", contact.id,
                    {"text": text[:5000], "published_at": published_at, "author": author,
                     "channel": channel, "qualification": q, "channel_permission": "research_only"}, source=source_url)
+    if owned_identity(identity):
+        contact.qualification = q
+        contact.status = "ineligible"
     if contact.suppressed or contact.status in INELIGIBLE:
         return event  # Preserve new evidence without reactivating an excluded person.
     if q["qualified"] and age <= 30:
@@ -168,7 +173,7 @@ def research_contact(factory, work, fetch=public_json):
             return {"decision": "source_author_required", "source": source}
         contact = db.get(Contact, contact_id)
         contact = existing_contact(db, contact.identity) if contact else None
-        if not contact or contact.suppressed or contact.status in INELIGIBLE:
+        if not contact or contact.suppressed or contact.status in INELIGIBLE or owned_identity(contact.identity):
             return {"decision": "do_not_contact", "reason": "missing or suppressed contact"}
         contact_id = contact.id
         # Discourse's numbered topic endpoint returns the window around this
@@ -185,7 +190,8 @@ def research_contact(factory, work, fetch=public_json):
         used = list(db.scalars(select(Evidence.id).where(Evidence.kind == "RESEARCH_FETCH_INTENT",
                     Evidence.occurred_at >= bucket * 21600)))
         if len(used) >= 2:
-            return {"decision": "research_cap_reached", "next_window": (bucket + 1) * 21600}
+            return {"decision": "research_cap_reached", "next_window": (bucket + 1) * 21600,
+                    "defer_until": (bucket + 1) * 21600}
         record(db, "research-fetch:" + work.id, "RESEARCH_FETCH_INTENT", event.subject,
                {"decision": "Verify merchant context before choosing a response", "source_evidence_id": event.id})
         remember(db, "channel", cache_key, {"next_at": time.time() + 21600, "source": source,

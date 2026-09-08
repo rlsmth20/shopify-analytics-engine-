@@ -43,6 +43,7 @@ def bootstrap(factory):
 
 
 def schedule(factory):
+    from .execution import priority_order, watchdog
     now = time.time()
     with factory() as db:
         if get_memory(db, "working", "control").get("paused"):
@@ -90,9 +91,10 @@ def schedule(factory):
             db.execute(update(Work).where(Work.kind == kind, Work.status == "ready", Work.created_at < now - horizon)
                        .values(status="superseded", error="Newer periodic wake covers this interval"))
         ready = db.scalar(select(Work).where(Work.status == "ready", Work.due_at <= now)
-                          .order_by(Work.priority.desc(), Work.due_at).limit(1))
+                          .order_by(priority_order(), Work.priority.desc(), Work.due_at).limit(1))
         remember(db, "working", "next", {"action": ready.kind if ready else "await_next_evidence", "work_id": ready.id if ready else None,
                  "reason": "Highest available priority toward qualified acquisition", "true_idle": False})
+        watchdog(db)
         db.commit()
 
 

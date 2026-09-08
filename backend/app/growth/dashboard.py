@@ -131,6 +131,7 @@ def outreach_projection(db, now):
 
 
 def dashboard(db):
+    from .execution import state as execution_state
     from .outbound import status as outbound_status
     now = time.time()
     day = int(now // 86400) * 86400
@@ -163,6 +164,7 @@ def dashboard(db):
     next_work = db.scalar(select(Work).where(Work.status == "ready").order_by(Work.due_at, Work.priority.desc()).limit(1))
     return {
         "generated_at": now,
+        "execution": execution_state(db, now),
         "measurement": {"day_timezone": "UTC", "mission_started_at": mission.get("started_at"),
                         "mission_funnel": cohort, "funnel_scope": "All recorded product activity; includes accounts predating the growth mission."},
         "mission": {**mission, "qualified_users": qualified, "target": 10},

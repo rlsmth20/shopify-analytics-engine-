@@ -13,6 +13,11 @@ def canonical_identity(identity):
     return value
 
 
+def owned_identity(identity):
+    return canonical_identity(identity) in {"shopify-community:skubase", "reddit:skubase",
+        "info@skubase.io", "support@skubase.io", "email:info@skubase.io", "email:support@skubase.io"}
+
+
 def identity_match(identity):
     canonical = canonical_identity(identity)
     variants = [canonical]
