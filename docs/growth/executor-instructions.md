@@ -91,6 +91,8 @@ Keep payload files in .growth-deploy, not the repository root.
   features. Preserve copy revision 4; add cohort qualification_policy=market_discovery_v1
   to separate this eligibility experiment from prior narrow ICP. Produce send
   successor with exact body, assessment, sources and experiment/cohort.
+  Select an actual ID from the assigned active_experiments or operator-export.
+  Never invent an experiment ID or reuse an expired historical example.
 - send/outreach: refresh safety check, rules, suppression and capacity; reserve
   with outreach-reserve immediately before one exact permitted submission.
   Payload includes identity, organization, source, qualified=true, verified facts,

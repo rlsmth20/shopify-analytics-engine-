@@ -65,3 +65,12 @@ evidence-driven intermediate-model fallback, not a return to premium reasoning.
 Workers must not execute historical helper scripts or substitute old evidence for
 real browser checks. The initial Luna-run observations above remain historical
 validation data, not the final execution routing or a claim of new sent outreach.
+
+Final handoff validation exposed missing execution context as well: standing owner
+authorization is now explicit in worker instructions, operator-monitor persists
+actual browser observations through the production connection with a fenced
+lease, and operator-export/task packets provide real active experiment IDs.
+Expired or invented experiments still cannot reserve a contact. Exhausted sends
+with retained terminal outcomes do not globally stop independent discovery.
+At the recorded validation checkpoint, no new first contact was confirmed; the
+ledger remained 5/20. Prepared copy and eligibility are not counted as delivery.

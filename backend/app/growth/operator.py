@@ -130,7 +130,13 @@ def export_packet(db):
         .order_by(Memory.id).limit(6))]
     claimed = db.scalar(select(func.count()).select_from(Memory).where(*active, lease > now))
     recent = list(db.scalars(select(FirstContact).where(FirstContact.sent_at > now - 86400).order_by(FirstContact.sent_at.desc()).limit(20)))
+    from .models import Experiment
+    experiments = [{"id": e.id, "key": e.key, "channel": e.specification.get("channel"),
+                    "offer": e.specification.get("message_positioning") or e.specification.get("message"),
+                    "stop_at": e.stop_at} for e in db.scalars(select(Experiment).where(
+                        Experiment.status == "active", Experiment.stop_at > now).order_by(Experiment.started_at.desc()).limit(8))]
     return {"tasks": available, "claimed_tasks": claimed,
+            "active_experiments": experiments,
             "exhausted_tasks": exhausted[:6], "capacity": status(db),
             "recent_sends": [{"id": r.id, "channel": r.channel, "receipt": r.receipt} for r in recent],
             "next_action": "claim_next_task" if available else "resolve_exhausted_tasks" if exhausted else "wait_for_current_operator" if claimed else "replenish_pipeline",

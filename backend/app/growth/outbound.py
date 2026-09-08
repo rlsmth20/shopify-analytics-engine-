@@ -57,7 +57,7 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
         raise GrowthError("Verified merchant relevance and a sourced fact are required")
     experiment = db.get(Experiment, experiment_id)
     if not experiment or experiment.status != "active" or experiment.stop_at <= now:
-        raise GrowthError("An active, unexpired experiment is required")
+        raise GrowthError("An active, unexpired experiment is required. Run operator-export for a real active ID; never invent an experiment ID.")
     if channel not in CHANNELS or not body.strip() or not all(cohort.get(k) for k in ("icp", "offer", "message_version")):
         raise GrowthError("Channel, exact message and immutable cohort labels are required")
     prior = db.scalar(select(FirstContact).where(FirstContact.contact_id == contact.id))

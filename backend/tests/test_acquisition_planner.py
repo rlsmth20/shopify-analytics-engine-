@@ -56,6 +56,17 @@ class PlannerTests(unittest.TestCase):
             events=list(db.scalars(select(Evidence).where(Evidence.kind=='ACQUISITION_QUEUE_EMPTY')))
             self.assertEqual(events[0].data['depth'],0)
 
+    def test_terminal_channel_outcome_does_not_globally_stop_discovery(self):
+        with self.factory() as db:
+            remember(db,'operator_task','terminal',{'stage':'send','status':'blocked','attempts':3})
+            db.commit()
+        self.assertIsNone(executor.take(self.factory,'executor'))
+        with self.factory() as db:
+            e=record(db,'terminal-outcome','ACQUISITION_STAGE_RESULT','terminal',{'outcome':'blocked'})
+            remember(db,'operator_task','terminal',{'stage':'send','status':'blocked','attempts':3,'result_evidence_id':e.id})
+            db.commit()
+        self.assertEqual(executor.take(self.factory,'executor')['stage'],'plan')
+
     def test_pending_retry_hold_capacity_mission_and_competing_executor(self):
         with self.factory() as db:
             self.assertIsNone(planner.replenish(db,{'remaining':0}))

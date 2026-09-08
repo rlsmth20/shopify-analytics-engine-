@@ -84,7 +84,8 @@ def take(factory, owner):
             "lease_until": time.time() + 120, "task_id": task["id"], "blocker": None,
             "last_progress_at": runtime.get("last_progress_at"), "next_retry_at": None})
         evidence = db.get(Evidence, task["evidence_id"])
-        task = {**task, "source_evidence": {"source": evidence.source, "kind": evidence.kind, "data": evidence.data}}
+        task = {**task, "active_experiments": packet.get("active_experiments", []),
+                "source_evidence": {"source": evidence.source, "kind": evidence.kind, "data": evidence.data}}
         db.commit()
         return task
 

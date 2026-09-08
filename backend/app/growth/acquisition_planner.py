@@ -221,6 +221,7 @@ def replenish(db, capacity, now=None):
         return None
     blocked = db.scalar(select(Memory.id).where(Memory.namespace == "operator_task",
         Memory.value["status"].as_string() == "blocked",
+        Memory.value["result_evidence_id"].as_integer().is_(None),
         Memory.value["attempts"].as_integer() >= 3).limit(1))
     if blocked:
         return None
