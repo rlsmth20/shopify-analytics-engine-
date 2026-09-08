@@ -151,3 +151,35 @@ set for the next normal discovery window, with the same two-query/six-hour
 budget. No extra wave was queued, and no message, ICP or cohort was changed.
 Capacity: 13 used, seven available, zero unresolved. Wake 6214; usage
 `c30e6e5003bf481ea9ac3360617adcac`; no paid API calls or advertising spend.
+
+## Routine wake — September 8, 07:16 UTC / 00:16 Pacific
+
+No new contacts, replies, requested checks, customer events or failures.
+Refreshed business inbox and community notifications remain system/test only;
+worker running and mailbox polling verified. Rolling capacity is nine used,
+11 available, zero unresolved. Thirteen merchants have been contacted in total;
+four have aged out of the rolling window, not become eligible for a repeat.
+Daily review is not due until 9 a.m. Pacific. Three check slots remain available.
+
+Six bounded source reads: the new cash-exposure results still include builders.
+The original author of [topic 675887](https://community.shopify.com/t/what-are-you-actually-paying-for-inventory-forecasting-after-stocky-19-to-199-spread/675887)
+and commenter Twister_00 explicitly disclose their own software, so exclude them
+as merchant prospects (6478). A targeted external search found
+[jadedjayedess's purchasing question](https://www.reddit.com/r/AutomateShopify/comments/1w0sta4/does_anyone_actually_let_inventory_planning/),
+displayed three days old: manual purchasing, forecast trust, seasonality and
+promotion concerns. Retain as a potential merchant conversation (6479), not a
+qualified user or send-ready contact. Store identity, catalog and willingness
+to pay remain unknown. Skubase's seasonal/promotion forecasting fit is unverified.
+
+The AutomateShopify rules URL exposed only headings after redirecting to a
+moderation page (6480); this does not establish posting permission. Next bounded
+wake: replies first, then verify that community's rules in the live browser and
+the dedicated business identity before considering one helpful disclosed reply.
+Do not infer permission from other vendor comments or use unsolicited PMs.
+No account creation, reservation or submission occurred. Preserve the original
+source rather than rereading it, stable message cohorts and current ICP.
+
+Wake evidence **6484**, usage `2587abe7ddae4f379abfa1fba554875a`.
+Advertising and new paid services/API calls $0; subscription tokens/cost UNKNOWN.
+No production changes or extra research wave. Persistent memory retains the
+prospect, channel check, source evidence and next action.
