@@ -4,18 +4,24 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 from collections import Counter, defaultdict
+from dataclasses import dataclass
+from hashlib import sha256
+import json
+from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session as DbSession
 
 from app.db.models import (
     PurchaseOrderLineRecord,
     PurchaseOrderReceiptRecord,
+    PurchaseOrderReceiptSubmissionRecord,
     PurchaseOrderRecord,
 )
 from app.schemas_v2 import PurchaseOrderDraft, PurchaseOrderLine, PurchaseOrderReceipt
 from app.services.supplier_scoring import SupplierObservation
 from app.services.shop_skus import AmbiguousSkuError, build_sku_alias_index
+from app.services.audit_log import record_audit_event
 
 
 class PurchaseOrderIdentityError(ValueError):
@@ -24,6 +30,17 @@ class PurchaseOrderIdentityError(ValueError):
 
 class PurchaseOrderReceiptError(ValueError):
     """A receipt cannot be applied to the saved remaining quantities."""
+
+
+class ReceiptSubmissionNotAppliedError(PurchaseOrderReceiptError):
+    """A keyed submission failed preflight before any receipt was applied."""
+
+
+@dataclass(frozen=True)
+class ReceiptSubmissionResult:
+    po: PurchaseOrderDraft
+    replayed: bool = False
+    request_id: str | None = None
 
 
 def list_saved_purchase_orders(db: DbSession, shop_id: int) -> list[PurchaseOrderDraft]:
@@ -67,20 +84,29 @@ def save_purchase_order(
                 f"SKU '{alias}' identifies multiple purchase-order lines. Review those lines before changing them; the purchase order was not changed."
             )
         _check_catalog_alias(index, alias)
+        old_line = next(iter(old_groups.get(alias, [])), None)
+        new_line = next(iter(new_groups.get(alias, [])), None)
+        if old_line is not None and old_line.received_qty > 0 and (new_line is None or new_line.qty < old_line.received_qty):
+            raise PurchaseOrderReceiptError(
+                f"SKU '{alias}' already has {old_line.received_qty} received units. Keep this line and an ordered quantity at least that large; no purchase-order data was changed.")
+    has_receipts = record is not None and db.scalar(select(PurchaseOrderReceiptRecord.id).where(
+        PurchaseOrderReceiptRecord.purchase_order_id == record.id).limit(1)) is not None
     if record is None:
         record = PurchaseOrderRecord(shop_id=shop_id, po_id=draft.po_id, vendor=draft.vendor)
         db.add(record)
         db.flush()
 
     record.vendor = draft.vendor
-    record.status = draft.status
+    if not has_receipts:
+        record.status = draft.status
     record.subtotal_cost = Decimal(str(draft.subtotal_cost or sum(line.extended_cost for line in draft.lines)))
     record.shipping_cost = Decimal(str(draft.shipping_cost))
     record.total_cost = Decimal(str(draft.total_cost))
     record.expected_arrival_date = draft.expected_arrival_date
     record.rationale = draft.rationale
     record.sent_at = draft.sent_at
-    record.received_at = draft.received_at
+    if not has_receipts:
+        record.received_at = draft.received_at
 
     for alias in changed_aliases:
         old_line = next(iter(old_groups.get(alias, [])), None)
@@ -96,7 +122,7 @@ def save_purchase_order(
         old_line.qty = line.qty
         old_line.unit_cost = Decimal(str(line.unit_cost))
         old_line.extended_cost = Decimal(str(line.extended_cost))
-        old_line.received_qty = max(line.received_qty, old_line.received_qty)
+        # Receipt counts come only from receiving, never from a stale/editable draft.
     db.commit()
     db.refresh(record)
     return _record_to_schema(db, record, index=index)
@@ -132,31 +158,81 @@ def receive_purchase_order(
     received_lines: dict[str, tuple[int, float | None]],
     received_at: datetime | None = None,
 ) -> PurchaseOrderDraft | None:
+    """Legacy internal entrypoint; HTTP receipt writes use the protected entrypoint."""
+    result = _receive_purchase_order(db, shop_id=shop_id, po_id=po_id,
+        received_lines=received_lines, received_at=received_at)
+    return result.po if result else None
+
+
+def receive_purchase_order_submission(
+    db: DbSession, *, shop_id: int, po_id: str, request_id: UUID | str,
+    received_lines: dict[str, tuple[int, float | None]],
+    received_at: datetime | None = None, user_id: int | None = None,
+) -> ReceiptSubmissionResult | None:
+    """Commit submission, quantities, receipt rows and audit together, or none."""
+    normalized_id = str(UUID(str(request_id)))
+    try:
+        # SQLite lacks row locks. Reserve its writer before reading the PO.
+        # The API may already have an auth read transaction, but no writes.
+        if db.get_bind().dialect.name == "sqlite":
+            connection = db.connection()
+            if not connection.connection.driver_connection.in_transaction:
+                db.execute(text("BEGIN IMMEDIATE"))
+            else:
+                db.execute(text("UPDATE purchase_orders SET id = id WHERE shop_id = :shop_id AND po_id = :po_id"),
+                           {"shop_id": shop_id, "po_id": po_id})
+        return _receive_purchase_order(db, shop_id=shop_id, po_id=po_id,
+            received_lines=received_lines, received_at=received_at,
+            request_id=normalized_id, user_id=user_id)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def _receipt_payload_hash(received_lines, received_at):
+    normalized_date = (received_at.replace(tzinfo=timezone.utc) if received_at.tzinfo is None
+                       else received_at.astimezone(timezone.utc)) if received_at is not None else None
+    payload = {"received_at": normalized_date.isoformat() if normalized_date else None,
+               "lines": [[sku, qty, str(Decimal(str(cost)).normalize()) if cost is not None else None]
+                         for sku, (qty, cost) in sorted(received_lines.items())]}
+    return sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
+def _receive_purchase_order(
+    db: DbSession, *, shop_id: int, po_id: str,
+    received_lines: dict[str, tuple[int, float | None]], received_at: datetime | None,
+    request_id: str | None = None, user_id: int | None = None,
+) -> ReceiptSubmissionResult | None:
     record = _get_record(db, shop_id, po_id, for_update=True)
     if record is None:
         return None
+    payload_hash = _receipt_payload_hash(received_lines, received_at) if request_id else None
+    if request_id:
+        previous = db.scalar(select(PurchaseOrderReceiptSubmissionRecord).where(
+            PurchaseOrderReceiptSubmissionRecord.shop_id == shop_id,
+            PurchaseOrderReceiptSubmissionRecord.purchase_order_id == record.id,
+            PurchaseOrderReceiptSubmissionRecord.request_id == request_id))
+        if previous is not None:
+            if previous.payload_hash != payload_hash:
+                raise PurchaseOrderReceiptError("This receipt submission ID was already used with different details. Review the recorded receipt before starting a separate delivery.")
+            # A retry remains successful even if the PO is now fully received
+            # or the catalog has since changed. Return current saved evidence.
+            db.expire_all()
+            result = ReceiptSubmissionResult(_record_to_schema(db, record), True, request_id)
+            db.commit()
+            return result
     received_at = received_at or datetime.now(timezone.utc)
     lines = db.scalars(
         select(PurchaseOrderLineRecord).where(PurchaseOrderLineRecord.purchase_order_id == record.id)
         .execution_options(populate_existing=True)
     ).all()
-    requested = {alias: values for alias, values in received_lines.items() if values[0] > 0}
-    if not requested:
-        raise PurchaseOrderReceiptError("Enter a positive received quantity for a saved line; no receipt was recorded.")
     index = build_sku_alias_index(db, shop_id)
-    groups = _line_groups(lines)
-    for alias in requested:
-        if len(groups.get(alias, [])) != 1:
-            raise PurchaseOrderIdentityError(
-                f"SKU '{alias}' does not identify exactly one saved purchase-order line. Review the receipt; no receipt was recorded."
-            )
-        _check_catalog_alias(index, alias)
-        line = groups[alias][0]
-        remaining = max(line.qty - line.received_qty, 0)
-        if requested[alias][0] > remaining:
-            raise PurchaseOrderReceiptError(
-                f"SKU '{alias}' has only {remaining} unreceived units on this purchase order. Refresh the receipt quantities; no receipt was recorded."
-            )
+    try:
+        requested = _validate_receipt(lines, index, received_lines)
+    except (PurchaseOrderIdentityError, PurchaseOrderReceiptError) as exc:
+        if request_id:
+            raise ReceiptSubmissionNotAppliedError(str(exc)) from None
+        raise
     for line in lines:
         if line.sku_id not in requested:
             continue
@@ -179,9 +255,36 @@ def receive_purchase_order(
         )
     record.received_at = received_at
     record.status = "received" if all(line.received_qty >= line.qty for line in lines) else "partially_received"
+    if request_id:
+        db.add(PurchaseOrderReceiptSubmissionRecord(shop_id=shop_id, purchase_order_id=record.id,
+            request_id=request_id, payload_hash=payload_hash))
+        record_audit_event(db, shop_id=shop_id, user_id=user_id, event_type="purchase_order_received",
+            entity_type="purchase_order", entity_id=record.po_id,
+            summary=f"Receipt recorded for purchase order {record.po_id}.",
+            metadata={"vendor": record.vendor, "request_id": request_id,
+                      "received_lines": [{"sku_id": sku, "received_qty": values[0], "received_unit_cost": values[1]}
+                                         for sku, values in requested.items()], "status": record.status}, commit=False)
     db.commit()
     db.refresh(record)
-    return _record_to_schema(db, record, index=index)
+    return ReceiptSubmissionResult(_record_to_schema(db, record, index=index), False, request_id)
+
+
+def _validate_receipt(lines, index, received_lines):
+    requested = {alias: values for alias, values in received_lines.items() if values[0] > 0}
+    if not requested:
+        raise PurchaseOrderReceiptError("Enter a positive received quantity for a saved line; no receipt was recorded.")
+    groups = _line_groups(lines)
+    for alias in requested:
+        if len(groups.get(alias, [])) != 1:
+            raise PurchaseOrderIdentityError(
+                f"SKU '{alias}' does not identify exactly one saved purchase-order line. Review the receipt; no receipt was recorded.")
+        _check_catalog_alias(index, alias)
+        line = groups[alias][0]
+        remaining = max(line.qty - line.received_qty, 0)
+        if requested[alias][0] > remaining:
+            raise PurchaseOrderReceiptError(
+                f"SKU '{alias}' has only {remaining} unreceived units on this purchase order. Refresh the receipt quantities; no receipt was recorded.")
+    return requested
 
 
 def receipt_lines_by_sku(lines):
@@ -204,7 +307,7 @@ def _line_groups(lines):
 
 
 def _line_state(line):
-    return (line.name, line.qty, Decimal(str(line.unit_cost)), Decimal(str(line.extended_cost)), line.received_qty)
+    return (line.name, line.qty, Decimal(str(line.unit_cost)), Decimal(str(line.extended_cost)))
 
 
 def _check_catalog_alias(index, alias):

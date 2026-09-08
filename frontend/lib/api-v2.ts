@@ -1,6 +1,7 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import type { FinancialProvenance, KnownValue } from "@/lib/financial-values";
 import type { ProductIdentity, IdentityIssue } from "@/lib/product-identity";
+import { ReceiptSubmissionError, type ReceiptRequest } from "@/lib/receipt-submission";
 import type { ScheduledEmailDelivery } from "@/lib/email-schedule";
 // V2 API client for forecast, analytics, reorder, suppliers, bundles, transfers,
 // liquidation, alerts, and dashboard endpoints.
@@ -670,19 +671,28 @@ export const updatePurchaseOrderStatus = (
     signal,
   );
 
-export const receivePurchaseOrder = (
+export const receivePurchaseOrder = async (
   poId: string,
-  payload: {
-    lines: { sku_id: string; received_qty: number; received_unit_cost?: number | null }[];
-    received_at?: string | null;
-  },
+  payload: ReceiptRequest,
   signal?: AbortSignal,
-) =>
-  postJson<{ po: PurchaseOrderDraft }>(
-    `/reorder/purchase-orders/${encodeURIComponent(poId)}/receive`,
-    payload,
-    signal,
-  );
+) => {
+  const path = `/reorder/purchase-orders/${encodeURIComponent(poId)}/receive`;
+  if (isDemo()) throw new ReceiptSubmissionError("Sample receipts can only be recorded in the sample workspace.");
+  let response: Response;
+  try {
+    response = await authenticatedFetch(`${API_BASE_URL}${path}`, { method: "POST", credentials: "include", cache: "no-store",
+      headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(payload), signal });
+  } catch { throw new ReceiptSubmissionError("The receipt response was not confirmed. Retry the saved submission to check it safely."); }
+  await handlePlanGate(response, path);
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = body?.detail;
+    const message = typeof detail === "string" ? detail : typeof detail?.message === "string" ? detail.message : "The receipt response was not confirmed. Retry the saved submission to check it safely.";
+    const notApplied = response.status === 409 && detail?.receipt_status === "not_applied" && detail?.request_id === payload.request_id;
+    throw new ReceiptSubmissionError(message, notApplied ? payload.request_id : null);
+  }
+  return body as { po: PurchaseOrderDraft; replayed: boolean; request_id: string };
+};
 
 export const fetchAuditEvents = (limit = 20, signal?: AbortSignal) =>
   get<{ events: AuditLogEvent[] }>(`/audit/events?limit=${limit}`, signal);

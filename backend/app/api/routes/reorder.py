@@ -22,9 +22,10 @@ from app.services.purchase_orders import build_purchase_order_drafts
 from app.services.purchase_order_records import (
     PurchaseOrderIdentityError,
     PurchaseOrderReceiptError,
+    ReceiptSubmissionNotAppliedError,
     receipt_lines_by_sku,
     list_saved_purchase_orders,
-    receive_purchase_order,
+    receive_purchase_order_submission,
     save_purchase_order,
     update_purchase_order_status,
 )
@@ -292,7 +293,7 @@ def save_po_draft(
         raise HTTPException(status_code=422, detail="Record explicit unit costs for every purchase-order line before saving.")
     try:
         saved = save_purchase_order(db, shop_id=user.shop_id, draft=payload.draft)
-    except PurchaseOrderIdentityError as exc:
+    except (PurchaseOrderIdentityError, PurchaseOrderReceiptError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
     record_audit_event(
         db,
@@ -347,30 +348,23 @@ def receive_po(
     user: Annotated[User, Depends(require_plan_feature("reorder_pos"))],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> PurchaseOrderStatusResponse:
+    if payload.request_id is None:
+        raise HTTPException(status_code=422, detail="Reload Skubase before recording this receipt. A receipt submission ID is required to prevent duplicate deliveries.")
     try:
-        po = receive_purchase_order(
+        result = receive_purchase_order_submission(
             db,
             shop_id=user.shop_id,
             po_id=po_id,
+            request_id=payload.request_id,
+            user_id=user.id,
             received_lines=receipt_lines_by_sku(payload.lines),
             received_at=payload.received_at,
         )
+    except ReceiptSubmissionNotAppliedError as exc:
+        raise HTTPException(status_code=409, detail={"message": str(exc), "receipt_status": "not_applied",
+                                                     "request_id": str(payload.request_id)}) from None
     except (PurchaseOrderIdentityError, PurchaseOrderReceiptError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
-    if po is None:
+    if result is None:
         raise HTTPException(status_code=404, detail="Purchase order not found.")
-    record_audit_event(
-        db,
-        shop_id=user.shop_id,
-        user_id=user.id,
-        event_type="purchase_order_received",
-        entity_type="purchase_order",
-        entity_id=po.po_id,
-        summary=f"Receipt recorded for purchase order {po.po_id}.",
-        metadata={
-            "vendor": po.vendor,
-            "received_lines": [line.model_dump() for line in payload.lines],
-            "status": po.status,
-        },
-    )
-    return PurchaseOrderStatusResponse(po=po)
+    return PurchaseOrderStatusResponse(po=result.po, replayed=result.replayed, request_id=result.request_id)

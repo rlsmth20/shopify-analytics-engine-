@@ -2,7 +2,12 @@
 
 import { isDemoActive } from "@/lib/shopify-embedded";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/components/auth-guard";
+import { ReceiptRecoveryPanel } from "@/components/receipt-recovery-panel";
+import { receiptScope, listPendingReceipts, retainReceiptSubmission, readPendingReceipt, clearReceiptSubmission, confirmedReceiptResponse,
+  withReceiptLock, markReceiptRejected, ReceiptSubmissionError,
+  type PendingReceipt, type ReceiptInput } from "@/lib/receipt-submission";
 
 import { BuyListEmailCard } from "@/components/buy-list-email-card";
 import { CashPlanCard } from "@/components/cash-plan-card";
@@ -55,6 +60,7 @@ export default function PurchaseOrdersPage() {
 }
 
 function PurchaseOrdersContent() {
+  const { user } = useAuth();
   const [drafts, setDrafts] = useState<PurchaseOrderDraft[]>([]);
   const [calendar, setCalendar] = useState<BuyingCalendarResponse | null>(null);
   const [total, setTotal] = useState<number | null>(null);
@@ -73,6 +79,26 @@ function PurchaseOrdersContent() {
   const [operationNotice, setOperationNotice] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [identityIssues, setIdentityIssues] = useState<IdentityIssue[]>([]);
+  const [recovery, setRecovery] = useState<{ scope: string | null; entries: PendingReceipt[]; error: string | null }>({ scope: null, entries: [], error: null });
+  const inFlightReceipts = useRef(new Set<string>());
+  const demo = user.id === 0;
+  const scope = demo ? "demo" : receiptScope(user.shop_id, user.id);
+  const activeScope = useRef<string | null>(scope);
+  activeScope.current = scope;
+  const recoveryReady = demo || (recovery.scope === scope && !recovery.error);
+  const pendingReceipts = recovery.scope === scope ? recovery.entries : [];
+
+  useEffect(() => {
+    activeScope.current = scope;
+    function readRecovery() {
+      if (demo) { setRecovery({ scope, entries: [], error: null }); return; }
+      try { setRecovery({ scope, entries: listPendingReceipts(window.localStorage, scope), error: null }); }
+      catch (error) { setRecovery({ scope, entries: [], error: errorMessage(error, "Saved receipt submissions could not be read in this browser.") }); }
+    }
+    readRecovery();
+    window.addEventListener("storage", readRecovery);
+    return () => { window.removeEventListener("storage", readRecovery); activeScope.current = null; };
+  }, [scope, demo]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -110,10 +136,13 @@ function PurchaseOrdersContent() {
   const visibleCalendarEvents = filterBuyingCalendarEvents(calendar?.events ?? [], search);
   const calendarSummary = buildCalendarSummary(visibleCalendarEvents);
 
-  if (error) return <p className="page-error-copy">{error}</p>;
+  const receiptRecovery = <ReceiptRecoveryPanel entries={pendingReceipts} error={recovery.scope === scope ? recovery.error : null} busyPo={busyPo}
+    onRetry={entry => void submitReceipt(entry.po_id)} onCorrect={entry => void correctRejectedReceipt(entry)} onReview={poId => { setSearch(""); setQuickView("all"); setExpanded(poId); }} />;
+  if (error) return <div className="page-stack">{receiptRecovery}<p className="page-error-copy">{error}</p>{operationError ? <p role="alert">{operationError}</p> : null}{operationNotice ? <p role="status">{operationNotice}</p> : null}</div>;
 
   return (
     <div className="po-page">
+      {receiptRecovery}
       <IdentityReviewNotice issues={identityIssues} />
       <CashPlanCard serviceLevel={serviceLevel} shippingCost={shippingCost} />
       <div className="po-toolbar">
@@ -345,6 +374,7 @@ function PurchaseOrdersContent() {
           const hasAmbiguousReceipts = po.lines.some(line => remainingLineQuantity(line) > 0 && receiptLineNeedsIdentityReview(po.lines, line));
           const canReceiveUnits = po.lines.some(line => remainingLineQuantity(line) > 0 && !receiptLineNeedsIdentityReview(po.lines, line));
           const costsKnown = purchaseOrderCostsKnown(po);
+          const receiptPending = pendingReceipts.some(entry => entry.po_id === po.po_id);
           const detailsId = `po-details-${encodeURIComponent(po.po_id)}`;
           return (
           <div key={po.po_id} className="po-card">
@@ -395,6 +425,8 @@ function PurchaseOrdersContent() {
                 ) : (
                   <>
                     <p className="po-rationale">{po.rationale}</p>
+                    {!isSavedPurchaseOrder(po) ? <p className="section-copy">Save this draft before recording a delivery.</p> : null}
+                    {receiptPending ? <p className="sync-safety-note identity-review-note">A receipt is awaiting confirmation. Use “Retry same receipt” above before editing this PO or entering another delivery.</p> : null}
                     {hasAmbiguousReceipts ? <p className="sync-safety-note">Some remaining lines need SKU mapping review. Receipts for those lines are blocked so stock is not added to the wrong product. You can receive other uniquely matched lines; saved PO history and safe edits remain available.</p> : null}
                     {!costsKnown ? <p className="muted small">Supplier unit costs are missing. Edit this PO and enter the actual costs before saving, approving, or recording a shipment.</p> : null}
                     <table className="po-table">
@@ -488,7 +520,7 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-secondary"
                     onClick={() => startEditingPo(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || po.status === "received" || po.status === "cancelled"}
+                    disabled={!recoveryReady || receiptPending || busyPo === po.po_id || editingPo === po.po_id || po.status === "received" || po.status === "cancelled"}
                   >
                     Edit PO
                   </button>
@@ -496,7 +528,7 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-primary"
                     onClick={() => void saveDraft(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || !costsKnown}
+                    disabled={!recoveryReady || receiptPending || busyPo === po.po_id || editingPo === po.po_id || !costsKnown}
                   >
                     {busyPo === po.po_id ? "Saving..." : costsKnown ? "Save draft" : "Add unit costs first"}
                   </button>
@@ -504,7 +536,7 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-secondary"
                     onClick={() => void markStatus(po, "approved")}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || po.status === "approved" || !costsKnown}
+                    disabled={!recoveryReady || receiptPending || busyPo === po.po_id || editingPo === po.po_id || po.status === "approved" || !costsKnown}
                   >
                     {busyPo === po.po_id ? "Approving..." : "Approve PO"}
                   </button>
@@ -523,7 +555,7 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-secondary"
                     onClick={() => void markStatus(po, "sent")}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || !costsKnown || ["sent", "partially_received", "received", "cancelled"].includes(po.status)}
+                    disabled={!recoveryReady || receiptPending || busyPo === po.po_id || editingPo === po.po_id || !costsKnown || ["sent", "partially_received", "received", "cancelled"].includes(po.status)}
                     title="Use after you have sent the purchase order to the supplier."
                   >
                     Mark as sent
@@ -532,7 +564,7 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-ghost"
                     onClick={() => startPartialReceipt(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || !costsKnown}
+                    disabled={!recoveryReady || receiptPending || !isSavedPurchaseOrder(po) || busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || !costsKnown}
                     title={!canReceiveUnits ? hasAmbiguousReceipts ? "Review SKU mapping before receiving remaining lines." : "All units on this PO have already been received." : undefined}
                   >
                     Receive partial
@@ -541,7 +573,7 @@ function PurchaseOrdersContent() {
                     type="button"
                     className="button button-ghost"
                     onClick={() => void receiveAll(po)}
-                    disabled={busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || hasAmbiguousReceipts || !costsKnown}
+                    disabled={!recoveryReady || receiptPending || !isSavedPurchaseOrder(po) || busyPo === po.po_id || editingPo === po.po_id || !canReceiveUnits || hasAmbiguousReceipts || !costsKnown}
                     title={hasAmbiguousReceipts ? "Use partial receipt for uniquely matched lines, then review the remaining SKU mappings." : !canReceiveUnits ? "All units on this PO have already been received." : undefined}
                   >
                     {busyPo === po.po_id ? "Receiving..." : "Receive all"}
@@ -555,7 +587,7 @@ function PurchaseOrdersContent() {
                     Export styled Excel
                   </button>
                 </div>
-                {receivingPo === po.po_id && editingPo !== po.po_id ? (
+                {receivingPo === po.po_id && editingPo !== po.po_id && !receiptPending ? (
                   <div className="po-receipt-form">
                     <div className="section-heading">
                       <div>
@@ -644,7 +676,7 @@ function PurchaseOrdersContent() {
                         type="button"
                         className="button button-primary"
                         onClick={() => void recordPartialReceipt(po)}
-                        disabled={busyPo === po.po_id}
+                        disabled={!recoveryReady || busyPo === po.po_id}
                       >
                         {busyPo === po.po_id ? "Recording..." : "Record receipt"}
                       </button>
@@ -685,6 +717,7 @@ function PurchaseOrdersContent() {
   }
 
   async function saveDraft(po: PurchaseOrderDraft): Promise<boolean> {
+    if (blockPendingReceipt(po.po_id)) return false;
     if (!requireRecordedCosts(po)) return false;
     setBusyPo(po.po_id);
     setOperationError(null);
@@ -720,6 +753,7 @@ function PurchaseOrdersContent() {
   }
 
   async function markStatus(po: PurchaseOrderDraft, status: PurchaseOrderDraft["status"]) {
+    if (blockPendingReceipt(po.po_id)) return;
     if (!requireRecordedCosts(po)) return;
     setBusyPo(po.po_id);
     setOperationError(null);
@@ -744,6 +778,8 @@ function PurchaseOrdersContent() {
   }
 
   function startPartialReceipt(po: PurchaseOrderDraft) {
+    if (blockPendingReceipt(po.po_id)) return;
+    if (!isSavedPurchaseOrder(po)) { setOperationError("Save this draft before recording a delivery."); return; }
     if (!requireRecordedCosts(po)) return;
     if (remainingPurchaseOrderUnits(po) > 0 && po.lines.every(line => remainingLineQuantity(line) <= 0 || receiptLineNeedsIdentityReview(po.lines, line))) {
       setOperationError("No uniquely matched lines remain to receive. Review SKU mappings before recording these receipts.");
@@ -775,6 +811,7 @@ function PurchaseOrdersContent() {
   }
 
   function startEditingPo(po: PurchaseOrderDraft) {
+    if (blockPendingReceipt(po.po_id)) return;
     setReceivingPo(null);
     setEditingPo(po.po_id);
     setEditDrafts((current) => ({
@@ -956,6 +993,8 @@ function PurchaseOrdersContent() {
   }
 
   async function recordPartialReceipt(po: PurchaseOrderDraft) {
+    if (blockPendingReceipt(po.po_id)) return;
+    if (!isSavedPurchaseOrder(po)) { setOperationError("Save this draft before recording a delivery."); return; }
     if (!requireRecordedCosts(po)) return;
     const draft = receiptDrafts[po.po_id];
     const receivedAt = receiptDateToIso(draft?.receivedAt ?? todayInputDate());
@@ -994,60 +1033,102 @@ function PurchaseOrdersContent() {
       return;
     }
 
-    setBusyPo(po.po_id);
-    setOperationError(null);
-    setOperationNotice(null);
-    try {
-      await savePurchaseOrder(po);
-      const response = await receivePurchaseOrder(po.po_id, { lines, received_at: receivedAt });
-      const fallbackPo = applyReceiptToPo(po, lines, receivedAt);
-      const nextPo = markSaved(response.po ?? fallbackPo);
-      persistDemoPurchaseOrder(nextPo);
-      upsertDraft(nextPo);
-      setReceivingPo(null);
-      clearReceiptDraft(po.po_id);
-      setOperationNotice(`Recorded ${sumReceiptQty(lines)} received unit${sumReceiptQty(lines) === 1 ? "" : "s"} for ${po.po_id} on ${formatReceiptDate(receivedAt)}.`);
-      if (!isDemoMode()) await refresh();
-    } catch (error) {
-      setOperationError(errorMessage(error, "Could not record purchase order receipt."));
-    } finally {
-      setBusyPo(null);
-    }
+    await submitReceipt(po.po_id, { lines, received_at: receivedAt }, po);
   }
 
   async function receiveAll(po: PurchaseOrderDraft) {
+    if (blockPendingReceipt(po.po_id)) return;
+    if (!isSavedPurchaseOrder(po)) { setOperationError("Save this draft before recording a delivery."); return; }
     if (!requireRecordedCosts(po)) return;
     if (po.lines.some(line => remainingLineQuantity(line) > 0 && receiptLineNeedsIdentityReview(po.lines, line))) {
       setOperationError("Review ambiguous SKU mappings before receiving all. Use partial receipt for uniquely matched lines.");
       return;
     }
-    setBusyPo(po.po_id);
-    setOperationError(null);
-    setOperationNotice(null);
+    const lines = po.lines.map((line) => ({
+      sku_id: line.sku_id,
+      received_qty: remainingLineQuantity(line),
+      received_unit_cost: financialValue(line, "unit_cost", line.unit_cost),
+    })).filter((line) => line.received_qty > 0);
+    if (lines.length === 0) {
+      setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
+      return;
+    }
+    await submitReceipt(po.po_id, { lines, received_at: new Date().toISOString() }, po);
+  }
+
+  function blockPendingReceipt(poId: string): boolean {
+    if (demo) return false;
     try {
-      await savePurchaseOrder(po);
-      const lines = po.lines.map((line) => ({
-        sku_id: line.sku_id,
-        received_qty: remainingLineQuantity(line),
-        received_unit_cost: financialValue(line, "unit_cost", line.unit_cost),
-      })).filter((line) => line.received_qty > 0);
-      if (lines.length === 0) {
-        setOperationNotice(`Purchase order ${po.po_id} is already fully received.`);
+      if (!recoveryReady) throw new Error("Receipt recovery must finish loading before this PO can be changed.");
+      if (readPendingReceipt(window.localStorage, scope, poId)) throw new Error("A receipt is awaiting confirmation for this PO. Resolve it using the saved receipt recovery controls before making another change.");
+      return false;
+    } catch (error) { setOperationError(errorMessage(error, "Receipt recovery could not be checked.")); return true; }
+  }
+
+  function reloadReceiptRecovery() {
+    if (activeScope.current !== scope) return;
+    setRecovery({ scope, entries: listPendingReceipts(window.localStorage, scope), error: null });
+  }
+
+  async function submitReceipt(poId: string, input?: ReceiptInput, currentPo?: PurchaseOrderDraft) {
+    const lockKey = `${scope}${poId}`;
+    if (inFlightReceipts.current.has(lockKey)) return;
+    inFlightReceipts.current.add(lockKey);
+    setBusyPo(poId); setOperationError(null); setOperationNotice(null);
+    let record: PendingReceipt | null = null;
+    try {
+      if (demo) {
+        if (!input || !currentPo) return;
+        const nextPo = markSaved(applyReceiptToPo(currentPo, input.lines, input.received_at));
+        persistDemoPurchaseOrder(nextPo); upsertDraft(nextPo); clearReceiptDraft(poId); setReceivingPo(null);
+        setOperationNotice(`Sample receipt recorded: ${sumReceiptQty(input.lines)} units. No store inventory was changed.`);
         return;
       }
-      const receivedAt = new Date().toISOString();
-      const response = await receivePurchaseOrder(po.po_id, { lines, received_at: receivedAt });
-      const nextPo = markSaved(response.po ?? applyReceiptToPo(po, lines, receivedAt));
-      persistDemoPurchaseOrder(nextPo);
-      upsertDraft(nextPo);
-      clearReceiptDraft(po.po_id);
-      setOperationNotice(`Received all remaining units for ${po.po_id}.`);
-      if (!isDemoMode()) await refresh();
+      if (!recoveryReady) throw new Error("Receipt recovery must finish loading before submitting a delivery.");
+      record = await withReceiptLock(navigator.locks, scope, poId, () => {
+        const pending = readPendingReceipt(window.localStorage, scope, poId);
+        if (pending) return pending;
+        if (!input) throw new Error("This receipt recovery record is no longer pending. Review the current PO history before entering another delivery.");
+        return retainReceiptSubmission(window.localStorage, scope, poId, input);
+      });
+      reloadReceiptRecovery();
+      if (record.rejection) throw new Error("This submission was rejected without recording received units. Use Correct rejected receipt before making changes.");
+      if (activeScope.current !== scope) return;
+      const response = await receivePurchaseOrder(poId, record.payload);
+      if (!confirmedReceiptResponse(response, record)) throw new Error("The receipt result could not be verified. Retry the saved submission; do not enter this delivery again.");
+      await withReceiptLock(navigator.locks, scope, poId, () => clearReceiptSubmission(window.localStorage, scope, record!));
+      if (activeScope.current !== scope) return;
+      upsertDraft(markSaved(response.po)); clearReceiptDraft(poId); setReceivingPo(null); reloadReceiptRecovery();
+      const units = sumReceiptQty(record.payload.lines);
+      setOperationNotice(response.replayed
+        ? `Already recorded: ${units} units for ${poId}. No additional received units were counted by this retry.`
+        : `Recorded ${units} received unit${units === 1 ? "" : "s"} for ${poId} on ${formatReceiptDate(record.payload.received_at)}.`);
+      void refresh().catch(() => { if (activeScope.current === scope) setOperationError("The receipt is confirmed, but the latest purchase-order list could not be refreshed. Reload to check current totals."); });
     } catch (error) {
-      setOperationError(errorMessage(error, "Could not receive purchase order."));
+      if (record && error instanceof ReceiptSubmissionError && error.notAppliedRequestId === record.payload.request_id) {
+        try { await withReceiptLock(navigator.locks, scope, poId, () => markReceiptRejected(window.localStorage, scope, record!, error.message)); reloadReceiptRecovery(); }
+        catch { /* Keep the original frozen submission when recovery storage cannot be updated. */ }
+      }
+      if (activeScope.current === scope) setOperationError(errorMessage(error, "Receipt confirmation was interrupted. Retry the saved submission to check it safely."));
     } finally {
-      setBusyPo(null);
+      inFlightReceipts.current.delete(lockKey);
+      if (activeScope.current === scope) setBusyPo(null);
     }
+  }
+
+  async function correctRejectedReceipt(record: PendingReceipt) {
+    if (inFlightReceipts.current.has(`${scope}${record.po_id}`)) return;
+    try {
+      await withReceiptLock(navigator.locks, scope, record.po_id, () => {
+        const stored = readPendingReceipt(window.localStorage, scope, record.po_id);
+        if (!stored?.rejection || stored.payload.request_id !== record.payload.request_id) throw new Error("This receipt is not confirmed as rejected. Retry the saved submission before changing it.");
+        clearReceiptSubmission(window.localStorage, scope, stored);
+      });
+      if (activeScope.current !== scope) return;
+      reloadReceiptRecovery(); clearReceiptDraft(record.po_id); setReceivingPo(null); setExpanded(record.po_id);
+      setOperationError(null); setOperationNotice("The rejected submission was cleared. No receipt was recorded for it. Review the current PO and enter the corrected delivery.");
+      await refresh();
+    } catch (error) { setOperationError(errorMessage(error, "The receipt recovery record could not be cleared.")); }
   }
 
   function upsertDraft(nextPo: PurchaseOrderDraft) {

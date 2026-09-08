@@ -278,6 +278,21 @@ class PurchaseOrderReceiptRecord(Base):
     )
 
 
+class PurchaseOrderReceiptSubmissionRecord(Base):
+    """One committed merchant receipt submission; retries cannot add its units again."""
+    __tablename__ = "purchase_order_receipt_submissions"
+    __table_args__ = (
+        UniqueConstraint("shop_id", "purchase_order_id", "request_id", name="uq_po_receipt_submission"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id", ondelete="CASCADE"), index=True)
+    purchase_order_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id", ondelete="CASCADE"), index=True)
+    request_id: Mapped[str] = mapped_column(String(36))
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), default=func.now())
+
+
 class AuditLogRecord(Base):
     """Workspace decision history for inventory actions and workflow changes."""
 

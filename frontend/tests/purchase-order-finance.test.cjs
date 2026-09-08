@@ -4,12 +4,13 @@ const path = require("node:path");
 const { test } = require("node:test");
 const vm = require("node:vm");
 const ts = require("typescript");
+const crypto = require("node:crypto");
 
 function load(file, dependencies = {}, extraSource = "", globals = {}) {
   const source = ts.transpileModule(readFileSync(path.join(__dirname, file), "utf8") + extraSource, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  const context = { exports: {}, Number, Math, Date, Map, Set, Intl, Error, ...globals, require(name) {
+  const context = { exports: {}, Number, Math, Date, Map, Set, Intl, Error, crypto, ...globals, require(name) {
     if (name in dependencies) return dependencies[name];
     throw new Error(`Unexpected runtime import: ${name}`);
   } };
@@ -19,6 +20,7 @@ function load(file, dependencies = {}, extraSource = "", globals = {}) {
 
 const financial = load("../lib/financial-values.ts");
 const identity = load("../lib/product-identity.ts");
+const receipt = load("../lib/receipt-submission.ts");
 const helpers = load("../lib/purchase-order-finance.ts", { "./financial-values": financial });
 const line = { sku_id: "SKU", name: "Product", qty: 5, received_qty: 0, unit_cost: 30, extended_cost: 150 };
 const po = {
@@ -78,9 +80,11 @@ function renderPurchaseOrder(draft, expanded = true, { receiving = false, receip
   let hook = 0;
   const calls = [];
   const stateUpdates = [];
-  const window = { location: { href: "" }, localStorage: { getItem: () => null, setItem: () => {} } };
+  const stored = new Map();
+  const window = { location: { href: "" }, localStorage: { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key), key: index => [...stored.keys()][index] ?? null, get length() { return stored.size; } } };
   const stateOverrides = new Map([[0, [draft]], [2, draft.total_cost], [7, false], [9, expanded ? draft.po_id : null]]);
   if (receiving) {
+    stateOverrides.set(18, { scope: receipt.receiptScope(1, 1), entries: [], error: null });
     stateOverrides.set(11, draft.po_id);
     stateOverrides.set(12, { [draft.po_id]: { receivedAt: "2026-09-07", lines: Object.fromEntries(draft.lines.map(line => [line.sku_id, { qty: String(line.qty - line.received_qty), cost: String(line.unit_cost) }])) } });
   }
@@ -89,15 +93,17 @@ function renderPurchaseOrder(draft, expanded = true, { receiving = false, receip
     currency: (value) => value === null ? "Unknown" : `$${value}`,
     savePurchaseOrder: async (value) => { calls.push(["save", value]); return { po: value }; },
     updatePurchaseOrderStatus: async (id, status) => { calls.push(["status", id, status]); return { po: { ...draft, status } }; },
-    receivePurchaseOrder: async (id, payload) => { calls.push(["receive", id, payload]); if (receiptError) throw new Error(receiptError); return { po: draft }; },
+    receivePurchaseOrder: async (id, payload) => { calls.push(["receive", id, payload]); if (receiptError) throw new Error(receiptError); return { po: draft, request_id: payload.request_id, replayed: false }; },
+    fetchPurchaseOrders: async () => ({ drafts: [draft] }), fetchBuyingCalendar: async () => ({ events: [] }),
   };
   const page = load("../app/(app-shell)/purchase-orders/page.tsx", {
     "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "fragment" },
-    react: { useEffect() {}, useState(initial) {
+    react: { useEffect() {}, useRef: initial => ({ current: initial }), useState(initial) {
       const index = hook++;
       return [stateOverrides.has(index) ? stateOverrides.get(index) : initial, (value) => stateUpdates.push([index, value])];
     } },
-    "@/lib/shopify-embedded": { isDemoActive: () => true },
+    "@/lib/shopify-embedded": { isDemoActive: () => !receiving },
+    "@/components/auth-guard": { useAuth: () => ({ user: { id: receiving ? 1 : 0, shop_id: receiving ? 1 : 0 } }) },
     "@/components/buy-list-email-card": { BuyListEmailCard: "BuyListEmailCard" },
     "@/components/cash-plan-card": { CashPlanCard: "CashPlanCard" },
     "@/components/gated-feature": { GatedFeature: "GatedFeature" },
@@ -107,7 +113,9 @@ function renderPurchaseOrder(draft, expanded = true, { receiving = false, receip
     "@/lib/purchase-order-finance": helpers,
     "@/lib/product-identity": identity,
     "@/components/identity-review-notice": { IdentityReviewNotice: "identity-review" },
-  }, "\nexport { PurchaseOrdersContent as renderForTest };", { window });
+    "@/components/receipt-recovery-panel": { ReceiptRecoveryPanel: "receipt-recovery" },
+    "@/lib/receipt-submission": receipt,
+  }, "\nexport { PurchaseOrdersContent as renderForTest };", { window, navigator: { locks: { request: async (_, action) => action() } } });
   const tree = page.renderForTest();
   const buttons = [], nodes = [];
   const elementsById = new Map();
@@ -192,7 +200,7 @@ test("duplicate PO aliases remain in review even with different product IDs and 
 
 test("a new server-side receipt conflict retains the mapping explanation without claiming receipt", async () => {
   const reason = "SKU matches multiple active variants. Review the mapping before receiving stock.";
-  const ui = renderPurchaseOrder(po, true, { receiving: true, receiptError: reason });
+  const ui = renderPurchaseOrder({ ...po, source: "saved" }, true, { receiving: true, receiptError: reason });
   ui.buttons.find(button => button.props.children === "Record receipt").props.onClick();
   await new Promise(setImmediate);
   assert.ok(ui.stateUpdates.some(([index, value]) => index === 16 && value === reason));

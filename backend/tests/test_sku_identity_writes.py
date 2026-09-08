@@ -1,5 +1,6 @@
 """Ambiguous SKU aliases cannot silently reset settings or rewrite PO evidence."""
 import unittest
+from uuid import uuid4
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -230,12 +231,12 @@ class SkuIdentityWriteTests(unittest.TestCase):
             orders.receive_purchase_order(self.db, shop_id=self.shop.id, po_id="PO-FIXTURE", received_lines={"SAFE": (0, None)})
         self.assert_no_mutation(before)
         with self.assertRaises(HTTPException) as empty:
-            reorder.receive_po("PO-FIXTURE", ReceivePurchaseOrderRequest(lines=[
+            reorder.receive_po("PO-FIXTURE", ReceivePurchaseOrderRequest(request_id=uuid4(), lines=[
                 ReceivePurchaseOrderLineRequest(sku_id="SAFE", received_qty=0)]),
                 SimpleNamespace(shop_id=self.shop.id, id=1), self.db)
         self.assertEqual(empty.exception.status_code, 409)
         self.assert_no_mutation(before)
-        payload = ReceivePurchaseOrderRequest(lines=[ReceivePurchaseOrderLineRequest(sku_id="SAFE", received_qty=1),
+        payload = ReceivePurchaseOrderRequest(request_id=uuid4(), lines=[ReceivePurchaseOrderLineRequest(sku_id="SAFE", received_qty=1),
                                                      ReceivePurchaseOrderLineRequest(sku_id="SAFE", received_qty=2)])
         with self.assertRaises(HTTPException) as raised:
             reorder.receive_po("PO-FIXTURE", payload, SimpleNamespace(shop_id=self.shop.id, id=1), self.db)
@@ -246,13 +247,13 @@ class SkuIdentityWriteTests(unittest.TestCase):
         self.product("SAFE"); self.product("PARTIAL")
         self.legacy([self.line(), self.line("PARTIAL", received_qty=8)])
         before = self.snapshot()
-        payload = ReceivePurchaseOrderRequest(lines=[
+        payload = ReceivePurchaseOrderRequest(request_id=uuid4(), lines=[
             ReceivePurchaseOrderLineRequest(sku_id="SAFE", received_qty=1),
             ReceivePurchaseOrderLineRequest(sku_id="PARTIAL", received_qty=3)])
         with self.assertRaises(HTTPException) as raised:
             reorder.receive_po("PO-FIXTURE", payload, SimpleNamespace(shop_id=self.shop.id, id=1), self.db)
         self.assertEqual(raised.exception.status_code, 409)
-        self.assertIn("2 unreceived units", raised.exception.detail)
+        self.assertIn("2 unreceived units", raised.exception.detail["message"])
         self.assert_no_mutation(before)
 
         saved = orders.receive_purchase_order(self.db, shop_id=self.shop.id, po_id="PO-FIXTURE",

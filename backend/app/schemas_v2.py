@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.schemas import SkuIdentityIssue, SkuIdentityProjection
@@ -431,16 +432,19 @@ class SavePurchaseOrderRequest(ApiModel):
 class ReceivePurchaseOrderLineRequest(ApiModel):
     sku_id: str
     received_qty: int = Field(ge=0)
-    received_unit_cost: Optional[float] = Field(default=None, ge=0)
+    received_unit_cost: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class ReceivePurchaseOrderRequest(ApiModel):
+    request_id: UUID | None = None
     lines: list[ReceivePurchaseOrderLineRequest]
     received_at: Optional[datetime] = None
 
 
 class PurchaseOrderStatusResponse(ApiModel):
     po: PurchaseOrderDraft
+    replayed: bool = False
+    request_id: str | None = None
 
 
 class AuditLogEvent(ApiModel):
