@@ -94,7 +94,14 @@ def create_app() -> FastAPI:
                 origin,
                 origin in allowed_origins if origin else None,
             )
-        return await call_next(request)
+        response = await call_next(request)
+        # API responses can contain merchant data or session state. Never allow
+        # browser/proxy reuse across users, even for authentication failures.
+        # CORS preflights and frontend hashed assets retain their own caching.
+        if request.method != "OPTIONS":
+            response.headers["Cache-Control"] = "private, no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
 
     app.add_middleware(
         CORSMiddleware,

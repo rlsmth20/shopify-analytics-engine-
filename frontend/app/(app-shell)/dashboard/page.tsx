@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
+import { workspaceStorageKey } from "@/lib/browser-session";
 import { BrowserHealthCheckOption } from "@/components/browser-health-check-option";
 import { IdentityReviewNotice } from "@/components/identity-review-notice";
 import { trackGrowthEvent } from "@/lib/analytics";
@@ -87,7 +88,7 @@ export default function DashboardPage() {
       .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [refreshAttempt]);
+  }, [refreshAttempt, user.id, user.shop_id]);
 
   useEffect(() => {
     if (data && !loading && !error) void trackGrowthEvent("INVENTORY_ANALYSIS_VIEWED");
@@ -95,16 +96,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+      const stored = window.localStorage.getItem(workspaceStorageKey(ONBOARDING_STORAGE_KEY, user));
       setCompletedOnboardingSteps(parseCompletedOnboardingSteps(stored));
       setOnboardingDismissed(
-        window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1"
+        window.localStorage.getItem(workspaceStorageKey(ONBOARDING_DISMISSED_KEY, user)) === "1"
       );
     } catch {
       setCompletedOnboardingSteps([]);
       setOnboardingDismissed(false);
     }
-  }, []);
+  }, [user.id, user.shop_id]);
 
   if (loading && !data) {
     return <div className="page-loading">Loading command center…</div>;
@@ -276,7 +277,7 @@ export default function DashboardPage() {
                 type="button"
                 className="button button-ghost"
                 onClick={() => {
-                  window.localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+                  try { window.localStorage.setItem(workspaceStorageKey(ONBOARDING_DISMISSED_KEY, user), "1"); } catch { /* Optional preference. */ }
                   setOnboardingDismissed(true);
                 }}
               >

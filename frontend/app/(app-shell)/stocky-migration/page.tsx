@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/components/auth-guard";
+import { readChecklist, workspaceStorageKey } from "@/lib/browser-session";
 
 const STORAGE_KEY = "skubase_stocky_migration_steps";
 
@@ -51,19 +53,23 @@ const STEPS = [
 ];
 
 export default function StockyMigrationPage() {
+  const { user } = useAuth();
+  const storageKey = workspaceStorageKey(STORAGE_KEY, user);
   const [done, setDone] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     try {
-      setDone(JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}"));
+      setDone(readChecklist(window.localStorage.getItem(storageKey)));
     } catch {
       setDone({});
     }
-  }, []);
+  }, [storageKey]);
 
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(done));
-  }, [done]);
+  function toggleStep(id: string) {
+    const next = { ...done, [id]: !done[id] };
+    setDone(next);
+    try { window.localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Keep controls usable without storage. */ }
+  }
 
   const completed = useMemo(
     () => STEPS.filter((step) => done[step.id]).length,
@@ -106,7 +112,7 @@ export default function StockyMigrationPage() {
               <button
                 type="button"
                 className={`button ${done[step.id] ? "button-ghost" : "button-primary"}`}
-                onClick={() => setDone((current) => ({ ...current, [step.id]: !current[step.id] }))}
+                onClick={() => toggleStep(step.id)}
               >
                 {done[step.id] ? "Done" : "Mark done"}
               </button>

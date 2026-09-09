@@ -43,7 +43,12 @@ async function requestEntitlements(fresh: boolean): Promise<Entitlements> {
   const response = await authenticatedFetch(url, { credentials: "include" });
   const body = await response.json().catch(() => null);
   if (!response.ok || !body) {
-    throw new Error(body?.detail || `Entitlements failed with status ${response.status}.`);
+    throw new Error(typeof body?.detail === "string" ? body.detail : "Your plan could not be checked. Please try again.");
+  }
+  if (body.billing_status_loaded !== true || body.billing_status_error ||
+      !Array.isArray(body.capabilities) || !body.capabilities.every((value: unknown) => typeof value === "string") ||
+      typeof body.plan_id !== "string" || typeof body.plan_name !== "string" || typeof body.subscription_status !== "string") {
+    throw new Error("Your plan could not be checked. Please try again.");
   }
   return body as Entitlements;
 }
@@ -73,5 +78,5 @@ export function entitlementHas(
   entitlements: Entitlements | null,
   capability: CapabilityKey,
 ): boolean {
-  return Boolean(entitlements?.capabilities.includes(capability));
+  return Boolean(Array.isArray(entitlements?.capabilities) && entitlements.capabilities.includes(capability));
 }

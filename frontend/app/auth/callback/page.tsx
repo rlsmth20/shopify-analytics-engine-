@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { loginDestination } from "@/lib/login";
+import { announceSessionChange } from "@/lib/browser-session";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -16,6 +17,7 @@ function CallbackInner() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
   function redirectAfterLogin() {
+    announceSessionChange();
     // The email opens in another tab/browser, where sessionStorage is absent.
     router.replace(loginDestination(params.get("return_to")) || "/dashboard");
   }

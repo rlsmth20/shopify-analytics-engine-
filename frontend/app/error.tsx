@@ -21,12 +21,15 @@ export default function ErrorPage({
         <p className="error-eyebrow">500</p>
         <h1 className="error-title">Something went sideways.</h1>
         <p className="error-copy">
-          We&apos;ve logged the error. Try again in a moment — if it keeps
-          happening, drop us a note at info@skubase.io.
+          Try again, or reload to get the latest version of Skubase. If it keeps
+          happening, contact info@skubase.io.
         </p>
         <div className="error-actions">
           <button type="button" onClick={reset} className="button button-primary">
             Try again
+          </button>
+          <button type="button" onClick={() => window.location.reload()} className="button button-ghost">
+            Reload latest version
           </button>
           <Link href="/" className="button button-ghost">Go home</Link>
         </div>

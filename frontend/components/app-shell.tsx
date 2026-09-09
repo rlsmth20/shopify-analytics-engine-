@@ -195,6 +195,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setEmbedded(isEmbeddedShopifyContext());
+    if (user.id !== 0) return; // Real store identity comes only from the authenticated API.
     const urlShop = new URLSearchParams(window.location.search).get("shop");
     let storedDomain = urlShop;
     try {
@@ -206,7 +207,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     setShopifyDomain((previous) => storedDomain || previous || "");
     if (user.id === 0) setStoreLoaded(true);
-  }, [pathname]);
+  }, [pathname, user.id]);
 
   useEffect(() => {
     setSubscriptionLoaded(false);

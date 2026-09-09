@@ -75,6 +75,17 @@ test("website authentication retains its cookie contract", async () => {
   await api.authenticatedFetch("https://api.example.test/auth/me");
   assert.equal(calls[0].init.credentials, "include");
   assert.equal(calls[0].init.headers.has("Authorization"), false);
+  assert.equal(calls[0].init.cache, "no-store");
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
+});
+
+test("cached data is forbidden and caller cancellation is retained", async () => {
+  const { api, calls } = fixture({ embedded: false });
+  const controller = new AbortController();
+  await api.authenticatedFetch("https://api.example.test/dashboard", { cache: "force-cache", signal: controller.signal });
+  assert.equal(calls[0].init.cache, "no-store");
+  controller.abort();
+  assert.equal(calls[0].init.signal.aborted, true);
 });
 
 test("rejected Shopify authentication cannot silently fall back to cookies", async () => {

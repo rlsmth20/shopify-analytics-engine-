@@ -126,8 +126,14 @@ export async function authenticatedFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const embedded = getEmbeddedShopifyContext() !== null;
+  const method = (init.method || (typeof Request !== "undefined" && input instanceof Request ? input.method : "GET")).toUpperCase();
+  const readOnly = method === "GET" || method === "HEAD";
+  const callerSignal = init.signal || (typeof Request !== "undefined" && input instanceof Request ? input.signal : undefined);
+  const deadline = readOnly ? AbortSignal.timeout(30_000) : undefined;
   const request = {
     ...init,
+    cache: "no-store" as const,
+    signal: deadline ? (callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline) : callerSignal,
     headers: await authHeaders(init.headers),
     credentials: embedded ? "omit" as const : init.credentials ?? "include",
   };

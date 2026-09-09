@@ -570,11 +570,8 @@ async function fetchWithNetworkContext(
     ) {
       throw error;
     }
-    const origin = typeof window !== "undefined" ? window.location.origin : "unknown origin";
     throw new Error(
-      `Could not reach the Skubase API for ${path}. Browser origin: ${origin}. API URL: ${url}. ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      "We couldn't load your workspace data. Check your connection and try again."
     );
   }
 }
