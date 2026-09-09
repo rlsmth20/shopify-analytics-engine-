@@ -26,6 +26,8 @@ from app.db.models import (
 from app.db.session import get_db_session
 from app.growth import models as growth_models  # Register the same tenant tables as production init_db.
 from app.services import shopify_privacy as privacy
+from app.services import shopify_webhook_queue as queue
+from app.db.webhook_models import ShopifyWebhookJob
 
 SECRET = "fixture-privacy-secret-not-real"
 NOW = datetime.now(timezone.utc)
@@ -133,7 +135,11 @@ class PrivacyTests(unittest.TestCase):
         signature = base64.b64encode(hmac.new(SECRET.encode(), raw, hashlib.sha256).digest()).decode()
         headers = {"Content-Type": "application/json", "X-Shopify-Hmac-Sha256": signature if valid else "bad"}
         headers.update(extra_headers or {})
-        return self.client.post("/webhooks/" + path, content=raw, headers=headers)
+        response = self.client.post("/webhooks/" + path, content=raw, headers=headers)
+        if response.status_code == 200:
+            while queue.process_one(self.sessions):
+                pass
+        return response
 
     def test_shop_redaction_deletes_every_tenant_table_and_legacy_data_only_for_signed_shop(self):
         # Payload's external numeric ID intentionally equals the OTHER tenant.
@@ -142,6 +148,10 @@ class PrivacyTests(unittest.TestCase):
         self.db.expire_all()
         for table in Base.metadata.sorted_tables:
             with self.subTest(table=table.name):
+                if table.name == "shopify_webhook_jobs":
+                    job = self.db.scalar(select(ShopifyWebhookJob))
+                    self.assertEqual((job.status, job.domain, job.payload), ("done", "", {}))
+                    continue
                 if (table.name.startswith("growth_") or table.name == "copilot_budget_days") and "shop_id" not in table.c:
                     # Anonymous global accounting and operator-wide tables are not tenant fixtures.
                     self.assertEqual(self.count(table), 0)
@@ -165,7 +175,7 @@ class PrivacyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Synthetic"):
                 privacy.redact_shop(self.db, shop_domain="one.myshopify.com", triggered_at=None)
         for table in Base.metadata.sorted_tables:
-            expected = 0 if (table.name.startswith("growth_") or table.name == "copilot_budget_days") and "shop_id" not in table.c else 2
+            expected = 0 if (table.name.startswith("growth_") or table.name in {"copilot_budget_days", "shopify_webhook_jobs"}) and "shop_id" not in table.c else 2
             self.assertEqual(self.count(table), expected, table.name)
         self.assertEqual(self.db.get(AlertDeliveryAttemptRecord, f"delivery-{self.one}").provider_receipt,
                          f"provider-{self.one}")

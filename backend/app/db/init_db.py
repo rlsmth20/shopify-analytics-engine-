@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from app.db.base import Base
 from app.db import copilot_models  # Metadata-only Ask Skubase budgets and usage.
+from app.db import webhook_models  # Durable compliance receipts survive tenant deletion.
 from app.growth import models as growth_models  # additive growth tables
 from app.db.models import (
     AuditLogRecord,

@@ -17,6 +17,7 @@ from app.api.deps import get_current_user
 from app.db.models import User
 from app.db.session import SessionLocal, get_db_session
 from app.services import shopify_privacy as privacy
+from app.services import shopify_webhook_queue as webhook_queue
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["shopify-webhooks"])
@@ -68,34 +69,18 @@ def _triggered_at(request: Request) -> datetime | None:
         raise HTTPException(status_code=400, detail="Invalid Shopify event timestamp.") from exc
 
 
-def _process(topic: str, *, payload: dict, domain: str, webhook_id: str | None,
-             triggered_at: datetime | None = None) -> None:
-    # Commit before acknowledging; failures remain retryable by Shopify.
-    # Database work runs off the async event loop and never logs payload PII.
-    with SessionLocal() as db:
-        if topic == "customers/data_request":
-            result = privacy.record_customer_data_request(db, shop_domain=domain, payload=payload, webhook_id=webhook_id)
-        elif topic == "customers/redact":
-            result = privacy.redact_customer_orders(db, shop_domain=domain, payload=payload)
-        elif topic == "shop/redact":
-            result = privacy.redact_shop(db, shop_domain=domain, triggered_at=triggered_at)
-        elif topic == "app/uninstalled":
-            result = privacy.mark_shop_uninstalled(db, shop_domain=domain, triggered_at=triggered_at)
-        else:
-            raise ValueError("Unsupported Shopify privacy topic.")
-    logger.info("shopify_privacy_processed topic=%s counts=%s", topic, result)
-
-
 async def _handle(request: Request, *, topic: str, hmac_header: str | None) -> dict[str, str]:
     payload, domain = await _verified_payload(request, hmac_header)
     try:
-        await run_in_threadpool(
-            _process, topic, payload=payload, domain=domain,
+        receipt = await run_in_threadpool(
+            webhook_queue.enqueue, SessionLocal, topic=topic, payload=payload, domain=domain,
             webhook_id=request.headers.get("x-shopify-webhook-id"),
             triggered_at=_triggered_at(request) if topic in ("shop/redact", "app/uninstalled") else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    webhook_queue.wake()
+    logger.info("shopify_webhook_received topic=%s receipt=%s", topic, receipt)
     return {"status": "accepted"}
 
 

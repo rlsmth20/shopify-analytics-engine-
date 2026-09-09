@@ -38,6 +38,7 @@ from app.api.routes.contact import router as contact_router
 from app.services.alert_scheduler import start_alert_scheduler, stop_alert_scheduler
 from app.api.routes.growth import router as growth_router
 from app.growth.worker import start as start_growth, stop as stop_growth
+from app.services.shopify_webhook_queue import start as start_webhooks, stop as stop_webhooks
 
 
 @asynccontextmanager
@@ -51,11 +52,13 @@ async def lifespan(app: FastAPI):
         logger.exception("init_db failed at startup — DB may not be reachable yet.")
     start_alert_scheduler()
     start_growth()
+    start_webhooks()
     try:
         yield
     finally:
         await stop_alert_scheduler()
         await stop_growth()
+        await stop_webhooks()
 
 
 def create_app() -> FastAPI:
