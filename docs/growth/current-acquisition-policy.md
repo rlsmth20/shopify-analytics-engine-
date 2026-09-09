@@ -35,6 +35,13 @@ This supersedes older daily-quota and narrow-channel instructions.
 - Keep concise, factual copy, one practical question, verified capabilities, honest
   Skubase affiliation, and the currently verified Shopify review disclosure. Skubase
   supports exportable purchase orders; avoid invented gaps and needless caveats.
+- Do not use em dashes in outreach subjects, messages, posts, or follow-ups. Use
+  short sentences and ordinary punctuation. Apply to new drafts without changing
+  historical messages or already authorized submission bodies.
+- The owner supplied the mailing address on September 9. It is stored in the
+  backend BUSINESS_POSTAL_ADDRESS environment setting for commercial email footers.
+  Do not ask for it again or copy it into repository documentation. This resolves
+  the missing-address input only; provider, domain, cost and pilot gates still apply.
 - Preserve message/offer/source/ICP cohorts and failed experiments. Let actual merchant
   responses change strategy; do not rewrite positioning after a tiny sample.
 
