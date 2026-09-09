@@ -160,7 +160,13 @@ Keep payload files in .growth-deploy, not the repository root.
   concrete question or free health-check offer. Ask whether inventory/reordering
   is a problem; do not imply it is known. Include Shopify review in progress/not
   yet in App Store. No AI introduction, invented human/private-data access or
-  features. Preserve copy revision 4; add cohort qualification_policy=market_discovery_v1
+  features. Lead with benefits, not disclaimers. Skubase already exports supplier
+  POs and buying plans as Excel files; never describe PO export as a feature gap.
+  Do not append "I can't promise", "without promising a feature or delivery date"
+  or similar boilerplate. Collaboration language is conditional on a real workflow
+  gap, not a mandatory footer. Read the current messaging guidance before preparing
+  copy; historical messages are evidence, not a current capability catalog.
+  Preserve copy revision 4; add cohort qualification_policy=market_discovery_v1
   to separate this eligibility experiment from prior narrow ICP. Produce send
   successor with exact body, assessment, sources and experiment/cohort.
   Select an actual ID from the assigned active_experiments or operator-export.
