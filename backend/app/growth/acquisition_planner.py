@@ -13,8 +13,6 @@ from .models import Evidence, Experiment, Memory
 from .policy import GrowthError
 from .store import digest, get_memory, record, remember
 
-MAX_PLANS = 6                 # rolling 24 hours, including unsuccessful plans
-MAX_DISCOVERIES = 24          # rolling 24 hours across browser discovery branches
 CONTEXT_LIMIT = 12000
 HYPOTHESES = "acquisition_hypothesis"
 SEARCHES = "acquisition_search"
@@ -204,17 +202,6 @@ def admit_hypotheses(db, task, result, event):
     return admitted
 
 
-def research_budget_since(db, now):
-    """Only an audited owner resume can renew the bounded research allowance."""
-    since = now - 86400
-    reset = get_memory(db, "strategic", "acquisition_research_resume")
-    authorization = db.get(Evidence, reset["evidence_id"]) if reset.get("evidence_id") else None
-    if (authorization and authorization.kind == "ACQUISITION_RESEARCH_RESUMED"
-            and authorization.source == "owner_operator" and authorization.occurred_at <= now):
-        since = max(since, authorization.occurred_at)
-    return since
-
-
 def replenish(db, capacity, now=None):
     """Called under existing outbound lock by the persistent supervisor only."""
     from .operator import offer
@@ -237,19 +224,14 @@ def replenish(db, capacity, now=None):
     if blocked:
         return None
     state = get_memory(db, "working", "acquisition_planner")
+    if state.get("status") == "exploration_budget_wait":
+        # Owner removed aggregate research-run quotas. Migrate an existing wait
+        # without discarding history, resetting task retries, or bypassing holds.
+        record(db, "research-wait-retired:" + digest(state), "ACQUISITION_RESEARCH_WAIT_RETIRED",
+               "acquisition", {"prior_state": state, "reason": "Owner removed daily research-run ceiling"})
+        state = {"status": "ready", "retry_at": 0}
+        remember(db, "working", "acquisition_planner", state)
     if state.get("retry_at", 0) > now:
-        return None
-    # An explicit owner resume renews the bounded allowance once. Preserve all
-    # prior research evidence and ordinary rolling limits after that point.
-    budget_since = research_budget_since(db, now)
-    recent = list(db.scalars(select(Evidence).where(Evidence.kind == "ACQUISITION_PLANNER_QUEUED", Evidence.occurred_at > budget_since)))
-    discoveries = list(db.scalars(select(Memory).where(Memory.namespace == "operator_task",
-        Memory.value["stage"].as_string() == "discover", Memory.value["created_at"].as_float() > budget_since)))
-    if len(discoveries) >= MAX_DISCOVERIES or len(recent) >= MAX_PLANS:
-        retry = min([e.occurred_at + 86400 for e in recent] if len(recent) >= MAX_PLANS else
-                    [r.value["created_at"] + 86400 for r in discoveries]) + 1
-        remember(db, "working", "acquisition_planner", {"status": "exploration_budget_wait", "retry_at": retry,
-            "reason": "Bounded rolling research budget; not mission completion or TRUE_IDLE"})
         return None
     search_history = history(db)
     candidates = [r.value for r in db.scalars(select(Memory).where(Memory.namespace == HYPOTHESES,

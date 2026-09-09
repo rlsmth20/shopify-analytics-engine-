@@ -111,34 +111,30 @@ class PlannerTests(unittest.TestCase):
             self.assertIsNone(history['cost']['estimated_usd'])
             self.assertEqual(get_memory(db,planner.HYPOTHESES,task['hypothesis_id'])['status'],'retired')
 
-    def test_budget_wait_is_durable_not_true_idle(self):
+    def test_former_daily_limits_and_persisted_wait_do_not_stop_autonomous_work(self):
         with self.factory() as db:
-            for n in range(planner.MAX_PLANS):record(db,f'plan:{n}','ACQUISITION_PLANNER_QUEUED','acquisition',{})
-            self.assertIsNone(planner.replenish(db,{'remaining':15}))
-            state=get_memory(db,'working','acquisition_planner')
-            self.assertEqual(state['status'],'exploration_budget_wait')
-            self.assertGreater(state['retry_at'],time.time())
+            remember(db,'strategic','qualification_policy',{'version':'market_discovery_v1'})
+            for n in range(30):
+                record(db,f'plan:{n}','ACQUISITION_PLANNER_QUEUED','acquisition',{})
+                record(db,f'start:{n}','ACQUISITION_DISCOVERY_STARTED',str(n),{})
+                remember(db,'operator_task',f'old:{n}',{'stage':'discover','status':'done','created_at':time.time()})
+            remember(db,'working','acquisition_planner',{'status':'exploration_budget_wait','retry_at':time.time()+86400})
             db.commit()
-        self.assertIsNone(executor.take(self.factory,'new-process'))
-
-    def test_owner_resume_renews_once_without_deleting_history_or_removing_limits(self):
-        with self.factory() as db:
-            for n in range(planner.MAX_PLANS):
-                record(db,f'old-plan:{n}','ACQUISITION_PLANNER_QUEUED','acquisition',{},occurred_at=time.time()-10)
-            self.assertIsNone(planner.replenish(db,{'remaining':15}))
-            event=record(db,'owner-resume','ACQUISITION_RESEARCH_RESUMED','acquisition',{},source='owner_operator')
-            remember(db,'strategic','acquisition_research_resume',{'evidence_id':event.id})
-            remember(db,'working','acquisition_planner',{})
-            db.commit()
-        task=executor.take(self.factory,'resumed')
+        task=executor.take(self.factory,'new-process')
         self.assertEqual(task['stage'],'plan')
+        executor.accept(self.factory,'new-process',task,self.result())
+        task=executor.take(self.factory,'new-process')
+        self.assertEqual(task['stage'],'discover')
         with self.factory() as db:
-            self.assertEqual(len(list(db.scalars(select(Evidence).where(Evidence.kind=='ACQUISITION_PLANNER_QUEUED')))),planner.MAX_PLANS+1)
-            remember(db,'operator_task',task['id'],{**task,'status':'done'})
-            for n in range(planner.MAX_PLANS-1):
-                record(db,f'new-plan:{n}','ACQUISITION_PLANNER_QUEUED','acquisition',{})
-            remember(db,'working','acquisition_planner',{})
-            self.assertIsNone(planner.replenish(db,{'remaining':15}))
+            self.assertEqual(len(list(db.scalars(select(Evidence).where(Evidence.kind=='ACQUISITION_PLANNER_QUEUED')))),31)
+            self.assertIsNotNone(db.scalar(select(Evidence).where(Evidence.kind=='ACQUISITION_RESEARCH_WAIT_RETIRED')))
+
+    def test_removing_research_wait_cannot_bypass_contact_capacity_or_safety_hold(self):
+        with self.factory() as db:
+            remember(db,'working','acquisition_planner',{'status':'exploration_budget_wait','retry_at':time.time()+86400})
+            self.assertIsNone(planner.replenish(db,{'remaining':0}))
+            remember(db,'working','acquisition_hold',{'reason':'unresolved safety incident'})
+            self.assertIsNone(planner.replenish(db,{'remaining':8}))
             self.assertEqual(get_memory(db,'working','acquisition_planner')['status'],'exploration_budget_wait')
 
     def test_unsupported_idle_cannot_end_mission_or_restart_immediately(self):

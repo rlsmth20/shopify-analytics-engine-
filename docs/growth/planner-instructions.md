@@ -58,4 +58,5 @@ avenues, at least three real attempted evidence IDs in idle.attempted_evidence_i
 and a specific idle.external_condition that would reopen useful acquisition.
 Exhausting one query, lacking a perfectly certain prospect, or completing this
 stage does not establish global exhaustion. The supervisor periodically rechecks
-idle conditions; research-budget waits are not TRUE_IDLE.
+idle conditions. There is no daily planning/discovery-run quota; continue selecting
+useful hypotheses while contact capacity remains, with the per-stage limits above.

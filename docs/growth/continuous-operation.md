@@ -23,11 +23,13 @@ Raw evidence and observed result counts/rejection reasons are preserved in
 `acquisition_search`; unknown costs/counts stay null. Failed searches remain
 available to future planning. Terminal exclusions and send receipts are unchanged.
 
-Planning is limited to six synthesis stages per rolling 24 hours. Browser
-discovery is limited to 24 stages per rolling 24 hours, with at most two discovery
-branches per stage and two searches/four source reads per discovery. These are
-research cost bounds, not outreach targets. Budget waits have durable retry times
-and never count as TRUE_IDLE. Qualified work and replies retain priority. TRUE_IDLE
+Owner update: there is no daily planning/discovery-run quota. Acquisition keeps
+replenishing while permitted contact capacity remains; old research-budget waits
+are retired automatically with audit evidence. Each stage still has bounded time,
+context and retries, at most two branches, and two searches/four source reads per
+discovery. Per-prospect limits remain one search/two pages/two minutes. Qualified
+work and replies retain priority. The shared 20-new-merchant rolling ceiling still
+includes reservations with uncertain outcomes; never send to fill a quota. TRUE_IDLE
 requires concrete attempted evidence and an external condition; it is reconsidered
 after six hours. Duplicate-only plans back off 15 minutes within the daily bound.
 
@@ -229,10 +231,6 @@ suppression/channel gates. Older narrow qualification instructions below are
 superseded. Usage records retain actual completed-turn tokens and unknown dollar
 allocation; the dashboard economics API exposes acquisition_efficiency ratios.
 
-An explicit owner request to resume a research-budget wait may renew the bounded
-research allowance once. Record `ACQUISITION_RESEARCH_RESUMED` from `owner_operator`
-and reference its evidence ID in `strategic/acquisition_research_resume`; clear
-only the planner's budget wait. Both planner and executor count research since
-that authorization or the rolling 24-hour boundary, whichever is later. Retain
-all prior evidence, outreach counts, retry limits, suppressions and per-task time
-limits. Workers must never renew their own allowance.
+Historical `ACQUISITION_RESEARCH_RESUMED` records remain evidence only. No owner
+renewal is needed for aggregate research runs. Duplicate-search backoff, actual
+provider restrictions, spending limits and safety holds remain enforced.
