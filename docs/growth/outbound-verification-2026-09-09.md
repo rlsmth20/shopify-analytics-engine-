@@ -19,6 +19,10 @@ executor runs 379af17. No database migration or operational mailbox MX change.
 - The recovered executor performed fresh Gmail/Reddit checks, retained evidence
   20605, cleared the handled provider-support bounce, and automatically claimed
   existing acquisition send work. No merchant task was manually seeded for this check.
+- That FACTORFIVE contact-form task completed as verified not sent, with no Send
+  click or authorization. Its unused reservation was released; no message count
+  was added. Instructions now require visual/DOM verification when accessibility
+  omits an email input value, rather than treating missing AX Value as empty.
 
 The complete simulated worker loop covers first contact, queued provider response,
 actual-send reconciliation, authenticated/replayed webhook, reply association,

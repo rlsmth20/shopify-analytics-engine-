@@ -202,6 +202,13 @@ Keep payload files in .growth-deploy, not the repository root.
   body, cohort {icp,offer,message_version,qualification_policy}. Reuse cached
   operator-assess or include checks. Record actual receipt with outreach-complete.
   Never replay an uncertain send, including after a crash.
+  Browser accessibility trees can omit the Value of a populated email or URL input.
+  Absence of a Value entry alone does NOT prove a field is empty. Before rejecting
+  a form for a missing required field, inspect a screenshot or the documented
+  read-only DOM input value. If genuinely empty, focus it, select its content and
+  type the approved business address once. Verify visually before proceeding.
+  Do not repeatedly refill a populated field or consume an entire stage on an AX
+  representation issue. Actual validation errors still apply; never bypass them.
   If the assigned first_contact exists, DO NOT reserve or submit again. Its
   reservation_id is the durable identity needed to persist an existing receipt.
   Inspect the retained form/trace; if a real success confirmation is present,
