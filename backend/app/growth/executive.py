@@ -13,7 +13,7 @@ REVIEW_FIELDS = {"what_happened", "learned", "changed", "failed", "strongest_sig
                  "stop", "more", "icp", "positioning", "next_action", "reason", "evidence_ids", "funnel_bottleneck", "next_experiment"}
 SIGNALS = {"OPPORTUNITY", "PROSPECT_RESEARCHED", "REPLY_RECEIVED", "ACCESS_REQUESTED", "SHOPIFY_CONNECTION",
            "INVENTORY_ANALYSIS_VIEWED", "SUBSCRIPTION_PURCHASED", "CANCELLATION", "EXPERIMENT_EVALUATED",
-           "PRODUCT_FEEDBACK", "CONTACT_FORM_RECEIVED", "HISTORICAL_PURCHASE_INTENT", "IMPLEMENTATION_FIX"}
+           "COMMUNITY_SYNTHESIS", "PRODUCT_FEEDBACK", "CONTACT_FORM_RECEIVED", "HISTORICAL_PURCHASE_INTENT", "IMPLEMENTATION_FIX"}
 
 
 def export_packet(db):
@@ -29,15 +29,32 @@ def export_packet(db):
     previous = get_memory(db, "strategic", "executive-packet:" + window.key)
     if previous.get("schema_version") == 3:
         return previous
-    outcomes = list(db.scalars(select(Evidence).where(Evidence.kind.in_(SIGNALS - {"OPPORTUNITY", "IMPLEMENTATION_FIX", "HISTORICAL_PURCHASE_INTENT"})).order_by(Evidence.id.desc()).limit(6)))
+    outcomes = list(db.scalars(select(Evidence).where(Evidence.kind.in_(SIGNALS - {"OPPORTUNITY", "IMPLEMENTATION_FIX", "HISTORICAL_PURCHASE_INTENT", "COMMUNITY_SYNTHESIS"})).order_by(Evidence.id.desc()).limit(6)))
     for kind in ("IMPLEMENTATION_FIX", "HISTORICAL_PURCHASE_INTENT"):
         landmark = db.scalar(select(Evidence).where(Evidence.kind == kind).order_by(Evidence.id.desc()).limit(1))
         if landmark:
             outcomes.append(landmark)
     candidates = list(db.scalars(select(Evidence).where(Evidence.kind == "OPPORTUNITY").order_by(Evidence.id.desc()).limit(8)))
     events = outcomes + candidates
+    community = get_memory(db, "community", "synthesis")
+    reviewed = get_memory(db, "community", "reviewed_synthesis").get("evidence_id", 0)
+    community_packet = None
+    if community.get("evidence_id", 0) > reviewed:
+        source = db.get(Evidence, community["evidence_id"])
+        if source:
+            events.append(source)
+            community_packet = {"evidence_id": source.id, "threads": community["threads"],
+                "common_problems": community["common_problems"][:5],
+                "unresolved_problems": community["unresolved_problems"][:5],
+                "requested_features": community["requested_features"][:5],
+                "competitors": [{k: app[k] for k in ("name", "appearances", "self_promotions", "organic_recommendations")}
+                                for app in community["competitors"][:5]],
+                "interpretation": community["interpretation"],
+                "next_decision": community["hypothesis_to_evaluate"],
+                "details": "community-export: inspect only this new batch for explicit complaints, terminology and prospect evidence"}
     result = {"schema_version": 3, "day": day, "timezone": "America/Los_Angeles", "mission": get_memory(db, "strategic", "identity"),
               "strategy": get_memory(db, "strategic", "strategy"), "funnel": funnel.funnel_counts(db),
+              "community_learning": community_packet,
               "bottleneck": funnel.bottleneck(db),
               "evidence": [{"id": e.id, "kind": e.kind, "source": e.source, "epistemic": e.epistemic, "occurred_at": e.occurred_at,
                             "data": json.dumps(e.data, ensure_ascii=False)[:900]} for e in events],
@@ -79,6 +96,9 @@ def import_review(db, result, *, model="codex", input_tokens=None, output_tokens
                    source="codex_executive", epistemic="INFERENCE", occurred_at=now)
     strategy = get_memory(db, "strategic", "strategy")
     remember(db, "strategic", "review", {**result, "reviewer_model": model, "evidence_id": event.id})
+    community = packet.get("community_learning") or {}
+    if community.get("evidence_id") in cited:
+        remember(db, "community", "reviewed_synthesis", {"evidence_id": community["evidence_id"], "review_evidence_id": event.id})
     remember(db, "strategic", "strategy", {**strategy, **{k: result[k] for k in ("icp", "positioning", "next_action", "biggest_uncertainty", "next_experiment")},
              "discovery_focus": result.get("discovery_focus", "merchant_pain"),
              "evidence_ids": cited, "executive_evidence_id": event.id}, source="codex_executive")

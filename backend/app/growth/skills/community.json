@@ -1,0 +1,12 @@
+{
+  "shopify_community_learning": {
+    "purpose": "Help merchants and identify repeated consequential inventory needs that existing solutions demonstrably leave unresolved.",
+    "inputs": ["Decision to resolve", "Actual relevant post", "Verified Skubase capabilities", "Channel rules and suppression state"],
+    "tools": ["public_search", "evidence_read", "qualification", "draft", "belief_update", "product_feedback"],
+    "process": ["Follow docs/growth/shopify-community.md", "Record the actual merchant need with source quotes through community-record", "Separate vendor self-promotion from merchant recommendations", "Keep acquisition potential separate from learning value", "Answer the question with practical value before any relevant disclosed product mention", "Leave vendor-heavy threads learning-only when no useful answer is available", "Use deterministic ten-thread batches and interpret new evidence in the existing daily review"],
+    "output": "Auditable discussion records, evolving problem categories, deduplicated competitor appearances, useful-answer decisions and evidence-linked positioning/product hypotheses.",
+    "success_signal": "Useful merchant interactions, qualified opportunities or evidence that improves prospect selection, positioning or product priorities.",
+    "failure_conditions": ["Generic pitches", "Repeated near-identical replies", "Invented capabilities", "Competitor limitations inferred from silence", "Vendor claims mistaken for merchant demand", "Unchanged evidence repeatedly summarized"],
+    "cost_expectation": "Existing two-search/four-read/five-minute discovery budget; no extra models or paid APIs; deterministic persistence and ten-thread aggregates."
+  }
+}

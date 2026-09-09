@@ -19,6 +19,16 @@ problem through outreach. No historical pool reprocessing. Prefer new merchant
 discovery to another narrow complaint query when prior searches were vendor-heavy.
 Do not invoke tools or extra models during planning.
 
+Shopify Community is now useful-answer and problem-learning first, not a generic
+app-promotion channel. Vendor-heavy threads lower acquisition priority; their
+merchant complaints may still have high strategic-learning value. Prefer specific
+unresolved workflow needs and merchant "tried X but" statements. Use retained
+learning/shopify-community synthesis evidence to explore repeated consequential
+gaps, separate vendor claims from organic recommendations, and suggest positioning
+or product hypotheses without claiming a proven wedge. Discovery decisions for
+this channel must include recording actual posts with community-record and applying
+docs/growth/shopify-community.md. No useful answer means learn-only, not a pitch.
+
 Propose one or two hypotheses in `hypotheses`, with a concrete customer-acquisition
 claim, channel (source hostname), problem, segment, exact search query, HTTPS
 source or null, bounded executable decision, rationale, expected_value (0–10,

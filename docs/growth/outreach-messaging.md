@@ -1,5 +1,12 @@
 # Skubase outreach messaging — revision 4
 
+**Shopify Community override, September 9:** use [the useful-answer policy](shopify-community.md)
+and message version `community_useful_answer_v1`. Answer the actual question first;
+only then briefly mention a verified relevant Skubase capability with disclosed
+affiliation. No automatic health-check pitch or advertisement-first template on
+this channel. Vendor-heavy threads can be learning-only. The generic first-contact
+rules and example below apply to other permitted channels. Preserve old sent copy.
+
 ## Current owner correction — September 9, 2026
 
 Skubase HAS exportable purchase orders. Never call PO export a missing feature.

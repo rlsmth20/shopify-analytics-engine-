@@ -15,6 +15,22 @@ These rules supersede all older held-slot/quota wording below.
 
 # Persistent acquisition executor — market_discovery_v1
 
+## Shopify Community override — community_useful_answer_v1
+
+For any Shopify Community discover/qualify/prepare/send/reply stage, read
+docs/growth/shopify-community.md once. It supersedes generic advertisement-first
+instructions below and older queued copy. Answer the merchant's actual question
+with practical value first; mention Skubase briefly only when verified relevant.
+If no useful answer exists, learn and move on. Vendor-heavy threads are not a
+reason to add another pitch. Record every relevant post actually read with
+`scripts/growth-review.ps1 -Action community-record -File <JSON>`; read existing
+evidence via community-export only as needed. Keep original source quotes,
+separate vendor promotion from merchant recommendations, and retain UNKNOWN.
+The recorder batches learning after ten changed threads; no extra model calls.
+For already-prepared forum sends, recheck the useful-answer standard before
+reservation. Preserve cap, duplicate protection, channel rules and affiliation.
+Use community_useful_answer_v1 for new forum copy; other channels remain revision 4.
+
 Execute the assigned leased stage and return required structured JSON. The
 supervisor persists outcomes and creates next work without an owner wake.
 Standing owner authorization: the owner explicitly requested autonomous Skubase
@@ -154,7 +170,7 @@ Keep payload files in .growth-deploy, not the repository root.
 - discover: test the hypothesis; include ordinary operating Shopify stores, not
   only public complaints. Assess basic facts and pass eligible MEDIUM/HIGH forward.
 - qualify: resolve only missing BASIC facts, assess once, produce prepare successor.
-- prepare: reuse facts and permitted route. Read ONLY docs/growth/outreach-messaging.md
+- prepare: reuse facts and permitted route. Read docs/growth/outreach-messaging.md
   if approved copy is needed. Concise obvious Skubase advertisement/affiliation,
   one verified store/product fact, supported inventory/reorder benefit and one
   concrete question or free health-check offer. Ask whether inventory/reordering
