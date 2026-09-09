@@ -33,3 +33,13 @@ the CSV uploads and database assertions were verified through the real multipart
 API routes in an isolated database. This is not a claim of a completed browser
 file upload. Production delivery and build verification are recorded separately
 after rollout.
+
+Production rollout: code commit `6dd3e61`; Railway deployment
+`76ede209-561a-40c7-8733-2a15d02771b0` SUCCESS; Vercel deployment
+`dpl_EgSYrsBFyYYpFtGde6r3aaCzyDUo` READY at `https://www.skubase.io`
+(Next.js, 44-second remote build). The live schema includes the return destination,
+and credentialed CORS checks passed for both canonical Skubase origins. A real
+sign-in email arrived in `info@skubase.io`; following it and confirming sign-in
+established a session and returned to `/import-stocky`. No production inventory
+was uploaded or modified. Vercel's post-deployment error-log query returned no
+entries. Dedicated drain configuration was not audited in this change.
