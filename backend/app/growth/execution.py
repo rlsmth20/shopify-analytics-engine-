@@ -24,7 +24,7 @@ def state(db, now=None):
         Work.status.in_(["ready", "running", "blocked", "failed"]))))
     browser = [r.value for r in db.scalars(select(Memory).where(Memory.namespace == "operator_task"))
                if r.value.get("status") in {"pending", "running", "blocked"}
-               and r.value.get("stage", "discover") != "monitor"]
+               and r.value.get("stage", "discover") not in {"monitor", "deliverability"}]
     pending = [w for w in jobs if w.status == "ready"]
     pending_browser = [w for w in browser if w["status"] == "pending"]
     active_browser = [w for w in browser if w["status"] in {"pending", "running"}]

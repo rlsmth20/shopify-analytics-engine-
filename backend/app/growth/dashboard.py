@@ -135,6 +135,7 @@ def outreach_projection(db, now):
 def dashboard(db):
     from .execution import state as execution_state
     from .outbound import status as outbound_status
+    from .warmup import status as warmup_status
     now = time.time()
     day = int(now // 86400) * 86400
     def count(model, *conditions):
@@ -147,7 +148,8 @@ def dashboard(db):
     beliefs = list(db.scalars(select(Memory).where(Memory.namespace == "beliefs").order_by(Memory.updated_at.desc()).limit(12)))
     known_cost = db.scalar(select(func.coalesce(func.sum(Usage.estimated_usd), 0)))
     reserved_unknown = db.scalar(select(func.coalesce(func.sum(Usage.reserved_usd), 0)).where(Usage.estimated_usd.is_(None)))
-    acquisition_cost = known_cost + reserved_unknown
+    acquisition_cost = db.scalar(select(func.coalesce(func.sum(
+        func.coalesce(Usage.estimated_usd, Usage.reserved_usd)), 0)).where(Usage.task != "acquisition_deliverability"))
     mission = get_memory(db, "strategic", "identity")
     cohort = measured_funnel(db, since=mission.get("started_at", now))
     outreach = outreach_projection(db, now)
@@ -177,6 +179,7 @@ def dashboard(db):
                   "activations": today_funnel["INVENTORY_ANALYSIS_VIEWED"], "purchases": today_funnel["SUBSCRIPTION_PURCHASED"]},
         "funnel": stats,
         "outreach": outreach,
+        "controlled_email_tests": warmup_status(db, now),
         "pipeline": {"prospects": count(Contact), "qualified_prospects": count(Contact,
                      Contact.qualification["qualified"].as_boolean().is_(True), Contact.suppressed.is_(False),
                      ~Contact.status.in_(["declined", "unsubscribed", "delivery_failure", "bounced", "ineligible"])),
@@ -218,5 +221,6 @@ def dashboard(db):
                          for e in db.scalars(select(Evidence).where(Evidence.kind.in_(["OWNER_ATTENTION", "COMMUNITY_RESPONSE_DRAFTED", "PRODUCT_FEEDBACK"]))
                          .order_by(Evidence.id.desc()).limit(12)) if e.kind != "PRODUCT_FEEDBACK" or get_memory(db, "working", "acquisition_hold")],
         "recent_actions": [{"id": e.id, "kind": e.kind, "at": e.occurred_at, "source": e.source, "data": e.data} for e in db.scalars(
-            select(Evidence).where(Evidence.kind != "MEMORY_REVISION").order_by(Evidence.id.desc()).limit(20))],
+            select(Evidence).where(Evidence.kind.not_in(["MEMORY_REVISION", "CONTROLLED_TEST_STAGE_RESULT"]),
+                ~Evidence.kind.startswith("WARMUP_")).order_by(Evidence.id.desc()).limit(20))],
     }

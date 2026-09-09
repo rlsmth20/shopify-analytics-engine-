@@ -9,7 +9,7 @@ from .executive import export_packet, import_review
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["review-export", "review-import", "outreach-status", "outreach-reserve", "outreach-authorize", "outreach-complete", "outreach-backfill", "outreach-reconcile", "operator-export", "operator-enqueue", "operator-claim", "operator-complete", "operator-state", "operator-assess", "operator-monitor", "operator-monitor-start", "community-record", "community-export", "prospect-link", "prospect-history", "email-queue", "email-status", "email-suppress"])
+    parser.add_argument("action", choices=["warmup-status", "warmup-prepare", "warmup-authorize", "warmup-record", "review-export", "review-import", "outreach-status", "outreach-reserve", "outreach-authorize", "outreach-complete", "outreach-backfill", "outreach-reconcile", "operator-export", "operator-enqueue", "operator-claim", "operator-complete", "operator-state", "operator-assess", "operator-monitor", "operator-monitor-start", "community-record", "community-export", "prospect-link", "prospect-history", "email-queue", "email-status", "email-suppress"])
     parser.add_argument("--file")
     parser.add_argument("--model", default="codex")
     parser.add_argument("--input-tokens", type=int)
@@ -17,7 +17,12 @@ def main():
     parser.add_argument("--latency-ms", type=int)
     args = parser.parse_args()
     with SessionLocal() as db:
-        if args.action.startswith(("prospect-", "email-")):
+        if args.action.startswith("warmup-"):
+            from .warmup import operator_action
+            payload = json.loads(Path(args.file).read_text(encoding="utf-8-sig")) if args.file else {}
+            result = operator_action(db, args.action, payload)
+            db.commit()
+        elif args.action.startswith(("prospect-", "email-")):
             from . import identity, outreach_email
             payload = json.loads(Path(args.file).read_text(encoding="utf-8-sig")) if args.file else {}
             if args.action == "prospect-link":

@@ -19,7 +19,7 @@ def canonical_identity(identity):
 
 def owned_identity(identity):
     return canonical_identity(identity) in {"shopify-community:skubase", "reddit:skubase",
-        "info@skubase.io", "support@skubase.io", "email:info@skubase.io", "email:support@skubase.io"}
+        "info@skubase.io", "support@skubase.io", "skubase.io@gmail.com"}
 
 
 def prospect_identity(identity, source):

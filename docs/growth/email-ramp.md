@@ -72,8 +72,11 @@ increases for seven days; unresolved serious provider restrictions keep sending
 paused. These evidence thresholds do not instruct the agent to manufacture traffic.
 Use stronger eligible prospects first; never send merely to satisfy a minimum.
 
-No fake replies, recipient accounts, engagement networks, meaningless warming
-messages, or account/domain rotation. No paid mailbox warming is enabled.
+Controlled tests between verified owned inboxes are now explicitly authorized;
+see `controlled-email-tests.md`. They test delivery, formatting and reply routing
+on a separate small schedule. Test replies and reads never advance this merchant
+ramp or become customer engagement. No invented merchants, engagement networks,
+meaningless traffic or account/domain rotation. No paid warming service is enabled.
 Mail-server acceptance is not inbox placement; unknown spam measurements stay
 unknown. Preserve hard-bounce suppression across campaigns and linked identities.
 

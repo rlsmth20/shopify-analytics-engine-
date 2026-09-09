@@ -114,6 +114,8 @@ def take(factory, owner):
                 "blocker": "CODEX_RUNTIME_USAGE_WAIT", "next_retry_at": backoff["retry_at"]})
             db.commit()
             return None
+        from .warmup import schedule as schedule_controlled_tests
+        schedule_controlled_tests(db)
         from .reconciliation import enqueue_recovery
         enqueue_recovery(db)
         db.flush()
@@ -138,17 +140,17 @@ def take(factory, owner):
             db.flush()
             packet = operator.export_packet(db)
         from .acquisition_planner import replenish
-        if not any(t.get("stage") not in {"monitor", "reconcile"} for t in packet["tasks"]) and not packet["claimed_tasks"]:
+        if not any(t.get("stage") not in {"monitor", "reconcile", "deliverability"} for t in packet["tasks"]) and not packet["claimed_tasks"]:
             replenish(db, packet["capacity"])
             db.flush()
             packet = operator.export_packet(db)
         tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")]
         if safety.get("requires_attention"):
-            tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile"}]
+            tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile", "deliverability"}]
         if not packet["capacity"].get("dispatch_remaining", packet["capacity"]["remaining"]):
             tasks = [t for t in tasks if t.get("stage") not in {"send", "outreach"}]
         if packet["capacity"]["remaining"] == 0:
-            tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile"}]
+            tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile", "deliverability"}]
         if not tasks:
             remember(db, "working", "browser_executor", {**runtime, "owner": owner,
                 "heartbeat_at": time.time(), "lease_until": 0, "task_id": None,
@@ -223,7 +225,7 @@ def accept(factory, owner, task, result):
         stop = result.get("stop_reason")
         if stop is not None and stop not in STOP_REASONS:
             raise GrowthError("Invalid stop condition")
-        if not successors and not stop and task.get("stage") not in {"plan", "monitor", "reconcile", "send", "outreach"}:
+        if not successors and not stop and task.get("stage") not in {"plan", "monitor", "reconcile", "send", "outreach", "deliverability"}:
             raise GrowthError("A completed task must supply executable successors or a legitimate stop")
         if len(successors) > 6 or not result.get("observation") or not result.get("sources"):
             raise GrowthError("Retained real source observations and bounded successors required")
@@ -232,7 +234,7 @@ def accept(factory, owner, task, result):
         if result.get("outcome") not in {"done", "excluded", "blocked"}:
             raise GrowthError("Invalid result outcome")
         stage = task.get("stage", "discover")
-        event = record(db, "browser-stage:" + task["lease_token"], "ACQUISITION_STAGE_RESULT", task["id"],
+        event = record(db, "browser-stage:" + task["lease_token"], "CONTROLLED_TEST_STAGE_RESULT" if stage == "deliverability" else "ACQUISITION_STAGE_RESULT", task["id"],
             {"stage": stage, **result}, source="persistent_browser_executor")
         if stage in {"send", "outreach", "reconcile"}:
             from .reconciliation import apply_result
@@ -267,7 +269,7 @@ def accept(factory, owner, task, result):
         from .acquisition_planner import admit_hypotheses, retain_result
         if stage == "plan":
             admit_hypotheses(db, task, result, event)
-        elif stage not in {"monitor", "reconcile"}:
+        elif stage not in {"monitor", "reconcile", "deliverability"}:
             retain_result(db, task, result, event)
         executable = []
         for successor in successors:
@@ -291,7 +293,7 @@ def accept(factory, owner, task, result):
             raise GrowthError("Successors are already terminal; choose unprocessed acquisition work or an evidenced stop")
         operator.complete(db, task_id=task["id"], lease_token=task["lease_token"], evidence_id=event.id,
             outcome=result["outcome"], next_step=result["next_step"])
-        if result["outcome"] != "blocked" and stage not in {"monitor", "plan", "reconcile"}:
+        if result["outcome"] != "blocked" and stage not in {"monitor", "plan", "reconcile", "deliverability"}:
             record(db, "browser-progress:" + task["lease_token"], "ACQUISITION_PROGRESS", task["id"],
                 {"executor": owner, "stage": stage, "evidence_id": event.id,
                  "outcome": result["outcome"], "successor_keys": [s["key"] for s in executable]})
@@ -393,7 +395,7 @@ def execute(factory, owner, task, *, codex, repo):
     folder.mkdir(parents=True, exist_ok=True)
     output = folder / (task["lease_token"] + ".json")
     log = folder / (task["lease_token"] + ".jsonl")
-    instruction_file = "planner-instructions.md" if task.get("stage") == "plan" else "executor-instructions.md"
+    instruction_file = "controlled-email-tests.md" if task.get("stage") == "deliverability" else "planner-instructions.md" if task.get("stage") == "plan" else "executor-instructions.md"
     prompt = (repo / "docs/growth" / instruction_file).read_text(encoding="utf-8")
     if task.get("stage") == "reconcile":
         retained = []

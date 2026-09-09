@@ -110,6 +110,11 @@ Retain CHANNEL_MONITOR evidence and working/browser_safety_check
 check. Prioritize substantive replies/incidents and create reply successors when
 appropriate. No promotional response to Shopify review mail. Monitoring alone
 does not complete acquisition.
+Controlled Skubase mailbox tests are separate infrastructure work. Threads with
+`[sb-check:...]` between the verified accounts in `warmup-status` must never create
+prospects, merchant replies, acquisition successors or engagement evidence. Do not
+answer them as customer inquiries. Their scheduled `deliverability` stage handles
+thread replies and receipts using `controlled-email-tests.md` and `warmup-record`.
 Reuse an existing clear, uninvalidated browser check under five minutes old for
 send admission; a new stage alone does not require repeating those observations.
 Reddit Chat initially renders only a shell while its conversation content loads.

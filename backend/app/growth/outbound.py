@@ -63,11 +63,16 @@ def status(db, now=None):
 def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, cohort, now=None):
     now = time.time() if now is None else now
     lock(db)  # PostgreSQL row lock / SQLite write lock serializes competing callers.
+    if channel == "email" and db.scalar(select(Memory.id).where(Memory.namespace == "warmup_message",
+            Memory.value["state"].as_string() == "authorized",
+            Memory.value["submit_before"].as_float() > now).limit(1)):
+        raise GrowthError("CONTROLLED_TEST_SEND_IN_FLIGHT", "capacity")
     control = get_memory(db, "working", "control")
     if control.get("paused") and not control.get("deployment_drain"):
         raise GrowthError("Acquisition is paused")
     db.refresh(contact)
-    if owned_identity(contact.identity):
+    controlled = get_memory(db, "strategic", "controlled_email_tests").get("accounts", {})
+    if owned_identity(contact.identity) or canonical_identity(contact.identity) in controlled or (contact.email or "").lower() in controlled:
         raise GrowthError("Owned business account is not an acquisition prospect")
     identity_aliases = matching_contacts(db, contact.identity)
     if any(row.suppressed or row.status in INELIGIBLE for row in identity_aliases):

@@ -20,7 +20,7 @@ MAX_ATTEMPTS = 3
 
 def offer(db, *, key, source, decision, evidence_id, contact_id=None, priority=50, stage=None):
     stage = stage or ("outreach" if contact_id else "discover")
-    if stage not in {"plan", "discover", "qualify", "prepare", "send", "outreach", "monitor", "reply", "reconcile"}:
+    if stage not in {"plan", "discover", "qualify", "prepare", "send", "outreach", "monitor", "reply", "reconcile", "deliverability"}:
         raise GrowthError("Unknown acquisition stage")
     if not isinstance(key, str) or not key.strip() or len(key) > 200:
         raise GrowthError("Operator task requires a stable bounded key")
@@ -139,6 +139,7 @@ def export_packet(db):
         func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now)
         .order_by(case((stage == "reply", 0), (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4),
                       ((stage == "reconcile") & Memory.value["receipt_completion"].as_boolean().is_(True), 2),
+                      (stage == "deliverability", 2),
                       (stage == "reconcile", 2 if capacity["blocker"] in {"DAILY_CAP_REACHED", "OUTREACH_UNCERTAINTY_SAFETY_HOLD"} else 4), else_=3),
                   Memory.value["priority"].as_float().desc(), Memory.id).limit(6))]
     exhausted = [r.key for r in db.scalars(select(Memory).where(*active, lease <= now, attempts >= MAX_ATTEMPTS)

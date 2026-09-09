@@ -57,7 +57,7 @@ def efficiency(db):
     since = get_memory(db, "strategic", "qualification_policy").get("started_at")
     if since is None:
         return {"policy": POLICY, "status": "not_started"}
-    costs = list(db.scalars(select(Usage).where(Usage.key.like("acquisition-cli:%"), Usage.created_at >= since)))
+    costs = list(db.scalars(select(Usage).where(Usage.key.like("acquisition-cli:%"), Usage.created_at >= since, Usage.task != "acquisition_deliverability")))
     unknown = any(c.estimated_usd is None for c in costs)
     dollars = None if unknown or not costs else sum(c.estimated_usd for c in costs)
     tokens = sum((c.input_tokens or 0) + (c.output_tokens or 0) for c in costs)

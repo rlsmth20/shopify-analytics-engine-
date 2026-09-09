@@ -36,6 +36,13 @@ def read_dashboard(db: DB, owner: Admin):
     return dashboard(db)
 
 
+@router.get("/warmup-status")
+def read_warmup_status(db: DB, owner: Admin, response: Response):
+    from app.growth.warmup import status
+    response.headers["Cache-Control"] = "private, no-store"
+    return status(db)
+
+
 @router.get("/email-status")
 def read_email_status(db: DB, owner: Admin, response: Response):
     from app.growth.outreach_email import metrics

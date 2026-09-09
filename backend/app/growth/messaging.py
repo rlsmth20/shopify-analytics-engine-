@@ -172,6 +172,9 @@ def send(factory, work, *, policy=None, provider=resend_request):
 
 
 def ingest_reply(db, *, provider_id, sender, recipients, text, subject="", headers=None, occurred_at=None):
+    from .warmup import ingest_controlled
+    if ingest_controlled(db, sender, recipients, subject, text, provider_id):
+        return None
     mailbox = Policy.from_env().sender
     if mailbox not in [parseaddr(x)[1].lower() for x in recipients] or parseaddr(sender)[1].lower() == mailbox:
         raise GrowthError("Reply is not addressed to the dedicated growth mailbox")
@@ -267,13 +270,13 @@ def _poll_replies(factory, provider=resend_request):
         with factory() as db:
             # HTML is retained only as text; no links/attachments are automatically fetched.
             from .discovery import clean_text
-            ingest_reply(db, provider_id=row["id"], sender=full["from"], recipients=full.get("to", []),
+            merchant_reply = ingest_reply(db, provider_id=row["id"], sender=full["from"], recipients=full.get("to", []),
                          subject=full.get("subject", ""), text=full.get("text") or clean_text(full.get("html", "")),
                          headers=full.get("headers", {}),
                          occurred_at=timestamp(datetime.fromisoformat(full["created_at"].replace("Z", "+00:00"))))
             record(db, "inbound-seen:" + row["id"], "INBOUND_PROCESSED", "mailbox", {"provider_id": row["id"]})
             db.commit()
-            count += 1
+            count += int(merchant_reply is not None)
     with factory() as db:
         remember(db, "working", "inbound_cursor", {"after": rows[-1]["id"] if rows and result.get("has_more") else None})
         db.commit()

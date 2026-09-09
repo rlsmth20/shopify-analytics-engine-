@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile', 'operator-export', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-state', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record', 'community-export', 'prospect-link', 'prospect-history', 'email-queue', 'email-status', 'email-suppress')][string]$Action = 'review-export',
+    [ValidateSet('warmup-status', 'warmup-prepare', 'warmup-authorize', 'warmup-record', 'review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile', 'operator-export', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-state', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record', 'community-export', 'prospect-link', 'prospect-history', 'email-queue', 'email-status', 'email-suppress')][string]$Action = 'review-export',
     [string]$File,
     [string]$Model = 'codex'
 )
@@ -33,7 +33,7 @@ try {
         if (-not $File) { throw 'A reviewed JSON file is required.' }
         $growthArguments += @('--file', (Resolve-Path -LiteralPath $File).Path, '--model', $Model)
     }
-    if ($Action -in @('outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-reconcile', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record', 'prospect-link', 'prospect-history', 'email-queue', 'email-suppress')) {
+    if ($Action -in @('warmup-prepare', 'warmup-authorize', 'warmup-record', 'outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-reconcile', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record', 'prospect-link', 'prospect-history', 'email-queue', 'email-suppress')) {
         if (-not $File) { throw 'An exact reviewed JSON payload is required.' }
         $growthArguments += @('--file', (Resolve-Path -LiteralPath $File).Path)
     }

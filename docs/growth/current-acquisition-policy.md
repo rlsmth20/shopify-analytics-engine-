@@ -32,8 +32,10 @@ This supersedes older daily-quota and narrow-channel instructions.
   merchant outreach through working channels. Still inspect fresh actual inbox
   evidence for new merchant replies, opt-outs or broader delivery incidents.
 - Google authentication and a real internal transport diagnostic passed (evidence
-  22221). Start the ramp only with the first real merchant email. No fake warming,
-  unsolicited mass email or provider restriction bypasses. EmailPal setup is
+  22221). Start the merchant ramp only with the first real merchant email.
+  The owner separately authorized controlled mailbox infrastructure tests. Follow
+  `controlled-email-tests.md`; only verified owned inboxes, isolated test records,
+  no merchant-engagement credit and no provider restriction bypasses. EmailPal setup is
   superseded and its API dispatch remains disabled.
 - One optional silent-prospect email follow-up after campaign-configured spacing
   (minimum three days), only if enabled, with no human reply or suppression. Preserve
