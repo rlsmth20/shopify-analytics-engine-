@@ -53,12 +53,14 @@
 @media(max-width:1024px){
  .shell{grid-template-columns:minmax(0,1fr)}
  .shell :global(.sidebar){position:sticky;top:0;height:auto;max-height:calc(100dvh - 76px - env(safe-area-inset-bottom,0px));padding:12px 18px;gap:18px;z-index:50;border-right:0;border-bottom:1px solid var(--line);overflow-y:auto}
+ /* The whole mobile menu scrolls. Keep its sections at their content height. */
+ .shell :global(.sidebar)>*{flex-shrink:0}
  .mobileHeader{display:flex;align-items:center;justify-content:space-between;gap:14px}
  .shell :global(.sidebar-brand){padding:0}
  .shell :global(.brand-mark){width:27px;height:29px}
  .shell :global(.brand-name){font-size:1.25rem}
  .navigationToggle{display:flex;align-items:center;gap:8px;min-height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface-strong);color:var(--ink);font:inherit;font-size:.75rem;cursor:pointer;white-space:nowrap}
- .shell :global(.sidebar-nav){grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px;overflow:visible}
+ .shell :global(.sidebar-nav){flex:none;grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px;overflow:visible}
  .shell :global(.nav-link){justify-content:flex-start;padding:9px 8px;min-width:0;min-height:42px}
  .shell :global(.nav-link-label){min-width:0;font-size:.8rem;overflow-wrap:normal}
  .shell :global(.nav-link-gate){max-width:60px}
