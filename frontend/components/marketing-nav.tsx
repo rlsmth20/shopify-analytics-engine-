@@ -16,6 +16,7 @@ type AuthState = "loading" | "signed-out" | "signed-in";
  * this file only.
  */
 export function MarketingNav() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [authState, setAuthState] = useState<AuthState>("loading");
 
   useEffect(() => {
@@ -35,12 +36,13 @@ export function MarketingNav() {
   }, []);
 
   return (
-    <header className="marketing-nav">
+    <header className="marketing-nav" data-menu-open={menuOpen} onKeyDown={event => { if (event.key === "Escape") { setMenuOpen(false); event.currentTarget.querySelector<HTMLButtonElement>(".marketing-menu-toggle")?.focus(); } }}>
       <Link href="/" className="marketing-brand">
         <span className="marketing-brand-mark">sb</span>
         <span className="marketing-brand-name">skubase</span>
       </Link>
-      <nav className="marketing-nav-links" aria-label="Primary">
+      <button className="marketing-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="marketing-navigation" onClick={() => setMenuOpen(open => !open)}>{menuOpen ? "Close" : "Menu"}</button>
+      <nav id="marketing-navigation" className="marketing-nav-links" aria-label="Primary" onClick={() => setMenuOpen(false)}>
         <Link href="/features">Features</Link>
         <Link href="/pricing">Pricing</Link>
         <Link href="/about">About</Link>

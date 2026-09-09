@@ -229,7 +229,7 @@ function ReportTable({
   return (
     <section className="snapshot-report-section">
       <h2>{title}</h2>
-      <div className="compare-table-wrapper">
+      <div className="compare-table-wrapper" role="region" aria-label={`${title}; scroll horizontally to view all columns`} tabIndex={0}>
         <table className="compare-table snapshot-report-table">
           <thead>
             <tr>

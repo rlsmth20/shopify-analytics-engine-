@@ -62,6 +62,7 @@ export default function LeadTimeSettingsPage() {
 }
 
 function LeadTimeSettingsContent() {
+  const [ruleSection, setRuleSection] = useState("suppliers");
   const { user } = useAuth();
   const demo = user.id === 0;
   const { shopifyDomain, setShopifyDomain, hasHydrated } = useStoredShopDomain();
@@ -376,16 +377,6 @@ function LeadTimeSettingsContent() {
   return (
     <div className={`page-stack ${styles.page}`}>
       <SectionCard>
-        <div className="section-heading">
-          <div>
-            <p className="section-eyebrow">Inventory Rules</p>
-            <h2 className="section-title">Lead-time control center</h2>
-          </div>
-          <p className="section-copy">
-            Set default, supplier, category, and SKU-specific lead times that feed the Action Queue, Forecast, and Reorder / POs.
-          </p>
-        </div>
-
         <div className="settings-scope-row">
           <div className="field-label field-label-grow">
             <span>Connected workspace</span>
@@ -402,17 +393,16 @@ function LeadTimeSettingsContent() {
             {isLoadingSettings ? "Loading..." : failedLoads.length ? "Retry failed reads" : "Reload saved rules"}
           </button>
         </div>
-      </SectionCard>
-
-      <SectionCard>
         <p className="section-copy" role="status">{settingsConfirmed ? "Saved rule sections are loaded. Only sections with changes will be saved." : "Waiting for saved rule sections. Saving is disabled to protect your existing overrides."}</p>
+        <details className="workspace-disclosure" open={failedLoads.length > 0}><summary>Saved rule status & reload details</summary>
         <ul className="section-copy">{LOAD_SECTIONS.map(key => <li key={key}><strong>{SECTION_LABELS[key]}:</strong> {loadStates[key].status === "ready" ? "Loaded" : loadStates[key].status === "loading" ? "Loading…" : `Unavailable — ${loadStates[key].error}`}</li>)}</ul>
         {failedLoads.length > 0 ? <p className="section-copy">Retry failed reads to keep the sections already loaded. A missing product lookup does not erase saved SKU overrides.</p> : <p className="section-copy">Reloading saved rules replaces unsaved edits with the stored values.</p>}
+        </details>
       </SectionCard>
 
-      <form className="page-stack" onSubmit={handleSaveSettings}>
+      <form className="page-stack" noValidate onSubmit={handleSaveSettings}>
         <fieldset className="page-stack" disabled={!settingsConfirmed || isLoadingSettings || isSavingSettings} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        <SectionCard>
+        <details className="workspace-disclosure"><summary>How lead-time rules work</summary>
           <div className="section-heading">
             <div>
               <p className="section-eyebrow">How Skubase decides</p>
@@ -422,14 +412,21 @@ function LeadTimeSettingsContent() {
               Create alert rule
             </Link>
           </div>
+          <p className="section-copy">SKU override / Supplier / Category / Global default</p>
+          <details className="workspace-disclosure"><summary>When to use each rule</summary>
           <div className="lead-time-priority-grid">
             <PriorityStep number="1" title="SKU override" copy="Use this for hero SKUs, fragile items, import products, or anything with a known exception." />
             <PriorityStep number="2" title="Supplier lead time" copy="Set the normal delivery window for each supplier so all their SKUs inherit it." />
             <PriorityStep number="3" title="Category lead time" copy="Use category defaults for product types that behave similarly, like accessories or apparel." />
             <PriorityStep number="4" title="Global default" copy="Everything else falls back to the shop-wide default and safety buffer." />
           </div>
-        </SectionCard>
+          </details>
+        </details>
 
+        <nav className="rule-section-nav" aria-label="Lead-time rule sections">
+          {[{id:"suppliers",label:"Suppliers"},{id:"categories",label:"Categories"},{id:"skus",label:"SKU overrides"},{id:"defaults",label:"Defaults & preview"}].map(section => <button key={section.id} type="button" aria-pressed={ruleSection === section.id} aria-controls={`rule-panel-${section.id}`} onClick={() => setRuleSection(section.id)}>{section.label}</button>)}
+        </nav>
+        <div className="rule-panel" id="rule-panel-defaults" hidden={ruleSection !== "defaults"}>
         <div className="content-grid content-grid-2-1">
           <SectionCard>
             <div className="section-heading">
@@ -500,7 +497,8 @@ function LeadTimeSettingsContent() {
           </SectionCard>
         </div>
 
-        <div className="content-grid content-grid-2-2">
+        </div>
+        <div className="rule-panel" id="rule-panel-suppliers" hidden={ruleSection !== "suppliers"}>
           <LeadTimeTable
             eyebrow="Supplier rules"
             title="Supplier lead times"
@@ -511,7 +509,8 @@ function LeadTimeSettingsContent() {
             onAdd={addSupplierRow}
             onRowsChange={setSupplierRows}
           />
-
+        </div>
+        <div className="rule-panel" id="rule-panel-categories" hidden={ruleSection !== "categories"}>
           <LeadTimeTable
             eyebrow="Category rules"
             title="Category lead times"
@@ -524,6 +523,7 @@ function LeadTimeSettingsContent() {
           />
         </div>
 
+        <div className="rule-panel" id="rule-panel-skus" hidden={ruleSection !== "skus"}>
         <SectionCard>
           <div className="section-heading">
             <div>
@@ -621,7 +621,7 @@ function LeadTimeSettingsContent() {
                 ) : null}
               </div>
               <div className="lead-time-table-wrap" role="region" aria-label="SKU lead-time overrides; scroll horizontally to view all columns" tabIndex={0}>
-                <table className="lead-time-table">
+                <table className="lead-time-table lead-time-sku-table">
                   <thead>
                     <tr>
                       <th>SKU</th>
@@ -639,11 +639,12 @@ function LeadTimeSettingsContent() {
                           <span>{row.name}</span>
                           {skuNeedsIdentityReview(syncedSkus, row.name) ? <small>Mapping review needed; existing override retained</small> : null}
                         </td>
-                        <td>{row.supplier || "Unassigned"}</td>
-                        <td>{row.category || "Uncategorized"}</td>
-                        <td>
+                        <td data-label="Supplier">{row.supplier || "Unassigned"}</td>
+                        <td data-label="Category">{row.category || "Uncategorized"}</td>
+                        <td data-label="Lead time (days)">
                           <input
                             className="input-control lead-time-days-input"
+                            aria-label={`Lead time in days for ${row.productName || row.name}`}
                             type="number"
                             min={1}
                             value={row.lead_time_days}
@@ -689,6 +690,7 @@ function LeadTimeSettingsContent() {
           )}
         </SectionCard>
 
+        </div>
         <div className="button-row sticky-action-row">
           <button type="submit" className="button button-primary" disabled={!settingsConfirmed || isLoadingSettings || isSavingSettings}>
             {isSavingSettings ? "Saving lead-time rules..." : "Save lead-time rules"}
@@ -769,74 +771,17 @@ function LeadTimeTable({
       </div>
       <p className="section-copy">{description}</p>
 
-      {suggestions.length ? (
-        <div className="lead-time-chip-row">
-          {suggestions.slice(0, 8).map((suggestion) => (
-            <button
-              type="button"
-              className="filter-chip"
-              key={suggestion}
-              onClick={() => onAdd(suggestion)}
-            >
-              {suggestion}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="lead-time-table-wrap" role="region" aria-label={`${nameLabel} lead-time rules; scroll horizontally to view all columns`} tabIndex={0}>
-        <table className="lead-time-table">
-          <thead>
-            <tr>
-              <th>{nameLabel}</th>
-              <th>Lead time</th>
-              <th aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <input
-                    className="input-control"
-                    type="text"
-                    value={row.name}
-                    placeholder={nameLabel}
-                    onChange={(event) =>
-                      onRowsChange(updateRow(rows, row.id, "name", event.target.value))
-                    }
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input-control lead-time-days-input"
-                    type="number"
-                    min={1}
-                    value={row.lead_time_days}
-                    onChange={(event) =>
-                      onRowsChange(
-                        updateRow(rows, row.id, "lead_time_days", event.target.value)
-                      )
-                    }
-                  />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="button button-secondary button-sm"
-                    onClick={() =>
-                      onRowsChange(
-                        withEmptyFallback(rows.filter((candidate) => candidate.id !== row.id))
-                      )
-                    }
-                  >
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <datalist id={`${nameLabel.toLowerCase()}-suggestions`}>
+        {suggestions.map(suggestion => <option key={suggestion} value={suggestion} />)}
+      </datalist>
+      <div className="lead-rule-list">
+        {rows.map((row, index) => (
+          <div className="lead-rule-row" key={row.id}>
+            <label><span>{nameLabel}</span><input className="input-control" type="text" list={`${nameLabel.toLowerCase()}-suggestions`} value={row.name} placeholder={`Choose or enter ${nameLabel.toLowerCase()}`} onChange={event => onRowsChange(updateRow(rows, row.id, "name", event.target.value))} /></label>
+            <label><span>Lead time (days)</span><input className="input-control" type="number" min={1} value={row.lead_time_days} onChange={event => onRowsChange(updateRow(rows, row.id, "lead_time_days", event.target.value))} /></label>
+            <button type="button" className="button button-secondary button-sm" aria-label={`Remove ${nameLabel.toLowerCase()} rule ${row.name || index + 1}`} onClick={() => onRowsChange(withEmptyFallback(rows.filter(candidate => candidate.id !== row.id)))}>Remove</button>
+          </div>
+        ))}
       </div>
     </SectionCard>
   );

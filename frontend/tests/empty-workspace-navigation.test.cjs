@@ -194,7 +194,7 @@ test("filtering a populated action queue to no results offers filter recovery wi
   assert.equal(ui.links(publicTool).length, 0);
   ui.button("Show all actions").props.onClick();
   ui = h.render();
-  assert.ok(ui.nodes.some(node => node.type === "action-card"));
+  assert.ok(ui.nodes.some(node => node.type === "action-table" && node.props.actions.length === 1));
 });
 
 test("Store Sync offers the tool during a pending connection read and after failure without sending mutations", async () => {

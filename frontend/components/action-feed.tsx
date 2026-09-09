@@ -32,7 +32,7 @@ export function ActionFeed({
   const [filters, setFilters] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS);
   const [filtersReady, setFiltersReady] = useState(false);
   const [limit, setLimit] = useState(30);
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">("table");
   useEffect(() => {
     const read = () => { setFilters(readActionFilters(new URLSearchParams(window.location.search))); setLimit(30); };
     read();

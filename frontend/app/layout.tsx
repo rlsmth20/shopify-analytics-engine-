@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import localFont from "next/font/local";
 
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -8,6 +9,18 @@ import { Suspense } from "react";
 import { EmbeddedShopifyBootstrap } from "@/components/embedded-shopify-bootstrap";
 import { GrowthPageObserver } from "@/components/growth-page-observer";
 import "./globals.css";
+import "./design-a.css";
+
+const interfaceFont = localFont({
+  src: [
+    { path: "./fonts/inter-400.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/inter-500.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/inter-600.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/inter-700.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-interface",
+  display: "swap",
+});
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://skubase.io";
 
@@ -83,7 +96,7 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const embedded = (await headers()).get("x-skubase-embedded") === "1";
   return (
-    <html lang="en">
+    <html lang="en" className={interfaceFont.variable}>
       <head>
         {embedded ? (
           <>

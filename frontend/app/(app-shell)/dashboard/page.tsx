@@ -262,7 +262,7 @@ export default function DashboardPage() {
             <div>
               <p className="section-eyebrow">Setup progress</p>
               <h2 className="section-title section-title-small">
-                Finish the workflow that turns analytics into orders
+                Finish your workspace setup
               </h2>
               <p className="muted section-copy">
                 These are the remaining setup moves most likely to make the
@@ -285,6 +285,7 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
+          <details className="workspace-disclosure"><summary>View setup steps ({completedOnboardingSteps.length}/{ONBOARDING_STEPS.length} complete)</summary>
           <div className="signal-list">
             {ONBOARDING_STEPS.map((step) => {
               const complete = completedOnboardingSteps.includes(step.id);
@@ -303,6 +304,7 @@ export default function DashboardPage() {
               );
             })}
           </div>
+          </details>
         </section>
       ) : null}
 

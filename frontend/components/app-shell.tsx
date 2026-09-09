@@ -18,6 +18,7 @@ import { authenticatedFetch, isEmbeddedShopifyContext } from "@/lib/shopify-embe
 import { findWorkspacePages, productDataPresent, type NavItem } from "@/lib/workspace-navigation";
 import { accountPlanConfirmed, readAccountConnection } from "@/lib/account-data";
 import styles from "./app-shell.module.css";
+import { WorkspaceIcon } from "@/components/workspace-icon";
 
 type PageMeta = { eyebrow: string; title: string; description: string };
 
@@ -29,7 +30,7 @@ const pageMeta: Record<string, PageMeta> = {
   },
   "/dashboard": {
     eyebrow: "Command",
-    title: "Dashboard",
+    title: "Overview",
     description:
       "What should I do today? Start with the highest-impact inventory signals in your Shopify catalog."
   },
@@ -101,13 +102,13 @@ const pageMeta: Record<string, PageMeta> = {
   },
   "/store-sync": {
     eyebrow: "Settings",
-    title: "Connect and import inventory",
+    title: "Connect & import",
     description:
       "Connect Shopify, refresh your store data, or import a Stocky or ShipStation CSV."
   },
   "/lead-time-settings": {
     eyebrow: "Settings",
-    title: "Inventory rules",
+    title: "Lead times & stock rules",
     description:
       "Set global, supplier, category, and SKU lead-time rules for reorder recommendations."
   },
@@ -170,6 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [navigationQuery, setNavigationQuery] = useState("");
   const navigationSearch = useRef<HTMLInputElement>(null);
+  const accountMenu = useRef<HTMLDetailsElement>(null);
   const navigationToggle = useRef<HTMLButtonElement>(null);
   const [shopifyDomain, setShopifyDomain] = useState<string | null>(null);
   const [storeLoaded, setStoreLoaded] = useState(false);
@@ -184,6 +186,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   // don't see "demo" labels on their own data.
   const [hasRealData, setHasRealData] = useState<boolean | null>(null);
   const [inventoryStatusFailed, setInventoryStatusFailed] = useState(false);
+
+  useEffect(() => {
+    const closeAccount = (event: PointerEvent) => {
+      if (accountMenu.current && !accountMenu.current.contains(event.target as Node)) accountMenu.current.open = false;
+    };
+    document.addEventListener("pointerdown", closeAccount);
+    return () => document.removeEventListener("pointerdown", closeAccount);
+  }, []);
+
+  useEffect(() => { if (accountMenu.current) accountMenu.current.open = false; }, [pathname]);
+
+  useEffect(() => {
+    if (navigationOpen && window.matchMedia("(max-width: 1024px)").matches) {
+      navigationToggle.current?.scrollIntoView({ block: "start" });
+      navigationSearch.current?.focus({ preventScroll: true });
+    }
+  }, [navigationOpen]);
+
 
   // Trial countdown - only meaningful for real (non-demo) users.
   const trialDaysLeft: number | null = (() => {
@@ -341,7 +361,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       : "No active plan";
 
   return (
-    <div className={`app-shell ${styles.shell}`}>
+    <div className={`app-shell ${styles.shell}`} onKeyDown={event => {
+      if (event.key !== "Escape") return;
+      if (accountMenu.current?.open) { accountMenu.current.open = false; accountMenu.current.querySelector("summary")?.focus(); }
+      if (navigationOpen) { setNavigationOpen(false); navigationToggle.current?.focus(); }
+    }}>
+      <a className={styles.skipLink} href="#workspace-content">Skip to content</a>
       <aside className="sidebar" data-navigation-open={navigationOpen}>
         <div className={styles.mobileHeader}>
         <div className="sidebar-brand">
@@ -353,7 +378,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <button type="button" ref={navigationToggle} className={styles.navigationToggle} aria-expanded={navigationOpen}
           aria-controls="workspace-navigation" onClick={() => setNavigationOpen(!navigationOpen)}>
-          {navigationOpen ? "Close menu" : "Menu"}
+          <WorkspaceIcon name="menu" /> {navigationOpen ? "Close" : "Menu"}
         </button>
         </div>
 
@@ -363,7 +388,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <input id="workspace-search" ref={navigationSearch} type="search" value={navigationQuery}
               placeholder="Try “email alerts”" autoComplete="off" aria-controls="workspace-navigation"
               onChange={event => setNavigationQuery(event.target.value)}
-              onKeyDown={event => { if (event.key === "Escape") { setNavigationQuery(""); event.stopPropagation(); } }} />
+              onKeyDown={event => { if (event.key === "Escape" && navigationQuery) { setNavigationQuery(""); event.stopPropagation(); } }} />
             {navigationQuery ? <button type="button" aria-label="Clear page search" onClick={() => { setNavigationQuery(""); navigationSearch.current?.focus(); }}>×</button> : null}
           </div>
           {navigationQuery.trim() ? <p role="status">{visibleNav.length} matching page{visibleNav.length === 1 ? "" : "s"}</p> : null}
@@ -373,7 +398,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {groupedNav.length === 0 ? <p className={styles.noResults}>No page found. Try “import”, “reorder”, “alerts”, or “billing”.</p> : null}
           {groupedNav.map((group) => (
             <div key={group.section} className="sidebar-nav-group">
-              <p className="sidebar-nav-heading">{{ Command: "Start here", Intelligence: "Understand stock", Operations: "Buy & recover", Settings: "Setup & support" }[group.section]}</p>
+              <p className="sidebar-nav-heading">{{ Command: "Workspace", Intelligence: "Inventory", Operations: "Operations", Settings: "Manage" }[group.section]}</p>
               {group.items.map((item) => {
                 const isActive =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -394,9 +419,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                     title={isLocked ? `${item.label} is included on ${planDisplayName(item.minTier!)}.` : undefined}
                   >
                     <span className="nav-link-icon" aria-hidden>
-                      {item.icon}
+                      <WorkspaceIcon name={item.icon} />
                     </span>
-                    <span className="nav-link-label">{item.label}</span>
+                    <span className="nav-link-label">{item.href === "/dashboard" ? "Overview" : item.label}</span>
                     {isLocked ? (
                       <span className="nav-link-gate">{planDisplayName(item.minTier!)}</span>
                     ) : null}
@@ -407,21 +432,67 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="sidebar-note sidebar-plan-note">
-          <p className="sidebar-note-title">Workspace status</p>
-          <span className="sidebar-plan-chip">{planChipLabel}</span>
-          <p className="sidebar-note-copy">
-            {isShopifyInstalled
-              ? "Plan access is managed through Shopify. Locked pages show the tier needed."
-              : "Direct accounts can manage plan access from Billing."}
-          </p>
-          <Link href="/billing" className="sidebar-note-link">
-            Manage billing →
-          </Link>
+        <div className={styles.sidebarAccount}>
+          <Link href="/account"><WorkspaceIcon name="AC" /><span>Workspace settings<small>{planChipLabel}</small></span></Link>
+          <Link href="/billing">Manage billing →</Link>
         </div>
       </aside>
 
       <div className="app-main">
+        <div className={styles.utilityBar}>
+          <p className={styles.breadcrumb}>{meta.eyebrow}<span aria-hidden="true">/</span><strong>{meta.title}</strong></p>
+          <div className={styles.utilities}>
+            <div className={styles.syncStatus}>            {syncChip ? (
+              <span
+                className={`header-chip ${syncChip.warn ? "header-chip-warning" : "header-chip-success"}`}
+                title={syncChip.title}
+              >
+                {syncChip.label}
+              </span>
+            ) : null}
+</div>
+            <AskSkubaseChat />
+            <details className={styles.accountMenu} ref={accountMenu}>
+              <summary aria-label="Workspace account"><WorkspaceIcon name="AC" /><span>Workspace</span></summary>
+              <div className={styles.accountPanel}>
+            <span className="header-chip header-chip-tone">
+              {user.id === 0 ? "Sample workspace" : !storeLoaded ? "Loading store..." : connectionStatusFailed ? "Connection status unavailable" : shopifyDomain || "No store connected"}
+            </span>
+            {user.id === 0 ? <span className="header-chip">Sample data</span> : hasRealData === false ? <span className="header-chip">No product data</span> : inventoryStatusFailed ? <span className="header-chip">Inventory status unavailable</span> : null}
+            {user.id !== 0 && !embedded ? (
+              // Embedded users authenticate via Shopify; their synthetic
+              // shopify-admin+... address would only confuse.
+              <span className="header-chip header-chip-user" title={user.email}>
+                {user.email}
+              </span>
+            ) : null}
+            {user.id !== 0 ? (
+              <span className={`header-chip ${hasActiveSubscription ? "header-chip-success" : "header-chip-warning"}`}>
+                {planChipLabel}
+              </span>
+            ) : null}
+            {user.id !== 0 ? (
+              embedded ? null : (
+                // No sign-out inside Shopify admin — the session belongs to
+                // Shopify, and logging out would strand the iframe on the
+                // marketing site.
+                <button
+                  type="button"
+                  onClick={() => { void logout(); }}
+                  className="header-logout"
+                >
+                  Sign out
+                </button>
+              )
+            ) : (
+              <Link href="/login" className="button button-primary button-sm">
+                Sign up free
+              </Link>
+            )}
+          </div>
+            </details>
+          </div>
+        </div>
         {user.id === 0 ? (
           // Demo mode - synthetic user injected by AuthGuard when ?demo=1.
           <div className="demo-banner demo-banner-preview" role="status">
@@ -478,55 +549,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p className="header-copy">{meta.description}</p>
           </div>
 
-          <div className="header-meta">
-            <AskSkubaseChat />
-            <span className="header-chip header-chip-tone">
-              {user.id === 0 ? "Sample workspace" : !storeLoaded ? "Loading store..." : connectionStatusFailed ? "Connection status unavailable" : shopifyDomain || "No store connected"}
-            </span>
-            {syncChip ? (
-              <span
-                className={`header-chip ${syncChip.warn ? "header-chip-warning" : "header-chip-success"}`}
-                title={syncChip.title}
-              >
-                {syncChip.label}
-              </span>
-            ) : null}
-            {user.id === 0 ? <span className="header-chip">Sample data</span> : hasRealData === false ? <span className="header-chip">No product data</span> : inventoryStatusFailed ? <span className="header-chip">Inventory status unavailable</span> : null}
-            {user.id !== 0 && !embedded ? (
-              // Embedded users authenticate via Shopify; their synthetic
-              // shopify-admin+... address would only confuse.
-              <span className="header-chip header-chip-user" title={user.email}>
-                {user.email}
-              </span>
-            ) : null}
-            {user.id !== 0 ? (
-              <span className={`header-chip ${hasActiveSubscription ? "header-chip-success" : "header-chip-warning"}`}>
-                {planChipLabel}
-              </span>
-            ) : null}
-            {user.id !== 0 ? (
-              embedded ? null : (
-                // No sign-out inside Shopify admin — the session belongs to
-                // Shopify, and logging out would strand the iframe on the
-                // marketing site.
-                <button
-                  type="button"
-                  onClick={() => { void logout(); }}
-                  className="header-logout"
-                >
-                  Sign out
-                </button>
-              )
-            ) : (
-              <Link href="/login" className="button button-primary button-sm">
-                Sign up free
-              </Link>
-            )}
-          </div>
+
         </header>
 
-        <main className={appContainerClassName}>{children}</main>
+        <main id="workspace-content" tabIndex={-1} className={appContainerClassName}>{children}</main>
       </div>
+      <nav className={styles.bottomNav} aria-label="Mobile workspace">
+        {[{ href: "/dashboard", label: "Overview", icon: "DB" }, { href: "/actions", label: "Actions", icon: "AQ" }, { href: "/purchase-orders", label: "Orders", icon: "PO" }].map(item => (
+          <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined} onClick={() => setNavigationOpen(false)}><WorkspaceIcon name={item.icon} /><span>{item.label}</span></Link>
+        ))}
+        <button type="button" aria-expanded={navigationOpen} aria-controls="workspace-navigation" onClick={() => setNavigationOpen(open => !open)}><WorkspaceIcon name="menu" /><span>More</span></button>
+      </nav>
     </div>
   );
 }

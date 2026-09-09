@@ -143,12 +143,7 @@ export default function StoreSyncPage() {
               Connected to <strong>{connection.shopify_domain}</strong>. Last
               sync: {formatRelative(connection.last_sync_at)}.
             </p>
-            <div className="sync-safety-note" role="status">
-              <strong>Read-only sync.</strong> skubase imports products,
-              inventory, and order history for forecasting. It does not change
-              Shopify inventory quantities, prices, products, or orders from
-              this screen.
-            </div>
+            <p className="section-copy" style={{ margin: "10px 0 18px" }}>Read-only sync · your Shopify stock and orders stay unchanged.</p>
             <div className="button-row">
               <button
                 type="button"
@@ -260,6 +255,12 @@ export default function StoreSyncPage() {
             <h2 className="section-title section-title-small">CSV imports work too</h2>
           </div>
         </div>
+        <p className="section-copy">Bring your existing exports into Skubase. No Shopify app installation required.</p>
+        <div className="import-options">
+          <div className="import-option"><div><h3>Stocky</h3><p>Catalog and stock for CSV workspaces. Supported costs and lead times for connected Shopify catalogs.</p></div><Link href="/import-stocky" className="button button-secondary">Import Stocky CSV</Link></div>
+          <div className="import-option"><div><h3>ShipStation</h3><p>Non-Shopify shipment history. Add current inventory separately for reorder planning.</p></div><Link href="/import-shipstation" className="button button-secondary">Import ShipStation CSV</Link></div>
+        </div>
+        <details className="workspace-disclosure"><summary>How imports affect your inventory</summary>
         <p className="section-copy">
           In a CSV-only workspace, Stocky imports supply catalog details and a stock snapshot.
           When Shopify is connected or its catalog is already synced, Shopify remains the stock source:
@@ -269,14 +270,7 @@ export default function StoreSyncPage() {
           lead times. Shipment history alone does not tell us how much stock you have.
           These CSV imports do not require a Shopify app installation.
         </p>
-        <div className="button-row">
-          <Link href="/import-stocky" className="button button-ghost">
-            Import Stocky CSV
-          </Link>
-          <Link href="/import-shipstation" className="button button-ghost">
-            Import ShipStation CSV
-          </Link>
-        </div>
+        </details>
         <p className="section-copy">After importing, <Link href="/lead-time-settings">check your supplier lead times</Link> and <Link href="/actions">review your action queue</Link>. Add missing history before relying on demand estimates.</p>
       </SectionCard>
     </div>
