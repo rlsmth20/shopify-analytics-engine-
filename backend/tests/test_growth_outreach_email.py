@@ -51,6 +51,9 @@ class OutreachEmailTests(unittest.TestCase):
                 'inbound_verified': True, 'safe_test_verified': True})
             remember(db, 'strategic', 'outreach_email_pilot', {'active': True, 'max_messages': 50, 'started_at': time.time() - 10})
             remember(db, 'strategic', 'outreach_policy', {'daily_new_contact_limit': None})
+            remember(db, 'strategic', 'email_authentication', {'identities': {'rainer@outreach.skubase.io': {
+                'spf': True, 'dkim': True, 'dmarc': True, 'verified_at': time.time(), 'source': 'fixture headers'}}})
+            remember(db, 'working', 'outreach_inbox_cursor', {'checked_at': time.time()})
             exp = Experiment(key='email-fixture', specification={'followups_enabled': True}, stop_at=time.time() + 864000)
             db.add(exp); db.flush(); self.campaign = exp.id
             for n in range(4):
@@ -207,7 +210,9 @@ class OutreachEmailTests(unittest.TestCase):
         other = self.queue(1)
         self.clear_pacing()
         transport = Mock(return_value={'provider_id': 'must-not-send'})
-        with self.assertRaises(GrowthError): mail.send(self.factory, self.work(other), transport=transport)
+        result = mail.send(self.factory, self.work(other), transport=transport)
+        self.assertEqual(result['decision'], 'DAILY_CAP_REACHED')
+        self.assertGreater(result['defer_until'], time.time())
         transport.assert_not_called()
         with self.factory() as db:
             self.assertEqual(status(db)['sent'], 1)

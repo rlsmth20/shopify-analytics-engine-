@@ -1,9 +1,10 @@
 # Dedicated outreach email
 
 The conditional EmailPal adapter is separate from operational Resend/Gmail. No real
-provider send has been verified yet. The info@skubase.io account and Skubase workspace
-were created on September 9 using Google's signup route. No subscription or payment
-transaction exists. See outbound-provider-evaluation.md.
+provider send has been verified yet. The EmailPal account using info@skubase.io and
+its Skubase workspace were created on September 9 using Google's signup route.
+The Google mailbox already had September 6 activity. No EmailPal subscription or
+payment transaction exists. See outbound-provider-evaluation.md and email-ramp.md.
 
 The dedicated read/write API key and webhook signing secret are saved in Railway;
 neither is committed or exposed in output. Real authenticated GETs returned HTTP 200
@@ -41,6 +42,16 @@ source, account_verified, cost_authorized, domain_verified, inbound_verified and
 safe_test_verified. These are evidence-backed setup attestations, not model guesses.
 `strategic/outreach_email_pilot` records active, started_at and max_messages. Initial
 pilot sizing must be explicitly selected after provider setup; it does not auto-grow.
+After a verified successful pilot, store completed=true, successful=true, completed_at
+and an evidence source. This ends the lifetime pilot ceiling; the persistent email
+ramp then governs increases. Genuine replies do not consume the first-contact ceiling.
+The email-status response includes the current ramp, today's actual email count,
+authentication evidence, last increase and any reason increases are paused.
+
+Use Railway variable changes with `--skip-deploys`, followed by a controlled release
+of the current tested source. The linked Git main was older than the deployed growth
+branch on September 9; an automatic settings rebuild temporarily restored that older
+code. Do not assume a successful settings-triggered deployment contains recent fixes.
 
 ## Work and receipts
 

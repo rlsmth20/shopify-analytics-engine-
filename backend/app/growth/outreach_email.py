@@ -13,9 +13,10 @@ from datetime import datetime
 
 from sqlalchemy import func, select
 
+from . import email_ramp
 from .identity import INELIGIBLE, matching_contacts
 from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message
-from .outbound import authorize_submission, complete, lock, reserve_contact
+from .outbound import authorize_submission, complete, lock, reserve_contact, status as outbound_status
 from .policy import GrowthError, classify_reply
 from .store import digest, enqueue, get_memory, insert_once, record, remember, require_lease
 
@@ -28,6 +29,10 @@ def address(value):
     if parseaddr(value)[1] != value or not re.fullmatch(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,63}", value):
         raise GrowthError("INVALID_ADDRESS")
     if len(value) > 254:
+        raise GrowthError("INVALID_ADDRESS")
+    local, domain = value.rsplit("@", 1)
+    if len(local) > 64 or local.startswith(".") or local.endswith(".") or ".." in local or any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in domain.split(".")):
         raise GrowthError("INVALID_ADDRESS")
     return value
 
@@ -69,14 +74,19 @@ def readiness(db):
         blockers.append("INBOUND_NOT_VERIFIED")
     if not cfg["safe_test_mode"] and not approval.get("safe_test_verified"):
         blockers.append("SAFE_TEST_NOT_VERIFIED")
-    if not cfg["safe_test_mode"] and not get_memory(db, "strategic", "outreach_email_pilot").get("active"):
+    pilot = get_memory(db, "strategic", "outreach_email_pilot")
+    if not cfg["safe_test_mode"] and not pilot.get("active") and not email_ramp.pilot_completed(pilot):
         blockers.append("LIVE_PILOT_NOT_ACTIVE")
+    ramp = email_ramp.status(db, cfg["sender"])
+    if not cfg["safe_test_mode"] and not ramp["authentication"]["verified"]:
+        blockers.append("EMAIL_AUTHENTICATION_NOT_VERIFIED")
     health = get_memory(db, "working", "outreach_email_health")
     if health.get("paused"):
         blockers.append(health.get("reason", "DELIVERABILITY_HOLD"))
     return {"ready": not blockers, "blockers": blockers, "provider": cfg["provider"] or None,
             "safe_test_mode": cfg["safe_test_mode"], "sender": cfg["sender"], "health": health,
-            "daily_limit": get_memory(db, "strategic", "outreach_policy").get("daily_new_contact_limit", 20)}
+            "daily_limit": ramp["daily_ceiling"], "ramp": ramp,
+            "all_channel_daily_limit": get_memory(db, "strategic", "outreach_policy").get("daily_new_contact_limit", 20)}
 
 
 def suppress(db, recipient, reason, source):
@@ -94,6 +104,12 @@ def suppress(db, recipient, reason, source):
             ids.add(alias.id)
     record(db, "outreach-suppression:" + digest([recipient, reason, source]), "OUTREACH_SUPPRESSED", recipient,
            {"reason": reason, "contact_ids": sorted(ids)}, source=source)
+    if reason in {"unsubscribe", "bounce", "complaint"}:
+        sent_metadata = db.scalars(select(Memory).join(Message, (Memory.key == Message.id) & (Message.direction == "out"))
+            .where(Memory.namespace == META, Memory.value["safe_test"].as_boolean().is_(False),
+                   Memory.value["actual_recipient"].as_string() == recipient))
+        for sender in {item.value.get("sender") for item in sent_metadata} - {None, ""}:
+            email_ramp.signal(db, sender, reason, source + ":" + recipient)
     db.flush()
 
 
@@ -251,16 +267,27 @@ def send(factory, work, *, transport=None):
         pilot = get_memory(db, "strategic", "outreach_email_pilot")
         sent_rows = list(db.scalars(select(Memory).where(Memory.namespace == META,
             Memory.value["safe_test"].as_boolean().is_(False), Memory.value["attempted_at"].as_float() >= pilot.get("started_at", now))))
-        if not safe and (type(pilot.get("max_messages")) is not int or pilot["max_messages"] < 1 or len(sent_rows) >= pilot["max_messages"]):
+        if not safe and meta["kind"] != "reply" and not email_ramp.pilot_completed(pilot) and (type(pilot.get("max_messages")) is not int or pilot["max_messages"] < 1 or len(sent_rows) >= pilot["max_messages"]):
             raise GrowthError("LIVE_PILOT_REVIEW_REQUIRED", "configuration")
         maximum = campaign.specification.get("max_contacts")
         campaign_count = db.scalar(select(func.count()).select_from(FirstContact).where(FirstContact.experiment_id == row.experiment_id,
                                                                                        FirstContact.status == "sent")) or 0
         if not safe and meta["kind"] == "first_contact" and maximum is not None and campaign_count >= maximum:
-            raise GrowthError("CAMPAIGN_LIMIT_REACHED", "capacity")
+            return {"defer_until": campaign.stop_at, "decision": "campaign_limit_reached"}
         pacing = get_memory(db, "working", "outreach_email_pacing")
         if pacing.get("next_send_at", 0) > now:
             return {"defer_until": pacing["next_send_at"], "decision": "provider_spacing"}
+        if not safe and meta["kind"] == "first_contact":
+            ramp = email_ramp.status(db, sender, now, persist=True)
+            if ramp["remaining"] == 0:
+                db.commit()
+                return {"defer_until": ramp["resets_at"], "decision": "email_ramp_daily_ceiling",
+                        "confirmed_first_contacts": ramp["actual_first_contacts_today"], "ceiling": ramp["daily_ceiling"]}
+            capacity = outbound_status(db, now)
+            if not capacity["dispatch_remaining"]:
+                db.commit()
+                return {"defer_until": capacity.get("next_slot_at") or now + 300,
+                        "decision": capacity["blocker"]}
         reservation = None
         url = cfg["public_url"] + "/" + row.id + "?token=" + unsubscribe_token(row.id)
         body = row.body + "\n\n" + cfg["business_name"] + "\n" + cfg["postal_address"] + "\nTo opt out, reply unsubscribe or visit " + url
@@ -280,7 +307,7 @@ def send(factory, work, *, transport=None):
                     raise GrowthError("Follow-up awaits verified thread receipt", "configuration")
         row.status = "sending"
         remember(db, META, row.id, {**meta, "state": "sending", "safe_test": safe, "actual_recipient": actual,
-            "reservation_id": reservation, "provider": cfg["provider"], "attempted_at": now, "wire_body": body})
+            "reservation_id": reservation, "provider": cfg["provider"], "sender": sender, "attempted_at": now, "wire_body": body})
         remember(db, "working", "outreach_email_pacing", {"next_send_at": now + 60})
         record(db, "outreach-send-intent:" + row.id, "OUTREACH_SEND_INTENT", contact.id,
                {"message_id": row.id, "safe_test": safe, "actual_recipient": actual,
@@ -309,6 +336,8 @@ def send(factory, work, *, transport=None):
                         complete(db, meta["reservation_id"], outcome="uncertain")
                 record(db, "outreach-send-unknown:" + row.id, "OUTREACH_REJECTED" if definite else "OUTREACH_UNCERTAIN", row.contact_id,
                        {"message_id": row.id, "error_code": type(exc).__name__})
+                if not meta.get("safe_test"):
+                    email_ramp.signal(db, meta.get("sender", config()["sender"]), "provider_rejection" if definite else "uncertain_send", row.id)
                 if definite and getattr(exc, "category", None) in {"transient", "configuration"}:
                     row.status = "draft"
                     remember(db, "working", "outreach_email_pacing", {"next_send_at": time.time() + max(60, getattr(exc, "retry_after", None) or 60)})
@@ -353,6 +382,9 @@ def accepted(db, row, meta, provider_id, when):
     record(db, "outreach-accepted:" + row.id, "OUTREACH_TEST_ACCEPTED" if meta.get("safe_test") else "OUTREACH_ACCEPTED",
            row.contact_id, {"message_id": row.id, "provider_id": provider_id, "campaign_id": row.experiment_id,
                             "cohort": meta["cohort"]}, occurred_at=when)
+    if not meta.get("safe_test") and meta.get("kind") == "first_contact" and meta.get("sender"):
+        db.flush()
+        email_ramp.status(db, meta["sender"], persist=True, confirmed_at=when, advance=False)
 
 
 def process_event(db, event_id, event):
@@ -362,6 +394,12 @@ def process_event(db, event_id, event):
         kind="OUTREACH_PROVIDER_EVENT", subject="outreach", source="authenticated_outreach_provider", data=event)
     if not fresh and get_memory(db, "outreach_event_applied", str(retained.id)):
         return {"duplicate": True}
+    if event.get("type") in {"provider_warning", "provider_restriction", "spam_warning", "delivery_failure"}:
+        email_ramp.signal(db, config()["sender"], event["type"], event_id)
+        if event["type"] in {"provider_restriction", "spam_warning"}:
+            remember(db, "working", "outreach_email_health", {"paused": True, "reason": event["type"].upper(), "evidence_id": retained.id})
+        remember(db, "outreach_event_applied", str(retained.id), {"signal": event["type"]})
+        return {"signal_recorded": event["type"], "evidence_id": retained.id}
     row = db.scalar(select(Message).where(Message.provider_id == event.get("provider_id"))) if event.get("provider_id") else None
     # Provider-supplied immutable correlation handles delivery racing HTTP response.
     if not row and event.get("client_id"):
@@ -492,6 +530,8 @@ def poll(factory, work, *, fetch=None):
                 raise GrowthError("Invalid provider send receipt timestamp", "ambiguous") from None
             process_event(db, "poll:" + digest(result), {"type": kind, "provider_id": provider_id,
                 "recipient": meta["actual_recipient"], "sent_at": sent_at})
+            if not meta.get("safe_test") and verdict in {"bounced", "failed", "deferred"} and kind != "bounce":
+                email_ramp.signal(db, meta.get("sender", config()["sender"]), "delivery_failure", "poll:" + digest(result))
             db.commit()
             return {"decision": kind, "message_id": row.id}
         if result.get("status") == "failed":
@@ -500,6 +540,8 @@ def poll(factory, work, *, fetch=None):
             row.status = "unknown"
             record(db, "outreach-provider-failed:" + row.id, "OUTREACH_PROVIDER_FAILED", row.contact_id,
                    {"message_id": row.id, "provider_id": provider_id})
+            if not meta.get("safe_test"):
+                email_ramp.signal(db, meta.get("sender", config()["sender"]), "delivery_failure", row.id)
             db.commit()
             return {"decision": "provider_failed_reconcile_only"}
         elapsed = time.time() - work.payload.get("started_at", work.created_at)
@@ -513,6 +555,23 @@ def handle_webhook(factory, work):
     with factory() as db:
         event = db.get(Evidence, work.payload["evidence_id"]).data
     kind, data = event.get("type"), event.get("data", {})
+    # These failures are documented in EmailPal's current webhook event enum.
+    # A signed event for a different mailbox/domain must not halt this sender.
+    cfg = config()
+    approval = None
+    with factory() as db:
+        approval = get_memory(db, "strategic", "outreach_provider_approval")
+    mailbox_id = os.getenv("OUTREACH_EMAILPAL_MAILBOX_ID", "")
+    domain_id = approval.get("domain_id")
+    matching_failure = (kind == "mailbox.failed" and mailbox_id and (data.get("id") or data.get("mailbox_id")) == mailbox_id or
+                        kind == "domain.failed" and (data.get("name") == cfg["sender"].split("@")[-1] or
+                            domain_id and (data.get("id") or data.get("domain_id")) == domain_id))
+    if matching_failure:
+        with factory() as db:
+            require_lease(db, work)
+            result = process_event(db, event["id"], {"type": "provider_restriction", "provider_event": kind})
+            db.commit()
+            return result
     if kind == "message.received":
         resource_id = data.get("id") or data.get("message_id")
         if not isinstance(resource_id, str) or not re.fullmatch(r"msg_[a-zA-Z0-9_-]+", resource_id):

@@ -5,6 +5,11 @@ This supersedes older daily-quota and narrow-channel instructions.
 - **No owner-defined daily contact ceiling.** Persistent strategic memory stores
   `outreach_policy.daily_new_contact_limit = null`. Null means unlimited, not zero.
   Count actual confirmed first contacts separately from uncertain contacts.
+- **Email-specific override, September 9:** New first-contact emails start at a
+  maximum of 5/day, then 8, 12, 15, and 20 only as the persisted live ramp earns
+  increases. These are ceilings, not quotas. This does not reintroduce a shared
+  cap on forms/community activity. Genuine replies and ordinary operational mail
+  are independent of the first-contact ramp. See `email-ramp.md`.
 - Keep one external submission in flight. An uncertain contact remains protected
   from retries. Reconcile evidence; never click Send again to discover what happened.
   A broken channel accumulating ambiguous sends triggers the independent incident hold.
