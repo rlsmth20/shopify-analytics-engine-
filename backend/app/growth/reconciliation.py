@@ -10,6 +10,7 @@ from .models import Contact, Evidence, FirstContact, Memory
 from .policy import GrowthError
 from .store import get_memory, record, remember
 
+REVIEW_VERSION = 2  # Resume the original browser owner for delayed receipts.
 
 def offer_review(db, row, *, receipt_completion=False):
     from . import operator
@@ -28,7 +29,7 @@ def offer_review(db, row, *, receipt_completion=False):
         contact_id=contact.id, stage="reconcile", priority=100, evidence_id=intent.id,
         decision="Review the retained execution trace for this reservation. Never submit or replay it. Return submission outcome not_sent only with affirmative evidence that no submission occurred; sent requires an actual receipt; otherwise uncertain. The supervisor applies the result and selects the next action.")
     remember(db, operator.NAMESPACE, task["id"], {**task, "reservation_id": row.id, "receipt_completion": receipt_completion})
-    remember(db, "outreach_reconciliation", row.id, {"generation": generation, "task_id": task["id"], "retry_at": 0})
+    remember(db, "outreach_reconciliation", row.id, {"generation": generation, "task_id": task["id"], "retry_at": 0, "version": REVIEW_VERSION})
 
 
 def enqueue_recovery(db):
@@ -60,7 +61,8 @@ def enqueue_recovery(db):
         previous = get_memory(db, "outreach_reconciliation", row.id)
         # A reviewed uncertain send remains held. Reinspect on new evidence,
         # not every poll; this must not become another monitoring busy loop.
-        if previous.get("retry_at", 0) > now:
+        upgraded = previous.get("outcome") == "uncertain" and previous.get("version") != REVIEW_VERSION
+        if previous.get("retry_at", 0) > now and not upgraded:
             continue
         existing = get_memory(db, operator.NAMESPACE, previous.get("task_id", ""))
         if existing.get("status") in {"pending", "running"} and existing.get("attempts", 0) < operator.MAX_ATTEMPTS:
@@ -145,5 +147,6 @@ def apply_result(db, task, result, stage_event):
         complete(db, row.id, outcome=outcome, receipt=submission.get("receipt") if outcome == "sent" else {"observation": reason})
     previous = get_memory(db, "outreach_reconciliation", reservation_id)
     remember(db, "outreach_reconciliation", reservation_id, {**previous, "outcome": outcome,
+        "version": REVIEW_VERSION,
         "evidence_id": stage_event.id, "checked_at": time.time(),
         "retry_at": time.time() + 86400 if outcome == "uncertain" else 0})

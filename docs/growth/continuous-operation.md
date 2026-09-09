@@ -251,3 +251,9 @@ receipt reviews. Browser checks use operator-monitor-start before reading the
 live channels and pass its check_id to operator-monitor afterward. Freshness is
 measured conservatively from the machine-recorded start; old observations cannot
 be refreshed by recording them later or guessing a new timestamp.
+Receipt recovery resumes the original Codex session identified by the retained
+submission trace, so the original browser tab remains accessible across executor
+stages and worker restarts. It never resubmits. Failed structured results are
+retained alongside errors, including later provider observations. Existing
+uncertain reviews receive one new review when this recovery capability is
+upgraded; the upgrade does not release capacity or fabricate confirmation.

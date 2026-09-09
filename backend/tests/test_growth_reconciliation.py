@@ -147,3 +147,20 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(task['stage'],'reconcile')
         self.assertEqual(task['prior_reply_attempts'],3)
         self.assertEqual(task['attempts'],1)
+
+    def test_receipt_session_cannot_resume_an_unrelated_submission(self):
+        import json
+        from pathlib import Path
+        folder=Path(self.temp.name)
+        token='a'*32
+        session='11111111-1111-1111-1111-111111111111'
+        trace=folder/(token+'.jsonl')
+        trace.write_text(json.dumps({'type':'thread.started','thread_id':session})+'\n'+
+            json.dumps({'reservation_id':'other-reservation'})+'\n',encoding='utf-8')
+        task={'stage':'reconcile','reservation_id':'intended-reservation',
+              'reconciliation':{'events':[{'key':'executor-failure:'+token}]}}
+        self.assertIsNone(executor.receipt_session(task,folder))
+        task['reservation_id']='other-reservation'
+        self.assertEqual(executor.receipt_session(task,folder),session)
+        task['reconciliation']['events']=[{'key':'executor-failure:../../other'}]
+        self.assertIsNone(executor.receipt_session(task,folder))

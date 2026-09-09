@@ -41,6 +41,28 @@ def redact_log(line):
     return re.sub(r"(?:postgres(?:ql)?(?:\+psycopg)?://)[^\s\"'\\]+", "[REDACTED_DATABASE_URL]", line)
 
 
+def receipt_session(task, folder):
+    """Only resume a trace that actually contains this reservation's identity."""
+    if task.get("stage") != "reconcile":
+        return None
+    for event in task["reconciliation"]["events"]:
+        token = event["key"].split(":")[-1]
+        if not re.fullmatch(r"[0-9a-f]{32}", token):
+            continue
+        path = folder / (token + ".jsonl")
+        if not path.is_file():
+            continue
+        session = None
+        with path.open(encoding="utf-8", errors="replace") as stream:
+            for line in stream:
+                if '"thread.started"' in line:
+                    session = json.loads(line).get("thread_id")
+                if (session and re.fullmatch(r"[0-9a-f-]{36}", session)
+                        and task["reservation_id"] in line):
+                    return session
+    return None
+
+
 def take(factory, owner):
     with factory() as db:
         lock(db)
@@ -284,8 +306,13 @@ def execute(factory, owner, task, *, codex, repo):
             fields["evidence_ids"]["items"]["enum"] = ids
         schema_path = folder / (task["lease_token"] + "-schema.json")
         schema_path.write_text(json.dumps(schema), encoding="utf-8")
-    args = [codex, "exec", "--model", model, "-c", 'model_reasoning_effort="' + effort + '"',
-            "--json", "--cd", str(repo), "--output-schema",
+    session = receipt_session(task, folder)
+    args = [codex, "exec", "--cd", str(repo)]
+    if session:
+        args += ["resume", session]
+        prompt += "\nThis receipt review resumes the original submitting session. Inspect its ORIGINAL tab; do not reconstruct or reopen a success URL. This is a read-only recovery task, superseding the earlier send instruction. Never submit again.\n"
+        logging.info("Resuming original receipt session=%s reservation=%s", session, task["reservation_id"])
+    args += ["--model", model, "-c", 'model_reasoning_effort="' + effort + '"', "--json", "--output-schema",
             str(schema_path), "--output-last-message", str(output), "-"]
     with log.open("w", encoding="utf-8") as stream:
         job = ProcessJob()
