@@ -5,6 +5,14 @@ provider send has been verified yet. The info@skubase.io account and Skubase wor
 were created on September 9 using Google's signup route. No subscription or payment
 transaction exists. See outbound-provider-evaluation.md.
 
+The dedicated read/write API key and webhook signing secret are saved in Railway;
+neither is committed or exposed in output. Real authenticated GETs returned HTTP 200
+for the Skubase account and owned subdomain. Webhook resource
+`97935d29-0f74-4e67-aa3b-c5c8af313659` points to the deployed growth endpoint.
+OUTREACH_EMAIL_ENABLED remains false, SAFE_TEST_MODE true, and test destination
+info@skubase.io. The unsubscribe signing secret is independently generated. Account
+access is verified; provider policy approval and actual delivery/reply testing are not.
+
 ## Configuration
 
 Secrets belong in Railway environment configuration, never source control:
@@ -76,6 +84,10 @@ conditions; no primary DNS or MX changes have been made. Support ticket
 `0caeac82-bdc3-45ba-bb93-851dcc97998c` requests actual sourcing-policy/subdomain
 confirmation. Billing shows $69/month plus $0.60 per warmed mailbox/month, no
 subscription and no transactions. Do not authorize payment or infer readiness.
+Authenticated `/jobs` inspection showed domain setup/verification jobs queued with
+zero attempts. Do not keep enqueueing duplicates or guess DNS values while the
+provider has not processed these jobs. Its empty `dns.records` list is not verified
+DNS even though the response currently labels the empty set `healthy: true`.
 
 Before live activation verify test delivery, an actual reply, signed event/replay,
 unsubscribe and sender/domain identity. Require documented provider acceptance of
