@@ -1,11 +1,12 @@
 param(
-    [ValidateSet('review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile', 'operator-export', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-state', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record', 'community-export')][string]$Action = 'review-export',
+    [ValidateSet('review-export', 'review-import', 'outreach-status', 'outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-backfill', 'outreach-reconcile', 'operator-export', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-state', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record', 'community-export', 'prospect-link', 'prospect-history', 'email-queue', 'email-status', 'email-suppress')][string]$Action = 'review-export',
     [string]$File,
     [string]$Model = 'codex'
 )
 $ErrorActionPreference = 'Stop'
 $growthRepo = Split-Path -Parent $PSScriptRoot
 $growthPriorDatabase = $env:DATABASE_URL
+$growthPriorEmailVariables = @{}
 Push-Location $growthRepo
 try {
     $growthProject = railway status --json | ConvertFrom-Json
@@ -17,12 +18,22 @@ try {
         throw 'Skubase database connection unavailable.'
     }
     $env:DATABASE_URL = $growthVariables.DATABASE_PUBLIC_URL
+    if ($Action -like 'email-*') {
+        $growthBackendVariables = railway variables --service '6b132d29-f6ca-4536-92fb-1dcc0bb1027f' --environment 'd338b7ed-d399-4cfe-bac3-28fda380037e' --json | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { throw 'Outreach configuration unavailable.' }
+        foreach ($growthEntry in $growthBackendVariables.PSObject.Properties) {
+            if ($growthEntry.Name -like 'OUTREACH_*' -or $growthEntry.Name -in @('BUSINESS_NAME', 'BUSINESS_POSTAL_ADDRESS')) {
+                $growthPriorEmailVariables[$growthEntry.Name] = [Environment]::GetEnvironmentVariable($growthEntry.Name, 'Process')
+                [Environment]::SetEnvironmentVariable($growthEntry.Name, $growthEntry.Value, 'Process')
+            }
+        }
+    }
     $growthArguments = @('-m', 'app.growth.control', $Action)
     if ($Action -eq 'review-import') {
         if (-not $File) { throw 'A reviewed JSON file is required.' }
         $growthArguments += @('--file', (Resolve-Path -LiteralPath $File).Path, '--model', $Model)
     }
-    if ($Action -in @('outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-reconcile', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record')) {
+    if ($Action -in @('outreach-reserve', 'outreach-authorize', 'outreach-complete', 'outreach-reconcile', 'operator-enqueue', 'operator-claim', 'operator-complete', 'operator-assess', 'operator-monitor', 'operator-monitor-start', 'community-record', 'prospect-link', 'prospect-history', 'email-queue', 'email-suppress')) {
         if (-not $File) { throw 'An exact reviewed JSON payload is required.' }
         $growthArguments += @('--file', (Resolve-Path -LiteralPath $File).Path)
     }
@@ -32,5 +43,9 @@ try {
 } finally {
     $env:DATABASE_URL = $growthPriorDatabase
     $growthVariables = $null
+    foreach ($growthKey in $growthPriorEmailVariables.Keys) {
+        [Environment]::SetEnvironmentVariable($growthKey, $growthPriorEmailVariables[$growthKey], 'Process')
+    }
+    $growthBackendVariables = $null
     Pop-Location
 }

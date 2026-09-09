@@ -41,6 +41,18 @@ class ExecutionTests(unittest.TestCase):
                 'successors': [{'key': 'source:' + stage, 'source': 'https://example.com/need',
                     'decision': stage + ' the observed source', 'stage': stage}] if stage else []}
 
+    def test_runtime_wait_is_reported_without_false_starvation(self):
+        with self.factory() as db:
+            task = get_memory(db, 'operator_task', self.task['id'])
+            remember(db, 'operator_task', self.task['id'], {**task, 'created_at': time.time() - 3600})
+            retry = time.time() + 900
+            remember(db, 'working', 'browser_runtime_backoff', {'retry_at': retry})
+            db.commit()
+            view = state(db)
+            self.assertIsNone(view['operational_fault'])
+            self.assertEqual(view['current_blocker'], 'CODEX_USAGE_LIMIT')
+            self.assertEqual(view['next_wake_retry'], retry)
+
     def test_kind_priority_overrides_legacy_scores_and_reply_preempts(self):
         with self.factory() as db:
             for n in range(25):

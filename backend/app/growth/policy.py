@@ -21,7 +21,7 @@ def number(name, default=0.0):
 @dataclass(frozen=True)
 class Policy:
     daily_usd: float = 0
-    daily_emails: int = 20  # Compatibility field; shared first-contact ceiling is fixed at 20.
+    daily_emails: int = 20  # Legacy compatibility; the shared ledger reads the owner's nullable outreach policy.
     email_unit_usd: float = 0
     sender: str = ""
     postal_address: str = ""

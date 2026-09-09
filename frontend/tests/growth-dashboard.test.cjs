@@ -148,3 +148,63 @@ test("confirmed outreach excludes uncertainty across deployment versions", () =>
   assert.equal(view.confirmedOutreach({used:12,unresolved:8,confirmed_sent_count:12}),12);
   assert.equal(view.confirmedOutreach({used:21,unresolved:7,confirmed_sent_count:21}),21);
 });
+
+function renderDashboardCapacity(limit, confirmed, uncertain = 0, blocker = null) {
+  const capacity = { limit, confirmed_sent_count: confirmed, used: confirmed, unresolved: uncertain,
+    uncertain_contact_count: uncertain, in_flight_send_count: 0, remaining: limit === null ? null : Math.max(0, limit - confirmed),
+    blocker, day_timezone: 'America/Los_Angeles', next_slot_at: null };
+  const snapshot = {
+    mission: {}, today: {}, pipeline: { contacts: [] }, economics: {}, recent_actions: [],
+    experiments: { counts: {}, items: [] }, learning: { recent_changes: [], contradictions: [], beliefs: [] },
+    strategy: { bottleneck: {} }, agent: { first_contact_capacity: capacity, errors: [], health: 'running' },
+    execution: { daily_new_contact_cap: limit, sent_today: confirmed, remaining_capacity: capacity.remaining },
+  };
+  const code = ts.transpileModule(readFileSync(path.join(__dirname, '../app/growth/page.tsx'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const exports = {};
+  let stateIndex = 0;
+  const jsx = (type, props) => ({ type, props });
+  const dependencies = {
+    react: { useState(initial) { return [stateIndex++ === 0 ? snapshot : initial, () => {}]; },
+      useRef: initial => ({ current: initial }), useCallback: fn => fn, useEffect() {} },
+    'react/jsx-runtime': { jsx, jsxs: jsx },
+    'next/link': { __esModule: true, default: 'a' }, '@/lib/api-base': { API_BASE_URL: '' },
+    '@/lib/shopify-embedded': { authenticatedFetch() { assert.fail('Render cannot send requests'); } },
+    '@/lib/growth-dashboard': view, './page.module.css': { __esModule: true, default: {} },
+  };
+  vm.runInNewContext(code, { exports, require(name) {
+    assert.ok(name in dependencies, `Unexpected import ${name}`); return dependencies[name];
+  }, Intl, Date, Number, Math });
+  const text = [], meters = [];
+  function walk(node) {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (typeof node === 'string' || typeof node === 'number') { text.push(String(node)); return; }
+    if (node?.props?.role === 'meter') meters.push(node.props);
+    if (node?.props) walk(typeof node.type === 'function' ? node.type(node.props) : node.props.children);
+  }
+  walk(exports.default());
+  return { text: text.join(' '), meters };
+}
+
+test('uncapped dashboard shows actual outreach above twenty with no misleading quota meter', () => {
+  const rendered = renderDashboardCapacity(null, 24, 8);
+  assert.match(rendered.text, /Daily outreach limit No daily limit/);
+  assert.match(rendered.text, /Confirmed first contacts 24 Uncertain contacts 8/);
+  assert.match(rendered.text, /24  confirmed first contacts/);
+  assert.match(rendered.text, /8\s+uncertain contacts protected from retry/);
+  assert.match(rendered.text, /Continue outreach to other eligible merchants/);
+  assert.doesNotMatch(rendered.text, /\/ null|\/ 0|ceiling reached|above the ceiling|count toward 20/);
+  assert.equal(rendered.meters.length, 0);
+});
+
+test('finite historical snapshots retain quota meters and independent uncertainty holds', () => {
+  const finite = renderDashboardCapacity(20, 12, 8);
+  assert.equal(finite.meters.length, 1);
+  assert.equal(finite.meters[0]['aria-valuemax'], 20);
+  assert.equal(finite.meters[0]['aria-valuenow'], 12);
+  assert.match(finite.text, /Only confirmed submissions count toward the 20-contact ceiling/);
+  const held = renderDashboardCapacity(null, 24, 10, 'OUTREACH_UNCERTAINTY_SAFETY_HOLD');
+  assert.match(held.text, /Receipt uncertainty needs attention before another send/);
+  assert.equal(held.meters.length, 0);
+});

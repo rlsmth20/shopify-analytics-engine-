@@ -27,7 +27,7 @@ def evaluate(checks, signals=None):
         if fact.get("value") is False and fact.get("source") and fact.get("text"):
             return {"eligible": False, "priority": "REJECT", "confidence": "HIGH", "reason": reason}
     missing = [k for k in CORE if not ((checks.get(k) or {}).get("value") is True or
-               k == "shopify" and (checks.get(k) or {}).get("value") == "probable") or
+               k in {"merchant", "ecommerce", "physical_products", "shopify"} and (checks.get(k) or {}).get("value") == "probable") or
                not (checks.get(k) or {}).get("source") or not (checks.get(k) or {}).get("text")]
     if missing:
         return {"eligible": None, "priority": "DEFER", "confidence": "UNKNOWN",

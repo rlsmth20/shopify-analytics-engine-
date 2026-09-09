@@ -26,6 +26,41 @@ STOP_REASONS = {"DAILY_CAP_REACHED", "OUTREACH_OUTCOMES_UNRESOLVED", "OUTREACH_U
     "DISCOVERY_EXHAUSTED_FOR_CURRENT_SEARCH_SPACE", "REPLY_REQUIRES_PRIORITY_ATTENTION",
     "CHANNEL_BLOCKED", "SAFETY_BLOCKED", "BUDGET_BLOCKED", "PROVIDER_BLOCKED", "TRUE_IDLE"}
 
+RUNTIME_UNAVAILABLE = "runtime_unavailable"
+
+
+class RuntimeUnavailable(GrowthError):
+    def __init__(self, trace_digest):
+        super().__init__("CODEX_USAGE_LIMIT_BEFORE_EXECUTION", "runtime")
+        self.trace_digest = trace_digest
+
+
+def pre_execution_usage_rejection(path, output=None):
+    """Only a complete startup-only trace proves the prospect was never acted on."""
+    if output is not None and output.exists():
+        return None
+    failed_turn = False
+    try:
+        if not path.is_file() or path.stat().st_size > 128_000:
+            return None
+        raw = path.read_text(encoding="utf-8", errors="strict")
+        events = [json.loads(line) for line in raw.splitlines() if line.strip()]
+        if not events or events[-1].get("type") != "turn.failed":
+            return None
+        for event in events:
+            kind = event.get("type")
+            if kind not in {"thread.started", "turn.started", "error", "turn.failed"}:
+                return None  # Tool calls, output, usage, and unknown events are not safe to refund.
+            if kind in {"error", "turn.failed"}:
+                error = event.get("error") or event
+                message = error.get("message", "").lower()
+                if "hit your usage limit" not in message and error.get("code") != "usage_limit_reached":
+                    return None
+                failed_turn |= kind == "turn.failed"
+    except (ValueError, AttributeError, TypeError, OSError, UnicodeError):
+        return None
+    return digest(raw) if failed_turn else None
+
 
 def redact_log(line):
     # Diagnostic logs must not retain database credentials emitted by a child.
@@ -71,6 +106,13 @@ def take(factory, owner):
             return None
         if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold"):
             return None
+        backoff = get_memory(db, "working", "browser_runtime_backoff")
+        if backoff.get("retry_at", 0) > time.time():
+            remember(db, "working", "browser_executor", {**runtime, "owner": owner,
+                "heartbeat_at": time.time(), "lease_until": 0, "task_id": None,
+                "blocker": "CODEX_RUNTIME_USAGE_WAIT", "next_retry_at": backoff["retry_at"]})
+            db.commit()
+            return None
         from .reconciliation import enqueue_recovery
         enqueue_recovery(db)
         db.flush()
@@ -104,7 +146,7 @@ def take(factory, owner):
             tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile"}]
         if not packet["capacity"].get("dispatch_remaining", packet["capacity"]["remaining"]):
             tasks = [t for t in tasks if t.get("stage") not in {"send", "outreach"}]
-        if not packet["capacity"]["remaining"]:
+        if packet["capacity"]["remaining"] == 0:
             tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile"}]
         if not tasks:
             remember(db, "working", "browser_executor", {**runtime, "owner": owner,
@@ -131,6 +173,11 @@ def take(factory, owner):
             task = {**task, "reconciliation": reconciliation_packet(db, task)}
         task = {**task, "active_experiments": packet.get("active_experiments", []),
                 "source_evidence": {"source": evidence.source, "kind": evidence.kind, "data": evidence.data}}
+        if task.get("contact_id"):
+            from .identity import merchant_view
+            contact = db.get(Contact, task["contact_id"])
+            if contact:
+                task["merchant_history"] = merchant_view(db, contact.identity)
         db.commit()
         return task
 
@@ -238,8 +285,47 @@ def accept(factory, owner, task, result):
             "blocker": (get_memory(db, "working", "acquisition_planner").get("status")
                         if stage == "plan" and not (result.get("hypotheses") or []) else stop) if not successors else None,
             "next_retry_at": time.time() if successors else time.time() + 30})
+        if get_memory(db, "working", "browser_runtime_backoff"):
+            remember(db, "working", "browser_runtime_backoff", {"failures": 0, "retry_at": 0,
+                "recovered_at": time.time(), "evidence_id": event.id})
         db.commit()
         return event.id
+
+
+def defer_runtime(factory, owner, task, error):
+    """Back off the shared runtime, preserving prospect retries and all send fences."""
+    with factory() as db:
+        lock(db)
+        runtime = get_memory(db, "working", "browser_executor")
+        item = get_memory(db, operator.NAMESPACE, task["id"])
+        if (runtime.get("owner") != owner or item.get("lease_token") != task["lease_token"]
+                or item.get("status") != "running"):
+            return
+        prior = get_memory(db, "working", "browser_runtime_backoff")
+        failures = min(30, prior.get("failures", 0) + 1)
+        retry = time.time() + min(3600, 900 * 2 ** min(failures - 1, 2))
+        remember(db, operator.NAMESPACE, task["id"], {**item, "status": "pending",
+            "attempts": max(0, item["attempts"] - 1), "lease_token": None, "lease_until": 0,
+            "retry_at": retry, "error": "CODEX_USAGE_LIMIT_BEFORE_EXECUTION"})
+        event = record(db, "runtime-unavailable:" + task["lease_token"], "ACQUISITION_RUNTIME_UNAVAILABLE", "codex",
+            {"task_id": task["id"], "lease_token": task["lease_token"], "stage": task.get("stage"),
+             "execution_began": False, "trace_digest": error.trace_digest, "retry_at": retry,
+             "prospect_attempt_refunded": True, "failure_count": failures})
+        # A reservation from an earlier execution remains owned by receipt recovery.
+        if task.get("stage") in {"send", "outreach"} and task.get("contact_id"):
+            reservation = db.scalar(select(FirstContact).where(FirstContact.contact_id == task["contact_id"],
+                FirstContact.status.in_(["reserved", "uncertain"])))
+            if reservation:
+                from .reconciliation import offer_review
+                remember(db, operator.NAMESPACE, task["id"], {**get_memory(db, operator.NAMESPACE, task["id"]),
+                    "status": "blocked", "next_step": "Receipt recovery owns the unresolved admission; never retry submission"})
+                offer_review(db, reservation, receipt_completion=True)
+        remember(db, "working", "browser_runtime_backoff", {"failures": failures, "retry_at": retry,
+            "reason": "CODEX_USAGE_LIMIT_BEFORE_EXECUTION", "evidence_id": event.id})
+        remember(db, "working", "browser_executor", {**runtime, "owner": owner, "heartbeat_at": time.time(),
+            "lease_until": 0, "task_id": None, "blocker": "CODEX_RUNTIME_USAGE_WAIT",
+            "error": "Codex rejected startup before any acquisition action", "next_retry_at": retry})
+        db.commit()
 
 
 def failed(factory, owner, task, reason, result=None):
@@ -277,7 +363,8 @@ def execute(factory, owner, task, *, codex, repo):
     model, effort = route(task.get("stage"))
     budget = {"plan": 120, "discover": 300, "qualify": 120, "prepare": 180, "monitor": 180, "reconcile": 180}.get(task.get("stage"), 360)
     with factory() as db:
-        runs = list(db.scalars(select(Usage).where(Usage.result["task_id"].as_string() == task["id"])))
+        runs = list(db.scalars(select(Usage).where(Usage.result["task_id"].as_string() == task["id"],
+                                                 Usage.outcome != RUNTIME_UNAVAILABLE)))
         spent = sum(min(budget * 1000, (time.time() - r.created_at) * 1000) if r.outcome == "running"
                     else (r.latency_ms or r.result.get("budget_charged_ms", 0)) for r in runs)
     if task.get("stage") in {"send", "outreach", "reply", "reconcile"}:
@@ -348,6 +435,12 @@ def execute(factory, owner, task, *, codex, repo):
                     raise GrowthError("RESEARCH_BUDGET_EXHAUSTED", "budget")
                 time.sleep(10)
             if child.returncode or not output.exists():
+                reader.join(timeout=5)
+                stream.flush()
+                rejected = pre_execution_usage_rejection(log, output) if not reader.is_alive() else None
+                if rejected:
+                    outcome = RUNTIME_UNAVAILABLE
+                    raise RuntimeUnavailable(rejected)
                 raise GrowthError("Codex execution failed; inspect retained local executor log", "transient")
             result = json.loads(output.read_text(encoding="utf-8-sig"))
             outcome = result.get("outcome", "completed")
@@ -360,6 +453,12 @@ def execute(factory, owner, task, *, codex, repo):
             reader.join(timeout=5)
             stream.flush()
             retain(factory, task, model, log, time.monotonic() - started, outcome)
+            if outcome == RUNTIME_UNAVAILABLE:
+                with factory() as db:
+                    usage = db.scalar(select(Usage).where(Usage.key == "acquisition-cli:" + task["lease_token"]))
+                    usage.result = {**usage.result, "execution_began": False, "budget_charged_ms": 0,
+                                    "runtime_fault": "CODEX_USAGE_LIMIT_BEFORE_EXECUTION"}
+                    db.commit()
 
 
 def cycle(factory, owner, adapter):
@@ -371,6 +470,9 @@ def cycle(factory, owner, adapter):
         result = adapter(task)
         evidence = accept(factory, owner, task, result)
         logging.info("Acquisition stage persisted task=%s evidence=%s", task["id"], evidence)
+    except RuntimeUnavailable as exc:
+        defer_runtime(factory, owner, task, exc)
+        logging.warning("Codex runtime unavailable before acquisition execution; durable backoff task=%s", task["id"])
     except Exception as exc:
         failed(factory, owner, task, str(exc) if isinstance(exc, GrowthError) else type(exc).__name__, result=result)
         logging.error("Acquisition executor failed task=%s type=%s", task["id"], type(exc).__name__)

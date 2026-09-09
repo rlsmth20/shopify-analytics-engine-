@@ -5,12 +5,12 @@ from .models import Evidence, FirstContact, Memory, Work
 from .outbound import status
 from .store import get_memory, record, remember
 
-ACQUISITION = {"send", "opportunity", "research_contact", "discover"}
+ACQUISITION = {"send", "outreach_send", "opportunity", "research_contact", "discover"}
 
 
 def priority_order():
     # Kind outranks legacy numerical scores: maintenance cannot starve acquisition.
-    return case((Work.kind.in_(["reply", "inbox"]), 0),
+    return case((Work.kind.in_(["reply", "inbox", "outreach_reply", "outreach_event", "outreach_poll", "outreach_inbox"]), 0),
                 (Work.kind.in_(list(ACQUISITION)), 1),
                 (Work.kind == "product_feedback", 2),
                 (Work.kind == "evaluate", 3),
@@ -36,7 +36,9 @@ def state(db, now=None):
     planner = get_memory(db, "working", "acquisition_planner")
     ready = db.scalar(select(Work).where(Work.status == "ready", Work.due_at <= now)
                       .order_by(priority_order(), Work.priority.desc(), Work.due_at).limit(1))
-    permitted = (capacity["remaining"] > 0 and not get_memory(db, "working", "control").get("paused")
+    runtime_backoff = get_memory(db, "working", "browser_runtime_backoff")
+    runtime_wait = runtime_backoff.get("retry_at", 0) > now
+    permitted = (not runtime_wait and capacity["remaining"] != 0 and not get_memory(db, "working", "control").get("paused")
                  and not get_memory(db, "working", "acquisition_hold")
                  and not get_memory(db, "working", "browser_safety_check").get("requires_attention"))
     executable_ages = [w.created_at for w in pending if w.due_at <= now] + [w["created_at"] for w in pending_browser if w.get("retry_at", 0) <= now]
@@ -56,11 +58,11 @@ def state(db, now=None):
         fault = "ACQUISITION_RETRIES_EXHAUSTED"
     blocker = ("SAFETY_BLOCKED" if get_memory(db, "working", "control").get("paused") or
                get_memory(db, "working", "acquisition_hold") else
-               capacity["blocker"] or executor.get("blocker"))
+               capacity["blocker"] or ("CODEX_USAGE_LIMIT" if runtime_wait else executor.get("blocker")))
     future = [w.due_at for w in pending if w.due_at > now]
     future += [w.get("retry_at", 0) for w in browser if w.get("retry_at", 0) > now]
     next_at = now if ready or any(w.get("retry_at", 0) <= now for w in pending_browser) else min(future, default=now + 30)
-    return {"daily_new_contact_cap": 20, "window_hours": capacity["window_hours"],
+    return {"daily_new_contact_cap": capacity["limit"], "window_hours": capacity["window_hours"],
         "day_timezone": capacity["day_timezone"], "day": capacity["day"], "resets_at": capacity["resets_at"],
         "sent_today": capacity["sent"], "reserved_or_uncertain": capacity["unresolved"],
         "remaining_capacity": capacity["remaining"],
@@ -77,7 +79,7 @@ def state(db, now=None):
         "last_successful_send": sent, "current_blocker": blocker, "operational_fault": fault,
         "next_action": "execute_" + next((w.get("stage", "discover") for w in active_browser if w["status"] == "running"), "acquisition")
             if executor.get("task_id") else "claim_browser_acquisition" if pending_browser and not blocker else ready.kind if ready else "await_retry",
-        "next_wake_retry": capacity["next_slot_at"] if blocker == "DAILY_CAP_REACHED" else next_at,
+        "next_wake_retry": capacity["next_slot_at"] if blocker == "DAILY_CAP_REACHED" else runtime_backoff["retry_at"] if runtime_wait else next_at,
         "executor": executor, "planner": planner}
 
 

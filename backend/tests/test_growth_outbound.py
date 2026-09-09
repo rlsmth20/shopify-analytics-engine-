@@ -132,6 +132,89 @@ class OutboundTests(unittest.TestCase):
             self.assertEqual(view['blocker'],'OUTREACH_UNCERTAINTY_SAFETY_HOLD')
         with self.assertRaises(GrowthError): self.reserve(MAX_UNCERTAIN)
 
+    def test_uncapped_owner_policy_continues_after_twenty_and_late_confirmation(self):
+        with self.factory() as db:
+            remember(db, 'strategic', 'outreach_policy', {'daily_new_contact_limit': None})
+            db.commit()
+        unknown = self.reserve(0)['reservation_id']
+        with self.factory() as db:
+            complete(db, unknown, outcome='uncertain'); db.commit()
+        for n in range(1, 23):
+            item = self.reserve(n)
+            with self.factory() as db:
+                authorize_submission(db, item['reservation_id'])
+                complete(db, item['reservation_id'], receipt='receipt:' + str(n)); db.commit()
+        self.engine.dispose()  # The owner policy and duplicate fence survive restart.
+        with self.factory() as db:
+            view = status(db)
+            self.assertEqual((view['sent'], view['uncertain_contact_count']), (22, 1))
+            for field in ('limit', 'remaining', 'remaining_confirmed_capacity', 'next_slot_at', 'blocker'):
+                self.assertIsNone(view[field], field)
+            self.assertEqual(view['dispatch_remaining'], 1)
+        with self.assertRaises(GrowthError): self.reserve(0)
+        pending = self.reserve(23)['reservation_id']
+        with self.factory() as db:
+            complete(db, unknown, receipt='late verified receipt'); db.commit()
+            authorize_submission(db, pending)
+            complete(db, pending, receipt='receipt:23'); db.commit()
+            self.assertEqual(status(db)['confirmed_sent_count'], 24)
+            self.assertEqual(status(db)['late_confirmation_overage'], 0)
+        from app.growth import browser_executor
+        # No task is manually seeded: an empty queue still invokes autonomous planning.
+        next_task = browser_executor.take(self.factory, 'uncapped-restarted-executor')
+        self.assertIsNotNone(next_task)
+        self.assertEqual(next_task['stage'], 'plan')
+
+    def test_uncapped_still_serializes_dispatch_and_bounds_ambiguous_outcomes(self):
+        with self.factory() as db:
+            remember(db, 'strategic', 'outreach_policy', {'daily_new_contact_limit': None}); db.commit()
+        def attempt(n):
+            try: return self.reserve(n)
+            except GrowthError: return None
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            admitted = [r for r in pool.map(attempt, range(8)) if r]
+        self.assertEqual(len(admitted), 1)
+        with self.factory() as db:
+            complete(db, admitted[0]['reservation_id'], outcome='uncertain'); db.commit()
+        for n in range(8, 8 + MAX_UNCERTAIN - 1):
+            item = self.reserve(n)
+            with self.factory() as db:
+                complete(db, item['reservation_id'], outcome='uncertain'); db.commit()
+        with self.factory() as db:
+            view = status(db)
+            self.assertEqual(view['confirmed_sent_count'], 0)
+            self.assertIsNone(view['remaining'])
+            self.assertEqual(view['uncertain_contacts_protected'], MAX_UNCERTAIN)
+            self.assertEqual(view['blocker'], 'OUTREACH_UNCERTAINTY_SAFETY_HOLD')
+        with self.assertRaises(GrowthError): self.reserve(39)
+
+    def test_invalid_owner_ceiling_fails_closed(self):
+        with self.factory() as db:
+            for value in (-1, True, 'unlimited', 2.5):
+                remember(db, 'strategic', 'outreach_policy', {'daily_new_contact_limit': value})
+                with self.subTest(value=value), self.assertRaises(GrowthError): status(db)
+
+    def test_linked_merchant_history_blocks_cross_channel_duplicate_and_suppression(self):
+        from app.growth.identity import link_merchant, merchant_view
+        with self.factory() as db:
+            link_merchant(db, {'merchant_key': 'fixture-store', 'routes': [
+                {'identity': 'merchant:0', 'channel': 'contact_form', 'source': 'https://fixture.test/contact',
+                 'relationship': 'Store contact page links the community profile.'},
+                {'identity': 'merchant:1', 'channel': 'shopify_community', 'source': 'https://fixture.test/contact',
+                 'relationship': 'Same store links this community profile.'}]})
+            db.commit()
+        item = self.reserve(0)
+        with self.factory() as db:
+            complete(db, item['reservation_id'], receipt='verified form receipt'); db.commit()
+            history = merchant_view(db, 'merchant:1')
+            self.assertEqual(set(history['contact_ids']), {'0', '1'})
+            self.assertEqual(history['first_contacts'][0]['receipt'], 'verified form receipt')
+        with self.assertRaisesRegex(GrowthError, 'already contacted'): self.reserve(1)
+        with self.factory() as db:
+            db.get(Contact, '0').suppressed = True; db.commit()
+            self.assertTrue(merchant_view(db, 'merchant:1')['suppressed'])
+        with self.assertRaisesRegex(GrowthError, 'suppressed'): self.reserve(1)
+
     def test_owner_pause_fences_admission_and_final_submission(self):
         pending=self.reserve(0)['reservation_id']
         with self.factory() as db:

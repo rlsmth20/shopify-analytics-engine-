@@ -51,6 +51,10 @@ def schedule(factory):
         enqueue(db, f"observe:{int(now // 300)}", "observe", priority=75)
         if os.getenv("GROWTH_INBOUND_ENABLED") == "true":
             enqueue(db, f"inbox:{int(now // 300)}", "inbox", priority=100)
+        if os.getenv("OUTREACH_EMAIL_ENABLED") == "true":
+            from .outreach_email import schedule_followups
+            schedule_followups(db, now)
+            enqueue(db, f"outreach-inbox:{int(now // 300)}", "outreach_inbox", priority=100)
         window = review_day(now)
         review_key = "review:" + window.key
         completed = completed_review(db, window)
@@ -274,6 +278,13 @@ def daily_review(factory, work, model=call_model):
 
 
 def handle(factory, work, *, provider=messaging.resend_request, fetch=discovery.public_json, model=call_model):
+    if work.kind.startswith("outreach_"):
+        from . import outreach_email
+        handlers = {"outreach_send": outreach_email.send, "outreach_poll": outreach_email.poll,
+                    "outreach_event": outreach_email.handle_webhook, "outreach_reply": outreach_email.answer_reply,
+                    "outreach_inbox": outreach_email.refresh_inbox}
+        if work.kind in handlers:
+            return handlers[work.kind](factory, work)
     if work.kind == "send":
         return messaging.send(factory, work, provider=provider)
     if work.kind == "inbox":

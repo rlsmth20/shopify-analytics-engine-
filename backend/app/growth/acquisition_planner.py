@@ -207,7 +207,7 @@ def replenish(db, capacity, now=None):
     from .operator import offer
     now = time.time() if now is None else now
     mission_state = mission(db)
-    if mission_state["complete"] or mission_state.get("missing_identity") or not capacity["remaining"]:
+    if mission_state["complete"] or mission_state.get("missing_identity") or capacity["remaining"] == 0:
         return None
     if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold") or get_memory(db, "working", "browser_safety_check").get("requires_attention"):
         return None

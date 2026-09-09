@@ -43,7 +43,7 @@ function ActivityChart({ days }: { days: GrowthActivityDay[] }) {
         <div className={styles.barColumn}><span>{day.first_contacts}</span><i className={styles.contactBar} style={{ height: `${chartWidth(day.first_contacts, max)}%` }} /></div>
         <div className={styles.barColumn}><span>{day.substantive_replies}</span><i className={styles.replyBar} style={{ height: `${chartWidth(day.substantive_replies, max)}%` }} /></div>
       </div><small>{new Date(`${day.day}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</small></div>)}
-    </div> : <div className={styles.empty}><strong>No outreach or substantive replies recorded in this window.</strong><p>Research can continue without filling the send allowance. New evidence will appear here.</p></div>}
+    </div> : <div className={styles.empty}><strong>No outreach or substantive replies recorded in this window.</strong><p>New first contacts and substantive replies will appear here as they are recorded.</p></div>}
     <p className={styles.caption}>UTC calendar days · today is partial. Each merchant counts once per day in each series. Automated messages are excluded.</p>
   </>;
 }
@@ -154,11 +154,11 @@ export default function GrowthPage() {
         <h2 id="execution-title">Acquisition execution</h2>
         {data.execution.operational_fault && <p className={styles.notice} role="alert">Operational fault: {label(data.execution.operational_fault)}</p>}
         <dl className={styles.operations}>
-          <dt>Daily new-contact cap</dt><dd>{data.execution.daily_new_contact_cap} · {data.execution.day_timezone ? "resets at midnight Pacific" : "rolling 24 hours"}</dd>
-          <dt>Confirmed first contacts</dt><dd>{data.execution.sent_today}/{data.execution.daily_new_contact_cap}</dd>
+          <dt>Daily outreach limit</dt><dd>{data.execution.daily_new_contact_cap === null ? "No daily limit" : `${number(data.execution.daily_new_contact_cap)} · ${data.execution.day_timezone ? "resets at midnight Pacific" : "rolling 24 hours"}`}</dd>
+          <dt>Confirmed first contacts</dt><dd>{number(data.execution.sent_today)}{data.execution.daily_new_contact_cap !== null && ` / ${number(data.execution.daily_new_contact_cap)}`}</dd>
           <dt>Uncertain contacts</dt><dd>{data.execution.uncertain_contact_count ?? uncertain}</dd>
           <dt>Sends in progress</dt><dd>{data.execution.in_flight_send_count ?? sendsInFlight}</dd>
-          <dt>Remaining capacity</dt><dd>{data.execution.remaining_capacity}</dd>
+          <dt>Remaining capacity</dt><dd>{data.execution.daily_new_contact_cap === null ? "No daily limit" : number(data.execution.remaining_capacity)}</dd>
           <dt>Qualified ready</dt><dd>{data.execution.qualified_ready}</dd>
           <dt>Discovery pending</dt><dd>{data.execution.discovery_pending}</dd>
           <dt>Acquisition tasks running</dt><dd>{data.execution.acquisition_tasks_running}</dd>
@@ -172,13 +172,13 @@ export default function GrowthPage() {
       </section>}
       {held && <div className={styles.notice}><strong>New acquisition is on hold.</strong> Existing conversations and product-funnel investigation remain the priority. {data.strategy.bottleneck.observation}</div>}
       <div className={styles.columns}>
-        <section className={styles.card} aria-labelledby="capacity-title"><div className={styles.cardHeading}><h2 id="capacity-title">First-contact capacity</h2><span className={styles.tag}>{capacity?.day_timezone ? "Today · Pacific time" : "Rolling 24 hours"}</span></div>
-          {capacity ? <><div className={styles.capacityNumber}><strong>{number(confirmed)}<span> / {number(capacity.limit)} confirmed</span></strong><span>{number(capacity.remaining)} remaining · {number(uncertain)} uncertain</span></div>
-            <div className={styles.capacityTrack} role="meter" aria-label="Confirmed first contacts" aria-valuemin={0} aria-valuemax={capacity.limit} aria-valuenow={Math.min(confirmed, capacity.limit)} aria-valuetext={`${confirmed} confirmed first contacts of ${capacity.limit}; ${uncertain} uncertain contacts counted separately`}>
-              <span style={{ width: `${chartWidth(confirmed, capacity.limit)}%` }} /></div>
+        <section className={styles.card} aria-labelledby="capacity-title"><div className={styles.cardHeading}><h2 id="capacity-title">First-contact activity</h2><span className={styles.tag}>{capacity?.day_timezone ? "Today · Pacific time" : "Rolling 24 hours"}</span></div>
+          {capacity ? <><div className={styles.capacityNumber}><strong>{number(confirmed)}<span>{capacity.limit === null ? " confirmed first contacts" : ` / ${number(capacity.limit)} confirmed`}</span></strong><span>{capacity.limit === null ? "No daily limit" : `${number(capacity.remaining)} remaining`} · {number(uncertain)} uncertain</span></div>
+            {capacity.limit !== null && <div className={styles.capacityTrack} role="meter" aria-label="Confirmed first contacts" aria-valuemin={0} aria-valuemax={capacity.limit} aria-valuenow={Math.min(confirmed, capacity.limit)} aria-valuetext={`${confirmed} confirmed first contacts of ${capacity.limit}; ${uncertain} uncertain contacts counted separately`}>
+              <span style={{ width: `${chartWidth(confirmed, capacity.limit)}%` }} /></div>}
             <div className={styles.capacityMeta}><span>{sendsInFlight} send in progress</span><span>{uncertain} uncertain contacts protected from retry</span></div>
-            <div className={styles.callout}><strong>{capacity.late_confirmation_overage ? "Late receipts revealed outreach above the ceiling. New sends are stopped." : capacity.blocker === "OUTREACH_UNCERTAINTY_SAFETY_HOLD" ? "Receipt uncertainty needs attention before another send." : confirmed >= capacity.limit ? "Confirmed outreach ceiling reached." : sendsInFlight ? "A send is in progress; the next permit waits for its outcome." : "Continue outreach to other eligible merchants."}</strong><p>Only confirmed submissions count toward 20. Uncertain contacts stay protected from duplicate messages and do not consume confirmed-message capacity. A separate safety hold stops dispatch if unresolved outcomes reach 10. Replies, research and receipt checks continue.</p></div>
-            {capacity.next_slot_at && <p className={styles.caption}>Next confirmed-message capacity release: {time(capacity.next_slot_at)}.</p>}
+            <div className={styles.callout}><strong>{capacity.limit !== null && capacity.late_confirmation_overage ? "Late receipts revealed outreach above the ceiling. New sends are stopped." : capacity.blocker === "OUTREACH_UNCERTAINTY_SAFETY_HOLD" ? "Receipt uncertainty needs attention before another send." : capacity.limit !== null && confirmed >= capacity.limit ? "Confirmed outreach ceiling reached." : sendsInFlight ? "A send is in progress; the next permit waits for its outcome." : "Continue outreach to other eligible merchants."}</strong><p>{capacity.limit === null ? "There is no daily outreach ceiling. Only confirmed submissions appear in the outreach count. " : `Only confirmed submissions count toward the ${number(capacity.limit)}-contact ceiling. `}Uncertain contacts stay protected from duplicate messages. Sends proceed one at a time, with a separate safety hold if unresolved outcomes reach 10. Replies, research and receipt checks continue.</p></div>
+            {capacity.limit !== null && capacity.next_slot_at && <p className={styles.caption}>Next confirmed-message capacity release: {time(capacity.next_slot_at)}.</p>}
           </> : <div className={styles.empty}>Capacity data is unavailable. Check the shared send ledger before contacting a new merchant.</div>}
         </section>
         <section className={styles.card} aria-labelledby="activity-chart-title"><div className={styles.cardHeading}><h2 id="activity-chart-title">Conversations over volume</h2><span className={styles.tag}>Last 7 days</span></div>

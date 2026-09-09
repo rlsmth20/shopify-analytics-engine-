@@ -1,3 +1,7 @@
+# Latest policy takes precedence
+
+Read [current acquisition policy](current-acquisition-policy.md) first. The owner removed the daily contact ceiling. Dedicated-provider email uses the controlled email service after its readiness checks pass; Gmail/transactional Resend remain unsuitable for cold outreach.
+
 # Skubase outreach messaging — revision 4
 
 **Shopify Community override, September 9:** use [the useful-answer policy](shopify-community.md)
@@ -78,8 +82,8 @@ qualification_policy attribution and the existing immutable experiment cohort.
 Use the merchant's verified fact. Ask whether inventory/reordering is a problem
 when it is unknown. Never fabricate personalization or imply private-store access.
 Do not introduce yourself as an AI or invent a human identity. Respect channel
-rules, suppressions, reservations and the 20 confirmed first contacts per Pacific
-calendar day ceiling. No repetitive follow-ups to silent recipients.
+rules, suppressions, reservations and actual receipt accounting. There is no
+daily contact ceiling. No repetitive follow-ups to silent recipients.
 
 Shopify Community replies must stay relevant to the participant and contain no
 external promotional links or email details. General offers belong in its approved

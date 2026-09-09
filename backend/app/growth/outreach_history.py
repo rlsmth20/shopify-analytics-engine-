@@ -43,7 +43,7 @@ def history(db, *, before=None, status='sent', limit=25, search='', method=None)
     legacy_ids = [r.cohort.get('source_evidence_id') for r in rows if isinstance(r.cohort.get('source_evidence_id'), int)]
     legacy = {e.id: e for e in db.scalars(select(Evidence).where(Evidence.id.in_(legacy_ids)))}
     messages = list(db.scalars(select(Message).where(Message.contact_id.in_(contact_ids),
-        Message.direction == 'outbound', Message.sent_at.is_not(None)).order_by(Message.sent_at.desc())))
+        Message.direction.in_(['out', 'outbound']), Message.sent_at.is_not(None)).order_by(Message.sent_at.desc())))
     items = []
     for row in rows:
         contact = contacts.get(row.contact_id)
@@ -54,7 +54,8 @@ def history(db, *, before=None, status='sent', limit=25, search='', method=None)
         # Never substitute a current draft for a historical sent message.
         if not isinstance(body, str) or digest(body) != row.body_hash:
             body = None
-        matched = next((m for m in messages if m.contact_id == row.contact_id and digest(m.body) == row.body_hash), None)
+        matched = next((m for m in messages if m.contact_id == row.contact_id and
+                       (digest(m.body) == row.body_hash or row.action_key == 'email:' + m.id)), None)
         if body is None and matched:
             body = matched.body
         review = evidence.get('channel-check:' + row.id)

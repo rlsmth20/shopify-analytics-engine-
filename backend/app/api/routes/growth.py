@@ -4,11 +4,13 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -32,6 +34,62 @@ Admin = Annotated[User, Depends(require_admin)]
 @router.get("/dashboard")
 def read_dashboard(db: DB, owner: Admin):
     return dashboard(db)
+
+
+@router.get("/email-status")
+def read_email_status(db: DB, owner: Admin, response: Response):
+    from app.growth.outreach_email import metrics
+    response.headers["Cache-Control"] = "private, no-store"
+    return metrics(db)
+
+
+@router.get("/outreach/unsubscribe/{message_id}", response_class=HTMLResponse)
+def unsubscribe_confirmation(message_id: str, token: str = Query(max_length=64)):
+    from app.growth.outreach_email import unsubscribe_token
+    from app.growth.policy import GrowthError
+    if not re.fullmatch(r"[a-f0-9]{32}", message_id):
+        raise HTTPException(404, "Unknown message")
+    try:
+        valid = hmac.compare_digest(unsubscribe_token(message_id), token)
+    except GrowthError:
+        raise HTTPException(503, "Unsubscribe temporarily unavailable; reply unsubscribe to the email") from None
+    if not valid:
+        raise HTTPException(403, "Invalid link")
+    # A scanner GET never opts out a recipient. The signed POST needs no account.
+    return HTMLResponse('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width">'
+        '<title>Skubase email preferences</title><body><h1>Stop Skubase outreach emails</h1>'
+        '<p>Confirm to stop future outreach from Skubase.</p><form method="post"><button type="submit">Unsubscribe</button></form></body></html>',
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'none'; form-action 'self'; frame-ancestors 'none'"})
+
+
+@router.post("/outreach/unsubscribe/{message_id}", response_class=HTMLResponse)
+def unsubscribe_outreach(message_id: str, db: DB, token: str = Query(max_length=64)):
+    from app.growth.outreach_email import unsubscribe
+    from app.growth.policy import GrowthError
+    try:
+        unsubscribe(db, message_id, token)
+        db.commit()
+    except GrowthError:
+        raise HTTPException(400, "Invalid unsubscribe link; reply unsubscribe to the original email") from None
+    return HTMLResponse('<!doctype html><html lang="en"><title>Unsubscribed</title><body><h1>You are unsubscribed</h1>'
+        '<p>Skubase will stop sending you outreach emails.</p></body></html>', headers={"Cache-Control": "no-store"})
+
+
+@router.post("/webhooks/emailpal", status_code=202)
+async def emailpal_webhook(request: Request, db: DB):
+    from app.growth.outreach_provider import verify_webhook
+    from app.growth.policy import GrowthError
+    body = await request.body()
+    if len(body) > 64000:
+        raise HTTPException(413, "Webhook too large")
+    try:
+        event = verify_webhook(body, request.headers)
+    except GrowthError:
+        raise HTTPException(401, "Invalid webhook signature") from None
+    retained = record(db, "emailpal-webhook:" + event["id"], "OUTREACH_WEBHOOK", "outreach", event, source="emailpal_signed_webhook")
+    enqueue(db, "emailpal-event:" + event["id"], "outreach_event", {"evidence_id": retained.id}, priority=100)
+    db.commit()
+    return {"accepted": True}
 
 
 @router.get("/outreach-history")

@@ -55,6 +55,18 @@ class EligibilityTests(unittest.TestCase):
             db.flush()
             self.assertEqual(assess(db, {"identity": "merchant:test"})["reason"], "BOUNCED_SUPPRESSED")
 
+    def test_probable_basic_fit_is_eligible_but_contact_route_and_rules_need_evidence(self):
+        basic = {key: 'probable' for key in ('merchant', 'ecommerce', 'physical_products', 'shopify')}
+        result = evaluate(checks(**basic), {'inventory_pain': None, 'revenue': None, 'sku_count': None})
+        self.assertTrue(result['eligible'])
+        self.assertEqual(result['priority'], 'MEDIUM')
+        for key in CORE.keys() - basic.keys():
+            with self.subTest(key=key):
+                self.assertIsNone(evaluate(checks(**basic, **{key: 'probable'}))['eligible'])
+        unsourced = checks(**basic)
+        unsourced['physical_products']['source'] = ''
+        self.assertIsNone(evaluate(unsourced)['eligible'])
+
     def test_bare_community_handle_cannot_hide_suppressed_alias(self):
         with self.factory() as db:
             db.add(Contact(identity="shopify_community:merchant", source="https://community.shopify.com/t/123",
