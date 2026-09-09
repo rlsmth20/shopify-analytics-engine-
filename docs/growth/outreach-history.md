@@ -21,3 +21,10 @@ Validation: 13 backend history/dashboard tests, 10 frontend dashboard tests,
 frontend typecheck and production build. Read-only production projection verified
 36 confirmed records with message text and source links; three historical messages
 retain normalized spacing, and two receipts have text without a URL.
+
+Production release `18a424e`: Railway `60d378e7-226b-4521-842c-16852c60c294`
+SUCCESS; Vercel `dpl_GzJadMi6XFxrADyDEo3DJwPuQa9J` READY. Verified through
+the existing Shopify owner session: merchant search, exact body and expanded
+receipt, Reddit direct-message and original-post links, historical spacing labels,
+and a separate uncertain-contact list. Unauthenticated production requests return
+401. No outreach state was changed by verification.
