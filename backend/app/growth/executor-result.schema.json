@@ -68,16 +68,21 @@
         ],
         "properties": {
           "key": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           },
           "source": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 1000
           },
           "decision": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1500
           },
           "contact_id": {
             "type": [

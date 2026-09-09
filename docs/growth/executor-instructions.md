@@ -116,8 +116,11 @@ Return all schema-required fields: outcome, compact observation, actual sources,
 next_step, stop_reason, successors, hypotheses=[], search_result (counts/reason
 codes, null if unknown), idle=null. qualified_count means ELIGIBLE, not converted.
 Up to six successors/two discovery branches; stable keys by merchant/source/stage.
-Carry retained checks/evidence in successor decision. Do not repeat equivalent
-searches or revive excluded identities without new evidence. Empty queue invokes
+Carry retained checks/evidence in successor decision.
+Successor decisions must fit 1,500 characters total, including exact copy. Refer
+to assessment IDs and source evidence instead of repeating their full contents.
+Keep one concrete question or offer and concise copy so the complete handoff fits.
+Do not repeat equivalent searches or revive excluded identities without new evidence. Empty queue invokes
 planner automatically. Stop reasons: DAILY_CAP_REACHED, NO_CURRENT_QUALIFIED_PROSPECTS,
 DISCOVERY_EXHAUSTED_FOR_CURRENT_SEARCH_SPACE, REPLY_REQUIRES_PRIORITY_ATTENTION,
 CHANNEL_BLOCKED, SAFETY_BLOCKED, BUDGET_BLOCKED, PROVIDER_BLOCKED, TRUE_IDLE.

@@ -1,5 +1,6 @@
 """Durable browser handoffs recover safely without granting send authority."""
 import tempfile
+import json
 import time
 import unittest
 from pathlib import Path
@@ -31,6 +32,14 @@ class OperatorTests(unittest.TestCase):
     def tearDown(self):
         self.engine.dispose()
         self.temp.cleanup()
+
+    def test_model_handoff_limit_matches_queue_admission_boundary(self):
+        schema=json.loads((Path(__file__).parents[1]/'app/growth/executor-result.schema.json').read_text())
+        limit=schema['properties']['successors']['items']['properties']['decision']['maxLength']
+        with self.factory() as db:
+            self.assertEqual(offer(db,key='boundary',source=None,decision='a'*limit,evidence_id=self.evidence)['decision'],'a'*limit)
+            with self.assertRaises(GrowthError):
+                offer(db,key='oversized',source=None,decision='a'*(limit+1),evidence_id=self.evidence)
 
     def test_restart_duplicate_claim_recovery_and_stale_completion(self):
         now = time.time()
