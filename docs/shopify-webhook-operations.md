@@ -38,3 +38,27 @@ service, scheduler, secret, or paid infrastructure is required. To verify produc
 use a unique synthetic domain confirmed absent from `shops`; check signed receipt,
 worker completion, duplicate suppression, and invalid-signature rejection. Field
 delivery and Web Vitals charts retain historical failures until their windows age.
+
+## September 9, 2026 production verification
+
+- Code release: `be10072`.
+- Railway deployment: `b5051732-1002-4de3-b985-8b971482bf62`, SUCCESS.
+- Vercel deployment: `dpl_32oQcYGTPtfYobt1FZPcVDmLH8tU`, READY, aliased to www.skubase.io.
+- Shopify's historical failure detail reported no response after 6,000 ms for
+  `shop/redact`. Those failures subsequently succeeded on retry. That evidence
+  establishes timeouts, but does not isolate database work from a temporary outage.
+- Signed production tests against a unique synthetic domain verified absent from
+  `shops` returned 200 in 1,268 / 1,173 / 1,185 / 1,209 ms for shop redaction,
+  customer redaction, data requests, and uninstall respectively. All four durable
+  jobs completed with one attempt; duplicate submissions created no repeat work.
+  Completed payloads/domain were cleared. Invalid HMAC returned 401.
+- Production API health returned 200. Browser demo dashboard populated its cards
+  and charts. Legacy embedded-root redirect returned private/no-store 307 with
+  launch parameters preserved; all four WOFF2 font assets returned 200.
+- Backend regression suite: 446 tests passed. The separately run eight queue tests
+  also passed, including the concurrent claim test added after suite discovery.
+  Frontend: 239 tests, typecheck and production build passed.
+- Dashboard initial JavaScript gzip: 153,063 to 142,148 bytes. Fonts gzip:
+  645,953 to 442,386 bytes, with original glyphs and metrics preserved.
+  These are asset measurements, not measured field LCP/INP improvements. The
+  screenshot's 408 ms aggregate INP has no isolated interaction diagnosis yet.
