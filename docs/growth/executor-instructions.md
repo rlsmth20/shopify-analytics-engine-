@@ -1,7 +1,6 @@
-# Current accounting override — confirmed_outreach_v2
+# Current accounting override — confirmed_outreach_pacific_day_v3
 
-Only verified sent/submitted receipts count toward 20 new first contacts per rolling
-24 hours. Pending or uncertain contacts do not count. Keep unresolved contacts
+Only verified sent/submitted receipts count toward 20 new first contacts per America/Los_Angeles calendar day. Pending or uncertain contacts do not count. Keep unresolved contacts
 protected from retries. The ledger permits one live send at a time (10-minute
 reservation); an expired permit never authorizes submitting or retrying that contact.
 Immediately before the single external submission, call
@@ -27,7 +26,7 @@ confirmation requirement. Reserve, perform and receipt the permitted action.
 Actual tool denials or channel prohibitions remain blockers; do not bypass them.
 The owner's renewed instruction is "Exactly it should send 20", referring to
 confirmed permitted outreach, not occupied reservations. This continues the
-standing authorization above; quality and the rolling safety ceiling still apply.
+standing authorization above; quality and the daily safety ceiling still apply.
 User instructions take precedence over local skill guidelines. The Computer Use
 skill's request to confirm representational forms again does not revoke the
 owner's explicit authorization. An actual automatic approval denial is different:
@@ -189,7 +188,7 @@ Keep payload files in .growth-deploy, not the repository root.
   outreach-complete, return submission=null to preserve its exact receipt.
 - reply: prioritize engaged conversations, immediately respect declines/opt-outs.
 
-20 new merchants/rolling24h shared across channels is a ceiling, not quota.
+20 new merchants/Pacific calendar day shared across channels is a ceiling, not quota.
 No ads, new spending, paid model APIs, cold email (transport remains disabled),
 silent followups, mass DMs, restriction bypasses or personal accounts. Use
 permitted general business forms or contextual community channels. No cookies,

@@ -153,7 +153,7 @@ export default function GrowthPage() {
         <h2 id="execution-title">Acquisition execution</h2>
         {data.execution.operational_fault && <p className={styles.notice} role="alert">Operational fault: {label(data.execution.operational_fault)}</p>}
         <dl className={styles.operations}>
-          <dt>Daily new-contact cap</dt><dd>{data.execution.daily_new_contact_cap} · rolling 24 hours</dd>
+          <dt>Daily new-contact cap</dt><dd>{data.execution.daily_new_contact_cap} · {data.execution.day_timezone ? "resets at midnight Pacific" : "rolling 24 hours"}</dd>
           <dt>Confirmed first contacts</dt><dd>{data.execution.sent_today}/{data.execution.daily_new_contact_cap}</dd>
           <dt>Uncertain contacts</dt><dd>{data.execution.uncertain_contact_count ?? uncertain}</dd>
           <dt>Sends in progress</dt><dd>{data.execution.in_flight_send_count ?? sendsInFlight}</dd>
@@ -171,7 +171,7 @@ export default function GrowthPage() {
       </section>}
       {held && <div className={styles.notice}><strong>New acquisition is on hold.</strong> Existing conversations and product-funnel investigation remain the priority. {data.strategy.bottleneck.observation}</div>}
       <div className={styles.columns}>
-        <section className={styles.card} aria-labelledby="capacity-title"><div className={styles.cardHeading}><h2 id="capacity-title">First-contact capacity</h2><span className={styles.tag}>Rolling 24 hours</span></div>
+        <section className={styles.card} aria-labelledby="capacity-title"><div className={styles.cardHeading}><h2 id="capacity-title">First-contact capacity</h2><span className={styles.tag}>{capacity?.day_timezone ? "Today · Pacific time" : "Rolling 24 hours"}</span></div>
           {capacity ? <><div className={styles.capacityNumber}><strong>{number(confirmed)}<span> / {number(capacity.limit)} confirmed</span></strong><span>{number(capacity.remaining)} remaining · {number(uncertain)} uncertain</span></div>
             <div className={styles.capacityTrack} role="meter" aria-label="Confirmed first contacts" aria-valuemin={0} aria-valuemax={capacity.limit} aria-valuenow={Math.min(confirmed, capacity.limit)} aria-valuetext={`${confirmed} confirmed first contacts of ${capacity.limit}; ${uncertain} uncertain contacts counted separately`}>
               <span style={{ width: `${chartWidth(confirmed, capacity.limit)}%` }} /></div>

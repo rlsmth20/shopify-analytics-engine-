@@ -2,6 +2,8 @@
 import tempfile
 import time
 import unittest
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from app.growth.models import Contact, Experiment, FirstContact, Work
 from app.growth.outbound import LIMIT, MAX_UNCERTAIN, authorize_submission, complete, reconcile_not_sent, reserve_contact, status
 from app.growth.store import record, remember
 from app.growth.policy import GrowthError
+from app.growth.review_calendar import review_day
 
 
 class OutboundTests(unittest.TestCase):
@@ -87,7 +90,7 @@ class OutboundTests(unittest.TestCase):
             self.assertEqual(status(db)['sent'],21)
             self.assertEqual(status(db)['late_confirmation_overage'],1)
             self.assertEqual(status(db)['dispatch_remaining'],0)
-            self.assertEqual(status(db)['next_slot_at'], sorted(r.sent_at for r in db.scalars(select(FirstContact).where(FirstContact.status=='sent')))[1]+86400)
+            self.assertEqual(status(db)['next_slot_at'], review_day(time.time()).end)
         with self.assertRaises(GrowthError): self.reserve(29)
 
     def test_late_confirmation_fences_an_existing_permit(self):
@@ -139,20 +142,41 @@ class OutboundTests(unittest.TestCase):
             remember(db,'working','control',{'paused':True,'deployment_drain':'fixture-release'}); db.commit()
             authorize_submission(db,pending); db.commit()
 
-    def test_rolling_boundary_restart_uncertainty_and_permanent_dedupe(self):
+    def test_midnight_reset_restart_and_permanent_dedupe(self):
         now = time.time()
+        midnight = review_day(now).end
         for n in range(20):
             item = self.reserve(n, now=now)
             with self.factory() as db:
                 complete(db,item['reservation_id'],receipt='receipt:'+str(n),now=now); db.commit()
         self.engine.dispose()
         with self.factory() as db:
-            self.assertEqual(status(db,now+86399)['remaining'],0)
-            self.assertEqual(status(db,now+86400)['remaining'],20)
-        with self.assertRaises(GrowthError): self.reserve(0,now=now+86401)
-        self.reserve(20,now=now+86400)
+            self.assertEqual(status(db,midnight-0.001)['remaining'],0)
+            self.assertEqual(status(db,midnight)['remaining'],20)
+            self.assertEqual(status(db,midnight)['day_timezone'],'America/Los_Angeles')
+        with self.assertRaises(GrowthError): self.reserve(0,now=midnight)
+        pending = self.reserve(20,now=midnight)['reservation_id']
         with self.factory() as db:
-            self.assertEqual(status(db,now+172800)['remaining'],20)
+            complete(db,pending,receipt='today receipt',now=midnight); db.commit()
+            self.assertEqual(status(db,midnight)['sent'],1)
+            self.assertEqual(status(db,midnight)['remaining'],19)
+
+    def test_pacific_day_handles_dst_and_retains_uncertainty_across_midnight(self):
+        for day, hours in [('2026-03-08',23),('2026-11-01',25)]:
+            now = datetime.fromisoformat(day+'T12:00:00').replace(tzinfo=ZoneInfo('America/Los_Angeles')).timestamp()
+            with self.factory() as db:
+                view = status(db,now)
+                self.assertEqual(view['day'],day)
+                self.assertEqual(view['window_hours'],hours)
+        now = time.time()
+        item = self.reserve(0,now=now)
+        with self.factory() as db:
+            complete(db,item['reservation_id'],outcome='uncertain',now=now); db.commit()
+        midnight = review_day(now).end
+        with self.factory() as db:
+            view = status(db,midnight)
+            self.assertEqual((view['sent'],view['remaining'],view['uncertain_contact_count']),(0,20,1))
+        with self.assertRaises(GrowthError): self.reserve(0,now=midnight)
 
     def test_suppression_and_missing_evidence_and_cohort_snapshot(self):
         with self.factory() as db:

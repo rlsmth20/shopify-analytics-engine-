@@ -89,6 +89,7 @@ export type GrowthSnapshot = {
   generated_at?: number;
   execution?: {
     daily_new_contact_cap: number; sent_today: number; remaining_capacity: number;
+    day_timezone?: string; day?: string; resets_at?: number;
     confirmed_sent_count?: number; in_flight_send_count?: number; uncertain_contact_count?: number; late_confirmation_overage?: number;
     qualified_ready: number; discovery_pending: number; acquisition_tasks_running: number;
     oldest_pending_acquisition_age: number | null; last_acquisition_action: { at: number; stage: string } | null;
@@ -113,7 +114,7 @@ export type GrowthSnapshot = {
     unknown_cost_records?: number; acquisition_spend: number; advertising_spend: number; cac: number | null; limitations: string };
   agent: { activity: string; next_action: string; last_wake: number; model: string | null; health: string; paused: boolean;
     daily_budget_usd: number; next_due?: number | null; queue_ready?: number;
-    first_contact_capacity?: { policy?: string; confirmed_sent_count?: number; in_flight_send_count?: number; uncertain_contact_count?: number;
+    first_contact_capacity?: { policy?: string; day_timezone?: string; day?: string; resets_at?: number; confirmed_sent_count?: number; in_flight_send_count?: number; uncertain_contact_count?: number;
       remaining_confirmed_capacity?: number; dispatch_remaining?: number; blocker?: string | null; late_confirmation_overage?: number; limit: number; window_hours: number; used: number; remaining: number; unresolved: number;
       next_slot_at: number | null; is_target: boolean; scope: string; continue_non_outbound: boolean };
     executive?: { last_review?: number; mode?: string };

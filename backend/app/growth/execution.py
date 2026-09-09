@@ -60,7 +60,8 @@ def state(db, now=None):
     future = [w.due_at for w in pending if w.due_at > now]
     future += [w.get("retry_at", 0) for w in browser if w.get("retry_at", 0) > now]
     next_at = now if ready or any(w.get("retry_at", 0) <= now for w in pending_browser) else min(future, default=now + 30)
-    return {"daily_new_contact_cap": 20, "window_hours": 24,
+    return {"daily_new_contact_cap": 20, "window_hours": capacity["window_hours"],
+        "day_timezone": capacity["day_timezone"], "day": capacity["day"], "resets_at": capacity["resets_at"],
         "sent_today": capacity["sent"], "reserved_or_uncertain": capacity["unresolved"],
         "remaining_capacity": capacity["remaining"],
         "confirmed_sent_count": capacity["sent"], "in_flight_send_count": capacity["in_flight_send_count"],

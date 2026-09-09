@@ -1,6 +1,6 @@
-"""One merchant, one first contact; atomic rolling admission across channels.
+"""One merchant, one first contact; atomic Pacific-day admission across channels.
 
-Confirmed receipts alone consume the rolling quota. Short-lived send permits
+Confirmed receipts alone consume the calendar-day quota. Short-lived send permits
 serialize dispatch; expired/uncertain contacts retain permanent duplicate fences.
 """
 import time
@@ -11,9 +11,9 @@ from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message
 from .identity import INELIGIBLE, canonical_identity, prospect_identity, existing_contact, identity_match, matching_contacts, owned_identity
 from .policy import GrowthError
 from .store import digest, get_memory, record
+from .review_calendar import review_day
 
 LIMIT = 20
-WINDOW = 86400
 PERMIT_SECONDS = 600
 MAX_IN_FLIGHT = 1
 # Independent incident circuit breaker, not part of the confirmed outreach quota.
@@ -31,27 +31,29 @@ def lock(db):
 
 def status(db, now=None):
     now = time.time() if now is None else now
+    day = review_day(now)
     rows = list(db.scalars(select(FirstContact).where(or_(
-        FirstContact.status.in_(["reserved", "uncertain"]), FirstContact.sent_at > now - WINDOW))
+        FirstContact.status.in_(["reserved", "uncertain"]),
+        (FirstContact.sent_at >= day.start) & (FirstContact.sent_at < day.end)))
         .execution_options(populate_existing=True)))
     unresolved = sum(r.status in {"reserved", "uncertain"} for r in rows)
     in_flight = sum(r.status == "reserved" and r.reserved_at + PERMIT_SECONDS > now for r in rows)
     uncertain = unresolved - in_flight
-    sent = sum(r.status == "sent" and r.sent_at is not None and r.sent_at > now - WINDOW for r in rows)
-    releases = sorted(r.sent_at + WINDOW for r in rows if r.sent_at is not None and r.status == "sent")
-    needed = max(1, sent - LIMIT + 1)
+    sent = sum(r.status == "sent" and r.sent_at is not None and day.start <= r.sent_at < day.end for r in rows)
     remaining = max(0, LIMIT - sent)
     blocker = ("DAILY_CAP_REACHED" if not remaining else
                "OUTREACH_UNCERTAINTY_SAFETY_HOLD" if uncertain >= MAX_UNCERTAIN else
                "SEND_IN_FLIGHT" if in_flight >= MAX_IN_FLIGHT or sent + in_flight >= LIMIT else None)
-    return {"policy": "confirmed_outreach_v2", "limit": LIMIT, "window_hours": 24, "used": sent, "sent": sent,
+    return {"policy": "confirmed_outreach_pacific_day_v3", "limit": LIMIT,
+            "window_hours": (day.end - day.start) / 3600, "day_timezone": "America/Los_Angeles",
+            "day": day.day, "day_start_at": day.start, "resets_at": day.end, "used": sent, "sent": sent,
             "confirmed_sent_count": sent, "remaining_confirmed_capacity": remaining,
             "in_flight_send_count": in_flight, "uncertain_contact_count": uncertain,
             "uncertain_contacts_protected": uncertain, "uncertainty_safety_limit": MAX_UNCERTAIN,
             "late_confirmation_overage": max(0, sent - LIMIT),
             "blocker": blocker, "remaining": remaining,
             "dispatch_remaining": 0 if blocker else min(MAX_IN_FLIGHT - in_flight, remaining - in_flight),
-            "unresolved": unresolved, "next_slot_at": releases[needed-1] if sent >= LIMIT and len(releases) >= needed else None,
+            "unresolved": unresolved, "next_slot_at": day.end if sent >= LIMIT else None,
             "is_target": False, "scope": "new merchants across email, forms and public replies", "continue_non_outbound": True}
 
 
