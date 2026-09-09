@@ -61,7 +61,9 @@ def main():
                 parser.error("review-import requires --file")
             result = import_review(db, json.loads(Path(args.file).read_text(encoding="utf-8-sig")), model=args.model,
                 input_tokens=args.input_tokens, output_tokens=args.output_tokens, latency_ms=args.latency_ms)
-        print(json.dumps(result, ensure_ascii=False))
+        # Native Windows shells may use a legacy code page. JSON escapes retain
+        # merchant text exactly without failing before the operator can read it.
+        print(json.dumps(result, ensure_ascii=True))
 
 
 if __name__ == "__main__":
