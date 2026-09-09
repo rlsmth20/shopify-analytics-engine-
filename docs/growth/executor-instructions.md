@@ -98,6 +98,13 @@ Keep payload files in .growth-deploy, not the repository root.
   Parse completed tool calls and their text arguments/results without printing
   image/base64 blocks or secrets. Review the actual browser action trace, not
   merely an earlier model summary. No fresh inbox check is required to read logs.
+  Review ALL retained_failed_results and traces in chronological order. A later
+  provider redirect/confirmation on the ORIGINAL submitted tab can resolve an
+  earlier immediate snapshot that had not yet changed. Verify the original tab
+  ID and actual browser observations. Opening or guessing a success URL alone
+  is not proof. Do not discard a later observed confirmation because the first
+  post-click snapshot was uncertain. Failed result persistence does not mean
+  the external submission failed.
   Return submission={reservation_id,outcome,reason,receipt,evidence_ids}.
   not_sent requires affirmative evidence that no submission occurred, with the
   assigned stage evidence IDs and a concise trace-based reason.
@@ -141,6 +148,13 @@ Keep payload files in .growth-deploy, not the repository root.
   body, cohort {icp,offer,message_version,qualification_policy}. Reuse cached
   operator-assess or include checks. Record actual receipt with outreach-complete.
   Never replay an uncertain send, including after a crash.
+  If the assigned first_contact exists, DO NOT reserve or submit again. Its
+  reservation_id is the durable identity needed to persist an existing receipt.
+  Inspect the retained form/trace; if a real success confirmation is present,
+  return submission={reservation_id,outcome:"sent",reason,receipt:<exact confirmed
+  URL/text>,evidence_ids:[]}. Merely describing success in observation does not
+  persist a send. A verified receipt may return done, stop_reason=null,
+  successors=[]; the supervisor selects the next queued action automatically.
   If a reservation was created, always return submission with its actual outcome:
   sent with exact receipt; not_sent only if no submission was attempted; uncertain
   after any unconfirmed Send click. Include reason and evidence_ids=[] for your

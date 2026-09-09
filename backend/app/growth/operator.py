@@ -6,7 +6,7 @@ shared admission gate, and external receipts remain the proof of outreach.
 import time
 from urllib.parse import urlparse
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from .models import Evidence, FirstContact, Memory, uid
 from .outbound import lock, status
@@ -104,9 +104,21 @@ def export_packet(db):
     from .identity import owned_identity, INELIGIBLE
     from .models import Contact
     for row in db.scalars(select(Memory).where(Memory.namespace == NAMESPACE,
-            Memory.value["status"].as_string().in_(["pending", "running"]),
+            or_(Memory.value["status"].as_string().in_(["pending", "running"]),
+                (Memory.value["stage"].as_string() == "reply") & (Memory.value["status"].as_string() == "blocked")),
             func.coalesce(Memory.value["lease_until"].as_float(), 0) <= now)):
         candidate = db.get(Contact, row.value.get("contact_id")) if row.value.get("contact_id") else None
+        if row.value.get("stage") == "reply" and candidate:
+            source = db.get(Evidence, row.value.get("evidence_id"))
+            admission = db.scalar(select(FirstContact).where(FirstContact.contact_id == candidate.id))
+            if source and source.data.get("stop_reason") == "OUTREACH_OUTCOMES_UNRESOLVED" and admission:
+                # Legacy schemas lacked a reconcile successor. Receipt work is
+                # not a substantive customer reply and must use the receipt contract.
+                remember(db, NAMESPACE, row.key, {**row.value, "stage": "reconcile", "status": "pending",
+                    "reservation_id": admission.id, "receipt_completion": True, "retry_at": 0,
+                    "prior_reply_attempts": row.value.get("attempts", 0), "attempts": 0})
+        if row.value.get("status") == "blocked":
+            continue
         if row.value.get("stage") != "reconcile" and candidate and (owned_identity(candidate.identity) or candidate.suppressed or candidate.status in INELIGIBLE):
             lock(db)
             proof = record(db, "owned-account-exclusion:" + row.key, "PROSPECT_EXCLUDED", candidate.id,
@@ -126,6 +138,7 @@ def export_packet(db):
     available = [r.value for r in db.scalars(select(Memory).where(*active, lease <= now, attempts < MAX_ATTEMPTS,
         func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now)
         .order_by(case((stage == "reply", 0), (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4),
+                      ((stage == "reconcile") & Memory.value["receipt_completion"].as_boolean().is_(True), 2),
                       (stage == "reconcile", 2 if capacity["remaining"] == 0 else 4), else_=3),
                   Memory.value["priority"].as_float().desc(), Memory.id).limit(6))]
     exhausted = [r.key for r in db.scalars(select(Memory).where(*active, lease <= now, attempts >= MAX_ATTEMPTS)

@@ -106,3 +106,44 @@ class ReconciliationTests(unittest.TestCase):
             self.assertIsNone(db.get(FirstContact,reservation))
             from app.growth.store import digest
             self.assertFalse(get_memory(db,'operator_task',digest('after-release:'+reservation)))
+
+    def test_post_admission_failure_hands_off_to_receipt_recovery_before_other_acquisition(self):
+        from app.growth.operator import claim
+        reservation, proof = self.reserve_fixture(0)
+        with self.factory() as db:
+            row=db.get(FirstContact,reservation)
+            fresh=offer(db,key='receipt-needed',source='https://example.com/contact',decision='Fixture send',
+                contact_id=row.contact_id,stage='send',evidence_id=proof)
+            task=claim(db,fresh['id'],executor='worker')
+            remember(db,'working','browser_executor',{'owner':'worker'})
+            db.commit()
+        result=self.result(); result.update(stop_reason=None,submission=None)
+        with self.assertRaises(GrowthError): executor.accept(self.factory,'worker',task,result)
+        executor.failed(self.factory,'worker',task,'Receipt not persisted')
+        recovery=executor.take(self.factory,'worker')
+        self.assertEqual(recovery['stage'],'reconcile')
+        self.assertTrue(recovery['receipt_completion'])
+        self.assertEqual(recovery['first_contact']['reservation_id'],reservation)
+        result=self.recovered(recovery,proof,'sent')
+        result['submission']['receipt']='https://example.com/contact?contact_posted=true'
+        executor.accept(self.factory,'worker',recovery,result)
+        with self.factory() as db:
+            self.assertEqual(db.get(FirstContact,reservation).status,'sent')
+        self.assertEqual(executor.take(self.factory,'worker')['stage'],'discover')
+
+    def test_legacy_receipt_task_is_not_treated_as_a_customer_reply(self):
+        reservation, _ = self.reserve_fixture(0)
+        with self.factory() as db:
+            row = db.get(FirstContact,reservation)
+            row.reserved_at=time.time()-60
+            source=record(db,'legacy-receipt','ACQUISITION_STAGE_RESULT','old-send',
+                {'stop_reason':'OUTREACH_OUTCOMES_UNRESOLVED'})
+            legacy=offer(db,key='legacy-receipt-task',source='https://example.com/contact',decision='Reconcile prior send',
+                contact_id=row.contact_id,stage='reply',evidence_id=source.id)
+            remember(db,'operator_task',legacy['id'],{**legacy,'status':'blocked','attempts':3,'lease_until':0})
+            db.commit()
+        task=executor.take(self.factory,'worker')
+        self.assertEqual(task['id'],legacy['id'])
+        self.assertEqual(task['stage'],'reconcile')
+        self.assertEqual(task['prior_reply_attempts'],3)
+        self.assertEqual(task['attempts'],1)

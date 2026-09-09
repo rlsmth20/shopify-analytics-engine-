@@ -11,33 +11,56 @@ from .policy import GrowthError
 from .store import get_memory, record, remember
 
 
+def offer_review(db, row, *, receipt_completion=False):
+    from . import operator
+    previous = get_memory(db, "outreach_reconciliation", row.id)
+    existing = get_memory(db, operator.NAMESPACE, previous.get("task_id", ""))
+    if existing.get("status") in {"pending", "running"} and existing.get("attempts", 0) < operator.MAX_ATTEMPTS:
+        if receipt_completion and not existing.get("receipt_completion"):
+            remember(db, operator.NAMESPACE, existing["id"], {**existing, "receipt_completion": True})
+        return
+    intent = db.scalar(select(Evidence).where(Evidence.key == "first-contact-intent:" + row.id))
+    contact = db.get(Contact, row.contact_id)
+    if not intent or not contact:
+        return
+    generation = previous.get("generation", 0) + 1
+    task = operator.offer(db, key=f"reconcile:{row.id}:{generation}", source=contact.source,
+        contact_id=contact.id, stage="reconcile", priority=100, evidence_id=intent.id,
+        decision="Review the retained execution trace for this reservation. Never submit or replay it. Return submission outcome not_sent only with affirmative evidence that no submission occurred; sent requires an actual receipt; otherwise uncertain. The supervisor applies the result and selects the next action.")
+    remember(db, operator.NAMESPACE, task["id"], {**task, "reservation_id": row.id, "receipt_completion": receipt_completion})
+    remember(db, "outreach_reconciliation", row.id, {"generation": generation, "task_id": task["id"], "retry_at": 0})
+
+
 def enqueue_recovery(db):
     from . import operator
     now = time.time()
     runnable = db.scalar(select(Memory.id).where(Memory.namespace == operator.NAMESPACE,
         Memory.value["stage"].as_string() == "reconcile",
+        Memory.value["receipt_completion"].as_boolean().is_(True),
         Memory.value["status"].as_string().in_(["pending", "running"]),
         Memory.value["attempts"].as_integer() < operator.MAX_ATTEMPTS,
         func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now).limit(1))
     if runnable:
         return
     for row in db.scalars(select(FirstContact).where(
-            FirstContact.status.in_(["reserved", "uncertain"]), FirstContact.reserved_at < now - 600)):
+            FirstContact.status.in_(["reserved", "uncertain"]))):
         active = db.scalar(select(Memory.id).where(Memory.namespace == operator.NAMESPACE,
             Memory.value["contact_id"].as_string() == row.contact_id,
             Memory.value["status"].as_string() == "running",
             Memory.value["lease_until"].as_float() > now))
         if active:
             continue
+        send_tasks = select(Memory.key).where(Memory.namespace == operator.NAMESPACE,
+            Memory.value["contact_id"].as_string() == row.contact_id,
+            Memory.value["stage"].as_string().in_(["send", "outreach"]))
+        failed_send = db.scalar(select(Evidence.id).where(Evidence.subject.in_(send_tasks),
+            Evidence.kind == "EXECUTION_FAULT", Evidence.occurred_at >= row.reserved_at).limit(1))
+        if row.reserved_at >= now - 600 and not failed_send:
+            continue
         previous = get_memory(db, "outreach_reconciliation", row.id)
         # A reviewed uncertain send remains held. Reinspect on new evidence,
         # not every poll; this must not become another monitoring busy loop.
         if previous.get("retry_at", 0) > now:
-            continue
-        generation = previous.get("generation", 0) + 1
-        contact = db.get(Contact, row.contact_id)
-        intent = db.scalar(select(Evidence).where(Evidence.key == "first-contact-intent:" + row.id))
-        if not intent or not contact:
             continue
         existing = get_memory(db, operator.NAMESPACE, previous.get("task_id", ""))
         if existing.get("status") in {"pending", "running"} and existing.get("attempts", 0) < operator.MAX_ATTEMPTS:
@@ -45,11 +68,7 @@ def enqueue_recovery(db):
         if existing.get("attempts", 0) >= operator.MAX_ATTEMPTS and not previous.get("retry_at"):
             remember(db, "outreach_reconciliation", row.id, {**previous, "retry_at": now + 3600})
             continue
-        task = operator.offer(db, key=f"reconcile:{row.id}:{generation}", source=contact.source,
-            contact_id=contact.id, stage="reconcile", priority=100, evidence_id=intent.id,
-            decision="Review the retained execution trace for this reservation. Never submit or replay it. Return submission outcome not_sent only with affirmative evidence that no submission occurred; sent requires an actual receipt; otherwise uncertain. The supervisor applies the result and selects the next action.")
-        remember(db, operator.NAMESPACE, task["id"], {**task, "reservation_id": row.id})
-        remember(db, "outreach_reconciliation", row.id, {"generation": generation, "task_id": task["id"], "retry_at": 0})
+        offer_review(db, row, receipt_completion=bool(failed_send))
         # One owned review at a time; do not hold the shared send lock while
         # materializing the entire historical backlog over a remote connection.
         return
@@ -77,6 +96,10 @@ def apply_result(db, task, result, stage_event):
     if not submission:
         if task.get("stage") == "reconcile":
             raise GrowthError("Reconciliation requires an explicit submission outcome")
+        if task.get("stage") in {"send", "outreach"}:
+            prior = db.scalar(select(FirstContact).where(FirstContact.contact_id == task.get("contact_id")))
+            if (prior and prior.status != "sent") or (result.get("outcome") == "done" and not prior):
+                raise GrowthError("Return submission with the reservation ID and verified outcome; prose is not a persisted receipt")
         return
     row = db.get(FirstContact, submission.get("reservation_id"))
     if (not row or row.contact_id != task.get("contact_id") or
