@@ -8,7 +8,7 @@ import time
 from typing import Annotated, Literal
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -32,6 +32,18 @@ Admin = Annotated[User, Depends(require_admin)]
 @router.get("/dashboard")
 def read_dashboard(db: DB, owner: Admin):
     return dashboard(db)
+
+
+@router.get("/outreach-history")
+def read_outreach_history(db: DB, owner: Admin, response: Response,
+                         before: str | None = Query(default=None, max_length=32),
+                         status: Literal["sent", "uncertain", "reserved", "failed", "not_sent"] = "sent",
+                         search: str = Query(default="", max_length=150),
+                         method: Literal["email", "contact_form", "shopify_community", "reddit"] | None = None,
+                         limit: int = Query(default=25, ge=1, le=50)):
+    from app.growth.outreach_history import history
+    response.headers["Cache-Control"] = "private, no-store"
+    return history(db, before=before, status=status, limit=limit, search=search, method=method)
 
 
 @router.get("/evidence")

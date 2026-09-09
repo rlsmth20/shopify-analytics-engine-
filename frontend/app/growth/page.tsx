@@ -133,6 +133,7 @@ export default function GrowthPage() {
     <header className={styles.header}>
       <Link href="/dashboard" className={styles.brand}>skubase<span> / growth</span></Link>
       <div className={styles.headerActions}><span className={styles.pill}>Organic · $0 advertising</span>
+        <Link href="/growth/outreach">View messages sent →</Link>
         <button onClick={() => void load()} disabled={refreshing}>{refreshing ? "Refreshing…" : "Refresh"}</button>
         {data && <button onClick={() => void toggle()} disabled={busy} className={styles.quietButton}>{busy ? "Updating…" : data.agent.paused ? "Resume operator" : "Pause operator"}</button>}
       </div>
