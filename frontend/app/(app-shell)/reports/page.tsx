@@ -197,6 +197,7 @@ const reportMeta: Record<ReportKind, { title: string; description: string }> = {
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const reportPreview = useRef<HTMLElement | null>(null);
   const [selectedReport, setSelectedReport] = useState<ReportKind>("actions");
   const [reportLoad, setReportLoad] = useState<ReportLoadState | null>(null);
   const [reportRetry, setReportRetry] = useState(0);
@@ -373,7 +374,17 @@ export default function ReportsPage() {
               <button
                 type="button"
                 className="button button-secondary"
-                onClick={() => setSelectedReport(report.key)}
+                aria-controls="report-preview"
+                onClick={() => {
+                  setSelectedReport(report.key);
+                  requestAnimationFrame(() => {
+                    reportPreview.current?.focus({ preventScroll: true });
+                    reportPreview.current?.scrollIntoView({
+                      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+                      block: "start",
+                    });
+                  });
+                }}
               >
                 Preview report
               </button>
@@ -386,7 +397,9 @@ export default function ReportsPage() {
         ))}
       </section>
 
-      <section className="report-workspace section-card">
+      <section id="report-preview" ref={reportPreview} tabIndex={-1}
+        aria-label={`${reportMeta[selectedReport].title} preview`}
+        className="report-workspace section-card">
         <ReportToolbar
           title={reportMeta[selectedReport].title}
           description={reportMeta[selectedReport].description}
