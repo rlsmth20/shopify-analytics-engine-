@@ -60,12 +60,38 @@ class PlannerTests(unittest.TestCase):
         with self.factory() as db:
             remember(db,'operator_task','terminal',{'stage':'send','status':'blocked','attempts':3})
             db.commit()
-        self.assertIsNone(executor.take(self.factory,'executor'))
+        task = executor.take(self.factory,'executor')
+        self.assertEqual(task['stage'], 'plan')
+        executor.accept(self.factory,'executor',task,self.result())
         with self.factory() as db:
             e=record(db,'terminal-outcome','ACQUISITION_STAGE_RESULT','terminal',{'outcome':'blocked'})
             remember(db,'operator_task','terminal',{'stage':'send','status':'blocked','attempts':3,'result_evidence_id':e.id})
             db.commit()
-        self.assertEqual(executor.take(self.factory,'executor')['stage'],'plan')
+        self.assertEqual(executor.take(self.factory,'executor')['stage'],'discover')
+
+    def test_uncertain_contacts_and_receipt_backlog_do_not_block_new_discovery(self):
+        from app.growth.models import Contact
+        from app.growth.outbound import status
+        with self.factory() as db:
+            for n in range(20):
+                contact=Contact(identity=f'fixture:{n}',source='https://example.com/contact')
+                db.add(contact); db.flush()
+                db.add(FirstContact(contact_id=contact.id,action_key=f'fixture:{n}',channel='contact_form',
+                    experiment_id='fixture',cohort={},body_hash='fixture',reserved_at=time.time()-1200,
+                    status='uncertain' if n<8 else 'sent',sent_at=None if n<8 else time.time()-1000))
+            source=record(db,'receipt-source','OBSERVATION','receipt',{'fixture':True})
+            offer(db,key='receipt-backlog',source='https://example.com/contact',decision='Check retained receipt',
+                  stage='reconcile',evidence_id=source.id)
+            remember(db,'operator_task','old-uncertain-send',{'stage':'send','status':'blocked','attempts':3})
+            db.commit()
+            self.assertEqual((status(db)['sent'],status(db)['remaining']),(12,8))
+        task=executor.take(self.factory,'autonomous-worker')
+        self.assertEqual(task['stage'],'plan')
+        executor.accept(self.factory,'autonomous-worker',task,self.result())
+        task=executor.take(self.factory,'autonomous-worker')
+        self.assertEqual(task['stage'],'discover')
+        with self.factory() as db:
+            self.assertEqual(status(db)['uncertain_contact_count'],8)
 
     def test_pending_retry_hold_capacity_mission_and_competing_executor(self):
         with self.factory() as db:

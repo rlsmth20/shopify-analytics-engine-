@@ -12,7 +12,7 @@ from app.db.base import Base
 from app.growth.engine import bootstrap, schedule
 from app.growth.models import Contact, Experiment, FirstContact, Work
 from app.growth.outbound import LIMIT, MAX_UNCERTAIN, authorize_submission, complete, reconcile_not_sent, reserve_contact, status
-from app.growth.store import record
+from app.growth.store import record, remember
 from app.growth.policy import GrowthError
 
 
@@ -128,6 +128,16 @@ class OutboundTests(unittest.TestCase):
             self.assertEqual((view['sent'],view['remaining']),(0,20))
             self.assertEqual(view['blocker'],'OUTREACH_UNCERTAINTY_SAFETY_HOLD')
         with self.assertRaises(GrowthError): self.reserve(MAX_UNCERTAIN)
+
+    def test_owner_pause_fences_admission_and_final_submission(self):
+        pending=self.reserve(0)['reservation_id']
+        with self.factory() as db:
+            remember(db,'working','control',{'paused':True}); db.commit()
+            with self.assertRaises(GrowthError): authorize_submission(db,pending)
+        with self.assertRaises(GrowthError): self.reserve(1)
+        with self.factory() as db:
+            remember(db,'working','control',{'paused':True,'deployment_drain':'fixture-release'}); db.commit()
+            authorize_submission(db,pending); db.commit()
 
     def test_rolling_boundary_restart_uncertainty_and_permanent_dedupe(self):
         now = time.time()

@@ -58,6 +58,9 @@ def status(db, now=None):
 def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, cohort, now=None):
     now = time.time() if now is None else now
     lock(db)  # PostgreSQL row lock / SQLite write lock serializes competing callers.
+    control = get_memory(db, "working", "control")
+    if control.get("paused") and not control.get("deployment_drain"):
+        raise GrowthError("Acquisition is paused")
     db.refresh(contact)
     if owned_identity(contact.identity):
         raise GrowthError("Owned business account is not an acquisition prospect")
@@ -122,7 +125,8 @@ def authorize_submission(db, reservation_id, now=None):
     contact = db.get(Contact, row.contact_id)
     if not contact or any(c.suppressed or c.status in INELIGIBLE for c in matching_contacts(db, contact.identity)):
         raise GrowthError("Contact is suppressed or ineligible")
-    if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold"):
+    control = get_memory(db, "working", "control")
+    if (control.get("paused") and not control.get("deployment_drain")) or get_memory(db, "working", "acquisition_hold"):
         raise GrowthError("Acquisition is paused or held")
     record(db, "first-contact-authorized:" + row.id, "FIRST_CONTACT_SUBMISSION_AUTHORIZED", row.contact_id,
            {"reservation_id": row.id, "confirmed_count": current["sent"],

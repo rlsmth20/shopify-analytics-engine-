@@ -211,14 +211,15 @@ def replenish(db, capacity, now=None):
         return None
     if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold") or get_memory(db, "working", "browser_safety_check").get("requires_attention"):
         return None
-    # A retrying/running task is not an empty queue; never evade a failed send.
+    # Receipt reviews protect their contact, not unrelated acquisition capacity.
     active = db.scalar(select(Memory.id).where(Memory.namespace == "operator_task",
         Memory.value["status"].as_string().in_(["pending", "running"]),
-        Memory.value["stage"].as_string() != "monitor").limit(1))
+        Memory.value["stage"].as_string().not_in(["monitor", "reconcile"])).limit(1))
     if active:
         return None
     blocked = db.scalar(select(Memory.id).where(Memory.namespace == "operator_task",
         Memory.value["status"].as_string() == "blocked",
+        Memory.value["stage"].as_string().not_in(["send", "outreach", "reconcile"]),
         Memory.value["result_evidence_id"].as_integer().is_(None),
         Memory.value["attempts"].as_integer() >= 3).limit(1))
     if blocked:

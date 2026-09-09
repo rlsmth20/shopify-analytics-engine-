@@ -95,7 +95,7 @@ def take(factory, owner):
             db.flush()
             packet = operator.export_packet(db)
         from .acquisition_planner import replenish
-        if not any(t.get("stage") != "monitor" for t in packet["tasks"]) and not packet["claimed_tasks"]:
+        if not any(t.get("stage") not in {"monitor", "reconcile"} for t in packet["tasks"]) and not packet["claimed_tasks"]:
             replenish(db, packet["capacity"])
             db.flush()
             packet = operator.export_packet(db)
