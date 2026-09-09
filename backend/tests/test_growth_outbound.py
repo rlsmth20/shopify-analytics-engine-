@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
 from app.growth.engine import bootstrap, schedule
 from app.growth.models import Contact, Experiment, FirstContact, Work
-from app.growth.outbound import LIMIT, complete, reconcile_not_sent, reserve_contact, status
+from app.growth.outbound import LIMIT, MAX_UNCERTAIN, authorize_submission, complete, reconcile_not_sent, reserve_contact, status
 from app.growth.store import record
 from app.growth.policy import GrowthError
 
@@ -26,7 +26,7 @@ class OutboundTests(unittest.TestCase):
         with self.factory() as db:
             exp = Experiment(key='fixture-outreach', specification={'channel':'shopify_community'}, stop_at=time.time()+864000)
             db.add(exp); db.flush(); self.exp = exp.id
-            for n in range(25):
+            for n in range(40):
                 db.add(Contact(id=str(n), identity='merchant:'+str(n), source='https://example.test/question',
                     qualification={'qualified':True}, facts=[{'verified':True,'source':'https://example.test','text':'Fixture store inventory question'}]))
             db.commit()
@@ -41,18 +41,93 @@ class OutboundTests(unittest.TestCase):
                 cohort={'icp':'apparel','offer':'health_check','message_version':2}, now=now)
             db.commit(); return result
 
-    def test_concurrent_channels_cannot_admit_a_twenty_first_contact(self):
+    def test_concurrent_channels_allow_only_one_live_permit_without_counting_it(self):
         def attempt(n):
-            try: self.reserve(n); return True
-            except GrowthError: return False
+            try: return self.reserve(n)
+            except GrowthError: return None
         with ThreadPoolExecutor(max_workers=8) as pool:
-            self.assertEqual(sum(pool.map(attempt, range(25))), LIMIT)
+            admitted = [r for r in pool.map(attempt, range(25)) if r]
+        self.assertEqual(len(admitted), 1)
         with self.factory() as db:
-            self.assertEqual(status(db)['remaining'],0)
-        # Full outbound capacity must not pause research/observation scheduling.
+            view = status(db)
+            self.assertEqual(view['remaining'],20)
+            self.assertEqual(view['used'],0)
+            self.assertEqual(view['in_flight_send_count'],1)
+            self.assertEqual(view['dispatch_remaining'],0)
         schedule(self.factory)
         with self.factory() as db:
             self.assertIsNotNone(db.scalar(select(Work).where(Work.kind=='observe', Work.status=='ready')))
+
+    def test_twelve_confirmed_eight_uncertain_can_reach_twenty_without_retries(self):
+        unknown = []
+        for n in range(20):
+            item = self.reserve(n)
+            with self.factory() as db:
+                if n < 8:
+                    unknown.append(item['reservation_id'])
+                    complete(db,item['reservation_id'],outcome='uncertain')
+                else:
+                    complete(db,item['reservation_id'],receipt='receipt:'+str(n))
+                db.commit()
+        with self.factory() as db:
+            view=status(db)
+            self.assertEqual((view['used'],view['sent'],view['remaining'],view['uncertain_contact_count']),(12,12,8,8))
+        for n in range(8):
+            with self.assertRaises(GrowthError): self.reserve(n)
+        for n in range(20,28):
+            item=self.reserve(n)
+            with self.factory() as db:
+                authorize_submission(db,item['reservation_id'])
+                complete(db,item['reservation_id'],receipt='receipt:'+str(n)); db.commit()
+        with self.assertRaises(GrowthError): self.reserve(28)
+        with self.factory() as db:
+            self.assertEqual(status(db)['sent'],20)
+            self.assertEqual(status(db)['uncertain_contact_count'],8)
+            complete(db,unknown[0],receipt='late verified receipt'); db.commit()
+            self.assertEqual(status(db)['sent'],21)
+            self.assertEqual(status(db)['late_confirmation_overage'],1)
+            self.assertEqual(status(db)['dispatch_remaining'],0)
+            self.assertEqual(status(db)['next_slot_at'], sorted(r.sent_at for r in db.scalars(select(FirstContact).where(FirstContact.status=='sent')))[1]+86400)
+        with self.assertRaises(GrowthError): self.reserve(29)
+
+    def test_late_confirmation_fences_an_existing_permit(self):
+        unknown=self.reserve(0)['reservation_id']
+        with self.factory() as db:
+            complete(db,unknown,outcome='uncertain'); db.commit()
+        for n in range(1,20):
+            item=self.reserve(n)
+            with self.factory() as db:
+                complete(db,item['reservation_id'],receipt='receipt:'+str(n)); db.commit()
+        pending=self.reserve(20)['reservation_id']
+        with self.factory() as db:
+            complete(db,unknown,receipt='late receipt'); db.commit()
+        with self.factory() as db:
+            with self.assertRaises(GrowthError): authorize_submission(db,pending)
+            self.assertEqual(status(db)['sent'],20)
+
+    def test_expired_and_consumed_permits_never_authorize_a_repeat(self):
+        now=time.time()
+        item=self.reserve(0,now=now)
+        with self.factory() as db:
+            authorize_submission(db,item['reservation_id'],now=now); db.commit()
+        with self.factory() as db:
+            with self.assertRaises(GrowthError): authorize_submission(db,item['reservation_id'],now=now+1)
+            with self.assertRaises(GrowthError): authorize_submission(db,item['reservation_id'],now=now+601)
+            view=status(db,now+601)
+            self.assertEqual((view['sent'],view['remaining'],view['in_flight_send_count'],view['uncertain_contact_count']),(0,20,0,1))
+        with self.assertRaises(GrowthError): self.reserve(0,now=now+601)
+        self.reserve(1,now=now+601)
+
+    def test_ambiguous_outcomes_cannot_accumulate_without_bound(self):
+        for n in range(MAX_UNCERTAIN):
+            item=self.reserve(n)
+            with self.factory() as db:
+                complete(db,item['reservation_id'],outcome='uncertain'); db.commit()
+        with self.factory() as db:
+            view=status(db)
+            self.assertEqual((view['sent'],view['remaining']),(0,20))
+            self.assertEqual(view['blocker'],'OUTREACH_UNCERTAINTY_SAFETY_HOLD')
+        with self.assertRaises(GrowthError): self.reserve(MAX_UNCERTAIN)
 
     def test_rolling_boundary_restart_uncertainty_and_permanent_dedupe(self):
         now = time.time()
@@ -67,7 +142,7 @@ class OutboundTests(unittest.TestCase):
         with self.assertRaises(GrowthError): self.reserve(0,now=now+86401)
         self.reserve(20,now=now+86400)
         with self.factory() as db:
-            self.assertEqual(status(db,now+172800)['remaining'],19)
+            self.assertEqual(status(db,now+172800)['remaining'],20)
 
     def test_suppression_and_missing_evidence_and_cohort_snapshot(self):
         with self.factory() as db:

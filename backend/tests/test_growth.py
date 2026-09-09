@@ -123,7 +123,7 @@ class GrowthTests(unittest.TestCase):
         self.assertEqual(len(calls),1)
         with self.factory() as db:
             from app.growth.outbound import status
-            self.assertEqual(status(db)['remaining'],0)
+            self.assertEqual(status(db)['remaining'],20)
 
     def test_service_email_needs_no_address_but_rejects_promotion_and_tampering(self):
         from app.growth.service_replies import draft_requested_check

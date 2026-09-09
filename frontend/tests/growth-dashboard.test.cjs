@@ -142,3 +142,9 @@ test("business inbox panel shows its evidence distinctions without additional ne
   assert.match(rendered, /does not prove that Gmail is forwarding replies/);
   assert.match(rendered, /separate from merchant reply metrics/);
 });
+
+test("confirmed outreach excludes uncertainty across deployment versions", () => {
+  assert.equal(view.confirmedOutreach({used:20,unresolved:8}),12);
+  assert.equal(view.confirmedOutreach({used:12,unresolved:8,confirmed_sent_count:12}),12);
+  assert.equal(view.confirmedOutreach({used:21,unresolved:7,confirmed_sent_count:21}),21);
+});

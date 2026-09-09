@@ -16,7 +16,7 @@ class ReconciliationTests(unittest.TestCase):
     setUp = test_growth_execution.ExecutionTests.setUp
     tearDown = test_growth_execution.ExecutionTests.tearDown
     result = test_growth_execution.ExecutionTests.result
-    def reserve_fixture(self, n, sent=False, uncertain=False):
+    def reserve_fixture(self, n, sent=False, uncertain=False, priority_review=True):
         with self.factory() as db:
             contact = Contact(identity=f'fixture:{n}', source='https://example.com/contact')
             db.add(contact); db.flush()
@@ -32,6 +32,9 @@ class ReconciliationTests(unittest.TestCase):
             proof = record(db, 'browser-stage:fixture' + str(n), 'ACQUISITION_STAGE_RESULT', task['id'],
                 {'observation':'Fixture trace verifies no submission', 'stage':'send'})
             remember(db, 'operator_task', task['id'], {**task, 'status':'blocked', 'result_evidence_id':proof.id})
+            if n == 0 and not sent and priority_review:
+                from app.growth.reconciliation import offer_review
+                offer_review(db, row, receipt_completion=True)
             db.commit()
             return row.id, proof.id
 
@@ -46,7 +49,7 @@ class ReconciliationTests(unittest.TestCase):
         self.reserve_fixture(1, uncertain=True)
         for n in range(2,20): self.reserve_fixture(n, sent=True)
         with self.factory() as db:
-            self.assertEqual(state(db)['current_blocker'], 'OUTREACH_OUTCOMES_UNRESOLVED')
+            self.assertIsNone(state(db)['current_blocker'])
         task = executor.take(self.factory, 'recovery-process')
         self.assertEqual(task['stage'], 'reconcile')
         executor.accept(self.factory, 'recovery-process', task, self.recovered(task,proof))
@@ -56,10 +59,10 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(successor['key'], 'after-release:' + reservation)
         with self.factory() as db:
             self.assertIsNone(db.get(FirstContact,reservation))
-            self.assertEqual(status(db)['remaining'],1)
+            self.assertEqual(status(db)['remaining'],2)
             self.assertEqual(status(db)['sent'],18)
 
-    def test_uncertainty_never_releases_capacity_or_busy_loops(self):
+    def test_uncertainty_keeps_duplicate_protection_without_using_quota(self):
         reservation, proof = self.reserve_fixture(0, uncertain=True)
         for n in range(1,20): self.reserve_fixture(n, sent=True)
         task = executor.take(self.factory, 'worker')
@@ -67,10 +70,10 @@ class ReconciliationTests(unittest.TestCase):
             executor.accept(self.factory, 'worker', task, self.recovered(task,proof))
         executor.accept(self.factory, 'worker', task, self.recovered(task,proof,'uncertain'))
         successor = executor.take(self.factory,'worker')
-        self.assertIsNone(successor)
+        self.assertEqual(successor['stage'], 'discover')
         with self.factory() as db:
             self.assertEqual(db.get(FirstContact,reservation).status,'uncertain')
-            self.assertEqual(status(db)['remaining'],0)
+            self.assertEqual(status(db)['remaining'],1)
 
     def test_unrelated_evidence_cannot_release_and_live_owner_is_not_reconciled(self):
         reservation, proof = self.reserve_fixture(0)
@@ -132,7 +135,7 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(executor.take(self.factory,'worker')['stage'],'discover')
 
     def test_legacy_receipt_task_is_not_treated_as_a_customer_reply(self):
-        reservation, _ = self.reserve_fixture(0)
+        reservation, _ = self.reserve_fixture(0, priority_review=False)
         with self.factory() as db:
             row = db.get(FirstContact,reservation)
             row.reserved_at=time.time()-60
@@ -164,3 +167,25 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(executor.receipt_session(task,folder),session)
         task['reconciliation']['events']=[{'key':'executor-failure:../../other'}]
         self.assertIsNone(executor.receipt_session(task,folder))
+
+    def test_recovered_preparation_has_a_fresh_idempotent_send_key(self):
+        reservation, proof=self.reserve_fixture(0)
+        for n in range(1,20): self.reserve_fixture(n,sent=True)
+        recovery=executor.take(self.factory,'worker')
+        executor.accept(self.factory,'worker',recovery,self.recovered(recovery,proof))
+        preparation=executor.take(self.factory,'worker')
+        with self.factory() as db:
+            old=offer(db,key='source:send',source='https://example.com/contact',decision='Old send attempt',
+                contact_id=preparation['contact_id'],stage='send',evidence_id=proof)
+            remember(db,'operator_task',old['id'],{**old,'status':'blocked'})
+            db.commit()
+        result=self.result('send')
+        result['successors'][0]['contact_id']=preparation['contact_id']
+        result['successors'][0]['priority']=90
+        executor.accept(self.factory,'worker',preparation,result)
+        child=executor.take(self.factory,'worker')
+        self.assertEqual(child['stage'],'send')
+        self.assertTrue(child['key'].startswith('recovered-send:'))
+        self.assertNotEqual(child['id'],old['id'])
+        with self.factory() as db:
+            self.assertEqual(state(db)['last_acquisition_action']['successor_keys'],[child['key']])

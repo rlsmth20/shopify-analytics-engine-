@@ -1,3 +1,19 @@
+# Current accounting override — confirmed_outreach_v2
+
+Only verified sent/submitted receipts count toward 20 new first contacts per rolling
+24 hours. Pending or uncertain contacts do not count. Keep unresolved contacts
+protected from retries. The ledger permits one live send at a time (10-minute
+reservation); an expired permit never authorizes submitting or retrying that contact.
+Immediately before the single external submission, call
+`scripts/growth-review.ps1 -Action outreach-authorize -File <JSON>` with
+`{"reservation_id":"the actual reserved ID"}`. Submit once within the returned
+30-second deadline. Authorization is one-use; expiry or repeated authorization
+requires receipt/no-effect reconciliation, never another click. Completion records
+actual receipts even when late. A separate `OUTREACH_UNCERTAINTY_SAFETY_HOLD` at
+10 unresolved contacts prevents unbounded ambiguous sends; it is not the outreach
+counter. `SEND_IN_FLIGHT` is a temporary dispatch wait. Continue other useful work.
+These rules supersede all older held-slot/quota wording below.
+
 # Persistent acquisition executor — market_discovery_v1
 
 Execute the assigned leased stage and return required structured JSON. The

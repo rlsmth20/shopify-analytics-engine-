@@ -19,10 +19,10 @@ from sqlalchemy import select, func
 from sqlalchemy.engine import make_url
 from .outbound import lock, status
 from .policy import GrowthError
-from .store import get_memory, record, remember
+from .store import digest, get_memory, record, remember
 from .process_job import ProcessJob
 
-STOP_REASONS = {"DAILY_CAP_REACHED", "OUTREACH_OUTCOMES_UNRESOLVED", "NO_CURRENT_QUALIFIED_PROSPECTS",
+STOP_REASONS = {"DAILY_CAP_REACHED", "OUTREACH_OUTCOMES_UNRESOLVED", "OUTREACH_UNCERTAINTY_SAFETY_HOLD", "SEND_IN_FLIGHT", "NO_CURRENT_QUALIFIED_PROSPECTS",
     "DISCOVERY_EXHAUSTED_FOR_CURRENT_SEARCH_SPACE", "REPLY_REQUIRES_PRIORITY_ATTENTION",
     "CHANNEL_BLOCKED", "SAFETY_BLOCKED", "BUDGET_BLOCKED", "PROVIDER_BLOCKED", "TRUE_IDLE"}
 
@@ -102,12 +102,14 @@ def take(factory, owner):
         tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")]
         if safety.get("requires_attention"):
             tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile"}]
+        if not packet["capacity"].get("dispatch_remaining", packet["capacity"]["remaining"]):
+            tasks = [t for t in tasks if t.get("stage") not in {"send", "outreach"}]
         if not packet["capacity"]["remaining"]:
             tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile"}]
         if not tasks:
             remember(db, "working", "browser_executor", {**runtime, "owner": owner,
                 "heartbeat_at": time.time(), "lease_until": 0, "task_id": None,
-                "blocker": packet["capacity"]["blocker"] if not packet["capacity"]["remaining"] else
+                "blocker": packet["capacity"]["blocker"] if packet["capacity"]["blocker"] else
                     "CHANNEL_CHECK_REQUIRES_ATTENTION" if safety.get("requires_attention") else runtime.get("blocker"),
                 "next_retry_at": time.time() + 30})
             db.commit()
@@ -208,6 +210,10 @@ def accept(factory, owner, task, result):
         for successor in successors:
             if successor.get("stage") not in {"discover", "qualify", "prepare", "send", "outreach", "reply"}:
                 raise GrowthError("Maintenance is not an acquisition successor")
+            if task.get("key", "").startswith("after-release:") and successor.get("stage") in {"send", "outreach"}:
+                # A verified no-effect recovery creates a new attempt, while
+                # retries of this preparation retain one idempotent child key.
+                successor = {**successor, "key": "recovered-send:" + task["id"] + ":" + digest(successor["key"])[:16]}
             candidate = db.get(Contact, successor.get("contact_id")) if successor.get("contact_id") else None
             if candidate and candidate.qualification.get("eligible") is True:
                 successor = {**successor, "priority": {"HIGH": 90, "MEDIUM": 70, "LOW": 40}.get(
@@ -225,7 +231,7 @@ def accept(factory, owner, task, result):
         if result["outcome"] != "blocked" and stage not in {"monitor", "plan", "reconcile"}:
             record(db, "browser-progress:" + task["lease_token"], "ACQUISITION_PROGRESS", task["id"],
                 {"executor": owner, "stage": stage, "evidence_id": event.id,
-                 "outcome": result["outcome"], "successor_keys": [s["key"] for s in successors]})
+                 "outcome": result["outcome"], "successor_keys": [s["key"] for s in executable]})
         remember(db, "working", "browser_executor", {**runtime, "heartbeat_at": time.time(),
             "lease_until": 0, "task_id": None,
             "last_progress_at": time.time() if result["outcome"] != "blocked" and stage != "plan" else runtime.get("last_progress_at"),

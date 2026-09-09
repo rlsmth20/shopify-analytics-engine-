@@ -89,6 +89,7 @@ export type GrowthSnapshot = {
   generated_at?: number;
   execution?: {
     daily_new_contact_cap: number; sent_today: number; remaining_capacity: number;
+    confirmed_sent_count?: number; in_flight_send_count?: number; uncertain_contact_count?: number; late_confirmation_overage?: number;
     qualified_ready: number; discovery_pending: number; acquisition_tasks_running: number;
     oldest_pending_acquisition_age: number | null; last_acquisition_action: { at: number; stage: string } | null;
     last_successful_send: number | null; current_blocker: string | null; operational_fault: string | null;
@@ -112,7 +113,8 @@ export type GrowthSnapshot = {
     unknown_cost_records?: number; acquisition_spend: number; advertising_spend: number; cac: number | null; limitations: string };
   agent: { activity: string; next_action: string; last_wake: number; model: string | null; health: string; paused: boolean;
     daily_budget_usd: number; next_due?: number | null; queue_ready?: number;
-    first_contact_capacity?: { limit: number; window_hours: number; used: number; remaining: number; unresolved: number;
+    first_contact_capacity?: { policy?: string; confirmed_sent_count?: number; in_flight_send_count?: number; uncertain_contact_count?: number;
+      remaining_confirmed_capacity?: number; dispatch_remaining?: number; blocker?: string | null; late_confirmation_overage?: number; limit: number; window_hours: number; used: number; remaining: number; unresolved: number;
       next_slot_at: number | null; is_target: boolean; scope: string; continue_non_outbound: boolean };
     executive?: { last_review?: number; mode?: string };
     inbox_transport?: GrowthInboxTransport | null;
@@ -122,3 +124,8 @@ export type GrowthSnapshot = {
     observation?: string; recommended_action?: string } }[];
   recent_actions: { id: number; kind: string; at: number; source: string }[];
 };
+
+// Compatible with older API snapshots during a rolling deployment.
+export function confirmedOutreach(capacity: NonNullable<GrowthSnapshot["agent"]["first_contact_capacity"]>): number {
+  return capacity.confirmed_sent_count ?? Math.max(0, capacity.used - capacity.unresolved);
+}

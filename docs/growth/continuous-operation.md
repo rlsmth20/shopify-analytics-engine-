@@ -1,3 +1,23 @@
+# Current accounting override — confirmed_outreach_v2
+
+The rolling ceiling is 20 confirmed first-contact submissions, not reservations.
+Uncertain or expired intents remain per-contact duplicate fences but do not consume
+confirmed-message capacity. `used`, `sent`, `confirmed_sent_count` and the dashboard
+count verified receipts only; `remaining` is 20 minus those confirmations.
+`in_flight_send_count` and `uncertain_contact_count` are separate. Dispatch uses one
+short-lived, one-use permit, checked transactionally immediately before submission.
+At 10 uncertain contacts, a separate incident circuit breaker requires receipt
+recovery; it does not relabel uncertainty as completed outreach. Confirmations,
+admission and final authorization share the database dispatch lock.
+
+Late confirmation is recorded when learned, never suppressed or deferred to hide
+an overage. If it reveals more than 20 confirmed messages in the window, further
+dispatch stops until enough confirmations age out. Exactly 20 actual external
+messages cannot be guaranteed while potentially sent messages count as zero;
+this policy bounds unresolved exposure to 10 plus the single live permit, reports
+any revealed overage, and never automatically retries an uncertain contact.
+These rules supersede older held-slot language and historical campaign ledgers.
+
 # Continuous growth and first-contact ceiling
 
 Current policy **market_discovery_v1** supersedes older qualification language in

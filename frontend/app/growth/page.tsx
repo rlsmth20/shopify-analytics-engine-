@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { API_BASE_URL } from "@/lib/api-base";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
-import { chartWidth, FUNNEL_STAGES, growthLabel as label, growthMoney as money, growthNumber as number,
+import { confirmedOutreach, chartWidth, FUNNEL_STAGES, growthLabel as label, growthMoney as money, growthNumber as number,
   growthPercent as percent, growthTime as time, growthInboxView, outcomeLabel, type GrowthActivityDay, type GrowthCohort,
   type GrowthInboxTransport, type GrowthSnapshot } from "@/lib/growth-dashboard";
 import styles from "./page.module.css";
@@ -120,6 +120,9 @@ export default function GrowthPage() {
   }
 
   const capacity = data?.agent.first_contact_capacity;
+  const confirmed = capacity ? confirmedOutreach(capacity) : 0;
+  const uncertain = capacity?.uncertain_contact_count ?? capacity?.unresolved ?? 0;
+  const sendsInFlight = capacity?.in_flight_send_count ?? 0;
   const funnel = funnelScope === "all" ? data?.funnel : data?.measurement?.mission_funnel;
   const funnelMax = Math.max(1, ...Object.values(funnel || {}));
   const healthy = !!data && !data.agent.paused && !data.execution?.operational_fault && ["running", "healthy", "idle", "waiting"].includes(data.agent.health);
@@ -151,7 +154,9 @@ export default function GrowthPage() {
         {data.execution.operational_fault && <p className={styles.notice} role="alert">Operational fault: {label(data.execution.operational_fault)}</p>}
         <dl className={styles.operations}>
           <dt>Daily new-contact cap</dt><dd>{data.execution.daily_new_contact_cap} · rolling 24 hours</dd>
-          <dt>Sent in current window</dt><dd>{data.execution.sent_today}</dd>
+          <dt>Confirmed first contacts</dt><dd>{data.execution.sent_today}/{data.execution.daily_new_contact_cap}</dd>
+          <dt>Uncertain contacts</dt><dd>{data.execution.uncertain_contact_count ?? uncertain}</dd>
+          <dt>Sends in progress</dt><dd>{data.execution.in_flight_send_count ?? sendsInFlight}</dd>
           <dt>Remaining capacity</dt><dd>{data.execution.remaining_capacity}</dd>
           <dt>Qualified ready</dt><dd>{data.execution.qualified_ready}</dd>
           <dt>Discovery pending</dt><dd>{data.execution.discovery_pending}</dd>
@@ -167,12 +172,12 @@ export default function GrowthPage() {
       {held && <div className={styles.notice}><strong>New acquisition is on hold.</strong> Existing conversations and product-funnel investigation remain the priority. {data.strategy.bottleneck.observation}</div>}
       <div className={styles.columns}>
         <section className={styles.card} aria-labelledby="capacity-title"><div className={styles.cardHeading}><h2 id="capacity-title">First-contact capacity</h2><span className={styles.tag}>Rolling 24 hours</span></div>
-          {capacity ? <><div className={styles.capacityNumber}><strong>{number(capacity.used - capacity.unresolved)}<span> / {number(capacity.limit)} confirmed</span></strong><span>{number(capacity.remaining)} available · {number(capacity.unresolved)} held</span></div>
-            <div className={styles.capacityTrack} role="meter" aria-label="First-contact capacity used" aria-valuemin={0} aria-valuemax={capacity.limit} aria-valuenow={Math.min(capacity.used, capacity.limit)} aria-valuetext={`${capacity.used} of ${capacity.limit} slots used, including ${capacity.unresolved} unresolved reservations`}>
-              <span style={{ width: `${chartWidth(capacity.used - capacity.unresolved, capacity.limit)}%` }} /><i style={{ width: `${chartWidth(capacity.unresolved, capacity.limit)}%` }} /></div>
-            <div className={styles.capacityMeta}><span>{capacity.used - capacity.unresolved} completed first contacts</span><span>{capacity.unresolved} unresolved reservations</span></div>
-            <div className={styles.callout}><strong>{capacity.remaining > 0 ? "Continue qualified outreach while capacity remains." : capacity.unresolved > 0 ? "Submission outcomes need verification." : "20 confirmed first contacts in the rolling window."}</strong><p>{capacity.unresolved > 0 ? "Held slots are not completed sends. The executor reviews submission evidence, releases verified unused reservations, and resumes permitted outreach. Uncertain submissions remain held to prevent duplicates." : "Send only when a prospect qualifies. Replies to engaged merchants and essential checks continue at the ceiling."}</p></div>
-            {capacity.next_slot_at && <p className={styles.caption}>Next capacity release: {time(capacity.next_slot_at)}. Unresolved reservations stay reserved until reconciled.</p>}
+          {capacity ? <><div className={styles.capacityNumber}><strong>{number(confirmed)}<span> / {number(capacity.limit)} confirmed</span></strong><span>{number(capacity.remaining)} remaining · {number(uncertain)} uncertain</span></div>
+            <div className={styles.capacityTrack} role="meter" aria-label="Confirmed first contacts" aria-valuemin={0} aria-valuemax={capacity.limit} aria-valuenow={Math.min(confirmed, capacity.limit)} aria-valuetext={`${confirmed} confirmed first contacts of ${capacity.limit}; ${uncertain} uncertain contacts counted separately`}>
+              <span style={{ width: `${chartWidth(confirmed, capacity.limit)}%` }} /></div>
+            <div className={styles.capacityMeta}><span>{sendsInFlight} send in progress</span><span>{uncertain} uncertain contacts protected from retry</span></div>
+            <div className={styles.callout}><strong>{capacity.late_confirmation_overage ? "Late receipts revealed outreach above the ceiling. New sends are stopped." : capacity.blocker === "OUTREACH_UNCERTAINTY_SAFETY_HOLD" ? "Receipt uncertainty needs attention before another send." : confirmed >= capacity.limit ? "Confirmed outreach ceiling reached." : sendsInFlight ? "A send is in progress; the next permit waits for its outcome." : "Continue outreach to other eligible merchants."}</strong><p>Only confirmed submissions count toward 20. Uncertain contacts stay protected from duplicate messages and do not consume confirmed-message capacity. A separate safety hold stops dispatch if unresolved outcomes reach 10. Replies, research and receipt checks continue.</p></div>
+            {capacity.next_slot_at && <p className={styles.caption}>Next confirmed-message capacity release: {time(capacity.next_slot_at)}.</p>}
           </> : <div className={styles.empty}>Capacity data is unavailable. Check the shared send ledger before contacting a new merchant.</div>}
         </section>
         <section className={styles.card} aria-labelledby="activity-chart-title"><div className={styles.cardHeading}><h2 id="activity-chart-title">Conversations over volume</h2><span className={styles.tag}>Last 7 days</span></div>

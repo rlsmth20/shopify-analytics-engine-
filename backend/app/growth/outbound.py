@@ -1,8 +1,7 @@
 """One merchant, one first contact; atomic rolling admission across channels.
 
-An unresolved reservation consumes capacity until reconciled, even after 24h.
-No timeout silently grants another send. Browser operators must reserve just
-before submission and record the result; this is admission, not channel authority.
+Confirmed receipts alone consume the rolling quota. Short-lived send permits
+serialize dispatch; expired/uncertain contacts retain permanent duplicate fences.
 """
 import time
 
@@ -15,6 +14,11 @@ from .store import digest, get_memory, record
 
 LIMIT = 20
 WINDOW = 86400
+PERMIT_SECONDS = 600
+MAX_IN_FLIGHT = 1
+# Independent incident circuit breaker, not part of the confirmed outreach quota.
+# Prevent a broken channel from accumulating unlimited possibly-sent messages.
+MAX_UNCERTAIN = 10
 CHANNELS = {"email", "contact_form", "shopify_community", "reddit"}
 
 
@@ -28,14 +32,26 @@ def lock(db):
 def status(db, now=None):
     now = time.time() if now is None else now
     rows = list(db.scalars(select(FirstContact).where(or_(
-        FirstContact.status.in_(["reserved", "uncertain"]), FirstContact.sent_at > now - WINDOW))))
+        FirstContact.status.in_(["reserved", "uncertain"]), FirstContact.sent_at > now - WINDOW))
+        .execution_options(populate_existing=True)))
     unresolved = sum(r.status in {"reserved", "uncertain"} for r in rows)
+    in_flight = sum(r.status == "reserved" and r.reserved_at + PERMIT_SECONDS > now for r in rows)
+    uncertain = unresolved - in_flight
+    sent = sum(r.status == "sent" and r.sent_at is not None and r.sent_at > now - WINDOW for r in rows)
     releases = sorted(r.sent_at + WINDOW for r in rows if r.sent_at is not None and r.status == "sent")
-    needed = max(1, len(rows) - LIMIT + 1)
-    return {"limit": LIMIT, "window_hours": 24, "used": len(rows), "sent": len(rows) - unresolved,
-            "blocker": ("OUTREACH_OUTCOMES_UNRESOLVED" if unresolved else "DAILY_CAP_REACHED") if len(rows) >= LIMIT else None,
-            "remaining": max(0, LIMIT-len(rows)),
-            "unresolved": unresolved, "next_slot_at": releases[needed-1] if len(rows) >= LIMIT and len(releases) >= needed else None,
+    needed = max(1, sent - LIMIT + 1)
+    remaining = max(0, LIMIT - sent)
+    blocker = ("DAILY_CAP_REACHED" if not remaining else
+               "OUTREACH_UNCERTAINTY_SAFETY_HOLD" if uncertain >= MAX_UNCERTAIN else
+               "SEND_IN_FLIGHT" if in_flight >= MAX_IN_FLIGHT or sent + in_flight >= LIMIT else None)
+    return {"policy": "confirmed_outreach_v2", "limit": LIMIT, "window_hours": 24, "used": sent, "sent": sent,
+            "confirmed_sent_count": sent, "remaining_confirmed_capacity": remaining,
+            "in_flight_send_count": in_flight, "uncertain_contact_count": uncertain,
+            "uncertain_contacts_protected": uncertain, "uncertainty_safety_limit": MAX_UNCERTAIN,
+            "late_confirmation_overage": max(0, sent - LIMIT),
+            "blocker": blocker, "remaining": remaining,
+            "dispatch_remaining": 0 if blocker else min(MAX_IN_FLIGHT - in_flight, remaining - in_flight),
+            "unresolved": unresolved, "next_slot_at": releases[needed-1] if sent >= LIMIT and len(releases) >= needed else None,
             "is_target": False, "scope": "new merchants across email, forms and public replies", "continue_non_outbound": True}
 
 
@@ -74,22 +90,53 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
     if prior or prior_mail or alias_contact:
         raise GrowthError("Merchant was already contacted or has an unresolved intent; reconcile, never resend", "ambiguous")
     current = status(db, now)
-    if current["remaining"] == 0:
-        raise GrowthError("Rolling 24-hour first-contact ceiling reached; continue replies/research", "capacity")
+    if current["dispatch_remaining"] == 0:
+        raise GrowthError(current["blocker"] + "; continue replies, research and receipt reconciliation", "capacity")
     row = FirstContact(contact_id=contact.id, action_key=action_key, channel=channel, experiment_id=experiment_id,
         cohort={**cohort, "characteristics": contact.characteristics, "qualification": contact.qualification,
                 "fact_sources": contact.facts}, body_hash=digest(body), reserved_at=now)
     db.add(row); db.flush()
     record(db, "first-contact-intent:" + row.id, "FIRST_CONTACT_RESERVED", contact.id,
            {"reservation_id": row.id, "body": body, "channel": channel, "experiment_id": experiment_id,
-            "cohort": row.cohort, "submit_before": now + 600}, occurred_at=now)
-    return {"reservation_id": row.id, "submit_before": now + 600, "remaining": current["remaining"]-1}
+            "cohort": row.cohort, "submit_before": now + PERMIT_SECONDS}, occurred_at=now)
+    return {"reservation_id": row.id, "submit_before": now + PERMIT_SECONDS,
+            "remaining": current["remaining"], "authorize_before_submit": True}
+
+
+def authorize_submission(db, reservation_id, now=None):
+    """One-use final fence immediately before an external submission; never replay."""
+    now = time.time() if now is None else now
+    lock(db)
+    row = db.get(FirstContact, reservation_id)
+    if row:
+        db.refresh(row)
+    if not row or row.status != "reserved" or row.reserved_at + PERMIT_SECONDS <= now:
+        raise GrowthError("Send permit expired or uncertain; reconcile without retry", "ambiguous")
+    if db.scalar(select(Evidence.id).where(Evidence.key == "first-contact-authorized:" + row.id)):
+        raise GrowthError("Submission was already authorized; reconcile without retry", "ambiguous")
+    current = status(db, now)
+    if current["sent"] >= LIMIT or current["uncertain_contact_count"] >= MAX_UNCERTAIN:
+        raise GrowthError("Confirmed ceiling or uncertainty safety hold; do not submit", "capacity")
+    if current["in_flight_send_count"] > MAX_IN_FLIGHT:
+        raise GrowthError("Competing legacy permits; wait for receipt reconciliation", "capacity")
+    contact = db.get(Contact, row.contact_id)
+    if not contact or any(c.suppressed or c.status in INELIGIBLE for c in matching_contacts(db, contact.identity)):
+        raise GrowthError("Contact is suppressed or ineligible")
+    if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold"):
+        raise GrowthError("Acquisition is paused or held")
+    record(db, "first-contact-authorized:" + row.id, "FIRST_CONTACT_SUBMISSION_AUTHORIZED", row.contact_id,
+           {"reservation_id": row.id, "confirmed_count": current["sent"],
+            "submit_before": min(now + 30, row.reserved_at + PERMIT_SECONDS)}, occurred_at=now)
+    return {"reservation_id": row.id, "submit_before": min(now + 30, row.reserved_at + PERMIT_SECONDS),
+            "instruction": "Submit once before this deadline. Never retry an expired or consumed authorization."}
 
 
 def complete(db, reservation_id, *, receipt=None, outcome="sent", now=None):
     now = time.time() if now is None else now
     lock(db)
     row = db.get(FirstContact, reservation_id)
+    if row:
+        db.refresh(row)
     if not row or outcome not in {"sent", "uncertain"}:
         raise GrowthError("Known reservation and sent/uncertain outcome required")
     if row.status == "sent":
@@ -105,7 +152,12 @@ def complete(db, reservation_id, *, receipt=None, outcome="sent", now=None):
            {"reservation_id": row.id, "outcome": outcome, "receipt": receipt,
             "channel": row.channel, "experiment_id": row.experiment_id, "cohort": row.cohort}, occurred_at=now)
     db.flush()
-    return {"reservation_id": row.id, "status": row.status, "capacity": status(db, now)}
+    capacity = status(db, now)
+    if capacity["late_confirmation_overage"]:
+        record(db, "late-confirmation-overage:" + row.id, "OUTREACH_LATE_CONFIRMATION_OVERAGE", "outbound",
+               {"reservation_id": row.id, "confirmed_count": capacity["sent"], "limit": LIMIT,
+                "action": "Block new dispatch until confirmations age out; retain every real receipt"}, occurred_at=now)
+    return {"reservation_id": row.id, "status": row.status, "capacity": capacity}
 
 
 def backfill(db):
@@ -156,18 +208,7 @@ def reconcile_not_sent(db, reservation_id, evidence_id):
     return {"released":reservation_id, "capacity":status(db)}
 
 
-def operator_action(db, action, payload):
-    """Trusted owner CLI only; does not dispatch mail or authorize channel use."""
-    if action == "outreach-status":
-        return status(db)
-    if action == "outreach-backfill":
-        return backfill(db)
-    if action == "outreach-complete":
-        return complete(db, payload["reservation_id"], receipt=payload.get("receipt"), outcome=payload["outcome"])
-    if action == "outreach-reconcile":
-        return reconcile_not_sent(db,payload["reservation_id"],payload["evidence_id"])
-    if action != "outreach-reserve":
-        raise GrowthError("Unknown outreach operation")
+def require_browser_safety(db):
     executor = get_memory(db, "working", "browser_executor")
     if executor.get("owner"):
         safety = get_memory(db, "working", "browser_safety_check")
@@ -176,6 +217,24 @@ def operator_action(db, action, payload):
             Evidence.subject == str(evidence.id)).limit(1))
         if invalidated or safety.get("requires_attention") or time.time() - safety.get("checked_at", 0) > 300 or not evidence or evidence.kind != "CHANNEL_MONITOR" or time.time() - evidence.occurred_at > 300:
             raise GrowthError("Fresh essential browser reply/safety checks required before first contact")
+
+
+def operator_action(db, action, payload):
+    """Trusted owner CLI only; does not dispatch mail or authorize channel use."""
+    if action == "outreach-status":
+        return status(db)
+    if action == "outreach-backfill":
+        return backfill(db)
+    if action == "outreach-authorize":
+        require_browser_safety(db)
+        return authorize_submission(db, payload["reservation_id"])
+    if action == "outreach-complete":
+        return complete(db, payload["reservation_id"], receipt=payload.get("receipt"), outcome=payload["outcome"])
+    if action == "outreach-reconcile":
+        return reconcile_not_sent(db,payload["reservation_id"],payload["evidence_id"])
+    if action != "outreach-reserve":
+        raise GrowthError("Unknown outreach operation")
+    require_browser_safety(db)
     # Channel rules are reviewed by the authenticated operator, not guessed from keywords.
     if not payload.get("channel_rules_source") or not payload.get("relevance_evidence"):
         raise GrowthError("Current channel-rule and merchant relevance evidence required")

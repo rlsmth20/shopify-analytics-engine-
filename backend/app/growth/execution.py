@@ -56,13 +56,16 @@ def state(db, now=None):
         fault = "ACQUISITION_RETRIES_EXHAUSTED"
     blocker = ("SAFETY_BLOCKED" if get_memory(db, "working", "control").get("paused") or
                get_memory(db, "working", "acquisition_hold") else
-               capacity["blocker"] if not capacity["remaining"] else executor.get("blocker"))
+               capacity["blocker"] or executor.get("blocker"))
     future = [w.due_at for w in pending if w.due_at > now]
     future += [w.get("retry_at", 0) for w in browser if w.get("retry_at", 0) > now]
     next_at = now if ready or any(w.get("retry_at", 0) <= now for w in pending_browser) else min(future, default=now + 30)
     return {"daily_new_contact_cap": 20, "window_hours": 24,
-        "sent_today": capacity["used"] - capacity["unresolved"], "reserved_or_uncertain": capacity["unresolved"],
+        "sent_today": capacity["sent"], "reserved_or_uncertain": capacity["unresolved"],
         "remaining_capacity": capacity["remaining"],
+        "confirmed_sent_count": capacity["sent"], "in_flight_send_count": capacity["in_flight_send_count"],
+        "uncertain_contact_count": capacity["uncertain_contact_count"],
+        "late_confirmation_overage": capacity["late_confirmation_overage"],
         "qualified_ready": sum(w.get("stage") in {"prepare", "send", "outreach"} and w["status"] == "pending" for w in browser),
         "discovery_pending": sum(w.kind in {"discover", "research_contact"} for w in pending) +
                              sum(w.get("stage", "discover") in {"discover", "qualify"} for w in pending_browser),
