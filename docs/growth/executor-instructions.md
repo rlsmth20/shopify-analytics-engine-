@@ -92,6 +92,15 @@ Retain CHANNEL_MONITOR evidence and working/browser_safety_check
 check. Prioritize substantive replies/incidents and create reply successors when
 appropriate. No promotional response to Shopify review mail. Monitoring alone
 does not complete acquisition.
+Reuse an existing clear, uninvalidated browser check under five minutes old for
+send admission; a new stage alone does not require repeating those observations.
+Reddit Chat initially renders only a shell while its conversation content loads.
+Do not immediately classify that first snapshot as inaccessible. Keep the same
+tab, read the business mailbox, then inspect Chat again. If still loading, use
+one bounded content wait (up to 30 seconds) for an observed chat-navigation
+element, then inspect the conversation/receipt. Do not create repeated Chat tabs
+or mark an empty shell as a clear inbox. If content remains unavailable after
+this bounded check, record requires_attention=true with the actual failure.
 Before reading live Gmail/Reddit for a new check, call
 `scripts/growth-review.ps1 -Action operator-monitor-start -File <absolute JSON path>`
 with {task_id,lease_token} from the assigned task. Save the returned check_id.
@@ -157,7 +166,7 @@ Keep payload files in .growth-deploy, not the repository root.
   successor with exact body, assessment, sources and experiment/cohort.
   Select an actual ID from the assigned active_experiments or operator-export.
   Never invent an experiment ID or reuse an expired historical example.
-- send/outreach: refresh safety check, rules, suppression and capacity; reserve
+- send/outreach: validate safety-check freshness, rules, suppression and capacity; reserve
   with outreach-reserve immediately before one exact permitted submission.
   Payload includes identity, organization, source, qualified=true, verified facts,
   relevance_evidence, channel_rules_source, channel, action_key, experiment_id,
