@@ -38,3 +38,24 @@ identity changes, browser restoration, corrupt preferences, cache invalidation,
 read cancellation, and no write replay. Typecheck and production build passed;
 the final deployment rebuild validates the release snapshot. This audit is not a
 claim that every possible browser, merchant dataset, or third-party outage was tested.
+
+Production rollout: code commit `68a62b4`; Railway deployment
+`8db1322f-e8a9-49d0-b98e-d740db2d9aa6` SUCCESS; Vercel deployment
+`dpl_EUvZzshT75U1nLP193FhhjGpQDo7` READY at `https://www.skubase.io`
+(37-second remote build). Live health and unauthenticated auth/entitlement
+responses now return `Cache-Control: private, no-store` and `Pragma: no-cache`.
+Frontend HTML remains private/no-store; a versioned JavaScript asset retains
+`public,max-age=31536000,immutable` caching.
+
+Read-only Chrome checks covered dashboard, account, alerts, actions, analytics,
+forecast, reports, purchase orders, Stocky migration, store sync, stock rules,
+billing, both CSV import screens, privacy requests, transfers, bundles, dead-stock
+recovery, suppliers, and feedback. The signed-in workspace had no inventory;
+planning pages finished loading into empty states and setup guidance. No browser
+console errors appeared in these checks, and the post-deployment Vercel error-log
+query returned no entries. This does not establish coverage for every merchant
+dataset or verify sending alerts, making payments, or uploading inventory in
+production. Recovery fault cases remain covered by regression fixtures.
+
+Release evidence `12712` preserves the changes and verification limits in the
+growth agent's durable history. No growth executor restart was required.
