@@ -78,6 +78,13 @@ support@emailpal.io address was accepted by Gmail, then bounced with “Address 
 found.” No merchant was contacted. Google sign-in with info@skubase.io returned
 `login?error=oauth` with “Google sign-in did not complete.” No paid subscription,
 provider API credential, verified sending domain or successful support ticket was
-created. These additional reliability blockers mean EmailPal remains a conditional
-adapter, not an approved production provider. Do not purchase or activate it until
-the sourcing-policy and account-access questions are resolved.
+created on that first sign-in attempt. The Google **signup** route subsequently
+succeeded: the info@skubase.io account and Skubase workspace now exist. The exact
+use case was disclosed during onboarding, and support ticket
+[0caeac82-bdc3-45ba-bb93-851dcc97998c](https://www.emailpal.io/support/0caeac82-bdc3-45ba-bb93-851dcc97998c)
+was successfully submitted. The provider accepted `outreach.skubase.io` in manual
+DNS mode but has not issued its records or signing keys; it labels the domain
+“Ready in 60 days.” Billing confirms no subscription or transactions. Live cost is
+$69/month plus $0.60 per warmed mailbox/month. Account access is resolved; sourcing
+approval, domain readiness, payment approval and the business mailing address are
+still prerequisites. Do not infer approval from automatic account creation.

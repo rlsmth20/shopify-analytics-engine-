@@ -27,6 +27,7 @@ STOP_REASONS = {"DAILY_CAP_REACHED", "OUTREACH_OUTCOMES_UNRESOLVED", "OUTREACH_U
     "CHANNEL_BLOCKED", "SAFETY_BLOCKED", "BUDGET_BLOCKED", "PROVIDER_BLOCKED", "TRUE_IDLE"}
 
 RUNTIME_UNAVAILABLE = "runtime_unavailable"
+STDIN_DELIVERY_TIMEOUT = 30
 
 
 class RuntimeUnavailable(GrowthError):
@@ -131,7 +132,7 @@ def take(factory, owner):
                 monitor = operator.offer(db, key="browser-recovery:" + str(safety["evidence_id"]) + ":" + str(recovery.get("generation", 0) + 1),
                     source="https://mail.google.com/mail/u/4/", stage="monitor", priority=100,
                     evidence_id=safety["evidence_id"],
-                    decision="Recover the incomplete channel check. Reconnect through a fresh Chrome tab if the old debugger is unattached. Read dedicated Gmail and retained Reddit chat/offer live. Record operator-monitor with actual observations; clear requires_attention only if checks succeed and no reply/incident remains. Create reply work for actual actionable messages. No outreach or research in this task.")
+                    decision="Recover the incomplete channel check. Reconnect through a fresh Chrome tab if the old debugger is unattached. Read dedicated Gmail and retained Reddit chat/offer live. Consult the current acquisition policy and bounded provider_setup context. A retained, handled provider-setup bounce is scoped to that provider/address; when an active support ticket already owns it, it does not by itself block unrelated merchant browser channels. Keep cold email disabled while provider prerequisites remain unresolved. Record operator-monitor from fresh actual observations; clear requires_attention only when those checks support it and no actionable merchant reply or unresolved channel incident remains. Create reply work for actual actionable messages. No outreach or research in this task.")
                 remember(db, "working", "browser_monitor_recovery", {**recovery, "task_id": monitor["id"],
                     "generation": recovery.get("generation", 0) + 1})
             db.flush()
@@ -173,6 +174,15 @@ def take(factory, owner):
             task = {**task, "reconciliation": reconciliation_packet(db, task)}
         task = {**task, "active_experiments": packet.get("active_experiments", []),
                 "source_evidence": {"source": evidence.source, "kind": evidence.kind, "data": evidence.data}}
+        setup = get_memory(db, "working", "provider_setup")
+        task["provider_setup"] = {key: value[:1000] if isinstance(value, str) else value
+            for key, value in setup.items() if key in {"provider", "status", "account", "domain", "ticket_id",
+                "ticket_url", "ticket_status", "support_recipient", "handled", "bounce", "evidence_id", "next_action"}
+            and isinstance(value, (str, int, float, bool, type(None)))}
+        task["outreach_policy"] = {"daily_new_contact_limit": packet["capacity"]["limit"],
+            "confirmed_first_contacts": packet["capacity"]["sent"],
+            "uncertain_contacts": packet["capacity"]["uncertain_contact_count"],
+            "blocker": packet["capacity"]["blocker"]}
         if task.get("contact_id"):
             from .identity import merchant_view
             contact = db.get(Contact, task["contact_id"])
@@ -422,19 +432,46 @@ def execute(factory, owner, task, *, codex, repo):
                 stream.flush()
         reader = threading.Thread(target=forward, daemon=True)
         reader.start()
+        input_done = threading.Event()
+        input_errors = []
+        def deliver_prompt():
+            # A pipe write can block forever when startup stalls. Only this
+            # thread owns stdin; closing it from the supervisor could also block.
+            try:
+                child.stdin.write(prompt)
+            except Exception as exc:
+                input_errors.append(type(exc).__name__)
+            finally:
+                try:
+                    child.stdin.close()
+                except Exception as exc:
+                    input_errors.append(type(exc).__name__)
+                input_done.set()
+        writer = threading.Thread(target=deliver_prompt, name="skubase-prompt-" + task["lease_token"], daemon=True)
         started = time.monotonic()
         deadline = started + budget
+        input_deadline = min(deadline, started + STDIN_DELIVERY_TIMEOUT)
         outcome = "failed"
         try:
             job.assign(child)
-            child.stdin.write(prompt)
-            child.stdin.close()
+            writer.start()
             while child.poll() is None:
                 heartbeat(factory, owner, task)
-                if time.monotonic() > deadline:
+                now = time.monotonic()
+                if now >= deadline:
                     raise GrowthError("RESEARCH_BUDGET_EXHAUSTED", "budget")
-                time.sleep(10)
-            if child.returncode or not output.exists():
+                if not input_done.is_set() and now >= input_deadline:
+                    raise GrowthError("CODEX_STDIN_DELIVERY_TIMEOUT; execution state must be reconciled", "transient")
+                # Allow an early-exiting child to finish its diagnostic trace
+                # before classifying a broken pipe as a generic input failure.
+                if input_errors and now >= input_deadline:
+                    raise GrowthError("CODEX_STDIN_DELIVERY_FAILED; inspect retained executor log", "transient")
+                wait = min(10, max(.01, deadline - now))
+                if not input_done.is_set() or input_errors:
+                    wait = min(wait, max(.01, input_deadline - now))
+                time.sleep(wait)
+            writer.join(timeout=5)
+            if child.returncode or input_errors or not input_done.is_set() or not output.exists():
                 reader.join(timeout=5)
                 stream.flush()
                 rejected = pre_execution_usage_rejection(log, output) if not reader.is_alive() else None
@@ -450,6 +487,8 @@ def execute(factory, owner, task, *, codex, repo):
             if child.poll() is None:
                 child.kill()
                 child.wait(timeout=15)
+            if writer.ident is not None:
+                writer.join(timeout=5)
             reader.join(timeout=5)
             stream.flush()
             retain(factory, task, model, log, time.monotonic() - started, outcome)

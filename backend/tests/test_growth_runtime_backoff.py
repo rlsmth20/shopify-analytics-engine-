@@ -1,7 +1,10 @@
 """A rejected Codex startup is a runtime incident, not a failed merchant search."""
 import io
 import json
+import subprocess
+import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -159,3 +162,60 @@ class RuntimeBackoffTests(unittest.TestCase):
             self.assertEqual(get_memory(db, NAMESPACE, task['id'])['status'], 'blocked')
             self.assertEqual(db.scalar(select(FirstContact)).status, 'uncertain')
             self.assertFalse(get_memory(db, 'working', 'browser_runtime_backoff'))
+
+    def test_child_that_never_reads_large_prompt_is_timed_out_and_writer_is_joined(self):
+        # This real child never reads its input pipe. A synchronous multi-megabyte
+        # write would hang this test before reaching either heartbeat or timeout.
+        (self.repo / 'docs/growth/executor-instructions.md').write_text('Fixture prompt. ' * 150000)
+        task = executor.take(self.factory, 'blocked-input-fixture')
+        original_popen = subprocess.Popen
+        children = []
+        def launch_fixture(_args, **kwargs):
+            child = original_popen([sys.executable, '-c', 'import time; time.sleep(60)'], **kwargs)
+            children.append(child)
+            return child
+        started = time.monotonic()
+        try:
+            with patch('app.growth.executable.resolve_codex', return_value='fixture-codex'), \
+                 patch.object(executor.subprocess, 'Popen', side_effect=launch_fixture), \
+                 patch.object(executor, 'STDIN_DELIVERY_TIMEOUT', .3), \
+                 patch.object(executor, 'heartbeat', wraps=executor.heartbeat) as heartbeat:
+                with self.assertRaisesRegex(executor.GrowthError, 'CODEX_STDIN_DELIVERY_TIMEOUT'):
+                    executor.execute(self.factory, 'blocked-input-fixture', task, codex='fixture-codex', repo=self.repo)
+                self.assertGreaterEqual(heartbeat.call_count, 2)
+            self.assertLess(time.monotonic() - started, 10)
+            self.assertEqual(len(children), 1)
+            self.assertIsNotNone(children[0].poll())
+            self.assertFalse(any(t.name == 'skubase-prompt-' + task['lease_token'] for t in threading.enumerate()))
+            with self.factory() as db:
+                usage = db.scalar(select(Usage).where(Usage.result['task_id'].as_string() == task['id']))
+                self.assertEqual(usage.outcome, 'failed')
+                self.assertFalse(get_memory(db, 'working', 'browser_runtime_backoff'))
+                self.assertGreater(get_memory(db, NAMESPACE, task['id'])['lease_until'], time.time())
+        finally:
+            for child in children:
+                if child.poll() is None:
+                    child.kill(); child.wait(timeout=5)
+
+    def test_monitor_receives_bounded_handled_provider_context_without_fake_clearance(self):
+        with self.factory() as db:
+            proof = record(db, 'provider-bounce', 'CHANNEL_MONITOR', 'browser', {'requires_attention': True})
+            remember(db, 'working', 'browser_safety_check', {'requires_attention': True, 'evidence_id': proof.id})
+            remember(db, 'working', 'provider_setup', {'provider': 'emailpal', 'status': 'awaiting_provider_confirmation',
+                'account': 'info@skubase.io', 'domain': 'outreach.skubase.io', 'handled': True,
+                'ticket_id': 'fixture-ticket', 'ticket_status': 'open', 'ticket_url': 'https://www.emailpal.io/support/fixture',
+                'support_recipient': 'support@emailpal.io', 'bounce': 'address_not_found', 'evidence_id': proof.id,
+                'next_action': 'Await provider support. ' * 100, 'api_key': 'MUST_NOT_ENTER_PROMPT'})
+            remember(db, 'strategic', 'outreach_policy', {'daily_new_contact_limit': None})
+            db.commit()
+        task = executor.take(self.factory, 'scope-check-fixture')
+        self.assertEqual(task['stage'], 'monitor')
+        self.assertTrue(task['provider_setup']['handled'])
+        self.assertEqual(task['provider_setup']['ticket_status'], 'open')
+        self.assertLessEqual(len(task['provider_setup']['next_action']), 1000)
+        self.assertNotIn('api_key', task['provider_setup'])
+        self.assertIsNone(task['outreach_policy']['daily_new_contact_limit'])
+        self.assertIn('does not by itself block unrelated merchant browser channels', task['decision'])
+        self.assertIn('fresh actual observations', task['decision'])
+        with self.factory() as db:
+            self.assertTrue(get_memory(db, 'working', 'browser_safety_check')['requires_attention'])

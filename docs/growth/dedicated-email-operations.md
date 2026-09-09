@@ -1,7 +1,9 @@
 # Dedicated outreach email
 
-The conditional EmailPal adapter is separate from operational Resend/Gmail. No live
-provider account or real send has been verified yet. See outbound-provider-evaluation.md.
+The conditional EmailPal adapter is separate from operational Resend/Gmail. No real
+provider send has been verified yet. The info@skubase.io account and Skubase workspace
+were created on September 9 using Google's signup route. No subscription or payment
+transaction exists. See outbound-provider-evaluation.md.
 
 ## Configuration
 
@@ -65,6 +67,15 @@ with EmailPal `mode=connect,dns_method=manual`, after approved account access. R
 the exact provider-issued records; apply only records below that subdomain using the
 accessible DNS account. Do not change primary MX, nameservers or existing SPF records.
 Do not fabricate DKIM or return-path values. DNS remains pending provider issuance.
+
+The provider accepted `outreach.skubase.io` (resource
+`92cca13e-7db3-4f8e-81ce-157a93f70d4d`) in manual-DNS mode. Its domain page currently
+shows no signing keys or DNS records, including after requesting record generation.
+It also labels the new domain “Ready in 60 days.” These are unresolved provider
+conditions; no primary DNS or MX changes have been made. Support ticket
+`0caeac82-bdc3-45ba-bb93-851dcc97998c` requests actual sourcing-policy/subdomain
+confirmation. Billing shows $69/month plus $0.60 per warmed mailbox/month, no
+subscription and no transactions. Do not authorize payment or infer readiness.
 
 Before live activation verify test delivery, an actual reply, signed event/replay,
 unsubscribe and sender/domain identity. Require documented provider acceptance of

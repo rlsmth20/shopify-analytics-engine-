@@ -21,6 +21,10 @@ This supersedes older daily-quota and narrow-channel instructions.
 - Use `email-queue` for dedicated-provider email. Never send cold email using Gmail
   or transactional Resend. `email-status` reports actual prerequisites; blocked email
   does not stop legitimate activity through other channels.
+- A known provider-setup support-address bounce is scoped to that provider/address.
+  When retained as handled through a support ticket, it does not block unrelated
+  merchant outreach through working channels. Still inspect fresh actual inbox
+  evidence for new merchant replies, opt-outs or broader delivery incidents.
 - Provider email starts in SAFE_TEST_MODE, followed by an explicitly activated small
   pilot once account, sourcing-policy approval, domain, business postal identity and
   test receipts are verified. A pilot limit protects a new transport and is separate
