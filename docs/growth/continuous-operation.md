@@ -20,6 +20,13 @@ These rules supersede older held-slot language and historical campaign ledgers.
 
 # Continuous growth and first-contact ceiling
 
+The local supervisor resolves the installed desktop Codex executable before
+claiming each stage. Scheduled-task registration no longer pins an app-version
+directory. Existing `--codex` paths still work, with discovery in the installed
+desktop runtime directory if an update removes that path. If no executable is
+available, the supervisor reports `PROVIDER_BLOCKED` and retries without claiming
+prospect work or consuming its attempt allowance. No runtime is downloaded.
+
 Current policy **market_discovery_v1** supersedes older qualification language in
 this document: basic physical-product Shopify merchant eligibility is sufficient;
 public pain and unknown ICP fields are not gates. See executor-instructions.md.

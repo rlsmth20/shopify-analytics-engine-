@@ -271,6 +271,8 @@ def failed(factory, owner, task, reason, result=None):
 
 
 def execute(factory, owner, task, *, codex, repo):
+    from .executable import resolve_codex
+    codex = resolve_codex(codex)
     from .acquisition_usage import begin, route, retain
     model, effort = route(task.get("stage"))
     budget = {"plan": 120, "discover": 300, "qualify": 120, "prepare": 180, "monitor": 180, "reconcile": 180}.get(task.get("stage"), 360)
@@ -375,9 +377,17 @@ def cycle(factory, owner, adapter):
     return True
 
 
+def runtime_cycle(factory, owner, *, codex, repo):
+    # Preflight BEFORE a claim so an app update cannot exhaust prospect retries.
+    from .executable import resolve_codex
+    executable = resolve_codex(codex)
+    return cycle(factory, owner, lambda task: execute(factory, owner, task,
+        codex=executable, repo=Path(repo)))
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--codex", required=True)
+    parser.add_argument("--codex", help="Optional existing executable; recover from desktop updates automatically")
     parser.add_argument("--repo", required=True)
     parser.add_argument("--production", action="store_true")
     args = parser.parse_args()
@@ -405,10 +415,19 @@ def main():
     owner = "browser:" + uid()
     while True:
         try:
-            worked = cycle(SessionLocal, owner, lambda task: execute(SessionLocal, owner, task,
-                codex=args.codex, repo=Path(args.repo)))
+            worked = runtime_cycle(SessionLocal, owner, codex=args.codex, repo=args.repo)
         except Exception as exc:
             logging.error("Executor selection failed type=%s; retrying without external actions", type(exc).__name__)
+            if isinstance(exc, FileNotFoundError):
+                with SessionLocal() as db:
+                    lock(db)
+                    runtime = get_memory(db, "working", "browser_executor")
+                    if runtime.get("lease_until", 0) <= time.time() or runtime.get("owner") == owner:
+                        remember(db, "working", "browser_executor", {**runtime, "owner": owner,
+                            "heartbeat_at": time.time(), "lease_until": 0, "task_id": None,
+                            "blocker": "PROVIDER_BLOCKED", "error": "Installed Codex executable unavailable",
+                            "next_retry_at": time.time() + 30})
+                    db.commit()
             worked = False
         # Success immediately re-enters selection, irrespective of stage/send count.
         if not worked:
