@@ -124,7 +124,7 @@ def export_packet(db):
     stage = Memory.value["stage"].as_string()
     available = [r.value for r in db.scalars(select(Memory).where(*active, lease <= now, attempts < MAX_ATTEMPTS,
         func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now)
-        .order_by(case((stage == "reply", 0), (stage == "monitor", 4), else_=1),
+        .order_by(case((stage == "reply", 0), (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4), else_=2),
                   Memory.value["priority"].as_float().desc(), Memory.id).limit(6))]
     exhausted = [r.key for r in db.scalars(select(Memory).where(*active, lease <= now, attempts >= MAX_ATTEMPTS)
         .order_by(Memory.id).limit(6))]

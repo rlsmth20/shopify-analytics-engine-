@@ -14,7 +14,7 @@ import threading
 import time
 
 from . import operator
-from .models import Contact, Evidence, Usage, uid
+from .models import Contact, Evidence, FirstContact, Memory, Usage, uid
 from sqlalchemy import select, func
 from sqlalchemy.engine import make_url
 from .outbound import lock, status
@@ -50,21 +50,40 @@ def take(factory, owner):
         if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold"):
             return None
         packet = operator.export_packet(db)
+        safety = get_memory(db, "working", "browser_safety_check")
+        recovery = get_memory(db, "working", "browser_monitor_recovery")
+        if safety.get("requires_attention") and not packet["claimed_tasks"]:
+            existing = get_memory(db, operator.NAMESPACE, recovery.get("task_id", ""))
+            if (existing.get("status") == "running" and existing.get("lease_until", 0) <= time.time()
+                    and existing.get("attempts", 0) >= operator.MAX_ATTEMPTS):
+                existing = {**existing, "status": "blocked", "error": "Monitor recovery lease expired after final attempt"}
+                remember(db, operator.NAMESPACE, existing["id"], existing)
+                recovery = {**recovery, "retry_at": time.time() + 3600}
+                remember(db, "working", "browser_monitor_recovery", recovery)
+            if existing.get("status") not in {"pending", "running"} and recovery.get("retry_at", 0) <= time.time():
+                monitor = operator.offer(db, key="browser-recovery:" + str(safety["evidence_id"]) + ":" + str(recovery.get("generation", 0) + 1),
+                    source="https://mail.google.com/mail/u/4/", stage="monitor", priority=100,
+                    evidence_id=safety["evidence_id"],
+                    decision="Recover the incomplete channel check. Reconnect through a fresh Chrome tab if the old debugger is unattached. Read dedicated Gmail and retained Reddit chat/offer live. Record operator-monitor with actual observations; clear requires_attention only if checks succeed and no reply/incident remains. Create reply work for actual actionable messages. No outreach or research in this task.")
+                remember(db, "working", "browser_monitor_recovery", {**recovery, "task_id": monitor["id"],
+                    "generation": recovery.get("generation", 0) + 1})
+            db.flush()
+            packet = operator.export_packet(db)
         from .acquisition_planner import replenish
         if not any(t.get("stage") != "monitor" for t in packet["tasks"]) and not packet["claimed_tasks"]:
             replenish(db, packet["capacity"])
             db.flush()
             packet = operator.export_packet(db)
-        tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor"]
-        if get_memory(db, "working", "browser_safety_check").get("requires_attention"):
-            tasks = [t for t in tasks if t.get("stage") == "reply"]
+        tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")]
+        if safety.get("requires_attention"):
+            tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor"}]
         if not packet["capacity"]["remaining"]:
-            tasks = [t for t in tasks if t.get("stage") == "reply"]
+            tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor"}]
         if not tasks:
             remember(db, "working", "browser_executor", {**runtime, "owner": owner,
                 "heartbeat_at": time.time(), "lease_until": 0, "task_id": None,
                 "blocker": "DAILY_CAP_REACHED" if not packet["capacity"]["remaining"] else
-                    "REPLY_REQUIRES_PRIORITY_ATTENTION" if get_memory(db, "working", "browser_safety_check").get("requires_attention") else runtime.get("blocker"),
+                    "CHANNEL_CHECK_REQUIRES_ATTENTION" if safety.get("requires_attention") else runtime.get("blocker"),
                 "next_retry_at": time.time() + 30})
             db.commit()
             return None
@@ -107,7 +126,7 @@ def accept(factory, owner, task, result):
         stop = result.get("stop_reason")
         if stop is not None and stop not in STOP_REASONS:
             raise GrowthError("Invalid stop condition")
-        if not successors and not stop and task.get("stage") != "plan":
+        if not successors and not stop and task.get("stage") not in {"plan", "monitor"}:
             raise GrowthError("A completed task must supply executable successors or a legitimate stop")
         if len(successors) > 6 or not result.get("observation") or not result.get("sources"):
             raise GrowthError("Retained real source observations and bounded successors required")
@@ -118,10 +137,37 @@ def accept(factory, owner, task, result):
         stage = task.get("stage", "discover")
         event = record(db, "browser-stage:" + task["lease_token"], "ACQUISITION_STAGE_RESULT", task["id"],
             {"stage": stage, **result}, source="persistent_browser_executor")
+        if stage == "monitor":
+            safety = get_memory(db, "working", "browser_safety_check")
+            check = db.get(Evidence, safety.get("evidence_id")) if safety.get("evidence_id") else None
+            if (not check or check.kind != "CHANNEL_MONITOR" or check.data.get("lease_token") != task["lease_token"]
+                    or time.time() - check.occurred_at > 300):
+                raise GrowthError("Recovery requires fresh channel observations from this lease")
+            recovery = get_memory(db, "working", "browser_monitor_recovery")
+            failures = recovery.get("failures", 0) + 1 if safety.get("requires_attention") else 0
+            remember(db, "working", "browser_monitor_recovery", {**recovery, "failures": failures,
+                "retry_at": time.time() + min(3600, 900 * 2 ** min(failures - 1, 2)) if failures else 0})
+            if not safety.get("requires_attention"):
+                # Only resume pre-admission failures. Any reservation, including
+                # an uncertain receipt, forbids replay. Preserve retry counts.
+                for row in db.scalars(select(Memory).where(Memory.namespace == operator.NAMESPACE,
+                        Memory.value["status"].as_string() == "blocked",
+                        Memory.value["stage"].as_string().in_(["send", "outreach"]))):
+                    item = row.value
+                    prior = db.get(Evidence, item.get("result_evidence_id")) if item.get("result_evidence_id") else None
+                    if (not prior or prior.kind != "ACQUISITION_STAGE_RESULT" or prior.data.get("stop_reason") != "SAFETY_BLOCKED"
+                            or not item.get("contact_id") or item.get("attempts", 0) >= operator.MAX_ATTEMPTS):
+                        continue
+                    if db.scalar(select(FirstContact.id).where(FirstContact.contact_id == item["contact_id"]).limit(1)):
+                        continue
+                    remember(db, operator.NAMESPACE, row.key, {**item, "status": "pending", "lease_until": 0,
+                        "retry_at": 0, "recovery_evidence_id": event.id})
+                    record(db, "browser-check-resume:" + row.key + ":" + str(event.id), "ACQUISITION_SAFETY_RECOVERED",
+                        row.key, {"check_evidence_id": check.id, "prior_result_evidence_id": prior.id})
         from .acquisition_planner import admit_hypotheses, retain_result
         if stage == "plan":
             admit_hypotheses(db, task, result, event)
-        else:
+        elif stage != "monitor":
             retain_result(db, task, result, event)
         executable = []
         for successor in successors:
@@ -162,6 +208,9 @@ def failed(factory, owner, task, reason):
         if item.get("lease_token") != task["lease_token"] or item.get("status") != "running":
             return
         retry = time.time() + min(900, 30 * 2 ** item["attempts"])
+        if task.get("stage") == "monitor":
+            recovery = get_memory(db, "working", "browser_monitor_recovery")
+            remember(db, "working", "browser_monitor_recovery", {**recovery, "retry_at": time.time() + 3600})
         remember(db, operator.NAMESPACE, task["id"], {**item,
             "status": "pending" if item["attempts"] < operator.MAX_ATTEMPTS and "RESEARCH_BUDGET" not in reason else "blocked",
             "lease_until": 0, "retry_at": retry, "error": reason[:300]})
@@ -175,7 +224,7 @@ def failed(factory, owner, task, reason):
 def execute(factory, owner, task, *, codex, repo):
     from .acquisition_usage import begin, route, retain
     model, effort = route(task.get("stage"))
-    budget = {"plan": 120, "discover": 300, "qualify": 120, "prepare": 180}.get(task.get("stage"), 360)
+    budget = {"plan": 120, "discover": 300, "qualify": 120, "prepare": 180, "monitor": 180}.get(task.get("stage"), 360)
     with factory() as db:
         runs = list(db.scalars(select(Usage).where(Usage.result["task_id"].as_string() == task["id"])))
         spent = sum(min(budget * 1000, (time.time() - r.created_at) * 1000) if r.outcome == "running"

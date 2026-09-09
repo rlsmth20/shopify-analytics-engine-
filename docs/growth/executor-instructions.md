@@ -79,6 +79,16 @@ Keep payload files in .growth-deploy, not the repository root.
 
 ## Stages
 
+- monitor: recover an incomplete channel check; no research or outbound sends.
+  Read the source evidence for retained Gmail/Reddit URLs. Use a fresh Chrome tab
+  and navigate to those URLs if a retained tab reports an unattached debugger;
+  never keep retrying a broken tab handle. Record a fresh operator-monitor result.
+  requires_attention=false requires successful actual checks with no unresolved
+  reply/incident. If inaccessible, leave true and return blocked/SAFETY_BLOCKED;
+  the supervisor schedules a bounded retry. For actual merchant replies, create
+  reply successors with evidence. A clear check returns done, stop_reason=null,
+  successors=[]; the supervisor resumes acquisition automatically. Never claim
+  an inaccessible inbox is empty or replay a reserved/uncertain submission.
 - discover: test the hypothesis; include ordinary operating Shopify stores, not
   only public complaints. Assess basic facts and pass eligible MEDIUM/HIGH forward.
 - qualify: resolve only missing BASIC facts, assess once, produce prepare successor.

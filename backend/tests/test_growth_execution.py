@@ -12,7 +12,7 @@ from app.db.base import Base
 from app.growth.engine import bootstrap
 from app.growth import browser_executor as executor
 from app.growth.execution import state
-from app.growth.models import Evidence, Memory, Work
+from app.growth.models import Contact, Evidence, FirstContact, Memory, Work
 from app.growth.operator import offer
 from app.growth.policy import GrowthError
 from app.growth.store import claim, enqueue, finish, get_memory, record, remember
@@ -113,6 +113,72 @@ class ExecutionTests(unittest.TestCase):
             self.assertEqual(item['attempts'], 1)
             self.assertGreater(item['retry_at'], time.time())
             self.assertIsNone(state(db)['last_acquisition_action'])
+
+    def test_incomplete_check_autonomously_recovers_then_executes_queued_work(self):
+        with self.factory() as db:
+            proof = record(db, 'unattached', 'CHANNEL_MONITOR', self.task['id'], {'requires_attention': True})
+            remember(db, 'working', 'browser_safety_check', {'requires_attention': True, 'evidence_id': proof.id})
+            db.commit()
+        task = executor.take(self.factory, 'restarted')
+        self.assertEqual(task['stage'], 'monitor')
+        result = self.result()
+        result['stop_reason'] = None
+        # A successful model summary alone cannot clear a safety hold.
+        with self.assertRaises(GrowthError):
+            executor.accept(self.factory, 'restarted', task, result)
+        with self.factory() as db:
+            proof = record(db, 'fresh-clear', 'CHANNEL_MONITOR', task['id'], {'lease_token': task['lease_token']})
+            remember(db, 'working', 'browser_safety_check', {'requires_attention': False, 'evidence_id': proof.id})
+            db.commit()
+        executor.accept(self.factory, 'restarted', task, result)
+        resumed = executor.take(self.factory, 'restarted')
+        self.assertEqual(resumed['id'], self.task['id'])
+        self.assertEqual(resumed['stage'], 'discover')
+
+    def test_inaccessible_check_has_durable_cooldown_without_new_research(self):
+        with self.factory() as db:
+            proof = record(db, 'unattached', 'CHANNEL_MONITOR', self.task['id'], {})
+            remember(db, 'working', 'browser_safety_check', {'requires_attention': True, 'evidence_id': proof.id})
+            db.commit()
+        task = executor.take(self.factory, 'worker')
+        with self.factory() as db:
+            proof = record(db, 'still-unattached', 'CHANNEL_MONITOR', task['id'], {'lease_token': task['lease_token']})
+            remember(db, 'working', 'browser_safety_check', {'requires_attention': True, 'evidence_id': proof.id})
+            db.commit()
+        result = {**self.result(), 'outcome': 'blocked', 'stop_reason': 'SAFETY_BLOCKED'}
+        executor.accept(self.factory, 'worker', task, result)
+        self.assertIsNone(executor.take(self.factory, 'worker'))
+        with self.factory() as db:
+            recovery = get_memory(db, 'working', 'browser_monitor_recovery')
+            self.assertEqual(recovery['generation'], 1)
+            self.assertGreater(recovery['retry_at'], time.time() + 800)
+
+    def test_recovery_never_replays_reserved_or_exhausted_sends(self):
+        with self.factory() as db:
+            proof = record(db, 'unattached', 'CHANNEL_MONITOR', self.task['id'], {})
+            remember(db, 'working', 'browser_safety_check', {'requires_attention': True, 'evidence_id': proof.id})
+            for name, reserved, attempts in [('safe', False, 1), ('uncertain', True, 1), ('exhausted', False, 3)]:
+                contact = Contact(identity=name, source='https://example.com')
+                db.add(contact)
+                db.flush()
+                result = record(db, 'blocked:' + name, 'ACQUISITION_STAGE_RESULT', name, {'stop_reason': 'SAFETY_BLOCKED'})
+                remember(db, 'operator_task', name, {'id': name, 'status': 'blocked', 'stage': 'send',
+                    'contact_id': contact.id, 'attempts': attempts, 'result_evidence_id': result.id})
+                if reserved:
+                    db.add(FirstContact(contact_id=contact.id, action_key='reserved', channel='contact_form',
+                        experiment_id='fixture', cohort={}, body_hash='fixture'))
+            db.commit()
+        task = executor.take(self.factory, 'worker')
+        with self.factory() as db:
+            proof = record(db, 'clear', 'CHANNEL_MONITOR', task['id'], {'lease_token': task['lease_token']})
+            remember(db, 'working', 'browser_safety_check', {'requires_attention': False, 'evidence_id': proof.id})
+            db.commit()
+        executor.accept(self.factory, 'worker', task, {**self.result(), 'stop_reason': None})
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'operator_task', 'safe')['status'], 'pending')
+            self.assertEqual(get_memory(db, 'operator_task', 'safe')['attempts'], 1)
+            self.assertEqual(get_memory(db, 'operator_task', 'uncertain')['status'], 'blocked')
+            self.assertEqual(get_memory(db, 'operator_task', 'exhausted')['status'], 'blocked')
 
     def test_pending_zero_attempts_is_unhealthy_and_not_hidden_by_heartbeat(self):
         with self.factory() as db:
