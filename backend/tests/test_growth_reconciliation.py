@@ -88,3 +88,21 @@ class ReconciliationTests(unittest.TestCase):
             self.assertEqual(state(db)['current_blocker'],'DAILY_CAP_REACHED')
             self.assertEqual(status(db)['sent'],20)
         self.assertIsNone(executor.take(self.factory,'worker'))
+
+    def test_newly_failed_form_releases_capacity_without_regenerating_itself(self):
+        from app.growth.operator import claim
+        reservation, proof = self.reserve_fixture(0)
+        with self.factory() as db:
+            row = db.get(FirstContact,reservation)
+            fresh = offer(db,key='fresh-send',source='https://example.com/contact',decision='Fixture new send',
+                contact_id=row.contact_id,stage='send',evidence_id=proof)
+            task = claim(db,fresh['id'],executor='worker')
+            remember(db,'working','browser_executor',{'owner':'worker'})
+            db.commit()
+        result = self.recovered({**task,'reservation_id':reservation},proof)
+        result.update(outcome='blocked',stop_reason='CHANNEL_BLOCKED')
+        executor.accept(self.factory,'worker',task,result)
+        with self.factory() as db:
+            self.assertIsNone(db.get(FirstContact,reservation))
+            from app.growth.store import digest
+            self.assertFalse(get_memory(db,'operator_task',digest('after-release:'+reservation)))

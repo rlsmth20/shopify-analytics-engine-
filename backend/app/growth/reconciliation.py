@@ -112,7 +112,9 @@ def apply_result(db, task, result, stage_event):
                     "result_evidence_id": proof.id, "completed_at": time.time(),
                     "next_step": "Verified unused admission released; successor prepares a new admission"})
         contact = db.get(Contact, task["contact_id"])
-        if intent and contact:
+        # Recovered historical admissions get one fresh preparation. A newly
+        # failed send releases its slot but must not regenerate itself forever.
+        if intent and contact and task.get("stage") == "reconcile":
             operator.offer(db, key="after-release:" + reservation_id, source=contact.source,
                 contact_id=contact.id, stage="prepare", priority=90, evidence_id=intent.id,
                 decision="Prior action was VERIFIED NOT SENT and its unused reservation was released. Reuse the retained verified merchant facts and approved exact copy/cohort in source evidence. Prepare a fresh send task under standing owner authorization, with a fresh admission at send time. Never reuse the old reservation ID. Preserve current eligibility, suppression and channel checks.")
