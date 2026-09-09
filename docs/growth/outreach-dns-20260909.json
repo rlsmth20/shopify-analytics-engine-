@@ -1,0 +1,59 @@
+{
+  "zone": "skubase.io",
+  "provider": "EmailPal",
+  "domain_id": "92cca13e-7db3-4f8e-81ce-157a93f70d4d",
+  "published_at": "2026-09-09T21:20:00Z",
+  "source": "Authenticated provider-issued records; verified against public DNS",
+  "evidence_id": 22820,
+  "records": [
+    {
+      "name": "ed20260909._domainkey.outreach.skubase.io",
+      "type": "TXT",
+      "value": "v=DKIM1; k=ed25519; p=1RwRdChSclpJ2gFbzy4/gCZjNcdn0nyY2Gc2x/YeEi8=",
+      "ttl": 60
+    },
+    {
+      "name": "rsa20260909._domainkey.outreach.skubase.io",
+      "type": "TXT",
+      "value": "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq7mrn3b05aYs7Dee0mkg0dinC0P5WWJU4jI232kBli4qT9tPnQ8aGxTiVXObc68ZMxMEshArNl+Szxrghrov7ONvTty6ha436kpp0psZ3+BaGRPqO+6LgOHveD2ivLwItEJM/stRP9mPBomPjeaVpZBKMV5wCi2OlCIRDgLy5iFzbWDm4bBfKVtSDUaias6WV8UoB955uwnhuMLM6XmwrTzPSDJzdC+qP3u4weRlakiRI2K6qgD5wpXAI+vvZMRn3NpZOrIP8kHew+WN+3LdZGvQLO0TyzZ7AT9ojGjah0VxCdAnxHX6jI79+dj0Gc7VQCukgPAyNmFweLYCnATg3QIDAQAB",
+      "ttl": 60
+    },
+    {
+      "name": "_dmarc.outreach.skubase.io",
+      "type": "TXT",
+      "value": "v=DMARC1; p=reject; rua=mailto:dmarc@outreach.skubase.io; ruf=mailto:dmarc@outreach.skubase.io; adkim=s; aspf=s; fo=1; pct=100",
+      "ttl": 60
+    },
+    {
+      "name": "inbound.outreach.skubase.io",
+      "type": "A",
+      "value": "15.204.220.98",
+      "ttl": 60
+    },
+    {
+      "name": "outreach.skubase.io",
+      "type": "MX",
+      "value": "inbound.outreach.skubase.io",
+      "ttl": 60,
+      "priority": 10
+    },
+    {
+      "name": "s1.outreach.skubase.io",
+      "type": "TXT",
+      "value": "v=spf1 ip4:176.105.231.0/24 -all",
+      "ttl": 60
+    },
+    {
+      "name": "outreach.skubase.io",
+      "type": "TXT",
+      "value": "v=spf1 include:s1.outreach.skubase.io -all",
+      "ttl": 60
+    },
+    {
+      "name": "_emailpal-verify.outreach.skubase.io",
+      "type": "TXT",
+      "value": "emailpal-verify=OTJjY2ExM2UtN2RiMy00Zj",
+      "ttl": 60
+    }
+  ]
+}

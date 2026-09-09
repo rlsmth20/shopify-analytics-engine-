@@ -82,6 +82,9 @@ info@skubase.io does not authorize replacing that transport with Gmail. The
 outreach subdomain starts its own ramp and must verify its own authentication.
 Provider policy, cost authorization, domain readiness and live test prerequisites
 remain outstanding. The owner-provided mailing address is already configured.
+Later on September 9, the provider issued the outbound subdomain records. All eight
+were published and matched public DNS (evidence 22820); its verification job and
+actual signed delivery are still required before marking that sender authenticated.
 
 References: [Google sender guidance](https://support.google.com/mail/answer/81126),
 [Vercel DNS management](https://vercel.com/docs/cli/dns).

@@ -100,6 +100,33 @@ zero attempts. Do not keep enqueueing duplicates or guess DNS values while the
 provider has not processed these jobs. Its empty `dns.records` list is not verified
 DNS even though the response currently labels the empty set `healthy: true`.
 
+### Later September 9 update: DNS published
+
+The provider's setup jobs subsequently succeeded and issued eight real records.
+All eight were added using the authenticated Vercel DNS interface and independently
+matched public DNS at 21:20 UTC. Primary Google Workspace MX and operational Resend
+records were preserved. Evidence 22820 retains the issued records and resolver checks.
+See `outreach-dns-20260909.json` for the exact public configuration. The MX priority
+is 10; the provider contract supplied the destination without a priority.
+
+Verification job `830ce101-0834-40f9-97de-eda5175eab71` was queued after publication.
+Poll that existing job rather than requesting another rewrite or verification job.
+Do not equate public DNS publication with provider readiness or a delivered message.
+Once the domain is ready, provision exactly one mailbox with first_name=Rainer,
+pattern=first, cold_daily_limit=5 and warming=false. Match an existing sender before
+creating it and inspect the create receipt before retrying any ambiguous response.
+Set its display name to `Rainer from Skubase` using the documented mailbox update.
+
+Support ticket `0caeac82-bdc3-45ba-bb93-851dcc97998c` received a 14:21 Pacific update
+with the completed DNS checks, job ID, no-network-warming requirement, sourcing
+clarification and subscription activation issue. Billing still shows $69/month,
+no subscription, no trial and no transactions. The Starter-current button is disabled;
+only more expensive upgrades are offered. Do not buy an upgrade to work around this.
+The existing provider support question must resolve the correct Starter activation
+route and whether its displayed 60-day eligibility restriction applies to this setup.
+No subscription charge, warming traffic, mailbox or real test send was created by
+the DNS publication itself. Cost authorization remains separate from DNS readiness.
+
 Before live activation verify test delivery, an actual reply, signed event/replay,
 unsubscribe and sender/domain identity. Require documented provider acceptance of
 Skubase's public-business-contact sourcing. Keep email off while these are unresolved.
