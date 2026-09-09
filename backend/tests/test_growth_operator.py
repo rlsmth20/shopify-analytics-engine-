@@ -4,6 +4,7 @@ import json
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from sqlalchemy import create_engine, select, func
 from sqlalchemy.orm import sessionmaker
@@ -11,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
 from app.growth.engine import bootstrap
 from app.growth.models import FirstContact
-from app.growth.operator import offer, claim, complete, export_packet, LEASE_SECONDS
+from app.growth.operator import offer, claim, complete, export_packet, operator_action, LEASE_SECONDS
 from app.growth.policy import GrowthError
 from app.growth.store import record, remember
 
@@ -40,6 +41,23 @@ class OperatorTests(unittest.TestCase):
             self.assertEqual(offer(db,key='boundary',source=None,decision='a'*limit,evidence_id=self.evidence)['decision'],'a'*limit)
             with self.assertRaises(GrowthError):
                 offer(db,key='oversized',source=None,decision='a'*(limit+1),evidence_id=self.evidence)
+
+    def test_browser_observation_start_uses_machine_time_and_cannot_renew_stale_checks(self):
+        with self.factory() as db:
+            task = claim(db, self.task['id'])
+            context = {'task_id':task['id'], 'lease_token':task['lease_token']}
+            start = operator_action(db, 'operator-monitor-start', context)
+            payload = {**context, 'check_id':start['check_id'], 'mailbox':'info@skubase.io',
+                'requires_attention':False, 'observations':[
+                    {'source':'https://mail.google.com/mail/u/4/', 'observation':'Fixture live inbox check'},
+                    {'source':'https://www.reddit.com/chat/', 'observation':'Fixture live reply check'}]}
+            result = operator_action(db, 'operator-monitor', payload)
+            self.assertEqual(result['checked_at'],start['started_at'])
+            with patch('app.growth.operator.time.time',return_value=start['started_at']+301):
+                with self.assertRaises(GrowthError):
+                    operator_action(db,'operator-monitor',payload)
+            with self.assertRaises(GrowthError):
+                operator_action(db,'operator-monitor',{**payload,'lease_token':'different-lease'})
 
     def test_restart_duplicate_claim_recovery_and_stale_completion(self):
         now = time.time()

@@ -32,7 +32,9 @@ def status(db, now=None):
     unresolved = sum(r.status in {"reserved", "uncertain"} for r in rows)
     releases = sorted(r.sent_at + WINDOW for r in rows if r.sent_at is not None and r.status == "sent")
     needed = max(1, len(rows) - LIMIT + 1)
-    return {"limit": LIMIT, "window_hours": 24, "used": len(rows), "remaining": max(0, LIMIT-len(rows)),
+    return {"limit": LIMIT, "window_hours": 24, "used": len(rows), "sent": len(rows) - unresolved,
+            "blocker": ("OUTREACH_OUTCOMES_UNRESOLVED" if unresolved else "DAILY_CAP_REACHED") if len(rows) >= LIMIT else None,
+            "remaining": max(0, LIMIT-len(rows)),
             "unresolved": unresolved, "next_slot_at": releases[needed-1] if len(rows) >= LIMIT and len(releases) >= needed else None,
             "is_target": False, "scope": "new merchants across email, forms and public replies", "continue_non_outbound": True}
 
@@ -138,8 +140,13 @@ def reconcile_not_sent(db, reservation_id, evidence_id):
     lock(db)
     row = db.get(FirstContact, reservation_id)
     evidence = db.get(Evidence, evidence_id)
+    authenticated = False
+    if evidence and evidence.source == "authenticated_browser_executor":
+        task = get_memory(db, "operator_task", evidence.data.get("task_id", ""))
+        authenticated = (task.get("status") == "running" and task.get("lease_token") == evidence.data.get("lease_token")
+                         and task.get("lease_until", 0) > time.time() and row and task.get("contact_id") == row.contact_id)
     if (not row or row.status == "sent" or not evidence or evidence.kind != "OUTREACH_NOT_SENT_VERIFIED"
-        or evidence.source != "owner_operator" or evidence.subject != reservation_id
+        or (evidence.source != "owner_operator" and not authenticated) or evidence.subject != reservation_id
         or evidence.data.get("no_external_effect") is not True or not evidence.data.get("reason")):
         raise GrowthError("Retained operator verification of no external send is required; uncertainty cannot release capacity")
     record(db, "first-contact-released:"+row.id, "FIRST_CONTACT_RELEASED", row.contact_id,

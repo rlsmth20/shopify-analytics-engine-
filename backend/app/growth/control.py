@@ -9,7 +9,7 @@ from .executive import export_packet, import_review
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["review-export", "review-import", "outreach-status", "outreach-reserve", "outreach-complete", "outreach-backfill", "outreach-reconcile", "operator-export", "operator-enqueue", "operator-claim", "operator-complete", "operator-state", "operator-assess", "operator-monitor"])
+    parser.add_argument("action", choices=["review-export", "review-import", "outreach-status", "outreach-reserve", "outreach-complete", "outreach-backfill", "outreach-reconcile", "operator-export", "operator-enqueue", "operator-claim", "operator-complete", "operator-state", "operator-assess", "operator-monitor", "operator-monitor-start"])
     parser.add_argument("--file")
     parser.add_argument("--model", default="codex")
     parser.add_argument("--input-tokens", type=int)

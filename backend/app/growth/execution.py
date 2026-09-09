@@ -56,7 +56,7 @@ def state(db, now=None):
         fault = "ACQUISITION_RETRIES_EXHAUSTED"
     blocker = ("SAFETY_BLOCKED" if get_memory(db, "working", "control").get("paused") or
                get_memory(db, "working", "acquisition_hold") else
-               "DAILY_CAP_REACHED" if not capacity["remaining"] else executor.get("blocker"))
+               capacity["blocker"] if not capacity["remaining"] else executor.get("blocker"))
     future = [w.due_at for w in pending if w.due_at > now]
     future += [w.get("retry_at", 0) for w in browser if w.get("retry_at", 0) > now]
     next_at = now if ready or any(w.get("retry_at", 0) <= now for w in pending_browser) else min(future, default=now + 30)

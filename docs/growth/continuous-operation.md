@@ -234,3 +234,20 @@ allocation; the dashboard economics API exposes acquisition_efficiency ratios.
 Historical `ACQUISITION_RESEARCH_RESUMED` records remain evidence only. No owner
 renewal is needed for aggregate research runs. Duplicate-search backoff, actual
 provider restrictions, spending limits and safety holds remain enforced.
+# Submission recovery
+
+The dashboard counts confirmed sends separately from held admissions. When
+holds occupy capacity, the blocker is OUTREACH_OUTCOMES_UNRESOLVED, not a claim
+that 20 messages were sent. The continuous executor queues leased reconciliation
+after the submission window expires, including at zero available send capacity.
+It reviews retained browser traces and releases only verified unused reservations.
+Unconfirmed clicks remain held; missing receipts and elapsed time never authorize
+replay. Reviewed uncertainty is deferred for 24 hours to avoid a recovery busy
+loop. A fresh send stage also reports its submission outcome for atomic persistence
+and immediate release of verified unused capacity. This does not raise the shared
+20-new-merchant rolling safety ceiling.
+Once capacity is available, P1 preparation/sends take precedence over further
+receipt reviews. Browser checks use operator-monitor-start before reading the
+live channels and pass its check_id to operator-monitor afterward. Freshness is
+measured conservatively from the machine-recorded start; old observations cannot
+be refreshed by recording them later or guessing a new timestamp.

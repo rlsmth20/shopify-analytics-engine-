@@ -20,7 +20,7 @@ MAX_ATTEMPTS = 3
 
 def offer(db, *, key, source, decision, evidence_id, contact_id=None, priority=50, stage=None):
     stage = stage or ("outreach" if contact_id else "discover")
-    if stage not in {"plan", "discover", "qualify", "prepare", "send", "outreach", "monitor", "reply"}:
+    if stage not in {"plan", "discover", "qualify", "prepare", "send", "outreach", "monitor", "reply", "reconcile"}:
         raise GrowthError("Unknown acquisition stage")
     if not isinstance(key, str) or not key.strip() or len(key) > 200:
         raise GrowthError("Operator task requires a stable bounded key")
@@ -107,7 +107,7 @@ def export_packet(db):
             Memory.value["status"].as_string().in_(["pending", "running"]),
             func.coalesce(Memory.value["lease_until"].as_float(), 0) <= now)):
         candidate = db.get(Contact, row.value.get("contact_id")) if row.value.get("contact_id") else None
-        if candidate and (owned_identity(candidate.identity) or candidate.suppressed or candidate.status in INELIGIBLE):
+        if row.value.get("stage") != "reconcile" and candidate and (owned_identity(candidate.identity) or candidate.suppressed or candidate.status in INELIGIBLE):
             lock(db)
             proof = record(db, "owned-account-exclusion:" + row.key, "PROSPECT_EXCLUDED", candidate.id,
                 {"reason": "OBVIOUSLY_INAPPROPRIATE_TARGET" if owned_identity(candidate.identity) else
@@ -122,9 +122,11 @@ def export_packet(db):
     # behind newer terminal history or high-priority tasks with live leases.
     from sqlalchemy import case
     stage = Memory.value["stage"].as_string()
+    capacity = status(db, now)
     available = [r.value for r in db.scalars(select(Memory).where(*active, lease <= now, attempts < MAX_ATTEMPTS,
         func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now)
-        .order_by(case((stage == "reply", 0), (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4), else_=2),
+        .order_by(case((stage == "reply", 0), (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4),
+                      (stage == "reconcile", 2 if capacity["remaining"] == 0 else 4), else_=3),
                   Memory.value["priority"].as_float().desc(), Memory.id).limit(6))]
     exhausted = [r.key for r in db.scalars(select(Memory).where(*active, lease <= now, attempts >= MAX_ATTEMPTS)
         .order_by(Memory.id).limit(6))]
@@ -137,7 +139,7 @@ def export_packet(db):
                         Experiment.status == "active", Experiment.stop_at > now).order_by(Experiment.started_at.desc()).limit(8))]
     return {"tasks": available, "claimed_tasks": claimed,
             "active_experiments": experiments,
-            "exhausted_tasks": exhausted[:6], "capacity": status(db),
+            "exhausted_tasks": exhausted[:6], "capacity": capacity,
             "recent_sends": [{"id": r.id, "channel": r.channel, "receipt": r.receipt} for r in recent],
             "next_action": "claim_next_task" if available else "resolve_exhausted_tasks" if exhausted else "wait_for_current_operator" if claimed else "replenish_pipeline",
             "support_monitor": get_memory(db, "channel", "support_mailbox"),
@@ -145,11 +147,28 @@ def export_packet(db):
 
 
 def operator_action(db, action, payload):
+    if action == "operator-monitor-start":
+        task = get_memory(db, NAMESPACE, payload.get("task_id", ""))
+        if (task.get("status") != "running" or task.get("lease_token") != payload.get("lease_token")
+                or task.get("lease_until", 0) <= time.time()):
+            raise GrowthError("A current task lease is required to begin browser observations")
+        event = record(db, "browser-check-start:" + uid(), "CHANNEL_CHECK_STARTED", task["id"],
+            {"lease_token": task["lease_token"]}, source="authenticated_browser_executor")
+        return {"check_id": event.id, "started_at": event.occurred_at, "expires_at": event.occurred_at + 300,
+                "next_action": "Read live Gmail and Reddit now, then record operator-monitor with this check_id"}
     if action == "operator-monitor":
         from urllib.parse import urlparse
         now = time.time()
         task = get_memory(db, NAMESPACE, payload.get("task_id", ""))
         observed_at = payload.get("checked_at", 0)
+        if payload.get("check_id"):
+            started = db.get(Evidence, payload["check_id"])
+            if (not started or started.kind != "CHANNEL_CHECK_STARTED" or started.subject != payload.get("task_id")
+                    or started.data.get("lease_token") != payload.get("lease_token")):
+                raise GrowthError("Browser check does not belong to the current task lease")
+            # Conservative freshness begins BEFORE the observations, never at
+            # receipt time. A model cannot accidentally supply a guessed epoch.
+            observed_at = started.occurred_at
         observations = payload.get("observations", [])
         if (task.get("status") != "running" or task.get("lease_token") != payload.get("lease_token")
             or task.get("lease_until", 0) <= now or not isinstance(observed_at, (int, float))
@@ -169,7 +188,7 @@ def operator_action(db, action, payload):
             raise GrowthError("Explicit reply/incident attention state required")
         event = record(db, "browser-monitor:" + digest([payload["task_id"], observed_at, observations]),
             "CHANNEL_MONITOR", payload["task_id"], {"observations": observations, "mailbox": payload["mailbox"],
-                "requires_attention": attention, "lease_token": payload["lease_token"]},
+                "requires_attention": attention, "lease_token": payload["lease_token"], "check_id": payload.get("check_id")},
             source="authenticated_browser_executor", occurred_at=observed_at)
         remember(db, "working", "browser_safety_check", {"checked_at": observed_at,
             "evidence_id": event.id, "requires_attention": attention})

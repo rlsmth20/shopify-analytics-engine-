@@ -10,7 +10,8 @@
     "successors",
     "hypotheses",
     "search_result",
-    "idle"
+    "idle",
+    "submission"
   ],
   "properties": {
     "outcome": {
@@ -50,7 +51,8 @@
         "SAFETY_BLOCKED",
         "BUDGET_BLOCKED",
         "PROVIDER_BLOCKED",
-        "TRUE_IDLE"
+        "TRUE_IDLE",
+        "OUTREACH_OUTCOMES_UNRESOLVED"
       ]
     },
     "successors": {
@@ -228,6 +230,50 @@
         },
         "external_condition": {
           "type": "string"
+        }
+      }
+    },
+    "submission": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "reservation_id",
+        "outcome",
+        "reason",
+        "receipt",
+        "evidence_ids"
+      ],
+      "properties": {
+        "reservation_id": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "sent",
+            "not_sent",
+            "uncertain"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "receipt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
         }
       }
     }
