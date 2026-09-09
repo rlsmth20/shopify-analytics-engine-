@@ -4,6 +4,8 @@ No OAuth app, paid provider or alternate mailbox is needed. The authenticated
 browser executor submits once and retains the Gmail Sent-thread receipt.
 """
 import time
+import re
+from html import escape
 from urllib.parse import urlparse
 
 from sqlalchemy import select
@@ -14,6 +16,28 @@ from .store import digest, get_memory, remember
 
 SENDER = "info@skubase.io"
 PROVIDER = "google_workspace"
+
+
+def format_message(body, business):
+    """Keep the approved words, add readable paragraphs and a separate footer."""
+    paragraphs = []
+    for block in re.split(r"\n\s*\n", body.replace("\r\n", "\n").strip()):
+        sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", block)
+        paragraph = ""
+        for sentence in sentences:
+            if paragraph and (len(paragraph) + len(sentence) > 260 or sentence.rstrip().endswith("?")):
+                paragraphs.append(paragraph)
+                paragraph = ""
+            paragraph = (paragraph + " " + sentence).strip()
+        if paragraph:
+            paragraphs.append(paragraph)
+    text = "\n\n".join(paragraphs)
+    text += "\n\nRainer\n" + business["name"] + "\n\n" + business["postal_address"] + "\n\nTo opt out, reply unsubscribe."
+    # Gmail rich-text editors collapse raw newline characters inserted with
+    # setValue. Clipboard HTML uses explicit blocks; escape all merchant text.
+    html = '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">'
+    html += "".join("<div>" + (escape(line) if line else "<br>") + "</div>" for line in text.split("\n"))
+    return text, html + "</div>"
 
 
 def selected(db):
@@ -83,9 +107,9 @@ def prepare(db, contact, payload):
     if not body or len(body) > 2500 or "\u2014" in body + subject:
         raise GrowthError("Use concise outreach without em dashes")
     business = get_memory(db, "strategic", "email_business_identity")
-    body += "\n\n" + business["name"] + "\n" + business["postal_address"] + "\nTo opt out, reply unsubscribe."
+    body, html_body = format_message(body, business)
     return {"sender": SENDER, "recipient": recipient, "subject": subject, "body": body,
-            "email_source": payload["email_source"]}
+            "html_body": html_body, "format_version": "paragraphs_v1", "email_source": payload["email_source"]}
 
 
 def retain_intent(db, reservation_id, contact, experiment_id, prepared, cohort):
@@ -96,7 +120,8 @@ def retain_intent(db, reservation_id, contact, experiment_id, prepared, cohort):
     remember(db, "outreach_email", row.id, {"provider": PROVIDER, "sender": SENDER,
         "kind": "first_contact", "safe_test": False, "actual_recipient": prepared["recipient"],
         "recipient": prepared["recipient"], "reservation_id": reservation_id, "cohort": cohort,
-        "email_source": prepared["email_source"], "wire_body": prepared["body"]})
+        "email_source": prepared["email_source"], "wire_body": prepared["body"],
+        "html_body": prepared["html_body"], "format_version": prepared["format_version"]})
     return row
 
 

@@ -18,6 +18,16 @@ from app.growth.store import digest, get_memory, record, remember
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_gmail_layout_preserves_words_and_escapes_merchant_text(self):
+        body = 'We noticed A & B sells <special> products. Skubase helps prioritize reorders. Would a free check be useful?'
+        plain, html = workspace_mail.format_message(body, {'name': 'Skubase', 'postal_address': 'Fixture address'})
+        self.assertIn('\n\nWould a free check be useful?\n\nRainer\nSkubase\n\nFixture address', plain)
+        self.assertEqual(' '.join(plain.split())[:len(body)], body)
+        self.assertIn('A &amp; B sells &lt;special&gt;', html)
+        self.assertNotIn('<special>', html)
+        self.assertIn('<div><br></div><div>Would a free check be useful?</div>', html)
+        self.assertIn('<div>Rainer</div><div>Skubase</div>', html)
+
     def setUp(self):
         self.env = patch.dict('os.environ', {'GROWTH_MAILBOX': 'info@skubase.io'})
         self.env.start()
@@ -65,7 +75,7 @@ class WorkspaceTests(unittest.TestCase):
     def test_full_ledger_flow_starts_ramp_only_after_real_receipt(self):
         result = self.reserve(1)
         self.assertEqual(result['email']['sender'], 'info@skubase.io')
-        self.assertIn('Test address\nTo opt out, reply unsubscribe.', result['email']['body'])
+        self.assertIn('Rainer\nFixture\n\nTest address\n\nTo opt out, reply unsubscribe.', result['email']['body'])
         with self.factory() as db:
             self.assertIsNone(workspace_mail.status(db)['ramp']['start_at'])
             message = db.get(Message, result['message_id'])

@@ -300,7 +300,8 @@ def operator_action(db, action, payload):
         workspace = prepare(db, contact, payload)
         db.flush()  # reserve_contact refreshes the contact under its dispatch lock.
         payload = {**payload, "body": workspace["body"],
-                   "cohort": {**payload["cohort"], "provider": "google_workspace", "sender": workspace["sender"]}}
+                   "cohort": {**payload["cohort"], "provider": "google_workspace", "sender": workspace["sender"],
+                              "format_version": workspace["format_version"]}}
     result = reserve_contact(db, contact, action_key=payload["action_key"], channel=payload["channel"],
         experiment_id=payload["experiment_id"], body=payload["body"], cohort=payload["cohort"])
     if workspace:

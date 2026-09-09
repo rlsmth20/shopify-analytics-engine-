@@ -21,16 +21,31 @@ For each relevant, individually reviewed first contact:
 2. Call `outreach-reserve` with the existing merchant/qualification/experiment
    fields, `channel=email`, `recipient`, `subject` and `email_source` containing
    the actual published business-contact URL. Include stable cohort labels.
-3. Use the returned `email` object exactly. It adds the configured business name,
+3. Use the returned `email` object exactly. It adds a separate Rainer signature, the configured business name,
    owner-supplied mailing address and reply-unsubscribe footer. Do not duplicate
    that footer in the proposed body. Keep one inventory question and no em dashes.
-4. Prepare the Gmail draft; verify sender, recipient, subject and complete body.
+4. **Preserve the layout:** focus the Gmail message body and paste the returned
+   `email.html_body` with `tab.paste(html, {format: "html"})`. Do not use
+   `setValue` for Gmail's rich-text message body: it collapsed real line breaks in
+   the Earth & City email. Subject/recipient inputs may still use `setValue`.
+   If HTML paste is unavailable, enter each line with actual Return key events;
+   use two Returns for paragraph gaps. Do not replace newlines with spaces.
+   Inspect a screenshot of the actual draft before authorizing. It must show
+   short separated paragraphs, the question on its own, a separate signature,
+   address and opt-out line. An accessibility text dump alone does not prove layout.
+   Verify sender, recipient, subject and complete body against the reserved text.
    Immediately before Send, call `outreach-authorize` with the reservation ID.
    Click once within its 30-second deadline. An expired authorization cannot be reused.
 5. Open the actual Gmail Sent conversation and match recipient, subject and body.
    Complete with `outcome=sent` and its exact Gmail thread URL as `receipt`.
    A draft, generic inbox URL or success assumption is not a receipt. If uncertain,
    retain `outcome=uncertain`; never retry to determine whether it was sent.
+
+Formatting correction applies to new unsent drafts. Preserve sent messages as
+history; do not resend Earth & City merely to improve its formatting. Aim for
+70-110 words before the signature/footer, one or two short sentences per paragraph,
+one relevant benefit and one standalone question. Keep the required affiliation
+and current Shopify review disclosure without a lengthy feature list.
 
 The first real merchant send starts the persistent ramp. The initial ceiling is
 five actual first-contact emails per Pacific day, increasing through 8, 12, 15 and

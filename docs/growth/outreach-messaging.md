@@ -22,6 +22,14 @@ and editorial correction, not evidence of conversion uplift.
 
 ## First-contact writing rules
 
+**Email layout correction:** Use 70-110 words before the signature/footer,
+short paragraphs separated by blank lines, and put the single question in its own
+paragraph. Avoid a wall of text or a long feature list. The Workspace formatter
+adds Rainer's signature and separates the business address and opt-out line.
+Do not add those twice. Paste its returned HTML into Gmail and inspect the actual
+draft screenshot; raw newlines through `setValue` do not preserve Gmail layout.
+See workspace-email-operations.md. Do not resend already delivered messages.
+
 Lead with what Skubase does and the practical benefit to this merchant. Aim for
 90–130 words, shorter when the channel calls for it. Include:
 

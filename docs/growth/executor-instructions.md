@@ -192,7 +192,10 @@ Keep payload files in .growth-deploy, not the repository root.
   Never invent an experiment ID or reuse an expired historical example.
 - send/outreach for Workspace email: read workspace-email-operations.md. Use
   outreach-reserve with channel=email, recipient, subject and email_source plus
-  the common fields below. Use its returned exact email body and footer, verify
+  the common fields below. Paste returned email.html_body with format=html into
+  the focused body, never setValue. Visually inspect the draft screenshot for
+  paragraph gaps and separate signature/address/opt-out before authorization.
+  Use its returned exact email body and footer, verify
   the info@skubase.io account, authorize once immediately before Send, and retain
   the matching Gmail Sent-thread receipt. email-status supplies the email ramp.
   Never use the dormant EmailPal service or personal Gmail connector.
