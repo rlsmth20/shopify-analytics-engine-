@@ -51,6 +51,9 @@ def config():
 
 
 def readiness(db):
+    from . import workspace_mail
+    if workspace_mail.selected(db):
+        return workspace_mail.status(db)
     cfg = config()
     approval = get_memory(db, "strategic", "outreach_provider_approval")
     blockers = []
@@ -151,6 +154,9 @@ def unsubscribe(db, message_id, token):
 
 def queue_email(db, payload):
     """Owner/agent internal API. Preparing a message never consumes contact capacity."""
+    from .workspace_mail import selected
+    if selected(db):
+        raise GrowthError("Use outreach-reserve with channel=email for the Workspace browser transport", "configuration")
     lock(db)
     contact = db.get(Contact, payload["prospect_id"])
     if not contact:
@@ -219,6 +225,10 @@ def _followup_allowed(db, message, meta, now):
 
 def send(factory, work, *, transport=None):
     """One provider call after a durable intent. Crash/timeout goes to reconciliation."""
+    from .workspace_mail import selected
+    with factory() as db:
+        if selected(db):
+            raise GrowthError("Workspace email uses the authenticated browser send ledger", "configuration")
     if transport is None:
         from .outreach_provider import send_message
         transport = send_message

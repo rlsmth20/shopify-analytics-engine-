@@ -10,7 +10,7 @@ from sqlalchemy import func, or_, select, update
 from .models import Contact, Evidence, Experiment, FirstContact, Memory, Message
 from .identity import INELIGIBLE, canonical_identity, prospect_identity, existing_contact, identity_match, matching_contacts, owned_identity
 from .policy import GrowthError
-from .store import digest, get_memory, record
+from .store import digest, get_memory, record, remember
 from .review_calendar import review_day
 
 LIMIT = 20  # Legacy default only; owner policy may explicitly remove the ceiling.
@@ -133,6 +133,9 @@ def authorize_submission(db, reservation_id, now=None):
     control = get_memory(db, "working", "control")
     if (control.get("paused") and not control.get("deployment_drain")) or get_memory(db, "working", "acquisition_hold"):
         raise GrowthError("Acquisition is paused or held")
+    if row.channel == "email" and row.cohort.get("provider") == "google_workspace":
+        from .workspace_mail import authorize
+        authorize(db, row)
     record(db, "first-contact-authorized:" + row.id, "FIRST_CONTACT_SUBMISSION_AUTHORIZED", row.contact_id,
            {"reservation_id": row.id, "confirmed_count": current["sent"],
             "submit_before": min(now + 30, row.reserved_at + PERMIT_SECONDS)}, occurred_at=now)
@@ -157,6 +160,9 @@ def complete(db, reservation_id, *, receipt=None, outcome="sent", now=None):
     row.status = outcome
     if outcome == "sent":
         row.sent_at, row.receipt = now, receipt
+    if row.channel == "email" and row.cohort.get("provider") == "google_workspace":
+        from .workspace_mail import receipt as workspace_receipt
+        workspace_receipt(db, row, outcome, receipt)
     record(db, f"first-contact-result:{row.id}:{outcome}", "FIRST_CONTACT_RESULT", row.contact_id,
            {"reservation_id": row.id, "outcome": outcome, "receipt": receipt,
             "channel": row.channel, "experiment_id": row.experiment_id, "cohort": row.cohort}, occurred_at=now)
@@ -212,6 +218,12 @@ def reconcile_not_sent(db, reservation_id, evidence_id):
         raise GrowthError("Retained operator verification of no external send is required; uncertainty cannot release capacity")
     record(db, "first-contact-released:"+row.id, "FIRST_CONTACT_RELEASED", row.contact_id,
            {"reservation_id":row.id, "action_key":row.action_key, "evidence_id":evidence_id, "cohort":row.cohort})
+    if row.channel == "email" and row.cohort.get("provider") == "google_workspace":
+        message = db.scalar(select(Message).where(Message.key == "workspace:" + row.id))
+        if message and not message.sent_at:
+            message.status = "not_sent"
+            meta = get_memory(db, "outreach_email", message.id)
+            remember(db, "outreach_email", message.id, {**meta, "state": "not_sent", "no_effect_evidence_id": evidence_id})
     # A fresh admission gets a new ID. The old reservation cannot be reused.
     db.delete(row); db.flush()
     return {"released":reservation_id, "capacity":status(db)}
@@ -248,7 +260,9 @@ def operator_action(db, action, payload):
     if not payload.get("channel_rules_source") or not payload.get("relevance_evidence"):
         raise GrowthError("Current channel-rule and merchant relevance evidence required")
     if payload.get("channel") == "email":
-        raise GrowthError("Promotional email transport remains disabled; use permitted channels")
+        from .workspace_mail import selected
+        if not selected(db):
+            raise GrowthError("Browser email transport is not selected")
     identity = prospect_identity(payload["identity"], payload.get("source"))
     if not identity or len(identity) > 320:
         raise GrowthError("Canonical merchant identity required")
@@ -280,8 +294,19 @@ def operator_action(db, action, payload):
                              "qualified_user": contact.qualification.get("qualified_user", False), "evidence": payload["relevance_evidence"],
                              "verified_at": time.time()}
     db.flush()
+    workspace = None
+    if payload["channel"] == "email":
+        from .workspace_mail import prepare
+        workspace = prepare(db, contact, payload)
+        db.flush()  # reserve_contact refreshes the contact under its dispatch lock.
+        payload = {**payload, "body": workspace["body"],
+                   "cohort": {**payload["cohort"], "provider": "google_workspace", "sender": workspace["sender"]}}
     result = reserve_contact(db, contact, action_key=payload["action_key"], channel=payload["channel"],
         experiment_id=payload["experiment_id"], body=payload["body"], cohort=payload["cohort"])
+    if workspace:
+        from .workspace_mail import retain_intent
+        message = retain_intent(db, result["reservation_id"], contact, payload["experiment_id"], workspace, payload["cohort"])
+        result.update(message_id=message.id, email=workspace)
     record(db, "channel-check:"+result["reservation_id"], "OUTREACH_CHANNEL_REVIEW", contact.id,
            {"channel_rules_source": payload["channel_rules_source"], "source": payload["source"],
             "relevance_evidence": payload["relevance_evidence"]}, source="owner_operator")

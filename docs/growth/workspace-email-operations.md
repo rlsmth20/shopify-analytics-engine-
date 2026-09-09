@@ -1,0 +1,60 @@
+# Google Workspace acquisition email
+
+The owner's latest instruction selects the existing business Google Workspace
+mailbox, **info@skubase.io**. Use its authenticated Chrome Gmail session. Never
+use the personal Gmail connector or another signed-in account. EmailPal activation
+is superseded; do not purchase a subscription or continue its setup work.
+
+The internal browser send ledger enforces email ramp, merchant deduplication,
+suppression and one-use authorization. It stores the complete subject, recipient,
+body, source, campaign and Gmail receipt alongside other merchant interactions.
+The existing receive-only mailbox bridge continues reply ingestion and opt-outs.
+Operational email remains separate. Do not use the dormant dedicated-provider
+`email-queue` path for Workspace messages.
+
+For each relevant, individually reviewed first contact:
+
+1. Read `email-status`, merchant history and fresh business inbox safety evidence.
+   Verify the actual signed-in sender is info@skubase.io. Check current channel rules
+   and the published business contact route. Do not use Google for unsolicited mass
+   mail or bypass provider restrictions. A small ramp is not permission for spam.
+2. Call `outreach-reserve` with the existing merchant/qualification/experiment
+   fields, `channel=email`, `recipient`, `subject` and `email_source` containing
+   the actual published business-contact URL. Include stable cohort labels.
+3. Use the returned `email` object exactly. It adds the configured business name,
+   owner-supplied mailing address and reply-unsubscribe footer. Do not duplicate
+   that footer in the proposed body. Keep one inventory question and no em dashes.
+4. Prepare the Gmail draft; verify sender, recipient, subject and complete body.
+   Immediately before Send, call `outreach-authorize` with the reservation ID.
+   Click once within its 30-second deadline. An expired authorization cannot be reused.
+5. Open the actual Gmail Sent conversation and match recipient, subject and body.
+   Complete with `outcome=sent` and its exact Gmail thread URL as `receipt`.
+   A draft, generic inbox URL or success assumption is not a receipt. If uncertain,
+   retain `outcome=uncertain`; never retry to determine whether it was sent.
+
+The first real merchant send starts the persistent ramp. The initial ceiling is
+five actual first-contact emails per Pacific day, increasing through 8, 12, 15 and
+20 only with the existing elapsed-time and delivery/reply evidence requirements.
+Internal diagnostics do not start the clock. Reaching the email ceiling does not
+stop replies, research or other permitted channels. Do not manufacture warming.
+
+Prioritize genuine replies in their existing Gmail conversation. Retain inbound
+and outbound text, contact/message identity and receipt in the operator evidence.
+Do not count engaged replies as new first contacts. Never send canned follow-ups
+after a human reply. Read-only inbox monitoring and the existing receiving bridge
+continue independently. Apply `email-suppress` immediately to the actual merchant
+address for opt-outs, declines and verified hard bounces; never retry a failed
+address or bypass suppression using another channel. When a delivery daemon sends
+a failure, identify the failed recipient from the delivery report, not its sender.
+
+Authentication was verified by an actual received internal diagnostic with SPF,
+DKIM and DMARC passing (evidence 22221). Existing Google MX and operational records
+remain intact. Unused EmailPal subdomain records are historical setup, not an active
+sending transport. No additional provider subscription is enabled.
+
+Selection is versioned in `strategic/email_transport`; footer identity reuses
+the existing configured business information. Paid-provider API dispatch stays
+disabled. The executor receives a bounded live email readiness/ramp snapshot on
+each claimed task. No new scheduler or separate campaign tool is required.
+
+Reference: [Google Workspace acceptable use policy](https://workspace.google.com/terms/use_policy/).

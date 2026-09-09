@@ -1,6 +1,6 @@
 # Latest policy takes precedence
 
-Read [current acquisition policy](current-acquisition-policy.md) first. The owner removed the daily contact ceiling. Dedicated-provider email uses the controlled email service after its readiness checks pass; Gmail/transactional Resend remain unsuitable for cold outreach.
+Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared all-channel ceiling remains removed. EmailPal activation is superseded.
 
 # Autonomous acquisition hypothesis selection
 
@@ -57,7 +57,7 @@ The task decision permits at most two searches and four source reads, requires
 canonical identity and historical exclusion checks, and yields qualification
 successors for real prospects under basic eligibility. Public pain is a ranking
 signal, not a gate. Preserve suppressions and permissions; no daily contact ceiling.
-Dedicated-provider email is eligible only when email-status is ready. Otherwise
+Workspace email is eligible only when email-status is ready; follow workspace-email-operations.md. Otherwise
 use other permitted channels. No paid APIs/ads without authorization, repetitive
 DMs or channel-rule bypasses. Use configured restrained follow-ups. Preserve revision 4 and the review-pending disclosure.
 

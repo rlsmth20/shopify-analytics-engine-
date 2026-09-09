@@ -77,14 +77,11 @@ messages, or account/domain rotation. No paid mailbox warming is enabled.
 Mail-server acceptance is not inbox placement; unknown spam measurements stay
 unknown. Preserve hard-bounce suppression across campaigns and linked identities.
 
-The current cold-email transport remains the dedicated provider adapter. Auditing
-info@skubase.io does not authorize replacing that transport with Gmail. The
-outreach subdomain starts its own ramp and must verify its own authentication.
-Provider policy, cost authorization, domain readiness and live test prerequisites
-remain outstanding. The owner-provided mailing address is already configured.
-Later on September 9, the provider issued the outbound subdomain records. All eight
-were published and matched public DNS (evidence 22820); its verification job and
-actual signed delivery are still required before marking that sender authenticated.
+The owner selected Google Workspace info@skubase.io. Follow
+[Workspace operations](workspace-email-operations.md). Its actual received
+authentication diagnostic passed SPF, DKIM and DMARC (evidence 22221).
+The ramp starts with its first real merchant email; the diagnostic does not count.
+EmailPal activation is superseded. Existing operational mail and DNS are preserved.
 
 References: [Google sender guidance](https://support.google.com/mail/answer/81126),
 [Vercel DNS management](https://vercel.com/docs/cli/dns).

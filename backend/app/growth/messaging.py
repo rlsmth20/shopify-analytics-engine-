@@ -193,6 +193,9 @@ def ingest_reply(db, *, provider_id, sender, recipients, text, subject="", heade
     if not fresh:
         return message
     if classification in ("UNSUBSCRIBE", "SUBSTANTIVE_NEGATIVE", "DELIVERY_FAILURE"):
+        from .outreach_email import suppress
+        suppress(db, address, {"UNSUBSCRIBE": "unsubscribe", "SUBSTANTIVE_NEGATIVE": "declined",
+                 "DELIVERY_FAILURE": "bounce"}[classification], "inbound:" + provider_id)
         contact.suppressed = True
         contact.status = {"UNSUBSCRIBE": "unsubscribed", "SUBSTANTIVE_NEGATIVE": "declined", "DELIVERY_FAILURE": "delivery_failure"}[classification]
         for draft in db.scalars(select(Message).where(Message.contact_id == contact.id, Message.status == "draft")):

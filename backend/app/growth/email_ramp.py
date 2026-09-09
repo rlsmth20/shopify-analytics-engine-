@@ -82,6 +82,9 @@ def status(db, sender, now=None, *, persist=False, confirmed_at=None, advance=Tr
     healthy_receipts = sum(row.status in {"delivered", "replied"} for row, _ in rows)
     health = get_memory(db, "working", "outreach_email_health")
     fresh_monitor = get_memory(db, "working", "outreach_inbox_cursor").get("checked_at", 0) >= now - HEALTH_FRESH_SECONDS
+    if sender == "info@skubase.io" and get_memory(db, "strategic", "email_transport").get("provider") == "google_workspace":
+        monitor = get_memory(db, "working", "browser_safety_check")
+        fresh_monitor = not monitor.get("requires_attention") and monitor.get("checked_at", 0) >= now - HEALTH_FRESH_SECONDS
     recent_signals = {kind: at for kind, at in state.get("signals", {}).items() if at > now - SIGNAL_WINDOW_SECONDS}
     auth = authentication(db, sender)
     reason = (health.get("reason", "DELIVERABILITY_HOLD") if health.get("paused") else

@@ -132,7 +132,7 @@ def take(factory, owner):
                 monitor = operator.offer(db, key="browser-recovery:" + str(safety["evidence_id"]) + ":" + str(recovery.get("generation", 0) + 1),
                     source="https://mail.google.com/mail/u/4/", stage="monitor", priority=100,
                     evidence_id=safety["evidence_id"],
-                    decision="Recover the incomplete channel check. Reconnect through a fresh Chrome tab if the old debugger is unattached. Read dedicated Gmail and retained Reddit chat/offer live. Consult the current acquisition policy and bounded provider_setup context. A retained, handled provider-setup bounce is scoped to that provider/address; when an active support ticket already owns it, it does not by itself block unrelated merchant browser channels. Keep cold email disabled while provider prerequisites remain unresolved. Record operator-monitor from fresh actual observations; clear requires_attention only when those checks support it and no actionable merchant reply or unresolved channel incident remains. Create reply work for actual actionable messages. No outreach or research in this task.")
+                    decision="Recover the incomplete channel check. Reconnect through a fresh Chrome tab if the old debugger is unattached. Read dedicated Gmail and retained Reddit chat/offer live. Consult the current acquisition policy and bounded provider_setup context. A retained, handled provider-setup bounce is scoped to that provider/address; when an active support ticket already owns it, it does not by itself block unrelated merchant browser channels. Use current email-status and the selected Workspace transport policy; historical EmailPal setup does not block it. Respect actual provider warnings. Record operator-monitor from fresh actual observations; clear requires_attention only when those checks support it and no actionable merchant reply or unresolved channel incident remains. Create reply work for actual actionable messages. No outreach or research in this task.")
                 remember(db, "working", "browser_monitor_recovery", {**recovery, "task_id": monitor["id"],
                     "generation": recovery.get("generation", 0) + 1})
             db.flush()
@@ -183,6 +183,12 @@ def take(factory, owner):
             "confirmed_first_contacts": packet["capacity"]["sent"],
             "uncertain_contacts": packet["capacity"]["uncertain_contact_count"],
             "blocker": packet["capacity"]["blocker"]}
+        from . import workspace_mail
+        if workspace_mail.selected(db):
+            email = workspace_mail.status(db)
+            task["email_transport"] = {"provider": email["provider"], "sender": email["sender"],
+                "ready": email["ready"], "blockers": email["blockers"], "daily_ceiling": email["daily_limit"],
+                "remaining": email["ramp"]["remaining"], "operations": "docs/growth/workspace-email-operations.md"}
         if task.get("contact_id"):
             from .identity import merchant_view
             contact = db.get(Contact, task["contact_id"])

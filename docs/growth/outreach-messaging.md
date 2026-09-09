@@ -1,6 +1,6 @@
 # Latest policy takes precedence
 
-Read [current acquisition policy](current-acquisition-policy.md) first. The owner removed the daily contact ceiling. Dedicated-provider email uses the controlled email service after its readiness checks pass; Gmail/transactional Resend remain unsuitable for cold outreach.
+Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared all-channel ceiling remains removed. EmailPal activation is superseded.
 
 # Skubase outreach messaging — revision 4
 

@@ -23,17 +23,18 @@ This supersedes older daily-quota and narrow-channel instructions.
 - Link evidence-backed store/person/channel identities with `prospect-link`; read
   `prospect-history` before changing channels. Never use an alternate identity to
   bypass an opt-out, rejection, bounce or uncertain submission.
-- Use `email-queue` for dedicated-provider email. Never send cold email using Gmail
-  or transactional Resend. `email-status` reports actual prerequisites; blocked email
-  does not stop legitimate activity through other channels.
+- The owner selected **Google Workspace info@skubase.io**. Follow
+  `workspace-email-operations.md`: controlled browser reservation, exact message,
+  one-use authorization and actual Gmail receipt. No personal mailbox or EmailPal
+  subscription. `email-status` reports readiness and the email-only ramp.
 - A known provider-setup support-address bounce is scoped to that provider/address.
   When retained as handled through a support ticket, it does not block unrelated
   merchant outreach through working channels. Still inspect fresh actual inbox
   evidence for new merchant replies, opt-outs or broader delivery incidents.
-- Provider email starts in SAFE_TEST_MODE, followed by an explicitly activated small
-  pilot once account, sourcing-policy approval, domain, business postal identity and
-  test receipts are verified. A pilot limit protects a new transport and is separate
-  from the removed daily acquisition ceiling. No provider charges are authorized yet.
+- Google authentication and a real internal transport diagnostic passed (evidence
+  22221). Start the ramp only with the first real merchant email. No fake warming,
+  unsolicited mass email or provider restriction bypasses. EmailPal setup is
+  superseded and its API dispatch remains disabled.
 - One optional silent-prospect email follow-up after campaign-configured spacing
   (minimum three days), only if enabled, with no human reply or suppression. Preserve
   any existing promise not to follow up. Engaged replies do not count as first contact.
@@ -45,8 +46,7 @@ This supersedes older daily-quota and narrow-channel instructions.
   historical messages or already authorized submission bodies.
 - The owner supplied the mailing address on September 9. It is stored in the
   backend BUSINESS_POSTAL_ADDRESS environment setting for commercial email footers.
-  Do not ask for it again or copy it into repository documentation. This resolves
-  the missing-address input only; provider, domain, cost and pilot gates still apply.
+  Do not ask for it again or copy it into repository documentation. The Workspace sender reuses this information; no new provider cost is required.
 - Preserve message/offer/source/ICP cohorts and failed experiments. Let actual merchant
   responses change strategy; do not rewrite positioning after a tiny sample.
 

@@ -1,3 +1,9 @@
+# Historical provider setup, superseded
+
+The owner selected Google Workspace info@skubase.io. See
+[Workspace operations](workspace-email-operations.md). Do not activate EmailPal,
+purchase a plan or continue this historical setup. Its API sending stays disabled.
+
 # Dedicated outreach email
 
 The conditional EmailPal adapter is separate from operational Resend/Gmail. No real
