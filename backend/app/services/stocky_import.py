@@ -166,6 +166,7 @@ def import_stocky_products_csv(
 
         existing_by_sku: dict[str, list[Product]] = defaultdict(list)
         products = session.scalars(select(Product).where(Product.shop_id == shop.id)).all()
+        existing_by_variant = {p.shopify_variant_id: p for p in products}
         for p in products:
             if p.sku:
                 existing_by_sku[p.sku].append(p)
@@ -230,6 +231,13 @@ def import_stocky_products_csv(
                     result.skip_reasons.append(f"Row {row_num}: SKU matches multiple catalog products; review variant mapping before importing")
                 continue
             existing = candidates[0] if candidates else None
+            if not sku and not shopify_owned:
+                existing = existing_by_variant.get(shopify_variant_id)
+                if existing and (existing.sku or (existing.variant_name or "") != variant):
+                    result.rows_skipped += 1
+                    if len(result.skip_reasons) < 10:
+                        result.skip_reasons.append(f"Row {row_num}: product name matches another variant; add a unique SKU before importing")
+                    continue
             if shopify_owned:
                 if existing is None or not str(existing.shopify_variant_id).isdigit():
                     result.rows_skipped += 1
@@ -272,6 +280,7 @@ def import_stocky_products_csv(
                 )
                 session.add(product)
                 session.flush()
+                existing_by_variant[shopify_variant_id] = product
                 if sku:
                     existing_by_sku[sku].append(product)
                 result.products_inserted += 1

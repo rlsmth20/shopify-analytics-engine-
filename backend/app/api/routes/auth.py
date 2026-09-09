@@ -5,8 +5,9 @@ import os
 import logging
 from datetime import datetime, timezone
 from typing import Annotated, Optional
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session as DbSession
 
@@ -56,13 +57,13 @@ def _auth_error(code: str, message: str) -> HTTPException:
 class MagicLinkRequest(BaseModel):
     email: EmailStr
     shopify_domain: Optional[str] = Field(default=None, max_length=255)
+    return_to: Optional[str] = Field(default=None, max_length=200)
 
 
 class MagicLinkResponse(BaseModel):
     sent: bool
-    # We always return 200 + sent=True even if the email is unknown — this
-    # avoids leaking which addresses have accounts. The email itself is the
-    # signal of success.
+    # New and existing addresses receive the same response. Success means the
+    # email provider accepted the request, not that inbox delivery is guaranteed.
 
 
 class MeResponse(BaseModel):
@@ -93,22 +94,25 @@ def _build_me_response(user: User) -> MeResponse:
 @router.post("/magic-link/request", response_model=MagicLinkResponse)
 def request_magic_link(
     payload: MagicLinkRequest,
-    background_tasks: BackgroundTasks,
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> MagicLinkResponse:
     raw_token = issue_magic_link_token(db, email=payload.email)
     callback_url = f"{FRONTEND_URL}/auth/callback?token={raw_token}"
+    if payload.return_to in {"/dashboard", "/import-stocky", "/import-shipstation"}:
+        callback_url += "&" + urlencode({"return_to": payload.return_to})
     logger.info(
         "magic_link_requested email=%s domain=%s frontend_url=%s",
         _mask_email(str(payload.email).lower().strip()),
         str(payload.email).split("@")[-1],
         FRONTEND_URL,
     )
-    background_tasks.add_task(
-        send_magic_link_email,
+    accepted = send_magic_link_email(
         email=str(payload.email).lower().strip(),
         link=callback_url,
     )
+    if not accepted:
+        raise HTTPException(status_code=503, detail={"code": "email_delivery_failed",
+            "message": "We couldn't send your sign-in link. Please try again in a moment or contact info@skubase.io."})
     return MagicLinkResponse(sent=True)
 
 

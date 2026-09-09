@@ -3,6 +3,7 @@
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { loginDestination, loginError } from "@/lib/login";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -11,13 +12,11 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const returnTo = params.get("return_to");
-    if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
-      sessionStorage.setItem("skubase_login_return_to", returnTo);
-    }
+    setReturnTo(loginDestination(params.get("return_to")));
   }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -32,12 +31,13 @@ export default function LoginPage() {
       const res = await fetch(`${API_BASE}/auth/magic-link/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), return_to: returnTo }),
         credentials: "include",
+        signal: AbortSignal.timeout(20_000),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body?.detail || "We couldn't send the link right now. Try again in a moment.");
+        setError(loginError(body));
         return;
       }
       setSent(true);

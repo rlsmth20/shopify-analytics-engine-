@@ -212,7 +212,7 @@ export default function ImportStockyPage() {
           </ol>
           {embedded ? null : (
             <p className="import-help" style={{ marginTop: "16px" }}>
-              You need to be signed in to import. <Link href="/login">Sign in</Link> if you haven&apos;t already.
+          You need to be signed in to import. <Link href="/login?return_to=%2Fimport-stocky">Sign in</Link> if you haven&apos;t already.
             </p>
           )}
         </aside>

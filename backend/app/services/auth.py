@@ -204,9 +204,9 @@ def get_or_create_user_for_email(
     """Resolve or create the User row for a magic-link verification.
 
     First-time logins create a Shop and a User in one transaction. Subsequent
-    logins return the existing User. shopify_domain is best-effort; we fall
-    back to a synthetic domain derived from the email so the unique
-    constraint on Shop.shopify_domain is satisfied.
+    logins return the existing User. A submitted store name is not proof of
+    ownership. New users always get an isolated workspace; verified Shopify
+    installation is the only way to resolve Shopify ownership.
     """
     email = normalize_email(email)
     user = db.scalar(select(User).where(User.email == email))
@@ -220,22 +220,10 @@ def get_or_create_user_for_email(
         db.commit()
         return user
 
-    domain = (shopify_domain or "").strip().lower() or None
-    if domain is None:
-        # Synthesize a placeholder so the NOT NULL + UNIQUE constraints hold.
-        # The real Shopify domain is set later when the merchant connects.
-        # Strip everything that isn't alphanumeric — emails with underscores
-        # etc. otherwise produce domains normalize_shopify_domain rejects,
-        # which broke CSV imports for those users.
-        local = "".join(c if c.isalnum() else "-" for c in email.split("@", 1)[0])
-        local = "-".join(part for part in local.split("-") if part) or "user"
-        domain = f"pending-{local}-{secrets.token_hex(4)}.skubase.invalid"
-
-    shop = db.scalar(select(Shop).where(Shop.shopify_domain == domain))
-    if shop is None:
-        shop = Shop(shopify_domain=domain)
-        db.add(shop)
-        db.flush()  # Assign shop.id
+    domain = f"pending-{secrets.token_hex(16)}.skubase.invalid"
+    shop = Shop(shopify_domain=domain)
+    db.add(shop)
+    db.flush()  # Assign shop.id; never join a workspace by an unverified name.
 
     user = User(
         email=email,

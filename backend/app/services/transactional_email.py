@@ -155,7 +155,7 @@ def _magic_link_html(email: str, link: str) -> str:
           <p style="margin:0 0 8px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">skubase</p>
           <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;color:#0f172a;">Your Skubase sign-in link</h1>
           <p style="margin:0 0 24px;color:#334155;font-size:16px;line-height:1.6;">
-            Use the secure link below to sign in to Skubase. This link expires soon and can only be used once.
+            Use the secure link below to sign in to Skubase. This link expires in 15 minutes.
           </p>
           <p style="margin:0 0 24px;">
             <a href="{link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;">Sign in to Skubase</a>
@@ -182,7 +182,7 @@ def _magic_link_html(email: str, link: str) -> str:
 def _magic_link_text(email: str, link: str) -> str:
     return (
         "Your Skubase sign-in link\n\n"
-        "Use the secure link below to sign in to Skubase. This link expires soon and can only be used once.\n\n"
+        "Use the secure link below to sign in to Skubase. This link expires in 15 minutes.\n\n"
         f"Sign in to Skubase: {link}\n\n"
         "If you did not request this email, you can ignore it.\n\n"
         f"Sent to {email}\n"

@@ -4,6 +4,7 @@ import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { loginDestination } from "@/lib/login";
 
 const API_BASE = APP_API_BASE_URL;
 
@@ -15,13 +16,8 @@ function CallbackInner() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
   function redirectAfterLogin() {
-    const returnTo = sessionStorage.getItem("skubase_login_return_to");
-    if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
-      sessionStorage.removeItem("skubase_login_return_to");
-      router.replace(returnTo);
-    } else {
-      router.replace("/dashboard");
-    }
+    // The email opens in another tab/browser, where sessionStorage is absent.
+    router.replace(loginDestination(params.get("return_to")) || "/dashboard");
   }
 
   // Verification only runs from the button click below, never automatically on
@@ -43,6 +39,7 @@ function CallbackInner() {
       const res = await fetch(`${API_BASE}/auth/me`, {
         credentials: "include",
         cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       }).catch(() => null);
       if (cancelled) return;
       if (res?.ok) {
@@ -68,6 +65,7 @@ function CallbackInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
         credentials: "include",
+        signal: AbortSignal.timeout(20_000),
       });
       if (!res.ok) {
         const detail = parseAuthError(await res.json().catch(() => ({})));
@@ -173,6 +171,7 @@ async function confirmSession(): Promise<boolean> {
     const response = await fetch(`${API_BASE}/auth/me`, {
       credentials: "include",
       cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
     }).catch(() => null);
     if (response?.ok) return true;
     await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));

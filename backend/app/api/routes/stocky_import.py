@@ -26,7 +26,7 @@ async def import_stocky_csv(
     if not csv_file.filename or not csv_file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a .csv file.")
 
-    raw = await csv_file.read()
+    raw = await csv_file.read(25 * 1024 * 1024 + 1)
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded CSV is empty.")
     if len(raw) > 25 * 1024 * 1024:
