@@ -14,6 +14,11 @@ For a send:
 
 1. Verify the signed-in account matches `sender` and the recipient exactly matches
    `recipient`. Use the account URLs returned in the packet. Never add CC/BCC.
+   Gmail's routine external-recipient / not-in-contacts banner is informational,
+   not a delivery failure or account restriction. The allowlist already authorizes
+   these controlled external inboxes. Verify the address and continue. Actual
+   sending restrictions, quota errors, abuse warnings or rejected delivery stop
+   traffic. Do not classify an ordinary external-recipient banner as `warning`.
 2. For `parent_id`, open the retained receiving thread and use Reply. Match its
    subject and original sender. Do not create a new thread for a scheduled reply.
 3. Use the returned natural, clearly internal test copy. Topic, length and wording
@@ -26,6 +31,9 @@ For a send:
 6. Record the actual Sent-thread receipt with `warmup-record`:
    `{"message_id":"ID","event":"sent","account":"sender","url":"actual Gmail thread URL","observation":"Exact recipient, subject and body matched in Sent"}`.
    On ambiguity record `uncertain`. Never retry to determine whether it was sent.
+7. If time remains, inspect the receiving mailbox in the same execution using the
+   procedure below. Otherwise the scheduler creates a later inspection. Reuse a
+   matching unsent draft after a pre-send interruption; do not create duplicates.
 
 For inspect work, search only the scheduled marker in the appropriate controlled
 inbox, including Spam. Read the actual message and record `received` before moving
