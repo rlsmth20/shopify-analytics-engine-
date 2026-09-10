@@ -225,7 +225,9 @@ def accept(factory, owner, task, result):
         stop = result.get("stop_reason")
         if stop is not None and stop not in STOP_REASONS:
             raise GrowthError("Invalid stop condition")
-        if not successors and not stop and task.get("stage") not in {"plan", "monitor", "reconcile", "send", "outreach", "deliverability"}:
+        # Reviewing an automatic reply or completing a conversation need not
+        # create another message. The durable selector owns the next action.
+        if not successors and not stop and task.get("stage") not in {"plan", "monitor", "reply", "reconcile", "send", "outreach", "deliverability"}:
             raise GrowthError("A completed task must supply executable successors or a legitimate stop")
         if len(successors) > 6 or not result.get("observation") or not result.get("sources"):
             raise GrowthError("Retained real source observations and bounded successors required")

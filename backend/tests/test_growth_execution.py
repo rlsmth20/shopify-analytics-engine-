@@ -53,6 +53,36 @@ class ExecutionTests(unittest.TestCase):
             self.assertEqual(view['current_blocker'], 'CODEX_USAGE_LIMIT')
             self.assertEqual(view['next_wake_retry'], retry)
 
+    def test_completed_reply_without_successor_resumes_existing_acquisition(self):
+        with self.factory() as db:
+            reply = offer(db, key='automatic-reply', source='https://example.com/thread',
+                stage='reply', decision='Classify an observed inbox reply', evidence_id=self.task['evidence_id'])
+            db.commit()
+        reviewed = []
+        def classify(task):
+            reviewed.append(task['id'])
+            return {**self.result(), 'observation': 'Fixture automatic absence notice; no reply needed.',
+                'stop_reason': None, 'next_step': 'Resume acquisition; await a new message in this thread.'}
+        self.assertTrue(executor.cycle(self.factory, 'reply-worker', classify))
+        self.assertEqual(reviewed, [reply['id']])
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'operator_task', reply['id'])['status'], 'done')
+            self.assertIsNone(get_memory(db, 'working', 'browser_executor')['blocker'])
+            self.assertEqual(list(db.scalars(select(FirstContact))), [])
+        following = executor.take(self.factory, 'next-process')
+        self.assertEqual(following['id'], self.task['id'])
+        self.assertEqual(following['stage'], 'discover')
+
+    def test_reply_completion_still_requires_retained_observations(self):
+        with self.factory() as db:
+            offer(db, key='unverified-reply', source='https://example.com/thread',
+                stage='reply', decision='Review the incoming message', evidence_id=self.task['evidence_id'])
+            db.commit()
+        task = executor.take(self.factory, 'reply-worker')
+        with self.assertRaisesRegex(GrowthError, 'Retained real source observations'):
+            executor.accept(self.factory, 'reply-worker', task,
+                {**self.result(), 'stop_reason': None, 'sources': []})
+
     def test_kind_priority_overrides_legacy_scores_and_reply_preempts(self):
         with self.factory() as db:
             for n in range(25):
