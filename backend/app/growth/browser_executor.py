@@ -118,6 +118,8 @@ def take(factory, owner):
         schedule_controlled_tests(db)
         from .reconciliation import enqueue_recovery
         enqueue_recovery(db)
+        from .workspace_mail import defer_capped_tasks
+        defer_capped_tasks(db)
         db.flush()
         packet = operator.export_packet(db)
         safety = get_memory(db, "working", "browser_safety_check")

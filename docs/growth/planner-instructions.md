@@ -1,6 +1,6 @@
 # Latest policy takes precedence
 
-Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared all-channel ceiling remains removed. EmailPal activation is superseded.
+Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared all-channel ceiling is 20 confirmed first contacts per Pacific day. EmailPal activation is superseded.
 
 # Autonomous acquisition hypothesis selection
 
@@ -22,6 +22,11 @@ pain are neutral. MEDIUM merchants are actionable. Test whether reordering is a
 problem through outreach. No historical pool reprocessing. Prefer new merchant
 discovery to another narrow complaint query when prior searches were vendor-heavy.
 Do not invoke tools or extra models during planning.
+
+Use the supplied email_transport.remaining when choosing executable work. At zero,
+prioritize permitted contact forms, useful public interactions, and other legitimate
+channels. Email-only first-contact tasks wait for the next email window; do not
+repeatedly research email-only prospects just to use shared acquisition capacity.
 
 Shopify Community is now useful-answer and problem-learning first, not a generic
 app-promotion channel. Vendor-heavy threads lower acquisition priority; their

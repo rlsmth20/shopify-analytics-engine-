@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
 from app.growth.engine import bootstrap
-from app.growth.models import Contact, Experiment, Message
+from app.growth.models import Contact, Experiment, FirstContact, Message
 from app.growth import outbound, outreach_email, workspace_mail
 from app.growth.messaging import ingest_reply
 from app.growth.policy import GrowthError
@@ -89,6 +89,53 @@ class WorkspaceTests(unittest.TestCase):
             self.assertIsNotNone(view['ramp']['start_at'])
             self.assertEqual(db.get(Message, result['message_id']).body, result['email']['body'])
         with self.assertRaises(GrowthError): self.reserve(1)
+
+    def test_email_cap_defers_without_a_model_turn_and_other_work_continues(self):
+        from app.growth import browser_executor, operator
+        with self.factory() as db:
+            for n in range(5):
+                db.add(FirstContact(contact_id='sent-'+str(n), action_key='sent-'+str(n),
+                    channel='email', experiment_id=self.exp, cohort={}, body_hash='fixture',
+                    status='sent', sent_at=time.time()))
+            proof=record(db,'defer-fixture','OBSERVATION','fixture',{})
+            email=operator.offer(db,key='email-next',source='https://fixture.test',stage='send',
+                decision='channel=email; Send the prepared business inquiry.',priority=100,evidence_id=proof.id)
+            discovery=operator.offer(db,key='other-discovery',source='https://fixture.test',stage='discover',
+                decision='Explore another channel',priority=10,evidence_id=proof.id)
+            db.commit()
+        task=browser_executor.take(self.factory,'worker')
+        self.assertEqual(task['id'],discovery['id'])
+        with self.factory() as db:
+            deferred=get_memory(db,'operator_task',email['id'])
+            self.assertEqual(deferred['attempts'],0)
+            self.assertEqual(deferred['defer_reason'],'EMAIL_DAILY_CAP_REACHED')
+            self.assertEqual(workspace_mail.defer_capped_tasks(db),0)
+            self.assertEqual(outbound.status(db)['sent'],5)
+        browser_executor.accept(self.factory,'worker',task,{'outcome':'done','observation':'Fixture channel search complete',
+            'sources':['https://fixture.test'],'next_step':'Select another hypothesis','stop_reason':None,'successors':[]})
+        self.assertEqual(browser_executor.take(self.factory,'planner')['stage'],'plan')
+        with patch('time.time',return_value=deferred['retry_at']+1), self.factory() as db:
+            packet=operator.export_packet(db)
+            self.assertIn(email['id'],[t['id'] for t in packet['tasks']])
+
+    def test_email_deferral_preserves_replies_forms_and_uncertain_intents(self):
+        from app.growth import operator
+        with self.factory() as db:
+            for n in range(5):
+                db.add(FirstContact(contact_id='sent-'+str(n), action_key='sent-'+str(n),
+                    channel='email', experiment_id=self.exp, cohort={}, body_hash='fixture',status='sent',sent_at=time.time()))
+            db.add(FirstContact(contact_id='unknown',action_key='unknown',channel='email',
+                experiment_id=self.exp,cohort={},body_hash='fixture',status='uncertain'))
+            proof=record(db,'defer-fixture','OBSERVATION','fixture',{})
+            tasks=[]
+            for key,stage,decision,cid in [('reply','reply','channel=email','engaged'),
+                    ('form','send','channel=contact_form',None),('receipt','send','channel=email','unknown')]:
+                tasks.append(operator.offer(db,key=key,stage=stage,source='https://fixture.test',
+                    decision=decision,contact_id=cid,evidence_id=proof.id))
+            db.commit()
+            self.assertEqual(workspace_mail.defer_capped_tasks(db),0)
+            for task in tasks:
+                self.assertNotIn('defer_reason',get_memory(db,'operator_task',task['id']))
 
     def test_email_ceiling_does_not_cap_other_channels(self):
         for n in range(5): self.finish(self.reserve(n))

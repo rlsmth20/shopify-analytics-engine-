@@ -73,3 +73,10 @@ disabled. The executor receives a bounded live email readiness/ramp snapshot on
 each claimed task. No new scheduler or separate campaign tool is required.
 
 Reference: [Google Workspace acceptable use policy](https://workspace.google.com/terms/use_policy/).
+
+The executor defers pending first-contact tasks declaring `channel=email` until
+the next Pacific-day reset when the email ramp is full. Include that explicit
+channel field in send-task decisions. Deferral does not consume a model turn,
+retry, reservation, or acquisition count. Genuine replies and existing receipt
+recovery remain executable. Future-dated email work does not prevent the planner
+from replenishing other permitted acquisition channels.

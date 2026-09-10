@@ -8,7 +8,7 @@ import re
 import time
 from urllib.parse import parse_qs, unquote, urlparse
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from .models import Evidence, Experiment, Memory
 from .policy import GrowthError
 from .store import digest, get_memory, record, remember
@@ -214,6 +214,8 @@ def replenish(db, capacity, now=None):
     # Receipt reviews protect their contact, not unrelated acquisition capacity.
     active = db.scalar(select(Memory.id).where(Memory.namespace == "operator_task",
         Memory.value["status"].as_string().in_(["pending", "running"]),
+        or_(func.coalesce(Memory.value["defer_reason"].as_string(), "") != "EMAIL_DAILY_CAP_REACHED",
+            func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now),
         Memory.value["stage"].as_string().not_in(["monitor", "reconcile"])).limit(1))
     if active:
         return None

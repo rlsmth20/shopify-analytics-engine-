@@ -10,12 +10,46 @@ from urllib.parse import urlparse
 
 from sqlalchemy import select
 
-from .models import Contact, Evidence, Message
+from .models import Contact, Evidence, FirstContact, Memory, Message
 from .policy import GrowthError
-from .store import digest, get_memory, remember
+from .store import digest, get_memory, record, remember
 
 SENDER = "info@skubase.io"
 PROVIDER = "google_workspace"
+
+
+def defer_capped_tasks(db, now=None):
+    """Wait without a model turn or retry; caller holds the dispatch lock.
+
+    Only explicit email first-contact tasks with no prior intent are deferred.
+    Legacy task text uses the controlled channel=email field. Replies and
+    receipt recovery remain independent.
+    """
+    if not selected(db):
+        return 0
+    now = time.time() if now is None else now
+    from .email_ramp import status as ramp_status
+    ramp = ramp_status(db, SENDER, now)
+    if ramp['remaining']:
+        return 0
+    count = 0
+    for row in db.scalars(select(Memory).where(Memory.namespace == 'operator_task',
+            Memory.value['status'].as_string() == 'pending',
+            Memory.value['stage'].as_string().in_(['send', 'outreach']))):
+        task = row.value
+        if (task.get('retry_at', 0) >= ramp['resets_at'] or task.get('lease_until', 0) > now
+                or not (task.get('channel') == 'email' or re.search(r'\bchannel\s*=\s*email\b', task.get('decision', ''), re.I))):
+            continue
+        if task.get('contact_id') and db.scalar(select(FirstContact.id).where(FirstContact.contact_id == task['contact_id'])):
+            continue
+        event = record(db, f"email-ramp-defer:{task['id']}:{ramp['day']}", 'EMAIL_SEND_DEFERRED', task['id'],
+            {'reason': 'EMAIL_DAILY_CAP_REACHED', 'resume_at': ramp['resets_at'],
+             'actual_email_first_contacts': ramp['actual_first_contacts_today'], 'ceiling': ramp['daily_ceiling']})
+        remember(db, 'operator_task', task['id'], {**task, 'channel': 'email',
+            'retry_at': ramp['resets_at'], 'defer_reason': 'EMAIL_DAILY_CAP_REACHED',
+            'defer_evidence_id': event.id, 'next_step': 'Resume after the email ramp resets; use other permitted channels meanwhile.'})
+        count += 1
+    return count
 
 
 def format_message(body, business):
