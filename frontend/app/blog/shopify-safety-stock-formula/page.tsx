@@ -2,14 +2,19 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
+import { BLOG_POSTS } from "@/lib/blog-posts";
+import { BlogArticleMeta } from "@/components/blog-article-meta";
+
+const post = BLOG_POSTS["shopify-safety-stock-formula"];
+
 export const metadata = {
-  title: "The right safety stock formula for Shopify merchants — skubase",
-  description: "Most Shopify merchants use a fixed buffer day rule. Here is the formula that actually accounts for demand variance and supplier lead-time variation — and how to apply it.",
+  title: `${post.title} - skubase`,
+  description: post.description,
   alternates: { canonical: "/blog/shopify-safety-stock-formula" },
   keywords: ["safety stock formula Shopify", "Shopify safety stock", "how to calculate safety stock", "reorder point Shopify"],
   openGraph: {
-    title: "The right safety stock formula for Shopify merchants",
-    description: "Fixed buffer days leave you either overstocked or stocked out. Here is the formula that actually works.",
+    title: post.title,
+    description: post.description,
     url: "/blog/shopify-safety-stock-formula",
     type: "article",
   },
@@ -18,8 +23,9 @@ export const metadata = {
 const ARTICLE_LD = {
   "@context": "https://schema.org",
   "@type": "Article",
-  headline: "The right safety stock formula for Shopify merchants",
-  datePublished: "2026-04-29",
+  headline: post.title,
+  datePublished: post.publishedAt,
+  dateModified: post.updatedAt,
   author: { "@type": "Organization", name: "skubase" },
 };
 
@@ -29,17 +35,13 @@ export default function SafetyStockFormulaPage() {
       <MarketingNav />
 
       <article className="blog-article">
-        <p className="blog-article-meta">
-          <time dateTime="2026-04-29">April 29, 2026</time> · 10 min read · Forecasting
-        </p>
-        <h1 className="blog-article-title">The right safety stock formula for Shopify merchants</h1>
+        <BlogArticleMeta post={post} />
+        <h1 className="blog-article-title">{post.title}</h1>
         <p><Link href="/tools/reorder-point-calculator">Try the free reorder-point calculator</Link> to see how daily demand, lead time and safety stock change your ordering trigger.</p>
         <p className="blog-article-lead">
-          Most Shopify merchants set a fixed buffer — 30 days of cover on every SKU, or a flat minimum
-          quantity — and call it safety stock. It works until it doesn&apos;t: a fast mover stockouts two
-          weeks before a holiday; a slow mover sits for eight months. The problem is that a fixed buffer
-          ignores the two things that actually drive stockout risk: how much demand varies and how
-          reliably your supplier delivers.
+          A fixed buffer is a useful starting point. To refine it, look at how much demand varies and how reliably
+          suppliers deliver. This guide shows a statistical planning example and the practical data to collect
+          before changing your reorder settings.
         </p>
 
         <h2 className="blog-article-h2">What safety stock is actually for</h2>
@@ -48,29 +50,29 @@ export default function SafetyStockFormulaPage() {
           uncertainty in any replenishment cycle:
         </p>
         <ol className="blog-article-ol">
-          <li><strong>Demand uncertainty</strong> — sales in the lead-time window are higher than expected.</li>
-          <li><strong>Supply uncertainty</strong> — your supplier ships late, short, or both.</li>
+          <li><strong>Demand uncertainty</strong> - sales in the lead-time window are higher than expected.</li>
+          <li><strong>Supply uncertainty</strong> - your supplier ships late, short, or both.</li>
         </ol>
         <p>
           A fixed buffer day rule handles neither systematically. A SKU that sells 10 units/day with
-          ±1 variance needs far less safety stock than one that sells 10/day with ±8 variance, even
+          a standard deviation of 1 unit needs far less safety stock than one that sells 10/day with a standard deviation of 8 units, even
           though they have the same average.
         </p>
 
         <h2 className="blog-article-h2">The formula</h2>
         <p>
-          The standard safety stock formula that accounts for both sources of uncertainty is:
+          With independent daily demand and lead times, a normal approximation gives this planning estimate:
         </p>
         <p className="blog-article-formula">
           Safety Stock = Z × √(LT × σ_d² + D² × σ_lt²)
         </p>
         <p>Where:</p>
         <ul className="blog-article-ul">
-          <li><strong>Z</strong> — service-level Z-score. For 95% service level, Z = 1.645. For 98%, Z = 2.054. For 99%, Z = 2.326.</li>
-          <li><strong>LT</strong> — average lead time in days (time from PO to warehouse receipt).</li>
-          <li><strong>σ_d</strong> — standard deviation of daily demand over the measurement window.</li>
-          <li><strong>D</strong> — average daily demand.</li>
-          <li><strong>σ_lt</strong> — standard deviation of lead time (how much your supplier&apos;s delivery timing varies).</li>
+          <li><strong>Z</strong> - service-level Z-score. For a target 95% cycle service level, Z = 1.645. For 98%, Z = 2.054. For 99%, Z = 2.326.</li>
+          <li><strong>LT</strong> - average lead time in days (time from PO to warehouse receipt).</li>
+          <li><strong>σ_d</strong> - standard deviation of daily demand over the measurement window.</li>
+          <li><strong>D</strong> - average daily demand.</li>
+          <li><strong>σ_lt</strong> - standard deviation of lead time (how much your supplier&apos;s delivery timing varies).</li>
         </ul>
 
         <h2 className="blog-article-h2">A worked example</h2>
@@ -93,40 +95,39 @@ export default function SafetyStockFormulaPage() {
           = 1.645 × √(336 + 3,600)<br />
           = 1.645 × √3,936<br />
           = 1.645 × 62.7<br />
-          ≈ 103 units
+          ≈ 103.2 units; round up to 104 units
         </p>
         <p>
-          With a flat 30-day buffer, you&apos;d hold 360 units (30 × 12). The formula gets you to 103 — a
-          65% reduction in safety stock while maintaining a 95% service level. That&apos;s cash you&apos;re
-          currently tying up unnecessarily.
+          A 30-day buffer at 12 units/day is 360 units. The illustrative 104-unit estimate is about 71% lower.
+          It targets a 95% chance of avoiding a stockout during a replenishment cycle under these assumptions;
+          compare actual delivery and stockout results before changing the buffer.
         </p>
 
         <h2 className="blog-article-h2">The reorder point</h2>
         <p>
-          Safety stock is not your reorder point — it&apos;s the floor. The full reorder point (ROP) is:
+          Add expected lead-time demand to your safety stock to calculate the reorder point (ROP):
         </p>
         <p className="blog-article-formula">
           ROP = (Average Daily Demand × Average Lead Time) + Safety Stock
         </p>
         <p>
-          In the example above: ROP = (12 × 21) + 103 = 252 + 103 = 355 units. When on-hand drops
-          to 355, place the PO.
+          In this example: ROP = (12 × 21) + 104 = 356 units. Review replenishment when inventory position
+          (on hand plus on order minus backorders) reaches this level. Account for open orders before adding another PO.
         </p>
 
         <h2 className="blog-article-h2">Service level segmentation</h2>
         <p>
-          Not every SKU deserves a 98% service level. The Z-score is not free — higher service levels
-          mean exponentially more safety stock. A rational approach:
+          Not every SKU deserves a 98% service level. The Z-score is not free - higher service levels
+          require more safety stock. An illustrative starting point to test:
         </p>
         <ul className="blog-article-ul">
-          <li><strong>A-tier SKUs</strong> (top 20% of revenue) → 98–99% service level</li>
-          <li><strong>B-tier SKUs</strong> (next 30%) → 95% service level</li>
-          <li><strong>C-tier SKUs</strong> (bottom 50%) → 90% service level</li>
+          <li><strong>A-tier SKUs</strong> (largest cumulative revenue contribution) → 98–99% service level</li>
+          <li><strong>B-tier SKUs</strong> (middle contribution) → 95% service level</li>
+          <li><strong>C-tier SKUs</strong> (remaining contribution) → 90% service level</li>
         </ul>
         <p>
-          ABC segmentation lets you hold less total inventory while protecting the revenue-generating items.
-          Most Shopify merchants apply one buffer to every SKU — a C-item held at 98% service is cash
-          you don&apos;t need to lock up.
+          Choose service targets using revenue contribution, margin, substitutability, and the cost of a stockout.
+          A low-revenue spare part may still be essential to a customer, so ABC class is a starting point for review.
         </p>
 
         <h2 className="blog-article-h2">Where merchants get this wrong</h2>
@@ -153,22 +154,21 @@ export default function SafetyStockFormulaPage() {
 
         <h2 className="blog-article-h2">Getting supplier lead-time variance</h2>
         <p>
-          Most Shopify merchants don&apos;t track lead-time variance because no tool surfaces it automatically.
-          The data lives in your PO history: date PO sent, date goods received. The gap between those
+          Useful lead-time data lives in your PO history: date PO sent, date goods received. The gap between those
           two dates, across all POs for a vendor, gives you average lead time and standard deviation.
         </p>
         <p>
-          If you&apos;ve been using Stocky or a spreadsheet, you likely don&apos;t have this. Start collecting it.
-          Even a 6-month window of PO receipts gives you enough signal to distinguish reliable suppliers
-          from unreliable ones.
+          Use any saved Stocky records or spreadsheet order dates you already have, then record subsequent receipts
+          consistently. Keep the sample count visible: a supplier with two deliveries offers less evidence than
+          one with dozens of comparable shipments.
         </p>
 
         <h2 className="blog-article-h2">How skubase handles this</h2>
         <p>
-          skubase computes safety stock and reorder points using this formula — service-level segmented
-          by ABC tier, with lead-time variance pulled from your PO history. The daily action queue shows
-          which SKUs are below their ROP, ranked by urgency. You don&apos;t run the formula manually; you
-          work the queue.
+          Skubase uses demand variability, configured supplier lead times, and safety-buffer settings to help
+          prioritize reorder decisions. Recorded PO receipts support supplier scorecards and lead-time review.
+          The example above includes variable lead time; Skubase&apos;s current reorder calculation uses a configured
+          lead time, so review that setting when your supplier&apos;s delivery pattern changes.
         </p>
 
         <div className="blog-article-cta">

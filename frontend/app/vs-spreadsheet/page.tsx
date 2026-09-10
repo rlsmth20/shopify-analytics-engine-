@@ -5,40 +5,38 @@ import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
 export const metadata = {
-  title: "Better than your spreadsheet — skubase",
-  description: "If your forecasting lives in a Google Sheet with a trailing 6-month average, you''re tying up cash you don''t need to. skubase fixes that in ten minutes.",
+  title: "Better than your spreadsheet - skubase",
+  description: "Turn inventory data into reorder priorities, exportable purchase orders, and a repeatable weekly planning routine.",
   alternates: { canonical: "/vs-spreadsheet" },
   openGraph: {
-    title: "Your spreadsheet is overstocking you — skubase",
-    description: "ShipStation export → Google Sheet → 6-month moving average → reorder. That math is costing you money.",
+    title: "Inventory planning beyond the spreadsheet - skubase",
+    description: "Turn inventory data into reorder priorities, exportable purchase orders, and a repeatable weekly planning routine.",
     url: "/vs-spreadsheet",
     type: "website",
   },
 };
 
 const reasons = [
-  { title: "A 6-month rule of thumb is a tax on your working capital.", body: "Holding 6 months of cover for an A-item with steady demand is statistically wasteful — that''s a 95th-percentile-plus stockout rule applied to SKUs that only need 30–60 days. The cash gap is real, and it compounds across every reorder cycle." },
-  { title: "Trailing averages miss seasonality and trend.", body: "A 6-month moving average is half-blind on every Q4 ramp. skubase fits a Holt double-exponential model with a weekly seasonality factor, so a back-to-school SKU isn''t reordered like a steady-state one." },
-  { title: "All SKUs are not equal.", body: "Your A-items deserve a 99% service level; your C-items don''t. skubase segments by ABC × XYZ and sets safety stock per class — the math the spreadsheet can''t do without becoming a part-time job." },
-  { title: "Your suppliers are unmeasured.", body: "If your spreadsheet doesn''t track which suppliers miss promised lead times, you''re carrying their failures as your stockouts. skubase scores every supplier on on-time, fill rate, and lead-time stability." },
-  { title: "Dead stock is a cash recovery problem your sheet ignores.", body: "The Sheet shows you what you have. It does not propose a markdown plan, a bundle, a wholesale list, or a write-off. skubase does — with the dollar impact attached." }
+  { title: "Know what needs attention.", body: "Review stockout risk, excess inventory, and reorder priorities together instead of maintaining a separate shortlist." },
+  { title: "See demand changes.", body: "Forecast views use recent sales, trend, and weekly patterns when sufficient history is available. Compare the outlook with your upcoming promotions." },
+  { title: "Plan your next supplier order.", body: "Turn reorder recommendations into supplier-grouped PO drafts and export Excel workbooks with quantities and costs." },
+  { title: "Learn from actual deliveries.", body: "Record receipts and use supplier scorecards to review on-time delivery, fill rate, and lead-time stability on supported plans." },
+  { title: "Give slow stock a next action.", body: "Review markdown, bundle, wholesale, and write-off recommendations, with projected recovery when costs are available." },
 ];
 
 const compare = [
-  { metric: "Forecasting model", sheet: "Trailing 6-month moving average", skubase: "Holt double-exponential + weekly seasonality + stockout probability" },
-  { metric: "Safety stock", sheet: "Same buffer for every SKU", skubase: "Service-level segmented by ABC × XYZ class" },
-  { metric: "Reorder trigger", sheet: "Cover < 6 months", skubase: "Days-until-stockout < lead time + safety, ranked by $ impact" },
-  { metric: "Supplier accuracy", sheet: "Not tracked", skubase: "On-time %, fill rate, lead-time stability, tiered" },
-  { metric: "Bundle/kit logic", sheet: "Manual decomposition", skubase: "Auto-decomposes at reorder time" },
-  { metric: "Dead stock action", sheet: "None", skubase: "Markdown / bundle / wholesale / write-off plans" },
-  { metric: "Time to update", sheet: "30–60 minutes per week", skubase: "Zero — recomputes when shipments land" },
-  { metric: "Auditability", sheet: "Whoever last touched it", skubase: "Every recommended quantity explains itself" }
+  { metric: "Demand planning", sheet: "Choose formulas and refresh source data", skubase: "Forecast views with trend and weekly patterns when history supports them" },
+  { metric: "Reorder review", sheet: "Maintain lead-time and buffer calculations", skubase: "Ranked recommendations using sales, stock, lead times, and safety settings" },
+  { metric: "Purchase orders", sheet: "Build and maintain supplier order templates", skubase: "Supplier-grouped drafts, Excel exports, and vendor email drafts" },
+  { metric: "Supplier review", sheet: "Maintain order and receipt logs", skubase: "Receipt-based scorecards on supported plans" },
+  { metric: "Slow stock", sheet: "Compare recovery options manually", skubase: "Suggested recovery plans on supported plans" },
+  { metric: "Data refresh", sheet: "Refresh imports and formulas", skubase: "Shopify sync where installed, or supported CSV uploads" },
 ];
 
 const steps = [
-  { n: "1", title: "Drop in your ShipStation export", body: "We accept the standard Orders or Shipments CSV — SKU, quantity, ship date are all we need. ShipStation aggregates Shopify, Amazon, eBay, Walmart, and most other channels, so the import covers everywhere you sell." },
-  { n: "2", title: "See your real velocity", body: "Per-SKU 30 / 90 / 180-day shipped units. The number you''ve been eyeballing in the spreadsheet, computed correctly." },
-  { n: "3", title: "Get ranked actions", body: "Skubase ranks every SKU into urgent reorders, overstock to draw down, and dead stock to liquidate. Work the queue; close the spreadsheet." }
+  { n: "1", title: "Add inventory and sales data", body: "Use a supported Stocky product CSV for a CSV workspace and ShipStation for non-Shopify shipment history. Shopify-backed workspaces retain Shopify as the source for stock quantities." },
+  { n: "2", title: "Set your planning inputs", body: "Review supplier lead times, costs, and safety settings. Check a few familiar products against your current sheet." },
+  { n: "3", title: "Review and export your next order", body: "Work through the ranked actions, review the supplier-grouped purchase-order drafts, and export the approved plan." },
 ];
 
 export default function VsSpreadsheetPage() {
@@ -48,10 +46,11 @@ export default function VsSpreadsheetPage() {
 
       <section className="marketing-hero marketing-hero-migration">
         <p className="marketing-eyebrow">vs. your forecasting spreadsheet</p>
-        <h1 className="marketing-hero-title">Your reorder math is costing you money.</h1>
+        <h1 className="marketing-hero-title">Turn your inventory sheet into a weekly action plan.</h1>
         <p className="marketing-hero-sub">
-          If your forecasting lives in a Google Sheet — ShipStation export pasted in, six-month trailing average computed, reorder when cover drops below six months — you&apos;re carrying more inventory than you need to and you&apos;re still missing seasonality. skubase fixes both, in under ten minutes.
+          Bring sales, stock, and supplier lead times into one view. Skubase helps you see what needs reordering, review slow stock, and prepare purchase orders you can export and share.
         </p>
+        <p className="marketing-hero-trust">Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store. CSV workspaces and the <Link href="/tools/inventory-health-check">free inventory health check</Link> are available now.</p>
         <WaitlistForm source="vs_spreadsheet_hero" ctaLabel="Start free trial" />
         <p className="marketing-hero-trust">
           14-day free trial · No credit card · <strong>Prices locked at renewal</strong> ·{" "}
@@ -60,8 +59,8 @@ export default function VsSpreadsheetPage() {
       </section>
 
       <section className="marketing-section">
-        <p className="marketing-section-kicker">Why the spreadsheet is wrong</p>
-        <h2 className="marketing-section-title">Five things your sheet can&apos;t do — and skubase does by default.</h2>
+        <p className="marketing-section-kicker">A repeatable planning routine</p>
+        <h2 className="marketing-section-title">Five ways to simplify your inventory review.</h2>
         <div className="beliefs-grid">
           {reasons.map((r) => (
             <article key={r.title} className="belief-card">
@@ -78,7 +77,7 @@ export default function VsSpreadsheetPage() {
         <div className="compare-table-wrapper">
           <table className="compare-table">
             <thead>
-              <tr><th>Metric</th><th>Your spreadsheet</th><th>skubase</th></tr>
+              <tr><th>Metric</th><th>Spreadsheet workflow</th><th>skubase</th></tr>
             </thead>
             <tbody>
               {compare.map((row) => (
@@ -95,7 +94,7 @@ export default function VsSpreadsheetPage() {
 
       <section className="marketing-section">
         <p className="marketing-section-kicker">How it works</p>
-        <h2 className="marketing-section-title">Three steps. No consultant.</h2>
+        <h2 className="marketing-section-title">Three steps to your first review.</h2>
         <div className="migration-steps">
           {steps.map((s) => (
             <article key={s.n} className="migration-step">
@@ -110,9 +109,9 @@ export default function VsSpreadsheetPage() {
       </section>
 
       <section className="marketing-section marketing-cta-section">
-        <h2 className="marketing-section-title">Stop reordering by averages. Start reordering by math.</h2>
+        <h2 className="marketing-section-title">Make your next order easier to review.</h2>
         <p className="marketing-section-sub">
-          The spreadsheet was a heroic fix. skubase is the permanent one.
+          Try the sample dashboard, then bring a few representative products into your own workspace.
         </p>
         <WaitlistForm source="vs_spreadsheet_footer" ctaLabel="Start free trial" />
       </section>

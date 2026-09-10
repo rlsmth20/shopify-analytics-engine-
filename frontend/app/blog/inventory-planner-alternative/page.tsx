@@ -2,14 +2,19 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
+import { BLOG_POSTS } from "@/lib/blog-posts";
+import { BlogArticleMeta } from "@/components/blog-article-meta";
+
+const post = BLOG_POSTS["inventory-planner-alternative"];
+
 export const metadata = {
-  title: "Inventory Planner alternatives in 2026 - skubase",
-  description: "Compare Inventory Planner alternatives for Shopify merchants, with current pricing sources and clear distinctions between inventory planning and operations.",
+  title: `${post.title} - skubase`,
+  description: post.description,
   alternates: { canonical: "/blog/inventory-planner-alternative" },
   keywords: ["Inventory Planner alternative", "Inventory Planner Sage", "Shopify forecasting tool"],
   openGraph: {
-    title: "Inventory Planner alternatives in 2026",
-    description: "Compare pricing, inventory planning, and operational workflows for Shopify merchants.",
+    title: post.title,
+    description: post.description,
     url: "/blog/inventory-planner-alternative",
     type: "article",
   },
@@ -18,9 +23,9 @@ export const metadata = {
 const ARTICLE_LD = {
   "@context": "https://schema.org",
   "@type": "Article",
-  headline: "Inventory Planner alternatives in 2026",
-  datePublished: "2026-04-29",
-  dateModified: "2026-09-06",
+  headline: post.title,
+  datePublished: post.publishedAt,
+  dateModified: post.updatedAt,
   author: { "@type": "Organization", name: "skubase" },
 };
 
@@ -30,17 +35,15 @@ export default function InventoryPlannerAlternativePage() {
       <MarketingNav />
 
       <article className="blog-article">
-        <p className="blog-article-meta">
-          Published <time dateTime="2026-04-29">April 29, 2026</time> - Updated <time dateTime="2026-09-06">September 6, 2026</time> - Comparison
-        </p>
-        <h1 className="blog-article-title">Inventory Planner alternatives in 2026</h1>
+        <BlogArticleMeta post={post} />
+        <h1 className="blog-article-title">{post.title}</h1>
         <p className="blog-article-lead">
           Choosing an Inventory Planner alternative starts with the work you need to do: forecast demand,
           review replenishment, or manage purchasing and fulfillment. This comparison covers those differences
           and the pricing details to check before switching.
         </p>
         <p className="blog-article-meta">
-          Prices and product availability checked September 6, 2026. Prices shown below are USD for monthly billing;
+          Prices and product availability checked September 9, 2026. Prices shown below are USD for monthly billing;
           follow the linked pricing pages for current tiers and terms.
         </p>
 
@@ -74,12 +77,12 @@ export default function InventoryPlannerAlternativePage() {
           with the price-lock commitment described in our <Link href="/terms">terms</Link>.
         </p>
         <p>
-          skubase is read-only with respect to your Shopify store: it helps you plan, but does not send purchase
-          orders to suppliers, execute transfers, or change store inventory. Shopify sync brings in aggregate
-          inventory totals. Use Shopify or your operations system to carry out approved actions.
+          Skubase turns reorder recommendations into supplier-grouped purchase-order drafts. Export a PO as an Excel
+          workbook, open a vendor email draft, and record receipts to build supplier history. Its Shopify connection
+          reads store data for planning; inventory updates remain in Shopify or your operations system.
         </p>
         <p>
-          Connect Shopify or use a supported CSV import to bring data into skubase. Keep Inventory Planner exports
+          Start with a supported CSV import, or sync Shopify if Skubase is already installed for your store. Keep Inventory Planner exports
           for reference and check the destination&apos;s supported fields before importing; a product catalog import
           does not recreate your vendor records, purchase-order history, or forecasting rules.
         </p>
@@ -146,7 +149,9 @@ export default function InventoryPlannerAlternativePage() {
         <h2 className="blog-article-h2">If you want to try skubase</h2>
         <p>
           Explore the live demo with sample data, then review the plan limits and data connections for your store.
-          Every plan includes a 14-day free trial; no credit card is required to start.
+          Every plan includes a 14-day free trial; no credit card is required to start. Skubase is in Shopify&apos;s
+          review process and is not yet listed in the Shopify App Store. CSV workspaces and the
+          <Link href="/tools/inventory-health-check"> free inventory health check</Link> are available now.
         </p>
 
         <div className="blog-article-cta">

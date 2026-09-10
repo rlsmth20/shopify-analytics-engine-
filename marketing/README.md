@@ -1,25 +1,24 @@
-# Marketing posts — ready to paste
+# Marketing draft status
 
-These are drafts you can copy/paste into the relevant platform. Edit before posting if anything reads as off — most importantly, every post must sound like *you*, not a marketing template.
+Reviewed September 9, 2026.
 
-## Posting cadence
+## Current contextual starting points
 
-Don't post all of these the same day. Spread them out: one post every 1–2 days, different platform, different angle. Engage with every comment within 24 hours.
+- `shopify-community-stocky.md`: useful answers after Stocky's retirement.
+- `reddit-shopify-stocky-sunset.md`: questions about remaining purchasing work.
 
-## Files
+These are drafts, not messages to post on a schedule. Follow channel rules, answer the specific question, disclose the Skubase relationship, and keep claims grounded in current product capabilities. Public replies must be useful even without a product mention.
 
-- `reddit-shopify-stocky-sunset.md` — r/shopify (170k members)
-- `reddit-ecommerce-spreadsheet.md` — r/ecommerce (550k members)
-- `reddit-smallbusiness-pe-acquisitions.md` — r/smallbusiness (3M members)
-- `hn-show-hn.md` — Hacker News Show HN
-- `shopify-community-stocky.md` — Shopify Community forum (Apps & Integrations)
-- `linkedin-outreach-template.md` — DM template for G2/Capterra reviewers of competitors
-- `indie-hackers-build-log.md` — Indie Hackers post
+## Archived
 
-## Anti-patterns to avoid
+The other launch-era drafts are marked archived because they contain outdated pricing, dates, and unsupported comparisons. Do not use them as a source for outbound copy. Consult `docs/growth/current-acquisition-policy.md` and the current product pages instead.
 
-- **Don't link-drop.** Lead with the insight; the link comes near the end. Reddit downvotes pure promotion fast.
-- **Don't claim numbers you can't back.** "Save 40% of working capital" is fine if you can show the math (we can — see the moving-average post). "Best inventory tool" is empty.
-- **Don't argue with detractors.** If someone calls skubase bad, thank them and ask what would make it good. Public arguments lose.
-- **Don't post the same content twice.** Each platform gets a different angle. Cross-posting the same text gets flagged.
-- **Don't pretend to be a customer.** Disclose that you're the founder when you post. People notice.
+## Facts for new copy
+
+- Stocky retired August 31, 2026. Shopify documents a read-only export window; link its current migration guide rather than inventing an access deadline.
+- Skubase supports supplier-grouped PO drafts, Excel exports, vendor email drafts, and receipt recording. Store inventory updates remain in Shopify or the merchant's operations system.
+- A Stocky catalog import is not a migration of past purchase orders or sales history.
+- Skubase remains in Shopify review and is not yet listed in the App Store. CSV workspaces, the sample dashboard, and the free browser inventory health check are available.
+- Use `/pricing` for current plans. Never turn hypothetical savings into observed customer results.
+
+Source: https://help.shopify.com/en/manual/products/inventory/transitioning-from-stocky

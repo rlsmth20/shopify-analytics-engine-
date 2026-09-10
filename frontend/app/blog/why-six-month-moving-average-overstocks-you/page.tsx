@@ -2,18 +2,24 @@
 import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
+import { BLOG_POSTS } from "@/lib/blog-posts";
+import { BlogArticleMeta } from "@/components/blog-article-meta";
+
+const post = BLOG_POSTS["why-six-month-moving-average-overstocks-you"];
+
 export const metadata = {
-  title: "Why a 6-month moving average is overstocking you — skubase",
-  description: "If you reorder Shopify inventory when cover drops below six months, you''re carrying more than you need to.",
+  title: `${post.title} - skubase`,
+  description: post.description,
   alternates: { canonical: "/blog/why-six-month-moving-average-overstocks-you" },
-  openGraph: { title: "Why a 6-month moving average is overstocking you", description: "The math, and the fix.", url: "/blog/why-six-month-moving-average-overstocks-you", type: "article" },
+  openGraph: { title: post.title, description: post.description, url: "/blog/why-six-month-moving-average-overstocks-you", type: "article" },
 };
 
 const ARTICLE_LD = {
   "@context": "https://schema.org",
   "@type": "Article",
-  headline: "Why a 6-month moving average is overstocking you",
-  datePublished: "2026-04-25",
+  headline: post.title,
+  datePublished: post.publishedAt,
+  dateModified: post.updatedAt,
   author: { "@type": "Organization", name: "skubase" },
 };
 
@@ -23,56 +29,56 @@ export default function MovingAveragePost() {
       <MarketingNav />
 
       <article className="blog-article">
-        <p className="blog-article-meta">
-          <time dateTime="2026-04-25">April 25, 2026</time> · 7 min read · Forecasting
-        </p>
-        <h1 className="blog-article-title">Why a 6-month moving average is overstocking you</h1>
+        <BlogArticleMeta post={post} />
+        <h1 className="blog-article-title">{post.title}</h1>
         <p className="blog-article-lead">
-          A common Shopify reorder workflow: export ShipStation shipment volume, paste into a Google Sheet, compute a trailing six-month average per SKU, reorder when cover drops below six months. It works. It also overstocks fast movers and misses every seasonal ramp.
+          A six-month sales average can help you understand demand. Holding six months of stock is a separate decision. If you use one blanket stock target for every product, short-lead-time items can tie up cash while seasonal products still need attention.
         </p>
 
         <h2 className="blog-article-h2">What a 6-month rule actually says</h2>
         <p>
-          Reordering when cover drops below six months is effectively a 99th-percentile-or-higher safety policy. For a high-velocity, low-variability A-item, that&apos;s a fortune in parked working capital. The honest version: <em>&quot;I don&apos;t want to think about it, so I apply the worst-case buffer to every SKU.&quot;</em>
+          Your history window estimates demand. Your reorder point decides when to buy, and your order quantity decides how much to buy. Set those using supplier lead time, demand variability, order minimums, and your review schedule. A six-month stock target does not imply a particular service level.
         </p>
 
         <h2 className="blog-article-h2">Why moving averages miss seasonality</h2>
         <p>
-          A six-month moving average gives equal weight to every week. If you&apos;re forecasting an October reorder using April-through-September data, your average is dominated by summer demand — which has nothing to do with what your customers buy in November.
+          A six-month moving average gives equal weight to every week. If you&apos;re forecasting an October reorder using April-through-September data, the average combines spring and summer trading. Compare that baseline with recent demand and your actual seasonal sales pattern before placing an autumn order.
         </p>
         <p>
-          The fix is exponential smoothing (Holt-Winters or Holt double-exponential), which weights recent observations more heavily and decomposes the signal into level, trend, and seasonal components.
+          Trend and seasonal models can help when the data supports them. <a href="https://otexts.com/fpp3/holt.html">Holt&apos;s method</a> models level and trend; <a href="https://otexts.com/fpp3/holt-winters.html">Holt-Winters</a> adds a seasonal component. Compare forecast errors on held-out sales history before choosing a method.
         </p>
 
         <h2 className="blog-article-h2">Why one buffer per SKU is wrong</h2>
         <p className="blog-article-formula">Safety stock = z × σ_LT</p>
         <p>
-          The point of <em>z</em> is that <strong>different SKUs deserve different service levels.</strong> Top-revenue A-items want 99% (z ≈ 2.33). Lumpy C-items might be fine at 90%. A flat &quot;6 months&quot; applies the same z to everything. Result: overstocking C-items, understocking A-items, usually both.
+          Here, σ_LT is the standard deviation of demand during lead time, and z represents a target cycle service level under a normal approximation. Choose targets by the cost of a stockout, margin, and customer expectations. A blanket number of buffer days does not account for differences in variability.
         </p>
 
         <h2 className="blog-article-h2">A worked example</h2>
         <p>
-          A-item shipping 150/wk, σ=20, lead time 30 days. Average lead-time demand ≈ 643 units. σ_LT ≈ 47 units.
+          Illustrative assumptions: average demand is 150 units per week, weekly demand standard deviation is 20 units, independent weekly demand, and a fixed 30-day supplier lead time. Expected lead-time demand is 150 × 30/7 ≈ 643 units. Its standard deviation is 20 × √(30/7) ≈ 41.4 units.
         </p>
         <ul className="blog-article-ul">
-          <li><strong>6-month rule:</strong> 150 × 26 = 3,900 units of cover. At $25/unit = $97,500 parked.</li>
-          <li><strong>Service-level-segmented at 99%:</strong> ROP ≈ 753, plus cycle stock ≈ 900 total. At $25 = $22,500.</li>
+          <li><strong>Six-month cover target:</strong> 150 × 26 = 3,900 units.</li>
+          <li><strong>Illustrative 99% cycle-service reorder point:</strong> 643 + 2.326 × 41.4 ≈ 740 units after rounding up.</li>
         </ul>
         <p>
-          Same 99% service level, <strong>$75,000 less working capital tied up in one SKU</strong>. Multiply across a hundred A-items and the number gets very large.
+          The reorder point is an ordering trigger, not average inventory or a promised cash saving. Check inventory position (on hand plus on order minus backorders), then choose an order quantity that fits your buying cycle and supplier minimums. Compare actual stockouts and average stock over subsequent replenishment cycles.
         </p>
 
         <h2 className="blog-article-h2">Three things to do this week</h2>
         <ol className="blog-article-ol">
-          <li>Tag your top 20 SKUs. Their cover should be measured in weeks, not months.</li>
-          <li>Pull a vendor on-time history. Don&apos;t pay for vendor unreliability with a blanket 6-month rule.</li>
-          <li>Stop reordering by averages. Even simple exponential smoothing dramatically beats trailing average.</li>
+          <li>Review your top 20 SKUs. Compare their cover with supplier lead times and upcoming promotions.</li>
+          <li>Record order and receipt dates so your supplier lead-time settings reflect actual deliveries.</li>
+          <li>Compare a recent-demand forecast with your existing average on the same historical periods. Keep the method that supports better decisions.</li>
         </ol>
 
         <h2 className="blog-article-h2">Why skubase</h2>
         <p>
-          skubase runs Holt double-exponential with weekly seasonality on every SKU, classifies on ABC × XYZ, sets safety stock per class, scores suppliers, surfaces stockout probability. The math is visible — every recommended quantity explains itself.
+          Skubase brings recent sales, stock on hand, supplier lead times, and safety buffers into a ranked reorder queue. Forecast views use trend and weekly patterns when enough history is available. Review a recommendation, create a supplier-grouped PO draft, and export an Excel workbook for your next purchasing discussion.
         </p>
+
+        <p><Link href="/tools/reorder-point-calculator">Try the free reorder-point calculator</Link> with your own daily demand and supplier lead time.</p>
 
         <div className="blog-article-cta">
           <Link href="/login" className="button button-primary button-lg">Start free trial</Link>

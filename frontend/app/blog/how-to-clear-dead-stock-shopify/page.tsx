@@ -2,14 +2,19 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
+import { BLOG_POSTS } from "@/lib/blog-posts";
+import { BlogArticleMeta } from "@/components/blog-article-meta";
+
+const post = BLOG_POSTS["how-to-clear-dead-stock-shopify"];
+
 export const metadata = {
-  title: "How to clear dead stock on Shopify: markdown, bundle, wholesale, or write-off — skubase",
-  description: "Dead stock on Shopify costs you storage, cash, and opportunity. Here are four concrete plans — with the math on when each one makes sense.",
+  title: `${post.title} - skubase`,
+  description: post.description,
   alternates: { canonical: "/blog/how-to-clear-dead-stock-shopify" },
   keywords: ["dead stock Shopify", "clear dead inventory Shopify", "Shopify dead stock recovery", "aged inventory Shopify"],
   openGraph: {
-    title: "How to clear dead stock on Shopify",
-    description: "Markdown, bundle, wholesale, or write-off — and the math on when each one makes sense.",
+    title: post.title,
+    description: post.description,
     url: "/blog/how-to-clear-dead-stock-shopify",
     type: "article",
   },
@@ -18,8 +23,9 @@ export const metadata = {
 const ARTICLE_LD = {
   "@context": "https://schema.org",
   "@type": "Article",
-  headline: "How to clear dead stock on Shopify: markdown, bundle, wholesale, or write-off",
-  datePublished: "2026-04-29",
+  headline: post.title,
+  datePublished: post.publishedAt,
+  dateModified: post.updatedAt,
   author: { "@type": "Organization", name: "skubase" },
 };
 
@@ -29,15 +35,12 @@ export default function DeadStockPage() {
       <MarketingNav />
 
       <article className="blog-article">
-        <p className="blog-article-meta">
-          <time dateTime="2026-04-29">April 29, 2026</time> · 8 min read · Liquidation
-        </p>
-        <h1 className="blog-article-title">How to clear dead stock on Shopify: markdown, bundle, wholesale, or write-off</h1>
+        <BlogArticleMeta post={post} />
+        <h1 className="blog-article-title">{post.title}</h1>
         <p className="blog-article-lead">
-          Dead stock is inventory that hasn&apos;t sold in 90+ days and shows no sign of selling at full
-          price. Most inventory tools tell you it exists. Almost none tell you what to do about it. This
-          post covers four concrete plans — with the math on when each one makes sense — so you can
-          stop paying to store units that aren&apos;t selling.
+          Dead stock is inventory with little realistic demand at its current price. The right review window depends
+          on the product: a seasonal item and a replenishable everyday item need different treatment. Compare
+          these four options using likely cash recovery, selling costs, and how long stock will occupy space.
         </p>
 
         <h2 className="blog-article-h2">Why dead stock happens</h2>
@@ -48,8 +51,8 @@ export default function DeadStockPage() {
           cash is tied up, and every month it sits there it loses a little more value.
         </p>
         <p>
-          The cost isn&apos;t just opportunity cost. For merchants paying Shopify Fulfillment Network or
-          3PL storage fees, aged inventory has a direct monthly charge. For merchants holding their
+          The cost isn&apos;t just opportunity cost. For merchants paying warehouse or
+          third-party fulfillment storage fees, aged inventory has a direct monthly charge. For merchants holding their
           own stock, aged units occupy space that could hold faster-moving products.
         </p>
 
@@ -63,7 +66,7 @@ export default function DeadStockPage() {
           <li><strong>True dead stock:</strong> no sales in 90+ days with no seasonal explanation and no upcoming event that would clear it.</li>
         </ul>
         <p>
-          Acting on seasonal SKUs as dead stock is a common mistake — you sell the units at a loss in
+          Acting on seasonal SKUs as dead stock is a common mistake - you sell the units at a loss in
           January and scramble to reorder in October.
         </p>
 
@@ -71,7 +74,7 @@ export default function DeadStockPage() {
 
         <h3 className="blog-article-h3">Plan 1: Markdown</h3>
         <p>
-          A price cut direct to Shopify retail customers. The simplest plan — no logistics change,
+          A price cut direct to Shopify retail customers. The simplest plan - no logistics change,
           no new relationships, immediate execution.
         </p>
         <p>
@@ -82,8 +85,8 @@ export default function DeadStockPage() {
         <p>
           The math: discount to the point where the margin recovered exceeds the ongoing storage cost
           over the time it would take to sell. If a unit costs $3/month to store and you expect to sell
-          it in 6 months at full price, that&apos;s $18 in storage cost. A markdown that gets you $20 more
-          now is better — even at lower margin — because you also free up capital.
+          it in 6 months at full price, that&apos;s $18 in storage cost. A $15 reduction in net proceeds today would avoid $18 of storage in this example, leaving you $3 ahead
+          before other costs and the time value of money. Compare net proceeds after fees and fulfillment.
         </p>
         <p>
           The risk: margin erosion, brand perception on perennially discounted items, and Shopify
@@ -97,17 +100,16 @@ export default function DeadStockPage() {
         </p>
         <p>
           When it makes sense: you have a complementary product with real velocity. The dead-stock unit
-          has value-add to the fast mover&apos;s customer — accessories, consumables, related products.
+          has value-add to the fast mover&apos;s customer - accessories, consumables, related products.
         </p>
         <p>
-          The math: price the bundle at (fast mover price) + (dead stock recovery amount) — typically
-          10–30% of the dead stock unit&apos;s cost. If you can sell 200 bundles per month at a 40% margin
-          versus zero units of dead stock at any margin, the bundle wins even at a low dead-stock recovery.
+          The math: compare net contribution from the bundle with selling the fast mover alone. Include both
+          product costs, packaging, fulfillment, and discounts. Test whether attaching the slow item increases
+          recovery without simply discounting sales you would have made anyway.
         </p>
         <p>
-          The complication: bundles require inventory tracking discipline. If your Shopify store doesn&apos;t
-          decompose bundle sales back to component SKUs, you&apos;ll oversell. Tools like skubase track
-          bundle components and flag reorder needs at the component level.
+          The complication: bundles require inventory tracking discipline. Keep component quantities synchronized in your store&apos;s bundle workflow. Skubase can help review
+          component demand and reorder needs for configured bundles while stock updates stay in your store.
         </p>
 
         <h3 className="blog-article-h3">Plan 3: Wholesale / B2B</h3>
@@ -121,20 +123,19 @@ export default function DeadStockPage() {
           your retail channel.
         </p>
         <p>
-          The math: wholesale at 30–50% of cost is often better than holding for 12+ months of storage
-          fees. Run the numbers. If you hold 500 units that cost $20 each, and storage is $1/unit/month,
+          The math: compare the offer with expected later proceeds after carrying and selling costs. If you hold 500 units that cost $20 each, and storage is $1/unit/month,
           that&apos;s $500/month. Selling at $10/unit wholesale recovers $5,000 immediately versus $6,000
-          in 12 months minus $6,000 in storage — a wash at best.
+          in 12 months minus $6,000 in storage - a wash at best.
         </p>
         <p>
-          Routes: Faire for wholesale B2B, direct to a liquidator (Bulq, Direct Liquidation), or
-          a retailer in a non-competing geography.
+          Ask relevant retailers, existing wholesale contacts, or a liquidator for offers. Compare accepted
+          quantities, freight responsibility, fees, payment timing, and any resale restrictions.
         </p>
 
         <h3 className="blog-article-h3">Plan 4: Write-off</h3>
         <p>
-          Declare the inventory worthless, take the accounting write-off, and move on. Correct when
-          recovery cost exceeds recovery value.
+          When recovery costs exceed likely proceeds, consider disposal, recycling, or another appropriate exit.
+          Keep an itemized record of quantities, costs, condition, and the action taken.
         </p>
         <p>
           When it makes sense: units are damaged, obsolete, or so niche that no buyer exists at any
@@ -142,14 +143,13 @@ export default function DeadStockPage() {
           storage while waiting exceeds wholesale value.
         </p>
         <p>
-          The benefit: a write-off is a real tax deduction. Consult your accountant — depending on your
-          structure, writing off dead inventory can offset income meaningfully. It also forces an honest
-          accounting of your inventory quality instead of carrying ghost value on the books.
+          Have your accountant determine the appropriate accounting and tax treatment from those records.
+          Review stock values regularly so purchasing decisions reflect inventory you can realistically sell.
         </p>
 
         <h2 className="blog-article-h2">A decision framework</h2>
         <ol className="blog-article-ol">
-          <li>Is this a seasonal SKU? If yes, flag it and revisit before next season. Do not liquidate.</li>
+          <li>Is this a seasonal SKU? Compare likely next-season recovery with storage costs and obsolescence risk.</li>
           <li>Does it have retail demand at a discount? If yes → markdown.</li>
           <li>Does it pair with a fast mover? If yes → bundle.</li>
           <li>Is the volume large enough for bulk clearance? If yes → wholesale.</li>
@@ -158,10 +158,10 @@ export default function DeadStockPage() {
 
         <h2 className="blog-article-h2">How skubase surfaces this</h2>
         <p>
-          skubase&apos;s liquidation module flags dead-stock SKUs automatically — units with 90+ days
-          of no sales — and proposes a plan based on margin, velocity, and whether a bundle partner
-          exists. The action queue shows the dollar impact attached to each proposed plan so you
-          can prioritize by cash recovery, not by guesswork.
+          Skubase surfaces slow and inactive inventory, then suggests markdown, bundle, wholesale, or write-off
+          plans on supported subscriptions. The action queue helps you prioritize products and review projected
+          recovery when costs are known. Compare the suggested action with your seasonal calendar and actual
+          selling options, then carry out the chosen plan in your store.
         </p>
 
         <div className="blog-article-cta">

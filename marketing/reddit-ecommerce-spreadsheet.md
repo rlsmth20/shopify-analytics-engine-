@@ -1,3 +1,5 @@
+> ARCHIVED DRAFT as of September 9, 2026. Do not publish or use for outreach. Product, pricing, timeline, and competitor claims below are historical and have not been revalidated. Use the current website and docs/growth/current-acquisition-policy.md for new copy.
+
 # r/ecommerce — spreadsheet forecasting post
 
 **Subreddit:** r/ecommerce

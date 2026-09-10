@@ -6,7 +6,7 @@ import { MarketingFooter } from "@/components/marketing-footer";
 
 export const metadata = {
   title: "Goodbye Stocky, hello skubase - skubase",
-  description: "Plan inventory after Stocky's August 31, 2026 retirement. Explore skubase's read-only planning tools and supported product CSV import.",
+  description: "Plan inventory after Stocky's August 31, 2026 retirement. Review reorder recommendations, export purchase orders, and import your saved Stocky product CSV.",
   alternates: { canonical: "/goodbye-stocky" },
   keywords: ["Stocky alternative", "Stocky replacement", "Stocky sunset"],
   openGraph: { title: "Goodbye Stocky, hello skubase", description: "Inventory planning and catalog import after Stocky's August 31, 2026 retirement.", url: "/goodbye-stocky", type: "website" },
@@ -14,18 +14,18 @@ export const metadata = {
 
 const compareRows = [
   { capability: "Inventory", stocky: "Maintain accurate quantities at each location.", skubase: "Read aggregate inventory totals from Shopify for planning." },
-  { capability: "Purchasing", stocky: "Send supplier orders and receive stock.", skubase: "Review reorder plans and record receipts; Shopify stock stays unchanged." },
-  { capability: "Transfers", stocky: "Move stock between locations and confirm receipt.", skubase: "Does not execute transfers or update store quantities." },
+  { capability: "Purchasing", stocky: "Send supplier orders and receive stock.", skubase: "Create supplier-grouped PO drafts, export Excel workbooks, open vendor email drafts, and record receipts." },
+  { capability: "Transfers", stocky: "Move stock between locations and confirm receipt.", skubase: "Use Shopify for stock movements while reviewing replenishment priorities in Skubase." },
   { capability: "Dead stock", stocky: "Approve and carry out markdowns or other actions.", skubase: "Review suggested markdown, bundle, wholesale, or write-off plans, depending on your plan." },
   { capability: "Product data", stocky: "Retain catalog exports and verify stock counts.", skubase: "CSV-only workspaces can import catalog fields and stock snapshots. When Shopify is connected or its catalog is already synced, CSV quantities are ignored; supported costs and lead times can enrich an unambiguous Shopify variant." },
-  { capability: "Historical records", stocky: "Keep supplier, purchase-order, and transfer records for reference.", skubase: "Product CSV import does not migrate standalone vendor lists, PO history, transfers, or sales history." }
+  { capability: "Historical records", stocky: "Keep supplier, purchase-order, and transfer records for reference.", skubase: "Keep historical POs, transfers, and supplier records in a separate archive. Add sales history through a supported connection or shipment import." }
 ];
 
 const steps = [
   { number: "1", title: "Preserve your records", body: "Save available exports while read-only access remains. Keep historical records and supplier details for reference." },
   { number: "2", title: "Import your product catalog", body: "Use a Stocky product CSV for catalog details and a stock snapshot in a CSV-only workspace. Shopify-backed workspaces keep Shopify stock quantities and accept supported cost and lead-time updates for unambiguous variants. Review the reported changes and skipped rows." },
   { number: "3", title: "Add sales data and review recommendations", body: "Import non-Shopify shipment history through ShipStation, or sync Shopify if Skubase is already installed for your store. Stocky product CSVs do not include sales history. Check lead times and representative products before relying on recommendations." },
-  { number: "4", title: "Carry out approved actions", body: "Use Shopify or your operations system for purchasing, receiving, transfers, and inventory adjustments. skubase helps you decide what to do." }
+  { number: "4", title: "Carry out approved actions", body: "Review supplier-grouped PO drafts, export an Excel workbook, and open a vendor email draft. Record receipts in Skubase and maintain stock quantities in Shopify or your operations system." }
 ];
 
 export default function GoodbyeStockyPage() {
@@ -38,12 +38,12 @@ export default function GoodbyeStockyPage() {
         <h1 className="marketing-hero-title">Goodbye Stocky. Hello skubase.</h1>
         <p className="marketing-hero-sub">
           Plan your next inventory decisions with forecasts, stockout risk, and a ranked action queue.
-          skubase reads your Shopify data and helps you review recommendations; purchasing and stock movements
-          stay in Shopify or your operations system.
+          Turn reorder recommendations into supplier-grouped purchase orders you can export and share.
+          Track receipts and supplier performance as you build your new planning routine.
         </p>
         <p className="marketing-hero-trust">
           Shopify provides read-only Stocky exports for at least 90 days after retirement. <a href="https://help.shopify.com/en/manual/products/inventory/transitioning-from-stocky">Check Shopify&apos;s migration guidance</a>.
-          {" "}Availability checked September 6, 2026.
+          {" "}Availability checked September 9, 2026.
         </p>
         <p className="marketing-hero-trust">
           Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store.
@@ -61,7 +61,7 @@ export default function GoodbyeStockyPage() {
         <h2 className="marketing-section-title">Where skubase fits in your workflow.</h2>
         <p className="marketing-section-sub">
           <Link href="/pricing">Monthly plans are $29, $99, and $199</Link>. Review included features and limits
-          to choose the plan for your store. Prices checked September 6, 2026.
+          to choose the plan for your store. Prices checked September 9, 2026.
         </p>
         <div className="compare-table-wrapper">
           <table className="compare-table">

@@ -2,20 +2,25 @@
 import { MarketingNav } from "@/components/marketing-nav";
 import { MarketingFooter } from "@/components/marketing-footer";
 
+import { BLOG_POSTS } from "@/lib/blog-posts";
+import { BlogArticleMeta } from "@/components/blog-article-meta";
+
+const post = BLOG_POSTS["stocky-alternatives-2026"];
+
 export const metadata = {
-  title: "Stocky alternatives for Shopify merchants in 2026 - skubase",
-  description: "Stocky stopped managing inventory on August 31, 2026. Compare Shopify's built-in workflows and other inventory planning and operations options.",
+  title: `${post.title} - skubase`,
+  description: post.description,
   alternates: { canonical: "/blog/stocky-alternatives-2026" },
   keywords: ["Stocky alternative", "Stocky shutdown", "Shopify Stocky end of life"],
-  openGraph: { title: "Stocky alternatives for Shopify merchants in 2026", description: "Stocky retired August 31, 2026. Compare inventory planning and operations options.", url: "/blog/stocky-alternatives-2026", type: "article" },
+  openGraph: { title: post.title, description: post.description, url: "/blog/stocky-alternatives-2026", type: "article" },
 };
 
 const ARTICLE_LD = {
   "@context": "https://schema.org",
   "@type": "Article",
-  headline: "Stocky alternatives for Shopify merchants in 2026",
-  datePublished: "2026-04-25",
-  dateModified: "2026-09-06",
+  headline: post.title,
+  datePublished: post.publishedAt,
+  dateModified: post.updatedAt,
   author: { "@type": "Organization", name: "skubase" },
 };
 
@@ -25,17 +30,15 @@ export default function StockyAlternativesPost() {
       <MarketingNav />
 
       <article className="blog-article">
-        <p className="blog-article-meta">
-          Published <time dateTime="2026-04-25">April 25, 2026</time> - Updated <time dateTime="2026-09-06">September 6, 2026</time> - Migration
-        </p>
-        <h1 className="blog-article-title">Stocky alternatives for Shopify merchants in 2026</h1>
+        <BlogArticleMeta post={post} />
+        <h1 className="blog-article-title">{post.title}</h1>
         <p className="blog-article-lead">
           Stocky stopped managing inventory on <strong>August 31, 2026</strong>. Shopify now directs merchants
           to its admin and POS inventory workflows, with read-only Stocky access for exports for at least 90 days
           after retirement. See <a href="https://help.shopify.com/en/manual/products/inventory/transitioning-from-stocky">Shopify&apos;s migration guidance</a> for current availability.
         </p>
         <p className="blog-article-meta">
-          Prices and product availability checked September 6, 2026. Prices shown below are USD for monthly billing;
+          Prices and product availability checked September 9, 2026. Prices shown below are USD for monthly billing;
           follow the linked pricing pages for current tiers and terms.
         </p>
 
@@ -43,7 +46,7 @@ export default function StockyAlternativesPost() {
         <p>
           Shopify&apos;s <a href="https://help.shopify.com/en/manual/products/inventory/transitioning-from-stocky">built-in inventory workflows</a> cover
           purchase orders, transfers, quantity adjustments, and inventory history. Check those first, then identify
-          any additional forecasting, reporting, or channel requirements.
+          any additional planning or reporting requirements. Shopify also offers Sidekick assistance with replenishment and draft purchase orders.
         </p>
         <p>
           Distinguish a tool that recommends what to buy from one that sends orders, receives stock, or updates
@@ -59,9 +62,9 @@ export default function StockyAlternativesPost() {
           with a price-lock commitment in our <Link href="/terms">terms</Link>.
         </p>
         <p>
-          It is read-only with respect to Shopify: recommendations do not send supplier purchase orders, execute
-          transfers, or change store inventory. Shopify sync brings in aggregate inventory totals. Keep purchasing,
-          receiving, and transfers in Shopify or your operations system. <Link href="/goodbye-stocky">See the migration details</Link>.
+          Turn reorder recommendations into supplier-grouped purchase-order drafts, export them as Excel workbooks,
+          and open a vendor email draft to share your order. Record receipts in Skubase to build supplier history.
+          Shopify stock updates and physical receiving stay in your store or operations system. <Link href="/goodbye-stocky">See the migration details</Link>.
         </p>
 
         <h3 className="blog-article-h3">Inventory Planner (Sage)</h3>
@@ -115,11 +118,14 @@ export default function StockyAlternativesPost() {
 
         <h2 className="blog-article-h2">If skubase looks right</h2>
         <p>
-          skubase&apos;s Stocky product CSV importer brings in catalog details and stock quantities. Vendor names
-          and lead times can be read from product rows when present; this does not import a standalone vendor
-          list, purchase-order history, transfers, or sales history. Check the imported catalog and quantities,
-          then connect Shopify or import supported sales data for demand analysis.
+          Start with a saved Stocky Inventory On Hand CSV to add catalog details and a stock snapshot to a CSV workspace.
+          If Shopify is already connected or synced, its quantities remain authoritative; supported CSV costs and
+          lead times enrich matching variants. Add non-Shopify shipment history through ShipStation for demand analysis.
+          Keep old purchase orders, transfers, and supplier records in your migration archive.
         </p>
+
+        <p>Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store.
+          You can use a CSV workspace now, or <Link href="/tools/inventory-health-check">try the free inventory health check</Link> without installing an app.</p>
 
         <div className="blog-article-cta">
           <Link href="/login" className="button button-primary button-lg">Start free trial</Link>

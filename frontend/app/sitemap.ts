@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { BLOG_POSTS } from "@/lib/blog-posts";
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://skubase.io";
 
@@ -30,7 +31,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return routes.map(({ path, priority, freq }) => ({
     url: `${BASE_URL}${path}`,
-    lastModified,
+    lastModified: path.startsWith("/blog/")
+      ? BLOG_POSTS[path.slice(6) as keyof typeof BLOG_POSTS]?.updatedAt ?? lastModified
+      : ["/blog", "/goodbye-stocky", "/goodbye-genie", "/vs-spreadsheet"].includes(path)
+        ? "2026-09-09"
+        : lastModified,
     changeFrequency: freq,
     priority,
   }));
