@@ -1,10 +1,10 @@
 # Latest policy takes precedence
 
-Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared all-channel ceiling remains removed. EmailPal activation is superseded.
+Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared ceiling is 20 confirmed first contacts per Pacific day. EmailPal activation is superseded.
 
 # Current accounting override — confirmed_outreach_pacific_day_v3
 
-Only verified sent/submitted receipts count as first contacts. There is no daily contact ceiling. Pending or uncertain contacts do not count. Keep unresolved contacts
+Only verified sent/submitted receipts count as first contacts. The daily ceiling is 20 confirmed first contacts across acquisition channels. Pending or uncertain contacts do not count. Keep unresolved contacts
 protected from retries. The ledger permits one live send at a time (10-minute
 reservation); an expired permit never authorizes submitting or retrying that contact.
 Immediately before the single external submission, call
@@ -12,9 +12,9 @@ Immediately before the single external submission, call
 `{"reservation_id":"the actual reserved ID"}`. Submit once within the returned
 30-second deadline. Authorization is one-use; expiry or repeated authorization
 requires receipt/no-effect reconciliation, never another click. Completion records
-actual receipts even when late. A separate `OUTREACH_UNCERTAINTY_SAFETY_HOLD` at
-10 unresolved contacts prevents unbounded ambiguous sends; it is not the outreach
-counter. `SEND_IN_FLIGHT` is a temporary dispatch wait. Continue other useful work.
+actual receipts even when late. Uncertain outcomes do not create a global hold or consume the ceiling.
+Keep those merchants protected, track uncertainty by channel, and contact other
+eligible merchants. Actual operational incidents apply to the affected channel. `SEND_IN_FLIGHT` is a temporary dispatch wait. Continue other useful work.
 These rules supersede all older held-slot/quota wording below.
 
 # Persistent acquisition executor — market_discovery_v1

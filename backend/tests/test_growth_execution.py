@@ -83,6 +83,22 @@ class ExecutionTests(unittest.TestCase):
             executor.accept(self.factory, 'reply-worker', task,
                 {**self.result(), 'stop_reason': None, 'sources': []})
 
+    def test_uncertain_forms_do_not_filter_existing_send_work(self):
+        with self.factory() as db:
+            for n in range(10):
+                db.add(FirstContact(contact_id='unknown-'+str(n), action_key='unknown-'+str(n),
+                    channel='contact_form', experiment_id='fixture', body_hash='fixture',
+                    cohort={}, status='uncertain', reserved_at=time.time()-700))
+            sending = offer(db, key='eligible-send', source='https://example.com/contact',
+                stage='send', priority=100, decision='Contact a different eligible merchant',
+                evidence_id=self.task['evidence_id'])
+            db.commit()
+        task = executor.take(self.factory, 'restarted-process')
+        self.assertEqual(task['id'], sending['id'])
+        self.assertIsNone(task['outreach_policy']['blocker'])
+        self.assertEqual(task['outreach_policy']['uncertain_contacts'], 10)
+        self.assertIsNone(task['outreach_policy']['channels']['email']['blocker'])
+
     def test_kind_priority_overrides_legacy_scores_and_reply_preempts(self):
         with self.factory() as db:
             for n in range(25):

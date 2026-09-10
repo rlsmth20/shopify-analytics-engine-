@@ -12,6 +12,7 @@ from app.growth import warmup
 from app.growth.messaging import ingest_reply
 from app.growth.models import Contact, Evidence, FirstContact, Message, Memory
 from app.growth.policy import GrowthError
+from app.growth.review_calendar import review_day
 from app.growth.store import get_memory, record, remember
 
 
@@ -22,7 +23,8 @@ class WarmupTests(unittest.TestCase):
         Base.metadata.create_all(self.engine)
         self.factory=sessionmaker(self.engine,expire_on_commit=False,autoflush=False)
         bootstrap(self.factory)
-        self.now=time.time()
+        # Keep the delayed reply within the same fixture day, including late-night runs.
+        self.now=review_day(time.time()).start + 12*3600
         self.sender='info@skubase.io'; self.recipient='controlled@fixture.test'
         with self.factory() as db:
             accounts={}
@@ -50,7 +52,7 @@ class WarmupTests(unittest.TestCase):
     def received(self,db,item,folder='inbox'):
         return warmup.observe(db,{'message_id':item['id'],'event':'received','account':item['recipient'],
             'url':'https://mail.google.com/mail/u/1/#inbox/'+item['id'],'observation':'Fixture received in original folder',
-            'folder':folder,'authentication':{'spf':'pass','dkim':'pass','dmarc':'pass'}},self.now+60)
+            'folder':folder,'authentication':{'spf':'pass','dkim':'pass','dmarc':'pass'}},max(self.now,item['due_at'])+60)
 
     def test_persistent_thread_cycle_is_not_acquisition(self):
         with self.factory() as db:

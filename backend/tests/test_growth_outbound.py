@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
 from app.growth.engine import bootstrap, schedule
 from app.growth.models import Contact, Experiment, FirstContact, Work
-from app.growth.outbound import LIMIT, MAX_UNCERTAIN, authorize_submission, complete, reconcile_not_sent, reserve_contact, status
+from app.growth.outbound import LIMIT, authorize_submission, complete, reconcile_not_sent, reserve_contact, status
 from app.growth.store import record, remember
 from app.growth.policy import GrowthError
 from app.growth.review_calendar import review_day
@@ -121,16 +121,17 @@ class OutboundTests(unittest.TestCase):
         with self.assertRaises(GrowthError): self.reserve(0,now=now+601)
         self.reserve(1,now=now+601)
 
-    def test_ambiguous_outcomes_cannot_accumulate_without_bound(self):
-        for n in range(MAX_UNCERTAIN):
+    def test_uncertainty_count_does_not_create_a_hold(self):
+        for n in range(12):
             item=self.reserve(n)
             with self.factory() as db:
                 complete(db,item['reservation_id'],outcome='uncertain'); db.commit()
         with self.factory() as db:
             view=status(db)
             self.assertEqual((view['sent'],view['remaining']),(0,20))
-            self.assertEqual(view['blocker'],'OUTREACH_UNCERTAINTY_SAFETY_HOLD')
-        with self.assertRaises(GrowthError): self.reserve(MAX_UNCERTAIN)
+            self.assertIsNone(view['blocker'])
+            self.assertEqual(view['uncertain_contacts_protected'], 12)
+        self.reserve(12)
 
     def test_uncapped_owner_policy_continues_after_twenty_and_late_confirmation(self):
         with self.factory() as db:
@@ -165,7 +166,7 @@ class OutboundTests(unittest.TestCase):
         self.assertIsNotNone(next_task)
         self.assertEqual(next_task['stage'], 'plan')
 
-    def test_uncapped_still_serializes_dispatch_and_bounds_ambiguous_outcomes(self):
+    def test_uncapped_serializes_dispatch_without_an_uncertainty_hold(self):
         with self.factory() as db:
             remember(db, 'strategic', 'outreach_policy', {'daily_new_contact_limit': None}); db.commit()
         def attempt(n):
@@ -176,7 +177,7 @@ class OutboundTests(unittest.TestCase):
         self.assertEqual(len(admitted), 1)
         with self.factory() as db:
             complete(db, admitted[0]['reservation_id'], outcome='uncertain'); db.commit()
-        for n in range(8, 8 + MAX_UNCERTAIN - 1):
+        for n in range(8, 8 + 10 - 1):
             item = self.reserve(n)
             with self.factory() as db:
                 complete(db, item['reservation_id'], outcome='uncertain'); db.commit()
@@ -184,15 +185,59 @@ class OutboundTests(unittest.TestCase):
             view = status(db)
             self.assertEqual(view['confirmed_sent_count'], 0)
             self.assertIsNone(view['remaining'])
-            self.assertEqual(view['uncertain_contacts_protected'], MAX_UNCERTAIN)
-            self.assertEqual(view['blocker'], 'OUTREACH_UNCERTAINTY_SAFETY_HOLD')
-        with self.assertRaises(GrowthError): self.reserve(39)
+            self.assertEqual(view['uncertain_contacts_protected'], 10)
+            self.assertIsNone(view['blocker'])
+        self.assertIsNotNone(self.reserve(39))
 
     def test_invalid_owner_ceiling_fails_closed(self):
         with self.factory() as db:
             for value in (-1, True, 'unlimited', 2.5):
                 remember(db, 'strategic', 'outreach_policy', {'daily_new_contact_limit': value})
                 with self.subTest(value=value), self.assertRaises(GrowthError): status(db)
+
+    def test_ten_uncertain_forms_leave_nine_confirmed_slots_and_email_available(self):
+        with self.factory() as db:
+            for n in range(21):
+                db.add(FirstContact(contact_id=str(n), action_key='seed:'+str(n),
+                    channel='contact_form', experiment_id=self.exp, body_hash='fixture',
+                    cohort={}, status='uncertain' if n < 10 else 'sent',
+                    sent_at=None if n < 10 else time.time(), reserved_at=time.time()-700))
+            db.commit()
+            view = status(db)
+            self.assertEqual((view['sent'], view['remaining'], view['uncertain_contact_count']), (11, 9, 10))
+            self.assertEqual(view['channels']['contact_form']['uncertain_contact_count'], 10)
+            self.assertIsNone(view['blocker'])
+            self.assertIsNone(view['channels']['email']['blocker'])
+        for n in range(10):
+            with self.assertRaisesRegex(GrowthError, 'already contacted'):
+                self.reserve(n)
+        for n in range(21, 30):
+            with self.factory() as db:
+                item = reserve_contact(db, db.get(Contact,str(n)), action_key='fresh:'+str(n),
+                    channel='email' if n == 21 else 'contact_form', experiment_id=self.exp,
+                    body='Relevant question', cohort={'icp':'apparel','offer':'health_check','message_version':2})
+                authorize_submission(db, item['reservation_id'])
+                complete(db, item['reservation_id'], receipt='confirmed:'+str(n)); db.commit()
+        with self.factory() as db:
+            self.assertEqual(status(db)['sent'], 20)
+            self.assertEqual(status(db)['uncertain_contact_count'], 10)
+        with self.assertRaises(GrowthError): self.reserve(30)
+
+    def test_explicit_channel_failure_fences_only_that_channel(self):
+        item = self.reserve(1)
+        with self.factory() as db:
+            remember(db, 'outreach_channel_health', 'contact_form',
+                     {'paused':True, 'reason':'CONFIRMED_SUBMISSION_FAILURE'}); db.commit()
+            with self.assertRaisesRegex(GrowthError, 'CONFIRMED_SUBMISSION_FAILURE'):
+                authorize_submission(db, item['reservation_id'])
+            complete(db, item['reservation_id'], outcome='uncertain'); db.commit()
+        with self.assertRaisesRegex(GrowthError, 'CONFIRMED_SUBMISSION_FAILURE'): self.reserve(3)
+        # A different merchant and channel can still obtain the single permit.
+        other = self.reserve(2)
+        with self.factory() as db:
+            authorize_submission(db, other['reservation_id']); db.commit()
+            self.assertEqual(status(db)['channels']['contact_form']['blocker'], 'CONFIRMED_SUBMISSION_FAILURE')
+            self.assertIsNone(status(db)['channels']['email']['blocker'])
 
     def test_linked_merchant_history_blocks_cross_channel_duplicate_and_suppression(self):
         from app.growth.identity import link_merchant, merchant_view

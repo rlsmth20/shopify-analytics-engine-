@@ -16,10 +16,15 @@ from .review_calendar import review_day
 LIMIT = 20  # Legacy default only; owner policy may explicitly remove the ceiling.
 PERMIT_SECONDS = 600
 MAX_IN_FLIGHT = 1
-# Independent incident circuit breaker, not part of the confirmed outreach quota.
-# Prevent a broken channel from accumulating unlimited possibly-sent messages.
-MAX_UNCERTAIN = 10
 CHANNELS = {"email", "contact_form", "shopify_community", "reddit", "public_community", "social_dm"}
+
+
+def channel_blocker(db, channel):
+    """Explicit operational incidents apply only to their channel, never a count of unknowns."""
+    health = get_memory(db, "outreach_channel_health", channel)
+    if health.get("paused"):
+        return health.get("reason") or "CHANNEL_OPERATIONAL_HOLD"
+    return None
 
 
 def lock(db):
@@ -45,14 +50,23 @@ def status(db, now=None):
         raise GrowthError("Invalid owner outreach ceiling", "configuration")
     remaining = None if limit is None else max(0, limit - sent)
     blocker = ("DAILY_CAP_REACHED" if remaining == 0 else
-               "OUTREACH_UNCERTAINTY_SAFETY_HOLD" if uncertain >= MAX_UNCERTAIN else
                "SEND_IN_FLIGHT" if in_flight >= MAX_IN_FLIGHT or limit is not None and sent + in_flight >= limit else None)
+    channels = {}
+    for channel in sorted(CHANNELS):
+        channel_rows = [r for r in rows if r.channel == channel]
+        active = sum(r.status == "reserved" and r.reserved_at + PERMIT_SECONDS > now for r in channel_rows)
+        channels[channel] = {
+            "confirmed_sent_count": sum(r.status == "sent" and r.sent_at is not None and day.start <= r.sent_at < day.end for r in channel_rows),
+            "in_flight_send_count": active,
+            "uncertain_contact_count": sum(r.status in {"reserved", "uncertain"} for r in channel_rows) - active,
+            "blocker": channel_blocker(db, channel)}
     return {"policy": "uncapped_confirmed_outreach_v1" if limit is None else "confirmed_outreach_pacific_day_v3", "limit": limit,
             "window_hours": (day.end - day.start) / 3600, "day_timezone": "America/Los_Angeles",
             "day": day.day, "day_start_at": day.start, "resets_at": day.end, "used": sent, "sent": sent,
             "confirmed_sent_count": sent, "remaining_confirmed_capacity": remaining,
             "in_flight_send_count": in_flight, "uncertain_contact_count": uncertain,
-            "uncertain_contacts_protected": uncertain, "uncertainty_safety_limit": MAX_UNCERTAIN,
+            "uncertain_contacts_protected": uncertain, "uncertainty_safety_limit": None,
+            "channels": channels,
             "late_confirmation_overage": 0 if limit is None else max(0, sent - limit),
             "blocker": blocker, "remaining": remaining,
             "dispatch_remaining": 0 if blocker else MAX_IN_FLIGHT - in_flight if limit is None else min(MAX_IN_FLIGHT - in_flight, remaining - in_flight),
@@ -91,6 +105,8 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
         raise GrowthError("An active, unexpired experiment is required. Run operator-export for a real active ID; never invent an experiment ID.")
     if channel not in CHANNELS or not body.strip() or not all(cohort.get(k) for k in ("icp", "offer", "message_version")):
         raise GrowthError("Channel, exact message and immutable cohort labels are required")
+    if channel_blocker(db, channel):
+        raise GrowthError(channel_blocker(db, channel), "capacity")
     prior = db.scalar(select(FirstContact).where(FirstContact.contact_id == contact.id))
     aliases = [Contact.id.in_([row.id for row in identity_aliases]), identity_match(contact.identity)]
     if contact.email:
@@ -128,8 +144,10 @@ def authorize_submission(db, reservation_id, now=None):
     if db.scalar(select(Evidence.id).where(Evidence.key == "first-contact-authorized:" + row.id)):
         raise GrowthError("Submission was already authorized; reconcile without retry", "ambiguous")
     current = status(db, now)
-    if (current["limit"] is not None and current["sent"] >= current["limit"]) or current["uncertain_contact_count"] >= MAX_UNCERTAIN:
-        raise GrowthError("Confirmed ceiling or uncertainty safety hold; do not submit", "capacity")
+    if current["limit"] is not None and current["sent"] >= current["limit"]:
+        raise GrowthError("Confirmed ceiling reached; do not submit", "capacity")
+    if channel_blocker(db, row.channel):
+        raise GrowthError(channel_blocker(db, row.channel), "capacity")
     if current["in_flight_send_count"] > MAX_IN_FLIGHT:
         raise GrowthError("Competing legacy permits; wait for receipt reconciliation", "capacity")
     contact = db.get(Contact, row.contact_id)

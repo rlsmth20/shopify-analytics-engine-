@@ -198,13 +198,15 @@ test('uncapped dashboard shows actual outreach above twenty with no misleading q
   assert.equal(rendered.meters.length, 0);
 });
 
-test('finite historical snapshots retain quota meters and independent uncertainty holds', () => {
+test('finite snapshots show confirmed capacity without uncertainty holds', () => {
   const finite = renderDashboardCapacity(20, 12, 8);
   assert.equal(finite.meters.length, 1);
   assert.equal(finite.meters[0]['aria-valuemax'], 20);
   assert.equal(finite.meters[0]['aria-valuenow'], 12);
   assert.match(finite.text, /Only confirmed submissions count toward the 20-contact ceiling/);
-  const held = renderDashboardCapacity(null, 24, 10, 'OUTREACH_UNCERTAINTY_SAFETY_HOLD');
-  assert.match(held.text, /Receipt uncertainty needs attention before another send/);
-  assert.equal(held.meters.length, 0);
+  const available = renderDashboardCapacity(20, 11, 10);
+  assert.match(available.text, /Continue outreach to other eligible merchants/);
+  assert.match(available.text, /Uncertain forms do not block email or other merchants/);
+  assert.doesNotMatch(available.text, /safety hold|before another send/);
+  assert.equal(available.meters[0]['aria-valuenow'], 11);
 });

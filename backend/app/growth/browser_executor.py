@@ -184,6 +184,7 @@ def take(factory, owner):
         task["outreach_policy"] = {"daily_new_contact_limit": packet["capacity"]["limit"],
             "confirmed_first_contacts": packet["capacity"]["sent"],
             "uncertain_contacts": packet["capacity"]["uncertain_contact_count"],
+            "channels": packet["capacity"]["channels"],
             "blocker": packet["capacity"]["blocker"]}
         from . import workspace_mail
         if workspace_mail.selected(db):
