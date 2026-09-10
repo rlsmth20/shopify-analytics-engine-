@@ -104,25 +104,24 @@ export default function HomePage() {
     <div className="marketing-shell">
       <MarketingNav />
 
-      <section className="marketing-hero">
+      <section className="marketing-hero marketing-hero-home">
         <p className="marketing-eyebrow">Inventory decisions, made in order.</p>
         <h1 className="marketing-hero-title">
           The Shopify inventory tool that tells you what to do first.
         </h1>
         <p className="marketing-hero-sub">
-          Forecast the next 90 days, rank every SKU, score every supplier, and recover cash from
-          dead stock - in one Shopify-first product, at a price that doesn&apos;t triple at renewal.
+          Forecast demand, prioritize reorders, and recover cash from dead stock.
+          See what needs attention next, all in one Shopify inventory workspace.
         </p>
         <p className="marketing-hero-trust">
           Skubase is in Shopify&apos;s review process and is not yet listed in the Shopify App Store.
           Start with a CSV workspace, or <Link href="/tools/inventory-health-check">try the free browser inventory check</Link> with no account or installation.
         </p>
         <HeroCta source="home_hero" />
-        <p className="marketing-hero-trust">
-          14-day free trial - No credit card - <Link href="/dashboard?demo=1">See a live demo</Link> -{" "}
-          <Link href="/inventory-risk-snapshot">Get a free inventory risk snapshot</Link> -{" "}
-          <strong>Prices locked at renewal</strong>
-        </p>
+        <div className="marketing-hero-links">
+          <Link href="/dashboard?demo=1">Explore the live demo <span aria-hidden>→</span></Link>
+          <Link href="/inventory-risk-snapshot">Get a free inventory risk snapshot <span aria-hidden>→</span></Link>
+        </div>
       </section>
 
       <section className="marketing-migration" aria-label="Migration windows">

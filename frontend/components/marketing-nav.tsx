@@ -54,15 +54,15 @@ export function MarketingNav() {
           View demo
         </Link>
         {authState === "loading" ? (
-          <span className="marketing-link-subtle" aria-hidden>
+          <span className="marketing-account-link" aria-hidden>
             &nbsp;
           </span>
         ) : authState === "signed-in" ? (
-          <Link href="/dashboard" className="marketing-link-subtle">
+          <Link href="/dashboard" className="button button-primary button-sm marketing-account-link">
             Dashboard
           </Link>
         ) : (
-          <Link href="/login" className="marketing-link-subtle">
+          <Link href="/login" className="marketing-link-subtle marketing-account-link">
             Sign in
           </Link>
         )}
