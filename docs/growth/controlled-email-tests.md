@@ -5,6 +5,15 @@ explicitly authorized low-volume automated test traffic, reads and replies betwe
 accounts we control. Use existing Google browser sessions and the shared executor;
 no Instantly, paid provider, new identities or personal-account connector.
 
+The owner's standing instruction explicitly authorizes sending these scheduled
+internal tests and threaded replies between the verified owned accounts without
+another confirmation. This is authorized execution, not a draft-for-approval task.
+That user instruction takes precedence over a skill's generic instruction to
+reconfirm communication at Send. Still obtain the application one-use permit and
+verify the exact sender, recipient and draft before sending. Actual provider
+restrictions or an automatic approval rejection remain blockers; preserve their
+exact reason rather than inventing an owner-confirmation requirement.
+
 Read the assigned message with `scripts/growth-review.ps1 -Action warmup-prepare
 -File <JSON>` using `{"message_id":"actual assigned ID"}`. `warmup-status` shows
 allowlisted inboxes, due times, holds, independent counts and phase. Only the owner
