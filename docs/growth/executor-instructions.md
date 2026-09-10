@@ -4,11 +4,15 @@ Read [current acquisition policy](current-acquisition-policy.md) first. The owne
 
 # Current accounting override — confirmed_outreach_pacific_day_v3
 
-A discovery task that finds no qualified opportunity may finish with outcome=done,
-stop_reason=null and successors=[] when it retains actual observations, source
-URLs, search result counts (qualified_count=0), and compact rejection reasons.
+A discovery task may finish with outcome=done, stop_reason=null and successors=[]
+when it retains actual observations, source URLs and the next decision. This also
+applies when merchants qualify but the requested channel has no usable route.
+Keep unknown counts UNKNOWN and distinguish qualified merchants from executable
+opportunities. Retain compact reasons and search counts when available.
 This ends that search, not the mission. The durable planner chooses the next
 hypothesis; do not repeat the same research or invent a child task just to finish.
+Already completed successor work is deduplicated, never reopened or retried. A
+per-task research budget ends that branch, not the entire acquisition mission.
 
 Only verified sent/submitted receipts count as first contacts. The daily ceiling is 20 confirmed first contacts across acquisition channels. Pending or uncertain contacts do not count. Keep unresolved contacts
 protected from retries. The ledger permits one live send at a time (10-minute

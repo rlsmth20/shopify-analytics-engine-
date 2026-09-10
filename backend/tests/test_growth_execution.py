@@ -96,17 +96,49 @@ class ExecutionTests(unittest.TestCase):
         following = executor.take(self.factory, 'next-process')
         self.assertEqual(following['stage'], 'plan')
 
-    def test_exhausted_search_requires_observation_and_zero_qualified_evidence(self):
+    def test_search_completion_still_requires_observations(self):
         task = executor.take(self.factory, 'search-worker')
-        for search in ({}, {'result_count': 4, 'qualified_count': 1, 'rejection_reasons': ['SOME_IRRELEVANT']},
-                       {'result_count': 4, 'qualified_count': 0, 'rejection_reasons': []}):
-            with self.subTest(search=search), self.assertRaises(GrowthError):
-                executor.accept(self.factory, 'search-worker', task,
-                    {**self.result(), 'stop_reason': None, 'search_result': search})
         with self.assertRaisesRegex(GrowthError, 'Retained real source observations'):
             executor.accept(self.factory, 'search-worker', task, {**self.result(), 'stop_reason': None,
                 'sources': [], 'search_result': {'result_count': 0, 'qualified_count': 0,
                                                'rejection_reasons': ['NO_RESULTS']}})
+
+    def test_eligible_merchants_without_requested_channel_complete_with_unknown_count(self):
+        result = {**self.result(), 'stop_reason': None,
+            'search_result': {'result_count': None, 'qualified_count': 2,
+                              'rejection_reasons': ['EMAIL_ROUTE_NOT_PUBLISHED']}}
+        self.assertTrue(executor.cycle(self.factory, 'worker', lambda task: result))
+        with self.factory() as db:
+            learned = get_memory(db, 'acquisition_search', self.task['id'])
+            self.assertIsNone(learned['result_count'])
+            self.assertEqual(learned['reported_qualified_count'], 2)
+            self.assertEqual(learned['qualified_count'], 0)
+        self.assertEqual(executor.take(self.factory, 'next-process')['stage'], 'plan')
+
+    def test_terminal_successor_is_not_reopened_or_counted_as_new_work(self):
+        with self.factory() as db:
+            child = offer(db, key='completed-prepare', source='https://example.com', stage='prepare',
+                decision='Previously completed work', evidence_id=self.task['evidence_id'])
+            remember(db, 'operator_task', child['id'], {**child,'status':'done','attempts':1})
+            db.commit()
+        result = {**self.result('prepare'), 'successors': [{
+            'key':child['key'],'source':child['source'],'stage':'prepare','decision':child['decision']}]}
+        self.assertTrue(executor.cycle(self.factory, 'worker', lambda task: result))
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'operator_task', child['id'])['status'], 'done')
+            self.assertEqual(get_memory(db, 'operator_task', child['id'])['attempts'], 1)
+            self.assertEqual(get_memory(db, 'acquisition_search', self.task['id'])['qualified_count'], 0)
+        self.assertEqual(executor.take(self.factory, 'next-process')['stage'], 'plan')
+
+    def test_exhausted_task_budget_does_not_block_other_hypotheses(self):
+        task = executor.take(self.factory, 'budget-worker')
+        with self.factory() as db:
+            remember(db, 'operator_task', task['id'], {**task,'attempts':3})
+            db.commit()
+        executor.failed(self.factory, 'budget-worker', task, 'RESEARCH_BUDGET_EXHAUSTED')
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'working', 'browser_executor')['blocker'], 'RESEARCH_BRANCH_EXHAUSTED')
+        self.assertEqual(executor.take(self.factory, 'next-process')['stage'], 'plan')
 
     def test_uncertain_forms_do_not_filter_existing_send_work(self):
         with self.factory() as db:

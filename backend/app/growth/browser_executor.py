@@ -226,15 +226,9 @@ def accept(factory, owner, task, result):
         stop = result.get("stop_reason")
         if stop is not None and stop not in STOP_REASONS:
             raise GrowthError("Invalid stop condition")
-        # A completed search with no qualified result is useful retained evidence,
-        # not a failed execution or mission-wide stop. Let the selector move on.
-        search = result.get("search_result") or {}
-        exhausted_search = (task.get("stage") == "discover" and result.get("outcome") in {"done", "excluded"}
-            and type(search.get("result_count")) is int and search["result_count"] >= 0
-            and type(search.get("qualified_count")) is int and search["qualified_count"] == 0
-            and isinstance(search.get("rejection_reasons"), list) and bool(search["rejection_reasons"])
-            and all(isinstance(reason, str) and reason.strip() for reason in search["rejection_reasons"]))
-        if not successors and not stop and not exhausted_search and task.get("stage") not in {"plan", "monitor", "reply", "reconcile", "send", "outreach", "deliverability"}:
+        # Discovery may find merchants but no route usable for this hypothesis.
+        # Retained observations complete the search; the planner owns continuation.
+        if not successors and not stop and task.get("stage") not in {"discover", "plan", "monitor", "reply", "reconcile", "send", "outreach", "deliverability"}:
             raise GrowthError("A completed task must supply executable successors or a legitimate stop")
         if len(successors) > 6 or not result.get("observation") or not result.get("sources"):
             raise GrowthError("Retained real source observations and bounded successors required")
@@ -278,9 +272,8 @@ def accept(factory, owner, task, result):
         from .acquisition_planner import admit_hypotheses, retain_result
         if stage == "plan":
             admit_hypotheses(db, task, result, event)
-        elif stage not in {"monitor", "reconcile", "deliverability"}:
-            retain_result(db, task, result, event)
         executable = []
+        terminal_successors = []
         for successor in successors:
             if successor.get("stage") not in {"discover", "qualify", "prepare", "send", "outreach", "reply"}:
                 raise GrowthError("Maintenance is not an acquisition successor")
@@ -298,8 +291,13 @@ def accept(factory, owner, task, result):
                 remember(db, operator.NAMESPACE, offered["id"], offered)
             if offered["id"] != task["id"] and offered["status"] in {"pending", "running"}:
                 executable.append(offered)
-        if successors and not executable and not stop:
-            raise GrowthError("Successors are already terminal; choose unprocessed acquisition work or an evidenced stop")
+            else:
+                terminal_successors.append(offered["id"])
+        if terminal_successors:
+            record(db, "terminal-successors:" + task["lease_token"], "ACQUISITION_SUCCESSORS_DEDUPLICATED", task["id"],
+                   {"task_ids": terminal_successors, "result_evidence_id": event.id})
+        if stage not in {"plan", "monitor", "reconcile", "deliverability"}:
+            retain_result(db, task, {**result, "successors": executable}, event)
         operator.complete(db, task_id=task["id"], lease_token=task["lease_token"], evidence_id=event.id,
             outcome=result["outcome"], next_step=result["next_step"])
         if result["outcome"] != "blocked" and stage not in {"monitor", "plan", "reconcile", "deliverability"}:
@@ -379,7 +377,8 @@ def failed(factory, owner, task, reason, result=None):
                     "status": "blocked", "next_step": "Receipt recovery owns the unresolved admission; never retry submission"})
                 offer_review(db, reservation, receipt_completion=True)
         remember(db, "working", "browser_executor", {"owner": owner, "heartbeat_at": time.time(),
-            "lease_until": 0, "blocker": "PROVIDER_BLOCKED", "error": reason[:300], "next_retry_at": retry})
+            "lease_until": 0, "blocker": "RESEARCH_BRANCH_EXHAUSTED" if "RESEARCH_BUDGET" in reason else "PROVIDER_BLOCKED",
+            "error": reason[:300], "next_retry_at": retry})
         db.commit()
 
 

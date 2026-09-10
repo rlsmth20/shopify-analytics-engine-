@@ -221,6 +221,7 @@ def replenish(db, capacity, now=None):
         Memory.value["status"].as_string() == "blocked",
         Memory.value["stage"].as_string().not_in(["send", "outreach", "reconcile"]),
         Memory.value["result_evidence_id"].as_integer().is_(None),
+        func.coalesce(Memory.value["error"].as_string(), "") != "RESEARCH_BUDGET_EXHAUSTED",
         Memory.value["attempts"].as_integer() >= 3).limit(1))
     if blocked:
         return None
