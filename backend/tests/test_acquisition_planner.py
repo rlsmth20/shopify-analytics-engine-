@@ -69,6 +69,37 @@ class PlannerTests(unittest.TestCase):
             db.commit()
         self.assertEqual(executor.take(self.factory,'executor')['stage'],'discover')
 
+    def test_exhausted_prepare_is_isolated_and_next_hypothesis_executes(self):
+        with self.factory() as db:
+            remember(db,'operator_task','failed-form',{'id':'failed-form','stage':'prepare',
+                'status':'blocked','attempts':3,'error':'No executable successor',
+                'source':'https://example.com/contact'})
+            db.commit()
+        plan=executor.take(self.factory,'autonomous')
+        self.assertEqual(plan['stage'],'plan')
+        executor.accept(self.factory,'autonomous',plan,self.result())
+        discovery=executor.take(self.factory,'autonomous')
+        self.assertEqual(discovery['stage'],'discover')
+        with self.factory() as db:
+            failed=get_memory(db,'operator_task','failed-form')
+            self.assertEqual((failed['status'],failed['attempts']),('blocked',3))
+            self.assertTrue(failed['branch_failure_evidence_id'])
+            self.assertEqual(len(list(db.scalars(select(Evidence).where(
+                Evidence.kind=='ACQUISITION_BRANCH_EXHAUSTED')))),1)
+            self.assertIsNone(db.scalar(select(FirstContact)))
+
+    def test_explicitly_excluded_route_needs_no_manufactured_successor(self):
+        with self.factory() as db:
+            e=record(db,'route','OBSERVATION','merchant',{})
+            offer(db,key='prepare-no-form',source='https://example.com/contact',
+                decision='Check form route',stage='prepare',evidence_id=e.id)
+            db.commit()
+        task=executor.take(self.factory,'autonomous')
+        executor.accept(self.factory,'autonomous',task,{**self.result([]),'outcome':'excluded',
+            'observation':'Published contact page offers email only, no business form.',
+            'search_result':{'rejection_reasons':['NO_USABLE_CONTACT_FORM_ROUTE']}})
+        self.assertEqual(executor.take(self.factory,'autonomous')['stage'],'plan')
+
     def test_uncertain_contacts_and_receipt_backlog_do_not_block_new_discovery(self):
         from app.growth.models import Contact
         from app.growth.outbound import status

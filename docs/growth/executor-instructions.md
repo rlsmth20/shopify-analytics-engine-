@@ -14,6 +14,14 @@ hypothesis; do not repeat the same research or invent a child task just to finis
 Already completed successor work is deduplicated, never reopened or retried. A
 per-task research budget ends that branch, not the entire acquisition mission.
 
+For qualify/prepare, a verified unusable route can finish with outcome=excluded,
+successors=[], stop_reason=null and a compact search_result.rejection_reasons
+code (for example NO_USABLE_CONTACT_FORM_ROUTE). Preserve the eligible merchant
+and any other known route. Do not return outcome=done without a successor for
+these stages. Exhausted retries remain terminal for that task; they do not hold
+unrelated acquisition. Read docs/growth/community-inbox.md for community-inbox
+monitor tasks and existing Shopify Community reply conversations.
+
 Only verified sent/submitted receipts count as first contacts. The daily ceiling is 20 confirmed first contacts across acquisition channels. Pending or uncertain contacts do not count. Keep unresolved contacts
 protected from retries. The ledger permits one live send at a time (10-minute
 reservation); an expired permit never authorizes submitting or retrying that contact.

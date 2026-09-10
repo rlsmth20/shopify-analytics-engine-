@@ -120,6 +120,8 @@ def take(factory, owner):
         enqueue_recovery(db)
         from .workspace_mail import defer_capped_tasks
         defer_capped_tasks(db)
+        from .community_inbox import schedule as schedule_community_inbox
+        schedule_community_inbox(db)
         db.flush()
         packet = operator.export_packet(db)
         safety = get_memory(db, "working", "browser_safety_check")
@@ -146,7 +148,8 @@ def take(factory, owner):
             replenish(db, packet["capacity"])
             db.flush()
             packet = operator.export_packet(db)
-        tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")]
+        tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")
+                 or t.get("key", "").startswith("community-inbox:")]
         if safety.get("requires_attention"):
             tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile", "deliverability"}]
         if not packet["capacity"].get("dispatch_remaining", packet["capacity"]["remaining"]):
@@ -230,7 +233,10 @@ def accept(factory, owner, task, result):
             raise GrowthError("Invalid stop condition")
         # Discovery may find merchants but no route usable for this hypothesis.
         # Retained observations complete the search; the planner owns continuation.
-        if not successors and not stop and task.get("stage") not in {"discover", "plan", "monitor", "reply", "reconcile", "send", "outreach", "deliverability"}:
+        terminal_route = (task.get("stage") in {"qualify", "prepare"} and
+            result.get("outcome") == "excluded" and
+            bool((result.get("search_result") or {}).get("rejection_reasons")))
+        if not successors and not stop and not terminal_route and task.get("stage") not in {"discover", "plan", "monitor", "reply", "reconcile", "send", "outreach", "deliverability"}:
             raise GrowthError("A completed task must supply executable successors or a legitimate stop")
         if len(successors) > 6 or not result.get("observation") or not result.get("sources"):
             raise GrowthError("Retained real source observations and bounded successors required")
@@ -244,7 +250,10 @@ def accept(factory, owner, task, result):
         if stage in {"send", "outreach", "reconcile"}:
             from .reconciliation import apply_result
             apply_result(db, task, result, event)
-        if stage == "monitor":
+        if stage == "monitor" and task.get("key", "").startswith("community-inbox:"):
+            from .community_inbox import complete_check
+            complete_check(db, task, result, event)
+        elif stage == "monitor":
             safety = get_memory(db, "working", "browser_safety_check")
             check = db.get(Evidence, safety.get("evidence_id")) if safety.get("evidence_id") else None
             if (not check or check.kind != "CHANNEL_MONITOR" or check.data.get("lease_token") != task["lease_token"]
@@ -308,7 +317,8 @@ def accept(factory, owner, task, result):
                  "outcome": result["outcome"], "successor_keys": [s["key"] for s in executable]})
         remember(db, "working", "browser_executor", {**runtime, "heartbeat_at": time.time(),
             "lease_until": 0, "task_id": None,
-            "last_progress_at": time.time() if result["outcome"] != "blocked" and stage != "plan" else runtime.get("last_progress_at"),
+            "last_progress_at": time.time() if result["outcome"] != "blocked" and stage not in
+                {"plan", "monitor", "reconcile", "deliverability"} else runtime.get("last_progress_at"),
             "blocker": (get_memory(db, "working", "acquisition_planner").get("status")
                         if stage == "plan" and not (result.get("hypotheses") or []) else stop) if not successors else None,
             "next_retry_at": time.time() if successors else time.time() + 30})
@@ -406,6 +416,8 @@ def execute(factory, owner, task, *, codex, repo):
     output = folder / (task["lease_token"] + ".json")
     log = folder / (task["lease_token"] + ".jsonl")
     instruction_file = "controlled-email-tests.md" if task.get("stage") == "deliverability" else "planner-instructions.md" if task.get("stage") == "plan" else "executor-instructions.md"
+    if task.get("stage") == "monitor" and task.get("key", "").startswith("community-inbox:"):
+        instruction_file = "community-inbox.md"
     prompt = (repo / "docs/growth" / instruction_file).read_text(encoding="utf-8")
     if task.get("stage") == "reconcile":
         retained = []

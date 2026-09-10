@@ -219,14 +219,23 @@ def replenish(db, capacity, now=None):
         Memory.value["stage"].as_string().not_in(["monitor", "reconcile"])).limit(1))
     if active:
         return None
-    blocked = db.scalar(select(Memory.id).where(Memory.namespace == "operator_task",
+    # Exhausted task retries belong to that branch, not to the whole mission.
+    # Keep the failed task terminal, expose its evidence to the next planner,
+    # and never reset its attempts or any associated send reservation.
+    blocked = list(db.scalars(select(Memory).where(Memory.namespace == "operator_task",
         Memory.value["status"].as_string() == "blocked",
-        Memory.value["stage"].as_string().not_in(["send", "outreach", "reconcile"]),
+        Memory.value["stage"].as_string().in_(["plan", "discover", "qualify", "prepare"]),
         Memory.value["result_evidence_id"].as_integer().is_(None),
-        func.coalesce(Memory.value["error"].as_string(), "") != "RESEARCH_BUDGET_EXHAUSTED",
-        Memory.value["attempts"].as_integer() >= 3).limit(1))
-    if blocked:
-        return None
+        Memory.value["branch_failure_evidence_id"].as_integer().is_(None),
+        Memory.value["attempts"].as_integer() >= 3).limit(20)))
+    for row in blocked:
+        task = row.value
+        event = record(db, "branch-exhausted:" + row.key, "ACQUISITION_BRANCH_EXHAUSTED", row.key,
+            {"stage": task.get("stage"), "source": task.get("source"),
+             "reason": task.get("error"), "attempts": task["attempts"],
+             "scope": "task_only", "next_action": "Choose another supported acquisition branch"})
+        remember(db, "operator_task", row.key, {**task, "branch_failure_evidence_id": event.id})
+        remember(db, "learning", "failed-branch:" + row.key, {**event.data, "evidence_id": event.id})
     state = get_memory(db, "working", "acquisition_planner")
     if state.get("status") == "exploration_budget_wait":
         # Owner removed aggregate research-run quotas. Migrate an existing wait

@@ -111,12 +111,26 @@ def export_packet(db):
         if row.value.get("stage") == "reply" and candidate:
             source = db.get(Evidence, row.value.get("evidence_id"))
             admission = db.scalar(select(FirstContact).where(FirstContact.contact_id == candidate.id))
-            if source and source.data.get("stop_reason") == "OUTREACH_OUTCOMES_UNRESOLVED" and admission:
+            if (source and source.data.get("stop_reason") == "OUTREACH_OUTCOMES_UNRESOLVED"
+                    and admission and admission.status != "sent" and source.data.get("stage") != "reply"):
                 # Legacy schemas lacked a reconcile successor. Receipt work is
                 # not a substantive customer reply and must use the receipt contract.
                 remember(db, NAMESPACE, row.key, {**row.value, "stage": "reconcile", "status": "pending",
                     "reservation_id": admission.id, "receipt_completion": True, "retry_at": 0,
                     "prior_reply_attempts": row.value.get("attempts", 0), "attempts": 0})
+        if row.value.get("stage") == "reconcile" and "prior_reply_attempts" in row.value and candidate:
+            source = db.get(Evidence, row.value.get("evidence_id"))
+            admission = db.scalar(select(FirstContact).where(FirstContact.contact_id == candidate.id))
+            if source and source.data.get("stage") == "reply" and admission and admission.status == "sent":
+                # Earlier migration confused an uncertain conversation reply with
+                # its already-confirmed first contact. Restore read-only thread
+                # reconciliation without touching that original send ledger.
+                restored = {k: v for k, v in row.value.items() if k not in {"reservation_id", "receipt_completion"}}
+                restored.update(stage="reply", attempts=restored.pop("prior_reply_attempts"))
+                remember(db, NAMESPACE, row.key, restored)
+                record(db, "conversation-receipt-restored:" + row.key, "CONVERSATION_RECEIPT_RESTORED",
+                    candidate.id, {"task_id": row.key, "source_evidence_id": source.id,
+                                   "first_contact_unchanged": admission.id})
         if row.value.get("status") == "blocked":
             continue
         if row.value.get("stage") != "reconcile" and candidate and (owned_identity(candidate.identity) or candidate.suppressed or candidate.status in INELIGIBLE):
@@ -137,7 +151,9 @@ def export_packet(db):
     capacity = status(db, now)
     available = [r.value for r in db.scalars(select(Memory).where(*active, lease <= now, attempts < MAX_ATTEMPTS,
         func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now)
-        .order_by(case((stage == "reply", 0), (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4),
+        .order_by(case((stage == "reply", 0),
+                      ((stage == "monitor") & Memory.value["key"].as_string().startswith("community-inbox:"), 1),
+                      (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4),
                       ((stage == "reconcile") & Memory.value["receipt_completion"].as_boolean().is_(True), 2),
                       (stage == "deliverability", 2),
                       (stage == "reconcile", 2 if capacity["blocker"] in {"DAILY_CAP_REACHED", "OUTREACH_UNCERTAINTY_SAFETY_HOLD"} else 4), else_=3),

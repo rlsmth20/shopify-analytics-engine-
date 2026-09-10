@@ -9,7 +9,7 @@ from .executive import export_packet, import_review
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["warmup-status", "warmup-prepare", "warmup-authorize", "warmup-record", "review-export", "review-import", "outreach-status", "outreach-reserve", "outreach-authorize", "outreach-complete", "outreach-backfill", "outreach-reconcile", "operator-export", "operator-enqueue", "operator-claim", "operator-complete", "operator-state", "operator-assess", "operator-monitor", "operator-monitor-start", "community-record", "community-export", "prospect-link", "prospect-history", "email-queue", "email-status", "email-suppress"])
+    parser.add_argument("action", choices=["warmup-status", "warmup-prepare", "warmup-authorize", "warmup-record", "review-export", "review-import", "outreach-status", "outreach-reserve", "outreach-authorize", "outreach-complete", "outreach-backfill", "outreach-reconcile", "operator-export", "operator-enqueue", "operator-claim", "operator-complete", "operator-state", "operator-assess", "operator-monitor", "operator-monitor-start", "community-record", "community-reply", "community-export", "prospect-link", "prospect-history", "email-queue", "email-status", "email-suppress"])
     parser.add_argument("--file")
     parser.add_argument("--model", default="codex")
     parser.add_argument("--input-tokens", type=int)
@@ -39,11 +39,12 @@ def main():
             db.commit()
         elif args.action.startswith("community-"):
             from . import community
-            if args.action == "community-record":
+            if args.action in {"community-record", "community-reply"}:
                 if not args.file:
-                    parser.error("community-record requires --file")
+                    parser.error("community recording requires --file")
                 payload = json.loads(Path(args.file).read_text(encoding="utf-8-sig"))
-                result = community.retain(db, payload)
+                from .community_inbox import ingest_reply
+                result = ingest_reply(db, payload) if args.action == "community-reply" else community.retain(db, payload)
                 db.commit()
             else:
                 result = community.export(db)
