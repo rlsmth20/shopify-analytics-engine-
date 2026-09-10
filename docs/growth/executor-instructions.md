@@ -110,6 +110,12 @@ Retain CHANNEL_MONITOR evidence and working/browser_safety_check
 check. Prioritize substantive replies/incidents and create reply successors when
 appropriate. No promotional response to Shopify review mail. Monitoring alone
 does not complete acquisition.
+An ordinary out-of-office or automated receipt with no opt-out, rejection,
+delivery error or substantive question is not an actionable merchant reply.
+Retain AUTOMATED once, do not respond, do not create a reply successor, and do
+not set requires_attention solely because it remains visible or unread. Reuse
+the retained classification when the thread has no newer message. In particular,
+The Tea Nomad maternity-leave auto-reply was already reviewed in evidence 25006.
 Controlled Skubase mailbox tests are separate infrastructure work. Threads with
 `[sb-check:...]` between the verified accounts in `warmup-status` must never create
 prospects, merchant replies, acquisition successors or engagement evidence. Do not
