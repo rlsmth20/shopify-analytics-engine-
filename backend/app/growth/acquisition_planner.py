@@ -129,6 +129,19 @@ def context(db, search_history):
                    .order_by(Experiment.started_at.desc()).limit(5))]
     packet = {"mission": mission(db), "memory": memories,
         "funnel": funnel_counts(db), "bottleneck": bottleneck(db),
+        # Keep this compact feedback even when verbose memories exhaust context.
+        # Previously all search history could be trimmed before memory, leaving
+        # the model unaware of the same queries rejected by deterministic code.
+        "search_policy": {
+            "known_searches": [{"channel": str(r.value.get("channel", ""))[:80],
+                "query": str(r.value.get("query", ""))[:240], "status": str(r.value.get("status", ""))[:24]}
+                for r in db.scalars(select(Memory).where(Memory.namespace == HYPOTHESES)
+                    .order_by(Memory.updated_at.desc()).limit(12))],
+            "recent_rejections": [{"evidence_id": e.id,
+                "rejected": [{k: str(p.get(k, ""))[:240] for k in ("query", "reason", "matched_search")}
+                             for p in e.data.get("rejected", [])[:2]]}
+                for e in db.scalars(select(Evidence).where(Evidence.kind == "ACQUISITION_HYPOTHESES")
+                    .order_by(Evidence.id.desc()).limit(3))]},
         "experiments": experiments,
         "search_history": [{k: h.get(k) for k in ("task_id", "hypothesis", "queries", "source", "result_count",
             "qualified_count", "rejection_reasons", "date", "evidence_id", "value")}
@@ -176,8 +189,10 @@ def admit_hypotheses(db, task, result, event):
         signature = p["channel"] + " " + p["query"]
         prior = [h["channel"] + " " + h["query"] for h in known]
         prior += [q["source"] + " " + q["query"] for h in search_history for q in h.get("queries", [])]
-        if any(similar(signature, s) for s in prior):
-            rejected.append({"query": p["query"], "reason": "semantically_duplicate_search"})
+        matched = next((s for s in prior if similar(signature, s)), None)
+        if matched:
+            rejected.append({"query": p["query"], "reason": "semantically_duplicate_search",
+                             "matched_search": matched[:350]})
             continue
         hid = digest(sorted(canonical(signature)))
         value = {**p, "id": hid, "status": "candidate", "score": score(p, search_history),
@@ -191,10 +206,17 @@ def admit_hypotheses(db, task, result, event):
         valid_idle = (not proposals and result.get("stop_reason") == "TRUE_IDLE" and
             isinstance(idle.get("external_condition"), str) and len(idle["external_condition"]) >= 20 and
             len(set(evidence)) >= 3 and all(db.get(Evidence, i) for i in evidence))
+        duplicates = bool(proposals) and len(rejected) == len(proposals)
+        previous = get_memory(db, "working", "acquisition_planner")
+        duplicate_retries = previous.get("duplicate_retries", 0) + 1 if duplicates else 0
+        # One quick correction with explicit rejection feedback, then back off
+        # repeated invalid plans. Never execute duplicate research to fill slots.
+        delay = 21600 if valid_idle else 30 if duplicates and duplicate_retries == 1 else 900
         remember(db, "working", "acquisition_planner", {"status": "TRUE_IDLE" if valid_idle else "planning_retry",
             "explanation": result.get("observation"), "external_condition": idle.get("external_condition"),
             "attempted_evidence_ids": evidence, "last_plan_evidence": event.id,
-            "retry_at": time.time() + (21600 if valid_idle else 900)})
+            "feedback_version": 1, "duplicate_retries": duplicate_retries,
+            "retry_at": time.time() + delay})
     else:
         remember(db, "working", "acquisition_planner", {"status": "hypotheses_ready", "last_plan_evidence": event.id})
     record(db, "hypothesis-admission:" + task["lease_token"], "ACQUISITION_HYPOTHESES", task["id"],
@@ -237,6 +259,14 @@ def replenish(db, capacity, now=None):
         remember(db, "operator_task", row.key, {**task, "branch_failure_evidence_id": event.id})
         remember(db, "learning", "failed-branch:" + row.key, {**event.data, "evidence_id": event.id})
     state = get_memory(db, "working", "acquisition_planner")
+    if state.get("status") == "planning_retry" and state.get("feedback_version") != 1:
+        admission = db.scalar(select(Evidence).where(Evidence.kind == "ACQUISITION_HYPOTHESES",
+            Evidence.data["source_evidence"].as_integer() == state.get("last_plan_evidence")).limit(1))
+        if admission and admission.data.get("rejected") and not admission.data.get("admitted"):
+            record(db, "planner-feedback-upgrade:" + str(admission.id), "ACQUISITION_PLANNER_FEEDBACK_RESTORED",
+                "acquisition", {"admission_evidence_id": admission.id, "reason": "Supply previously omitted duplicate feedback once"})
+            state = {**state, "retry_at": 0, "feedback_version": 1, "duplicate_retries": 1}
+            remember(db, "working", "acquisition_planner", state)
     if state.get("status") == "exploration_budget_wait":
         # Owner removed aggregate research-run quotas. Migrate an existing wait
         # without discarding history, resetting task retries, or bypassing holds.
@@ -269,5 +299,5 @@ def replenish(db, capacity, now=None):
     task = offer(db, key="autonomous-plan:" + str(event.id), source=None,
         decision="Select the highest-value unexamined acquisition hypothesis using retained outcomes. Propose at most two distinct bounded discovery decisions. No web research during planning. No sends. Explain expected acquisition/information value, evidence and rejected alternatives. Empty queue is not completion.",
         evidence_id=event.id, stage="plan", priority=55)
-    remember(db, "working", "acquisition_planner", {"status": "planning", "task_id": task["id"], "trigger_evidence": trigger.id})
+    remember(db, "working", "acquisition_planner", {**state, "status": "planning", "task_id": task["id"], "trigger_evidence": trigger.id})
     return task

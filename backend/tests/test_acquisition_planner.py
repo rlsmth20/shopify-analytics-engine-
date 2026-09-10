@@ -1,4 +1,5 @@
 import tempfile
+import json
 import time
 import unittest
 from pathlib import Path
@@ -151,6 +152,47 @@ class PlannerTests(unittest.TestCase):
             self.assertEqual(len(hypotheses),1)
             admission=db.scalar(select(Evidence).where(Evidence.kind=='ACQUISITION_HYPOTHESES'))
             self.assertEqual(admission.data['rejected'][0]['reason'],'semantically_duplicate_search')
+
+    def test_duplicate_feedback_survives_bounded_context_and_correction_is_bounded(self):
+        proposal=self.proposal()
+        with self.factory() as db:
+            remember(db,planner.HYPOTHESES,'known',{**proposal,'status':'retired'})
+            for namespace in ('strategic','beliefs','customer','channel','learning'):
+                for n in range(5):remember(db,namespace,f'large:{n}',{'text':'x'*1400})
+            task={'id':'first-plan','lease_token':'first-lease'}
+            result=self.result([proposal])
+            event=record(db,'first-plan-result','ACQUISITION_STAGE_RESULT',task['id'],result)
+            planner.admit_hypotheses(db,task,result,event)
+            first=get_memory(db,'working','acquisition_planner')
+            self.assertLess(first['retry_at']-time.time(),35)
+            packet=planner.context(db,[])
+            self.assertLessEqual(len(json.dumps(packet,default=str)),planner.CONTEXT_LIMIT)
+            self.assertEqual(packet['search_policy']['known_searches'][0]['query'],proposal['query'])
+            rejected=packet['search_policy']['recent_rejections'][0]['rejected'][0]
+            self.assertEqual(rejected['reason'],'semantically_duplicate_search')
+            self.assertIn(proposal['query'],rejected['matched_search'])
+            planner.replenish(db,{'remaining':9},now=first['retry_at']+1)
+            second_task={'id':'second-plan','lease_token':'second-lease'}
+            second_event=record(db,'second-plan-result','ACQUISITION_STAGE_RESULT','second-plan',result)
+            planner.admit_hypotheses(db,second_task,result,second_event)
+            second=get_memory(db,'working','acquisition_planner')
+            self.assertEqual(second['duplicate_retries'],2)
+            self.assertGreater(second['retry_at']-time.time(),850)
+
+    def test_legacy_duplicate_wait_gets_feedback_once_without_manual_discovery(self):
+        with self.factory() as db:
+            e=record(db,'legacy-duplicate-result','ACQUISITION_STAGE_RESULT','old-plan',{})
+            record(db,'legacy-admission','ACQUISITION_HYPOTHESES','old-plan',
+                {'source_evidence':e.id,'admitted':[],'rejected':[{'query':'old search','reason':'semantically_duplicate_search'}]})
+            remember(db,'working','acquisition_planner',{'status':'planning_retry',
+                'last_plan_evidence':e.id,'retry_at':time.time()+900})
+            db.commit()
+        task=executor.take(self.factory,'persistent-worker')
+        self.assertEqual(task['stage'],'plan')
+        self.assertTrue(task['source_evidence']['data']['context']['search_policy']['recent_rejections'])
+        with self.factory() as db:
+            self.assertEqual(get_memory(db,'working','acquisition_planner')['duplicate_retries'],1)
+            self.assertIsNone(db.scalar(select(FirstContact)))
 
     def test_history_downweights_vendor_heavy_source_and_preserves_unknown(self):
         p=self.proposal()

@@ -23,6 +23,14 @@ problem through outreach. No historical pool reprocessing. Prefer new merchant
 discovery to another narrow complaint query when prior searches were vendor-heavy.
 Do not invoke tools or extra models during planning.
 
+Read `context.search_policy` before proposing queries. It retains known searches
+and recent admission rejections even when larger history was trimmed. A rejected
+query is not new work. Do not resubmit it with reordered words, dates or synonyms.
+Choose a meaningfully different merchant segment, source, contact route or
+acquisition hypothesis. Explain the difference from the matched prior search.
+One quick correction is allowed after duplicate proposals; repeated invalid
+proposals back off to protect compute. Do not interpret that as an email outage.
+
 Use the supplied email_transport.remaining when choosing executable work. At zero,
 prioritize permitted contact forms, useful public interactions, and other legitimate
 channels. Email-only first-contact tasks wait for the next email window; do not
