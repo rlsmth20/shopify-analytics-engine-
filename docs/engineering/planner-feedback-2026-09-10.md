@@ -21,3 +21,10 @@ remain unchanged.
 Validation: all thirteen planner tests passed. New regression cases cover
 feedback surviving oversized memory, matching-query attribution, one bounded
 quick correction, and automatic recovery of a legacy duplicate-only wait.
+
+Live verification: the restarted supervisor restored rejection feedback in
+evidence 36503, independently completed a new plan (36529), admitted a new
+coffee/specialty-food subscription and wholesale hypothesis without duplicates
+(36532), and started its discovery task (36548). No manual search task was
+created. The email ramp remained at five confirmed emails and the shared count
+remained eleven confirmed first contacts at release.
