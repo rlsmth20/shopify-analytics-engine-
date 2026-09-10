@@ -83,6 +83,31 @@ class ExecutionTests(unittest.TestCase):
             executor.accept(self.factory, 'reply-worker', task,
                 {**self.result(), 'stop_reason': None, 'sources': []})
 
+    def test_exhausted_search_records_learning_and_returns_to_planner(self):
+        result = {**self.result(), 'stop_reason': None,
+            'search_result': {'result_count': 4, 'qualified_count': 0,
+                              'rejection_reasons': ['EXISTING_SOLUTION_CONFIRMED']}}
+        self.assertTrue(executor.cycle(self.factory, 'search-worker', lambda task: result))
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'operator_task', self.task['id'])['status'], 'done')
+            self.assertEqual(get_memory(db, 'acquisition_search', self.task['id'])['reported_qualified_count'], 0)
+            self.assertIsNone(get_memory(db, 'working', 'browser_executor')['blocker'])
+            self.assertEqual(list(db.scalars(select(FirstContact))), [])
+        following = executor.take(self.factory, 'next-process')
+        self.assertEqual(following['stage'], 'plan')
+
+    def test_exhausted_search_requires_observation_and_zero_qualified_evidence(self):
+        task = executor.take(self.factory, 'search-worker')
+        for search in ({}, {'result_count': 4, 'qualified_count': 1, 'rejection_reasons': ['SOME_IRRELEVANT']},
+                       {'result_count': 4, 'qualified_count': 0, 'rejection_reasons': []}):
+            with self.subTest(search=search), self.assertRaises(GrowthError):
+                executor.accept(self.factory, 'search-worker', task,
+                    {**self.result(), 'stop_reason': None, 'search_result': search})
+        with self.assertRaisesRegex(GrowthError, 'Retained real source observations'):
+            executor.accept(self.factory, 'search-worker', task, {**self.result(), 'stop_reason': None,
+                'sources': [], 'search_result': {'result_count': 0, 'qualified_count': 0,
+                                               'rejection_reasons': ['NO_RESULTS']}})
+
     def test_uncertain_forms_do_not_filter_existing_send_work(self):
         with self.factory() as db:
             for n in range(10):

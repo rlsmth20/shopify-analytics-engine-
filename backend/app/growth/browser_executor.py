@@ -226,9 +226,15 @@ def accept(factory, owner, task, result):
         stop = result.get("stop_reason")
         if stop is not None and stop not in STOP_REASONS:
             raise GrowthError("Invalid stop condition")
-        # Reviewing an automatic reply or completing a conversation need not
-        # create another message. The durable selector owns the next action.
-        if not successors and not stop and task.get("stage") not in {"plan", "monitor", "reply", "reconcile", "send", "outreach", "deliverability"}:
+        # A completed search with no qualified result is useful retained evidence,
+        # not a failed execution or mission-wide stop. Let the selector move on.
+        search = result.get("search_result") or {}
+        exhausted_search = (task.get("stage") == "discover" and result.get("outcome") in {"done", "excluded"}
+            and type(search.get("result_count")) is int and search["result_count"] >= 0
+            and type(search.get("qualified_count")) is int and search["qualified_count"] == 0
+            and isinstance(search.get("rejection_reasons"), list) and bool(search["rejection_reasons"])
+            and all(isinstance(reason, str) and reason.strip() for reason in search["rejection_reasons"]))
+        if not successors and not stop and not exhausted_search and task.get("stage") not in {"plan", "monitor", "reply", "reconcile", "send", "outreach", "deliverability"}:
             raise GrowthError("A completed task must supply executable successors or a legitimate stop")
         if len(successors) > 6 or not result.get("observation") or not result.get("sources"):
             raise GrowthError("Retained real source observations and bounded successors required")

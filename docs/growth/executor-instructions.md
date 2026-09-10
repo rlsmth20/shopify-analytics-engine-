@@ -4,6 +4,12 @@ Read [current acquisition policy](current-acquisition-policy.md) first. The owne
 
 # Current accounting override — confirmed_outreach_pacific_day_v3
 
+A discovery task that finds no qualified opportunity may finish with outcome=done,
+stop_reason=null and successors=[] when it retains actual observations, source
+URLs, search result counts (qualified_count=0), and compact rejection reasons.
+This ends that search, not the mission. The durable planner chooses the next
+hypothesis; do not repeat the same research or invent a child task just to finish.
+
 Only verified sent/submitted receipts count as first contacts. The daily ceiling is 20 confirmed first contacts across acquisition channels. Pending or uncertain contacts do not count. Keep unresolved contacts
 protected from retries. The ledger permits one live send at a time (10-minute
 reservation); an expired permit never authorizes submitting or retrying that contact.
