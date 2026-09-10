@@ -50,3 +50,19 @@ first-contact record is unchanged. A regression test covers both admission and
 repair. Inbox checks no longer update the executor's acquisition-progress clock.
 The completed first scheduled forum check is evidence 35240; the supervisor also
 created a new acquisition plan on its own (evidence 35195).
+
+Live recovery completed without a manually seeded discovery task:
+
+- 35295: agent confirmed its published reply at post 97 without resubmitting.
+- 35316/35320: autonomous plan completed and admitted a distinct home-goods /
+  stockist contact-form hypothesis, using retained qualification results.
+- 35324/35325: queue-empty observation and hypothesis selection.
+- 35333: persistent executor started the generated discovery task.
+- 35358: real discovery qualified Studio Variously LLC from its public stockists
+  and contact pages, with Shopify footer evidence and a business inquiry form.
+  Unknown inventory pain, SKU count and founder details remained unknown.
+
+The forum inbox also retained vitaautentica's explicit opt-out (35223) and
+suppressed further contact without responding. At verification, acquisition was
+unpaused, with 10 confirmed first contacts and 15 separately tracked uncertain
+contacts. The forum conversation reply did not change the first-contact count.
