@@ -21,6 +21,12 @@ For each relevant, individually reviewed first contact:
 2. Call `outreach-reserve` with the existing merchant/qualification/experiment
    fields, `channel=email`, `recipient`, `subject` and `email_source` containing
    the actual published business-contact URL. Include stable cohort labels.
+   The required `facts` field is an array of objects, not an assessment ID,
+   string, or dictionary. Reuse the verified public fact from the task:
+   `"facts": [{"text": "<verified merchant fact>", "source": "<public URL supporting that fact>", "verified": true}]`.
+   Keep the existing assessment; a payload-format correction does not require
+   new merchant research. See the browser send payload fields in
+   `executor-instructions.md` before constructing this request.
 3. Use the returned `email` object exactly. It adds a separate Rainer signature, the configured business name,
    owner-supplied mailing address and reply-unsubscribe footer. Do not duplicate
    that footer in the proposed body. Keep one inventory question and no em dashes.

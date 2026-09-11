@@ -234,6 +234,10 @@ Keep payload files in .growth-deploy, not the repository root.
   relevance_evidence, channel_rules_source, channel, action_key, experiment_id,
   body, cohort {icp,offer,message_version,qualification_policy}. Reuse cached
   operator-assess or include checks. Record actual receipt with outreach-complete.
+  `facts` must be an array of objects with `text`, `source` and `verified: true`.
+  Copy the retained verified public fact and supporting URL. An assessment ID
+  or an array of plain strings does not satisfy this field. Correct malformed
+  request structure without repeating qualification or creating another task.
   Never replay an uncertain send, including after a crash.
   Browser accessibility trees can omit the Value of a populated email or URL input.
   Absence of a Value entry alone does NOT prove a field is empty. Before rejecting
