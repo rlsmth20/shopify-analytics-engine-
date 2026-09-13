@@ -190,6 +190,17 @@ Keep payload files in .growth-deploy, not the repository root.
   Return done, stop_reason=null, successors=[] after reviewing; the supervisor
   commits release/receipt/continued hold and selects the next work automatically.
 - monitor: recover an incomplete channel check; no research or outbound sends.
+  Resolve individual delivery failures within this task. For a verified invalid
+  recipient, read `prospect-history` with `{"identity":"<merchant domain>"}`.
+  If not yet suppressed, call `email-suppress` with
+  `{"recipient":"<actual failed recipient>","reason":"bounce"}` and verify
+  suppression. An old address-not-found notice for an already suppressed merchant
+  is handled evidence, not an unresolved global incident. Preserve its bounce
+  and ramp-increase pause; do not retry the merchant or clear delivery warnings.
+  When fresh inbox checks find no other unresolved issue and `email-status`
+  reports ready, this handled recipient bounce alone does not require attention.
+  Actual provider restrictions, systemic delivery failures and actionable human
+  replies still require handling. Never mark an inaccessible inbox clear.
   Read the source evidence for retained Gmail/Reddit URLs. Use a fresh Chrome tab
   and navigate to those URLs if a retained tab reports an unattached debugger;
   never keep retrying a broken tab handle. Record a fresh operator-monitor result.

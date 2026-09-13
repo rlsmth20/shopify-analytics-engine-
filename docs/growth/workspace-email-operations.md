@@ -67,6 +67,12 @@ continue independently. Apply `email-suppress` immediately to the actual merchan
 address for opt-outs, declines and verified hard bounces; never retry a failed
 address or bypass suppression using another channel. When a delivery daemon sends
 a failure, identify the failed recipient from the delivery report, not its sender.
+Check the merchant's `prospect-history` before treating an old failure as new.
+Once an invalid recipient is permanently suppressed, its retained bounce notice
+does not block other merchants. Keep the negative delivery signal and the pause
+on ramp increases. Distinguish `ramp.increase_paused` from transport `ready` and
+`blockers`: a pause on raising volume is not a global send pause. Escalate actual
+provider restrictions or systemic delivery deterioration; do not clear them.
 
 Authentication was verified by an actual received internal diagnostic with SPF,
 DKIM and DMARC passing (evidence 22221). Existing Google MX and operational records
