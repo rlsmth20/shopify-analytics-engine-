@@ -416,8 +416,8 @@ def execute(factory, owner, task, *, codex, repo):
     output = folder / (task["lease_token"] + ".json")
     log = folder / (task["lease_token"] + ".jsonl")
     instruction_file = "controlled-email-tests.md" if task.get("stage") == "deliverability" else "planner-instructions.md" if task.get("stage") == "plan" else "executor-instructions.md"
-    if task.get("stage") == "monitor" and task.get("key", "").startswith("community-inbox:"):
-        instruction_file = "community-inbox.md"
+    if task.get("stage") == "monitor":
+        instruction_file = "community-inbox.md" if task.get("key", "").startswith("community-inbox:") else "channel-monitor.md"
     prompt = (repo / "docs/growth" / instruction_file).read_text(encoding="utf-8")
     if task.get("stage") == "reconcile":
         retained = []
