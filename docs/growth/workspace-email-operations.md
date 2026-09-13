@@ -5,6 +5,15 @@ mailbox, **info@skubase.io**. Use its authenticated Chrome Gmail session. Never
 use the personal Gmail connector or another signed-in account. EmailPal activation
 is superseded; do not purchase a subscription or continue its setup work.
 
+Open the retained business mailbox URL `https://mail.google.com/mail/u/4/`,
+verified as info@skubase.io on September 13. The generic Gmail homepage and
+`/u/0/` can open a personal account. If the wrong account appears, do not inspect
+its messages or send from it: navigate to the retained business URL and verify
+the visible account identity. If that index has changed, select info@skubase.io
+from Google's account chooser. A wrong initial tab is recoverable within the
+same task; only missing business access or an actual login barrier is a blocker.
+Never rely on the numeric account index alone as sender verification.
+
 The internal browser send ledger enforces email ramp, merchant deduplication,
 suppression and one-use authorization. It stores the complete subject, recipient,
 body, source, campaign and Gmail receipt alongside other merchant interactions.
@@ -53,9 +62,12 @@ history; do not resend Earth & City merely to improve its formatting. Aim for
 one relevant benefit and one standalone question. Keep the required affiliation
 and current Shopify review disclosure without a lengthy feature list.
 
-The first real merchant send starts the persistent ramp. The initial ceiling is
-five actual first-contact emails per Pacific day, increasing through 8, 12, 15 and
-20 only with the existing elapsed-time and delivery/reply evidence requirements.
+The first real merchant send starts the persistent ramp. On September 13 the owner
+authorized more than five daily emails; the live Workspace ramp was advanced to
+**8 actual first-contact emails per Pacific day** as the next existing tier.
+This owner-directed increase preserves the recent bounce and pause on automatic
+increases. Further automatic increases to 12, 15 and 20 retain the existing
+elapsed-time and delivery/reply evidence requirements.
 Internal diagnostics do not start the clock. Reaching the email ceiling does not
 stop replies, research or other permitted channels. Do not manufacture warming.
 
