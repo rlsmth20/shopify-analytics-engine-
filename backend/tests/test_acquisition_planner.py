@@ -189,6 +189,35 @@ class PlannerTests(unittest.TestCase):
             admission=db.scalar(select(Evidence).where(Evidence.kind=='ACQUISITION_HYPOTHESES'))
             self.assertEqual(admission.data['rejected'][0]['reason'],'semantically_duplicate_search')
 
+    def test_owner_policy_and_objective_survive_rolling_memory_compaction(self):
+        with self.factory() as db:
+            policy = {'version': 'execution_first_v1', 'evidence_id': 85909,
+                'owner_precedence': 'Newest explicit owner instruction takes precedence. ' + 'x' * 20000,
+                'execution': 'Continue highest-value permitted acquisition. ' + 'x' * 20000,
+                'constraint_kinds': ['HARD', 'OWNER_PREFERENCE', 'INTERNAL_HEURISTIC', 'RESOURCE_OR_TECHNICAL'],
+                'irrelevant_history': 'x' * 20000}
+            remember(db, 'strategic', 'operating_policy', policy)
+            remember(db, 'strategic', 'acquisition_objective', {
+                'requested_date': '2026-09-14', 'requested_first_contacts': 1000, 'history': 'x' * 20000})
+            for key in ('operating_policy', 'acquisition_objective'):
+                row = db.scalar(select(Memory).where(Memory.namespace == 'strategic', Memory.key == key))
+                row.updated_at = 1  # Outside the five most recent strategic memories.
+            for namespace in ('strategic', 'beliefs', 'customer', 'channel', 'learning'):
+                for n in range(5):
+                    remember(db, namespace, f'large:{n}', {'text': 'x' * 20000})
+            db.flush()
+            packet = planner.context(db, [])
+            self.assertLessEqual(len(json.dumps(packet, default=str)), planner.CONTEXT_LIMIT)
+            self.assertEqual(packet['operating_policy']['version'], policy['version'])
+            self.assertEqual(packet['operating_policy']['evidence_id'], policy['evidence_id'])
+            self.assertEqual(packet['operating_policy']['constraint_kinds'], policy['constraint_kinds'])
+            self.assertEqual(packet['operating_policy']['execution'], policy['execution'][:480])
+            self.assertEqual(packet['operating_policy']['owner_precedence'], policy['owner_precedence'][:384])
+            self.assertNotIn('irrelevant_history', packet['operating_policy'])
+            self.assertEqual(packet['acquisition_objective'], {
+                'requested_date': '2026-09-14', 'requested_first_contacts': 1000})
+            self.assertNotIn('operating_policy', [m['key'] for m in packet['memory']['strategic']])
+
     def test_duplicate_feedback_survives_bounded_context_and_correction_is_bounded(self):
         proposal=self.proposal()
         with self.factory() as db:

@@ -119,6 +119,24 @@ def history(db):
 
 def context(db, search_history):
     from .funnel import funnel_counts, bottleneck
+    policy = get_memory(db, "strategic", "operating_policy")
+    objective = get_memory(db, "strategic", "acquisition_objective")
+    # Owner authority and the requested outcome must survive recency selection
+    # and rolling-memory compaction. Only bounded, explicitly selected fields
+    # belong in this protected packet, not an unbounded second memory history.
+    def policy_text(key, limit):
+        value = policy.get(key)
+        return value[:limit] if isinstance(value, str) else None
+    kinds = policy.get("constraint_kinds")
+    protected_policy = {"version": policy_text("version", 64),
+        "evidence_id": policy.get("evidence_id") if isinstance(policy.get("evidence_id"), int) else None,
+        "owner_precedence": policy_text("owner_precedence", 384),
+        "execution": policy_text("execution", 480),
+        "constraint_kinds": [k[:40] for k in kinds[:8] if isinstance(k, str)] if isinstance(kinds, list) else []}
+    protected_objective = {
+        "requested_date": objective.get("requested_date", "")[:32] if isinstance(objective.get("requested_date"), str) else None,
+        "requested_first_contacts": objective.get("requested_first_contacts")
+            if isinstance(objective.get("requested_first_contacts"), int) else None}
     memories = {}
     for namespace in ("strategic", "beliefs", "customer", "channel", "learning"):
         memories[namespace] = [{"key": r.key, "value": json.dumps(r.value, default=str)[:1400]}
@@ -128,6 +146,7 @@ def context(db, search_history):
                    "result": e.result} for e in db.scalars(select(Experiment)
                    .order_by(Experiment.started_at.desc()).limit(5))]
     packet = {"mission": mission(db), "memory": memories,
+        "operating_policy": protected_policy, "acquisition_objective": protected_objective,
         "funnel": funnel_counts(db), "bottleneck": bottleneck(db),
         # Keep this compact feedback even when verbose memories exhaust context.
         # Previously all search history could be trimmed before memory, leaving
