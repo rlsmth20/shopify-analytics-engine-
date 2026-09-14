@@ -128,6 +128,15 @@ Retain CHANNEL_MONITOR evidence and working/browser_safety_check
 check. Prioritize substantive replies/incidents and create reply successors when
 appropriate. No promotional response to Shopify review mail. Monitoring alone
 does not complete acquisition.
+In EVERY stage, including send admission, a visible bounce is not automatically
+a new unresolved incident. Check the failed merchant using `prospect-history`
+with {identity: merchant_domain}; permanently suppress a newly verified invalid
+address using `email-suppress` with {recipient: failed_address, reason: "bounce"}.
+An already suppressed recipient's unchanged bounce is handled evidence. Record
+that fact in the fresh observation and continue the same task if no other issue
+remains. Preserve the bounce and ramp-increase pause. Do not stop acquisition or
+create a recovery task merely to suppress an address already suppressed. Actual
+provider restrictions, systemic failures and inaccessible channels remain blockers.
 An ordinary out-of-office or automated receipt with no opt-out, rejection,
 delivery error or substantive question is not an actionable merchant reply.
 Retain AUTOMATED once, do not respond, do not create a reply successor, and do
