@@ -11,6 +11,7 @@ from app.growth import browser_executor as executor, acquisition_planner as plan
 from app.growth.models import Evidence, Memory, FirstContact
 from app.growth.store import record, remember, get_memory
 from app.growth.operator import offer
+from app.growth.policy import GrowthError
 
 
 class PlannerTests(unittest.TestCase):
@@ -56,6 +57,41 @@ class PlannerTests(unittest.TestCase):
             self.assertIsNone(db.scalar(select(FirstContact)))
             events=list(db.scalars(select(Evidence).where(Evidence.kind=='ACQUISITION_QUEUE_EMPTY')))
             self.assertEqual(events[0].data['depth'],0)
+
+    def test_invalid_plan_is_execution_failure_and_does_not_hold_unrelated_work(self):
+        task = executor.take(self.factory, 'worker')
+        result = self.result([{**self.proposal(), 'source': 'not-a-url'}])
+        with self.assertRaisesRegex(GrowthError, 'Hypothesis source must be HTTPS or null') as failure:
+            executor.accept(self.factory, 'worker', task, result)
+        executor.failed(self.factory, 'worker', task, str(failure.exception), result)
+        with self.factory() as db:
+            item = get_memory(db, 'operator_task', task['id'])
+            runtime = get_memory(db, 'working', 'browser_executor')
+            self.assertEqual(runtime['blocker'], 'EXECUTION_FAILED')
+            self.assertEqual(item['status'], 'pending')
+            self.assertEqual(item['attempts'], 1)
+            self.assertGreater(item['retry_at'], time.time())
+            fault = db.scalar(select(Evidence).where(Evidence.key == 'executor-failure:' + task['lease_token']))
+            self.assertEqual(fault.data['stage_result'], result)
+            self.assertEqual(fault.data['retry_at'], item['retry_at'])
+            other = offer(db, key='independent-source', source='https://example.com',
+                          decision='Discover a separate observed merchant source',
+                          evidence_id=task['evidence_id'], stage='discover')
+            db.commit()
+        next_task = executor.take(self.factory, 'worker')
+        self.assertEqual(next_task['id'], other['id'])
+        self.assertNotEqual(next_task['id'], task['id'])
+
+    def test_explicit_provider_failure_retains_provider_label_and_retry(self):
+        task = executor.take(self.factory, 'worker')
+        result = {**self.result([]), 'outcome': 'blocked', 'stop_reason': 'PROVIDER_BLOCKED'}
+        executor.failed(self.factory, 'worker', task, 'Observed provider restriction', result)
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'working', 'browser_executor')['blocker'], 'PROVIDER_BLOCKED')
+            item = get_memory(db, 'operator_task', task['id'])
+            self.assertEqual(item['status'], 'pending')
+            self.assertEqual(item['attempts'], 1)
+            self.assertGreater(item['retry_at'], time.time())
 
     def test_terminal_channel_outcome_does_not_globally_stop_discovery(self):
         with self.factory() as db:

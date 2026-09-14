@@ -1,6 +1,23 @@
 # Latest policy takes precedence
 
-Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared all-channel ceiling is 20 confirmed first contacts per Pacific day. EmailPal activation is superseded.
+Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). Use the live owner-defined shared ceiling, currently 1,000/day; distinguish it from the requested 1,000-contact outcome today. EmailPal activation is superseded.
+
+## Execution-first owner policy (revision 1, September 14)
+
+Use docs/growth/operating-policy.md for owner authority and constraint handling.
+Maximize relevant acquisition per time/compute. New explicit owner directions
+override older OWNER_PREFERENCE values; preserve the change history. Distinguish
+HARD restrictions from OWNER_PREFERENCE, INTERNAL_HEURISTIC and actual RESOURCE_OR_TECHNICAL
+constraints. Cite a concrete source before calling something a hard/provider limit.
+The 8-email ramp is an internal deliverability control, not Google's enforced cap.
+Protect that channel while executing through other legitimate channels. Do not
+argue about acknowledged risk, ask repeatedly to continue, or lower the owner's
+objective silently. The September 14 requested outcome is 1,000 contacts; live shared
+capacity is 1,000/day. Report actual outcomes separately. Broad discovery has no
+daily prospect-count quota. Unknown optional fit fields do not block eligibility.
+Use deterministic/batched work and cheap models; meaningful replies outrank
+bookkeeping. Finish this lease, persist useful results, and let the durable
+planner select the next executable action. Empty queue is not mission completion.
 
 # Autonomous acquisition hypothesis selection
 
@@ -48,7 +65,8 @@ docs/growth/shopify-community.md. No useful answer means learn-only, not a pitch
 
 Propose one or two hypotheses in `hypotheses`, with a concrete customer-acquisition
 claim, channel (source hostname), problem, segment, exact search query, HTTPS
-source or null, bounded executable decision, rationale, expected_value (0–10,
+source or null (for example https://www.reddit.com; never a bare hostname
+in the source field), bounded executable decision, rationale, expected_value (0–10,
 relative estimate) and confidence (0–1). Explain which prior evidence supports the
 decision and which alternative you rejected. Set successors to []: planning does
 not directly authorize arbitrary queue writes. Set search_result and idle to null.
@@ -66,10 +84,13 @@ another specific acquisition decision. Do not repeat an exhausted query with a
 different date or synonyms. Account for retained exclusions and vendor-heavy
 results; explore adjacent manifestations of demonstrated merchant problems.
 
-The task decision permits at most two searches and four source reads, requires
-canonical identity and historical exclusion checks, and yields qualification
-successors for real prospects under basic eligibility. Public pain is a ranking
-signal, not a gate. Preserve suppressions and permissions; no daily contact ceiling.
+Use two searches/four reads as an economy default, not a daily discovery quota
+or a limit on merchants found in a useful source. Plan inexpensive cached/batched
+extraction when available, within the enforced execution deadline. Require
+canonical identity and historical exclusion checks. Yield executable successors
+for real prospects under basic eligibility; preserve additional observed
+candidates through trusted recording rather than repeating the same research. Public pain is a ranking
+signal, not a gate. Preserve suppressions, permissions and the live owner ceiling.
 Workspace email is eligible only when email-status is ready; follow workspace-email-operations.md. Otherwise
 use other permitted channels. No paid APIs/ads without authorization, repetitive
 DMs or channel-rule bypasses. Use configured restrained follow-ups. Preserve revision 4 and the review-pending disclosure.

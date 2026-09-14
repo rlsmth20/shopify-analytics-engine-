@@ -388,8 +388,13 @@ def failed(factory, owner, task, reason, result=None):
                 remember(db, operator.NAMESPACE, task["id"], {**get_memory(db, operator.NAMESPACE, task["id"]),
                     "status": "blocked", "next_step": "Receipt recovery owns the unresolved admission; never retry submission"})
                 offer_review(db, reservation, receipt_completion=True)
+        # Validation/tool failures are not evidence of a provider restriction.
+        # Classification is observational; retry and receipt recovery stay intact.
+        blocker = ("RESEARCH_BRANCH_EXHAUSTED" if "RESEARCH_BUDGET" in reason else
+                   "PROVIDER_BLOCKED" if (result or {}).get("stop_reason") == "PROVIDER_BLOCKED" else
+                   "EXECUTION_FAILED")
         remember(db, "working", "browser_executor", {"owner": owner, "heartbeat_at": time.time(),
-            "lease_until": 0, "blocker": "RESEARCH_BRANCH_EXHAUSTED" if "RESEARCH_BUDGET" in reason else "PROVIDER_BLOCKED",
+            "lease_until": 0, "blocker": blocker,
             "error": reason[:300], "next_retry_at": retry})
         db.commit()
 

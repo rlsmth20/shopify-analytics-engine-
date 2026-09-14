@@ -1,6 +1,10 @@
 # Current owner acquisition policy — September 14, 2026
 
 This supersedes older daily-quota and narrow-channel instructions.
+Apply [execution operating policy](operating-policy.md): newest owner preferences
+win, constraints need provenance, and useful work continues across channels.
+The September 14 requested outcome is 1,000 contacts today. The ceiling permits
+execution toward that objective; neither capacity nor discovery counts as contact.
 
 - **Owner increased the shared ceiling to 1,000 confirmed first contacts per Pacific day on September 14.**
   Persistent strategic memory stores `outreach_policy.daily_new_contact_limit = 1000`.
@@ -8,6 +12,7 @@ This supersedes older daily-quota and narrow-channel instructions.
   count or an instruction to fill volume through repetitive posts or unsolicited
   mass DMs. Count confirmed first contacts separately from uncertain contacts.
   Email remains subject to its separate evidence-based ramp and provider rules.
+  The ramp is an internal deliverability control, not a provider-enforced limit.
 - **Email-specific override, September 13:** The owner authorized more than five
   first-contact emails daily. The live Workspace sender was advanced to the next
   existing tier, **8 per Pacific day**, as an owner-directed increase. This is not
