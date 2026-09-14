@@ -1,6 +1,11 @@
 # Latest policy takes precedence
 
-Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). Use the live owner-defined shared ceiling, currently 1,000/day; distinguish it from the requested 1,000-contact outcome today. EmailPal activation is superseded.
+Read docs/growth/current-acquisition-policy.md from the repository root first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in docs/growth/workspace-email-operations.md. Use the live owner-defined shared ceiling, currently 1,000/day; distinguish it from the requested 1,000-contact outcome today. EmailPal activation is superseded.
+
+Status names such as outreach-status and email-status are CLI actions, not
+Markdown filenames. Use scripts/growth-review.ps1 -Action outreach-status or
+-Action email-status only when this stage needs live status; planner uses its
+supplied packet without extra tool calls.
 
 ## Execution-first owner policy (revision 1, September 14)
 
