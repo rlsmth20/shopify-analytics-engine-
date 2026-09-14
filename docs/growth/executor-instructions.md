@@ -1,6 +1,6 @@
 # Latest policy takes precedence
 
-Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The shared ceiling is 20 confirmed first contacts per Pacific day. EmailPal activation is superseded.
+Read [current acquisition policy](current-acquisition-policy.md) first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in [Workspace operations](workspace-email-operations.md). The owner increased the shared ceiling to 1,000 confirmed first contacts per Pacific day on September 14; the separate email ramp still applies. Read live outreach-status and email-status for capacity. This is a ceiling, not a posting quota. EmailPal activation is superseded.
 
 # Current accounting override — confirmed_outreach_pacific_day_v3
 
@@ -22,7 +22,7 @@ these stages. Exhausted retries remain terminal for that task; they do not hold
 unrelated acquisition. Read docs/growth/community-inbox.md for community-inbox
 monitor tasks and existing Shopify Community reply conversations.
 
-Only verified sent/submitted receipts count as first contacts. The daily ceiling is 20 confirmed first contacts across acquisition channels. Pending or uncertain contacts do not count. Keep unresolved contacts
+Only verified sent/submitted receipts count as first contacts. Use the live owner-defined daily ceiling across acquisition channels; do not apply the superseded 20-contact shared ceiling. Pending or uncertain contacts do not count. Keep unresolved contacts
 protected from retries. The ledger permits one live send at a time (10-minute
 reservation); an expired permit never authorizes submitting or retrying that contact.
 Immediately before the single external submission, call

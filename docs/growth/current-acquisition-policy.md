@@ -1,13 +1,20 @@
-# Current owner acquisition policy — September 9, 2026
+# Current owner acquisition policy — September 14, 2026
 
 This supersedes older daily-quota and narrow-channel instructions.
 
-- **20 confirmed first contacts per Pacific day across acquisition channels.**
-  Persistent strategic memory stores `outreach_policy.daily_new_contact_limit = 20`.
-  Count actual confirmed first contacts separately from uncertain contacts.
-- **Email-specific override, September 9:** New first-contact emails start at a
-  maximum of 5/day, then 8, 12, 15, and 20 only as the persisted live ramp earns
-  increases. These are ceilings, not quotas. The shared 20-contact ceiling also applies to
+- **Owner increased the shared ceiling to 1,000 confirmed first contacts per Pacific day on September 14.**
+  Persistent strategic memory stores `outreach_policy.daily_new_contact_limit = 1000`.
+  This permits additional eligible acquisition; it is not a guaranteed completion
+  count or an instruction to fill volume through repetitive posts or unsolicited
+  mass DMs. Count confirmed first contacts separately from uncertain contacts.
+  Email remains subject to its separate evidence-based ramp and provider rules.
+- **Email-specific override, September 13:** The owner authorized more than five
+  first-contact emails daily. The live Workspace sender was advanced to the next
+  existing tier, **8 per Pacific day**, as an owner-directed increase. This is not
+  earned delivery evidence: the recent bounce and pause on automatic increases
+  remain recorded. Further automatic increases to 12, 15 and 20 require the
+  existing ramp evidence and health checks. These are ceilings, not quotas.
+  The shared 1,000-contact ceiling also applies to
   forms/community activity. Genuine replies and ordinary operational mail
   are independent of the first-contact ramp. See `email-ramp.md`.
 - Keep one external submission in flight. An uncertain contact remains protected
@@ -21,7 +28,13 @@ This supersedes older daily-quota and narrow-channel instructions.
 - Prioritize substantive inbound, promising conversations, eligible first contacts,
   discovery, restrained follow-ups, useful public participation, then analysis.
 - Discover across store websites/forms, Reddit, Shopify Community and other appropriate
-  public sources. Community answers must stand on their own without the Skubase mention.
+  public sources. Correct the recent storefront/form-only bias by considering
+  under-tested Reddit and community merchant questions in each new planning cycle.
+  Prefer fresh, specific requests where a useful answer or permitted direct
+  conversation is possible. Do not impose channel posting quotas or transfer an
+  exhausted email allowance into mass forum/DM traffic. Crowded vendor threads
+  are learning sources; try a different question when no useful contribution exists.
+  Community answers must stand on their own without the Skubase mention.
 - Link evidence-backed store/person/channel identities with `prospect-link`; read
   `prospect-history` before changing channels. Never use an alternate identity to
   bypass an opt-out, rejection, bounce or uncertain submission.
@@ -56,3 +69,13 @@ This supersedes older daily-quota and narrow-channel instructions.
 
 The planner replenishes empty queues autonomously. Never create manual discovery work
 just to claim an autonomy test passed. Keep all actions and provider receipts auditable.
+
+## September 14 activation evidence
+
+Owner policy evidence `85659` records the new ceiling and preserved email ramp.
+The persistent executor independently selected its next hypothesis (`85663`) and
+claimed discovery task `b4be09ff38b51b26d930f0de0957b4e51a4fd1fa04e66c4dd166f8e423d9f9ce`
+after the old shared cap cleared. No discovery task or external send was manually
+seeded. At activation, actual first contacts remained 20 (8 email, 12 forms).
+Existing outbound/planner verification passed: 29 tests and 4 subtests.
+The higher ceiling is configuration, not evidence that 1,000 contacts occurred.
