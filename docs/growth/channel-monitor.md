@@ -35,6 +35,9 @@ required structured result promptly; this monitor has a bounded runtime.
    clear the check. Apply the same distinction to already processed human replies:
    only an unresolved next action needs attention. Perform the fresh channel checks
    below normally; this rule does not permit clearing unseen messages or incidents.
+   For email history, query the exact sender/failed-recipient email address first.
+   A bare domain returning no contact_ids does not prove its email address is
+   unsuppressed. Resolve the address before calling a historical message new.
 4. For a verified invalid-recipient bounce, call prospect-history with
    {"identity":"<merchant domain>"}. If not already suppressed, call
    email-suppress with {"recipient":"<actual failed recipient>","reason":"bounce"}.
@@ -45,6 +48,12 @@ required structured result promptly; this monitor has a bounded runtime.
 5. Inspect the retained Reddit chat/notification URL for new replies. Use the
    existing Skubase account. Allow the page to load using normal state reads;
    do not assume a loading pane is an empty inbox. No searching or posting.
+   Use the assigned source, current browser inventory or Reddit notifications to
+   locate the retained conversation. Never recursively search .growth-deploy or
+   execution logs for a URL. That directory contains large traces and such scans
+   waste the monitor budget. Reserve the final 45 seconds for recording results;
+   stop additional inspection in time to record an honest incomplete check if
+   necessary. Complete the recording command before returning the final result.
 6. Record operator-monitor using this exact payload shape:
    {"task_id":"<assigned id>","lease_token":"<assigned lease_token>",
     "check_id":<returned integer>,"mailbox":"info@skubase.io",
