@@ -39,7 +39,7 @@ required structured result promptly; this monitor has a bounded runtime.
    A bare domain returning no contact_ids does not prove its email address is
    unsuppressed. Resolve the address before calling a historical message new.
 4. For a verified invalid-recipient bounce, call prospect-history with
-   {"identity":"<merchant domain>"}. If not already suppressed, call
+   {"identity":"<actual failed recipient email>"}. If not already suppressed, call
    email-suppress with {"recipient":"<actual failed recipient>","reason":"bounce"}.
    Never retry the address. A retained notice for an already suppressed merchant
    is handled evidence. Preserve its negative ramp signal. email-status transport

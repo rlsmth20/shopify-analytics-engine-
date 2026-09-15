@@ -171,9 +171,20 @@ Retain CHANNEL_MONITOR evidence and working/browser_safety_check
 check. Prioritize substantive replies/incidents and create reply successors when
 appropriate. No promotional response to Shopify review mail. Monitoring alone
 does not complete acquisition.
+In EVERY stage, including send admission, distinguish a newly actionable human
+reply from the same reply already processed. Before blocking on an opt-out or
+decline, query `prospect-history` with {identity: exact_sender_email}. Verify
+that the exact observed reply is retained and suppression is active. When both
+are established, cite that evidence in the fresh channel observation, retain
+the suppression, and continue unrelated acquisition if no other issue remains.
+Do not create another reply task or acknowledge an already handled opt-out.
+Unread status or continued inbox visibility does not make a message new. A
+newer reply, unresolved request, or unprocessed opt-out still needs handling.
+Apply this check during send-stage Gmail checks, not just monitor tasks.
 In EVERY stage, including send admission, a visible bounce is not automatically
 a new unresolved incident. Check the failed merchant using `prospect-history`
-with {identity: merchant_domain}; permanently suppress a newly verified invalid
+with {identity: exact_failed_recipient_email}; a bare-domain lookup returning no
+contacts is not proof that an email is unsuppressed. Permanently suppress a newly verified invalid
 address using `email-suppress` with {recipient: failed_address, reason: "bounce"}.
 An already suppressed recipient's unchanged bounce is handled evidence. Record
 that fact in the fresh observation and continue the same task if no other issue
@@ -243,7 +254,7 @@ Keep payload files in .growth-deploy, not the repository root.
   commits release/receipt/continued hold and selects the next work automatically.
 - monitor: recover an incomplete channel check; no research or outbound sends.
   Resolve individual delivery failures within this task. For a verified invalid
-  recipient, read `prospect-history` with `{"identity":"<merchant domain>"}`.
+  recipient, read `prospect-history` with `{"identity":"<actual failed recipient email>"}`.
   If not yet suppressed, call `email-suppress` with
   `{"recipient":"<actual failed recipient>","reason":"bounce"}` and verify
   suppression. An old address-not-found notice for an already suppressed merchant
