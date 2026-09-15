@@ -26,6 +26,15 @@ required structured result promptly; this monitor has a bounded runtime.
    genuine merchant replies and opt-outs. Automated acknowledgments, newsletters,
    DMARC reports, internal sb-check threads and historical EmailPal support mail
    are not customer interest. Do not reread unchanged operational threads.
+   Before treating a visible opt-out or decline as actionable, use prospect-history
+   to check whether that exact message is already recorded and the merchant is
+   suppressed. If both are confirmed, it is handled evidence even if still unread
+   or visible in the inbox. Retain the suppression and cite its evidence; do not
+   create another reply task or keep unrelated acquisition on hold. A new opt-out
+   still requires immediate processing. Never send an acknowledgment merely to
+   clear the check. Apply the same distinction to already processed human replies:
+   only an unresolved next action needs attention. Perform the fresh channel checks
+   below normally; this rule does not permit clearing unseen messages or incidents.
 4. For a verified invalid-recipient bounce, call prospect-history with
    {"identity":"<merchant domain>"}. If not already suppressed, call
    email-suppress with {"recipient":"<actual failed recipient>","reason":"bounce"}.
