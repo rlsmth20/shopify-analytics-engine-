@@ -6,7 +6,19 @@ export const growthMoney = (value: GrowthCount) => typeof value === "number" && 
   ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: value > 0 && value < 1 ? 4 : 2 }).format(value) : "Unknown";
 export const growthPercent = (value: GrowthCount) => typeof value === "number" && Number.isFinite(value)
   ? `${Math.round(value * 100)}%` : "Unknown";
-export const growthLabel = (value?: string | null) => value ? value.replaceAll("_", " ") : "Not recorded";
+/** Legacy cohort metadata can contain structured qualification criteria, not display text. */
+export function growthText(value: unknown, fallback = "UNKNOWN"): string {
+  if (typeof value === "string") return value.trim() || fallback;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    for (const key of ["label", "name", "description", "segment", "industry"]) {
+      if (typeof record[key] === "string" && record[key].trim()) return record[key].trim();
+    }
+  }
+  return fallback;
+}
+export const growthLabel = (value?: unknown) => growthText(value, "Not recorded").replaceAll("_", " ");
 export const growthTime = (value?: number | null) => value && Number.isFinite(value)
   ? new Date(value * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Not yet recorded";
 export const chartWidth = (value: GrowthCount, maximum: number) => typeof value === "number" && Number.isFinite(value) && maximum > 0
@@ -21,7 +33,7 @@ export const FUNNEL_STAGES = [
   ["SUBSCRIPTION_PURCHASED", "Verified purchases"],
 ] as const;
 export type GrowthCohort = {
-  id: string; experiment_id: string; channel: string; icp: string | null; offer: string | null;
+  id: string; experiment_id: string; channel: string; icp: unknown; offer: unknown;
   message_version: number | string | null; sent: number; pending: number; mature: number;
   email_delivered: number | null; email_bounced: number | null; delivery_unknown: number;
   substantive_replies: number; positive_interest: number; linked_contacts: number;
@@ -40,10 +52,10 @@ export type GrowthOutcomeBlock = {
 export type GrowthOutcomes = {
   periods: Partial<Record<GrowthOutcomePeriod, GrowthOutcomeBlock>>;
   channels: (GrowthOutcomeBlock & { id?: string; channel?: string; dimensions?: Record<string, string | null> })[];
-  cohorts?: (GrowthOutcomeBlock & { id: string; experiment_id: string; channel: string; icp_segment: string | null;
-    offer: string | null; message: string | number | null; positioning: string | null; cta: string | null;
+  cohorts?: (GrowthOutcomeBlock & { id: string; experiment_id: unknown; channel: string; icp_segment: unknown;
+    offer: unknown; message: unknown; positioning: unknown; cta: unknown;
     maturity: string; mature_contacts: number })[];
-  best: { channel: string | null; icp_segment: string | null; offer: string | null; message: string | number | null };
+  best: { channel: unknown; icp_segment: unknown; offer: unknown; message: unknown };
   bottleneck: { stage: string; observation: string; recommended_action: string };
   next_decision_point: { confirmed_contacts: number; target: number; remaining: number; guidance: string };
   current_experiment: string | null;

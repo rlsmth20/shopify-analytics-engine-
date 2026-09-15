@@ -274,3 +274,40 @@ test('older snapshots cannot invent attributed customers or channel winners', ()
   assert.match(rendered.text, /Best channel UNKNOWN/);
   assert.match(rendered.text, /not available in this snapshot/);
 });
+
+test('structured legacy cohort criteria render safely in real React without fabricating a segment', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const code = ts.transpileModule(readFileSync(path.join(__dirname, '../app/growth/page.tsx'), 'utf8')
+    + '\nexport { OutcomesSummary as TestOutcomes, CohortTable as TestCohorts };', {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const exports = {};
+  const dependencies = {
+    react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
+    'next/link': { __esModule: true, default: 'a' }, '@/lib/api-base': { API_BASE_URL: '' },
+    '@/lib/shopify-embedded': { authenticatedFetch() { assert.fail('Rendering cannot make network calls'); } },
+    '@/lib/growth-dashboard': view, './page.module.css': { __esModule: true, default: {} },
+  };
+  vm.runInNewContext(code, { exports, require(name) { return dependencies[name]; }, Intl, Date, Number, Math });
+  const legacy = { qualified: true, fit: true, score: 95, confidence: 0.8 };
+  const block = { metrics: { confirmed_contacts: 12 }, funnel: {}, accounting: {}, rates: {}, costs: {} };
+  const cohort = { ...block, id: 'legacy-cohort', experiment_id: null, channel: 'contact_form',
+    icp_segment: legacy, offer: { hypothesis: 'internal' }, message: { version: 1 },
+    positioning: { requested: true }, cta: { ask: 'internal' }, maturity: 'EARLY_SIGNAL', mature_contacts: 12 };
+  const outcomes = { periods: { today: block }, cohorts: [cohort], channels: [],
+    best: { channel: 'contact_form', icp_segment: legacy, offer: legacy, message: legacy },
+    bottleneck: { stage: 'insufficient_evidence' } };
+  const html = renderToStaticMarkup(React.createElement(exports.TestOutcomes, { outcomes, period: 'today', onPeriod() {} }));
+  assert.match(html, /Unknown segment/);
+  assert.match(html, /Best ICP segment<\/dt><dd>UNKNOWN/);
+  assert.match(html, /Unknown offer/);
+  assert.match(html, /Experiment UNKNOWN/);
+  assert.doesNotMatch(html, /\[object Object\]|qualified.*true|score.*95/);
+  const oldCohort = { id: 'old', experiment_id: 'old-experiment', channel: 'email', icp: legacy,
+    offer: legacy, message_version: 1, outcomes: {}, sent: 12, linked_contacts: 0 };
+  const legacyHtml = renderToStaticMarkup(React.createElement(exports.TestCohorts, { cohorts: [oldCohort] }));
+  assert.match(legacyHtml, /ICP not labeled/);
+  assert.equal(view.growthText({ label: 'Apparel' }), 'Apparel');
+  assert.equal(view.growthLabel(legacy), 'Not recorded');
+});

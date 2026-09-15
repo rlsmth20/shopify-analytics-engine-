@@ -7,7 +7,7 @@ import { authenticatedFetch } from "@/lib/shopify-embedded";
 import { confirmedOutreach, chartWidth, FUNNEL_STAGES, growthLabel as label, growthMoney as money, growthNumber as number,
   growthPercent as percent, growthTime as time, growthInboxView, outcomeLabel, type GrowthActivityDay, type GrowthCohort,
   type GrowthInboxTransport, type GrowthSnapshot, type GrowthOutcomes, type GrowthOutcomePeriod,
-  ACQUISITION_FUNNEL_STAGES, outcomeMetric } from "@/lib/growth-dashboard";
+  ACQUISITION_FUNNEL_STAGES, outcomeMetric, growthText } from "@/lib/growth-dashboard";
 import styles from "./page.module.css";
 
 function Metric({ name, value, detail }: { name: string; value: string | number; detail?: string }) {
@@ -54,7 +54,7 @@ function OutcomesSummary({ outcomes, period, onPeriod, experimentNames = {} }: {
         </dl><p className={styles.caption}>{checkpoint?.guidance || "Review around 100 confirmed relevant contacts, or earlier when strong positive or negative evidence appears."}</p>
         <dl className={styles.operations}>{[["channel", "Best channel"], ["icp_segment", "Best ICP segment"], ["offer", "Best offer"], ["message", "Best message / positioning"]].map(([key, title]) => {
           const value = outcomes?.best[key as keyof GrowthOutcomes["best"]];
-          return <div key={key} className={styles.definitionRow}><dt>{title}</dt><dd>{value == null ? "UNKNOWN" : key === "channel" ? label(String(value)) : typeof value === "number" ? `Variant ${value}` : value}</dd></div>;
+          return <div key={key} className={styles.definitionRow}><dt>{title}</dt><dd>{value == null ? "UNKNOWN" : key === "channel" ? label(growthText(value)) : typeof value === "number" ? `Variant ${value}` : growthText(value)}</dd></div>;
         })}</dl>
         <p className={styles.caption}>A leading channel or offer needs downstream evidence. Early sample sizes are learning guidelines, not statistical certainty.</p>
       </section>
@@ -74,9 +74,9 @@ function OutcomesSummary({ outcomes, period, onPeriod, experimentNames = {} }: {
       {outcomes?.cohorts?.length ? <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Acquisition cohort outcomes, scroll horizontally"><table className={styles.cohortTable}>
         <caption>Each original experiment, channel, merchant segment, offer, positioning and CTA stays separate. Thresholds are review guidelines; allow time for responses.</caption>
         <thead><tr><th scope="col">Cohort hypothesis</th><th scope="col">Learning window</th><th scope="col">Contacts</th><th scope="col">Substantive</th><th scope="col">Positive</th><th scope="col">Connected</th><th scope="col">Paid</th><th scope="col">MRR</th></tr></thead>
-        <tbody>{outcomes.cohorts.map(cohort => <tr key={cohort.id}><th scope="row"><strong>{label(cohort.channel)} · {cohort.icp_segment || "Unknown segment"}</strong>
-          <small>{cohort.offer || "Unknown offer"} · variant {cohort.message ?? "UNKNOWN"}</small><small>{cohort.positioning || "Positioning unknown"}</small><small>CTA: {cohort.cta || "UNKNOWN"}</small>
-          <small>Experiment {cohort.experiment_id.slice(0, 8)} · cohort {cohort.id.slice(0, 8)}</small></th>
+        <tbody>{outcomes.cohorts.map(cohort => <tr key={cohort.id}><th scope="row"><strong>{label(cohort.channel)} · {growthText(cohort.icp_segment, "Unknown segment")}</strong>
+          <small>{growthText(cohort.offer, "Unknown offer")} · variant {growthText(cohort.message)}</small><small>{growthText(cohort.positioning, "Positioning unknown")}</small><small>CTA: {growthText(cohort.cta)}</small>
+          <small>Experiment {growthText(cohort.experiment_id).slice(0, 8)} · cohort {growthText(cohort.id).slice(0, 8)}</small></th>
           <td>{label(cohort.maturity)}<small>{number(cohort.mature_contacts)} contacts aged 7+ days</small></td>
           {["confirmed_contacts", "substantive_responses", "positive_responses", "shopify_connections", "paying_customers", "mrr"].map(key => <td key={key}>{outcomeMetric(cohort.metrics[key], key === "mrr" ? "money" : "number")}</td>)}</tr>)}</tbody>
       </table></div> : <p className={styles.empty}>No acquisition cohorts are available yet.</p>}
@@ -140,7 +140,7 @@ function CohortTable({ cohorts }: { cohorts: GrowthCohort[] }) {
     <table className={styles.cohortTable}><caption>Original experiment, channel, ICP, offer and message version stay separate. Unknown means the outcome cannot yet be linked.</caption>
       <thead><tr><th scope="col">Cohort / offer</th><th scope="col">First contacts</th><th scope="col">Receipt status</th><th scope="col">Substantive reply</th><th scope="col">Positive interest</th><th scope="col">Signup</th><th scope="col">Connected</th><th scope="col">Activated</th><th scope="col">Paid</th></tr></thead>
       <tbody>{cohorts.map(c => <tr key={c.id}>
-        <th scope="row"><span className={styles.channel}>{label(c.channel)}</span><strong>{c.icp || "ICP not labeled"}</strong><small>{label(c.offer)} · message {c.message_version ?? "unknown"}</small><small>Experiment {c.experiment_id.slice(0, 8)} · cohort {c.id.slice(0, 6)}</small><small>{c.linked_contacts}/{c.sent} merchant account links</small></th>
+        <th scope="row"><span className={styles.channel}>{label(c.channel)}</span><strong>{growthText(c.icp, "ICP not labeled")}</strong><small>{label(c.offer)} · message {growthText(c.message_version)}</small><small>Experiment {c.experiment_id.slice(0, 8)} · cohort {c.id.slice(0, 6)}</small><small>{c.linked_contacts}/{c.sent} merchant account links</small></th>
         <td><strong className={styles.tableNumber}>{number(c.sent)}</strong><small>{c.mature}/{c.sent} observed ≥7 days</small>{c.pending > 0 && <small className={styles.warningText}>{c.pending} unresolved</small>}</td>
         <td>{c.channel === "email" ? <><strong>{number(c.email_delivered)} delivered</strong><small>{number(c.email_bounced)} bounced · {c.delivery_unknown} unknown</small></> : <><strong>{!c.sent ? "Awaiting receipt" : c.channel === "contact_form" ? "Form accepted" : "Publicly posted"}</strong><small>{c.sent ? `${c.sent} receipts` : "No completed receipt"}</small><small>Email delivery: N/A</small></>}</td>
         <td><strong className={styles.tableNumber}>{c.substantive_replies}</strong><small>{percent(c.substantive_reply_rate)} of contacted</small></td>
