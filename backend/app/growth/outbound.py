@@ -122,7 +122,13 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
     if current["dispatch_remaining"] == 0:
         raise GrowthError(current["blocker"] + "; continue replies, research and receipt reconciliation", "capacity")
     row = FirstContact(contact_id=contact.id, action_key=action_key, channel=channel, experiment_id=experiment_id,
-        cohort={**cohort, "characteristics": contact.characteristics, "qualification": contact.qualification,
+        cohort={**cohort, "schema_version": 2, "prospect_id": contact.id,
+                "source": contact.source, "contact_method": channel,
+                "industry": contact.characteristics.get("industry") or contact.characteristics.get("category"),
+                "shopify_confidence": contact.qualification.get("shopify_confidence") or contact.characteristics.get("shopify_status"),
+                "message_variant": cohort.get("message_variant") or cohort.get("variant"),
+                "positioning": cohort.get("positioning"), "cta": cohort.get("cta"),
+                "characteristics": contact.characteristics, "qualification": contact.qualification,
                 "fact_sources": contact.facts}, body_hash=digest(body), reserved_at=now)
     db.add(row); db.flush()
     record(db, "first-contact-intent:" + row.id, "FIRST_CONTACT_RESERVED", contact.id,

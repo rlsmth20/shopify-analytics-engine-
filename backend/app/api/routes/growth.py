@@ -275,6 +275,9 @@ def client_event(payload: ClientEvent, request: Request, db: DB,
             raise HTTPException(400, "Usable analysis must be served to this authenticated store first")
         product_event(db, payload.name, user.shop_id, f"view:{payload.name}:{user.shop_id}:{int(time.time() // 86400)}",
                       data={"view_confirmed_by": "authenticated_browser_after_render"})
+        if payload.name == "INVENTORY_ANALYSIS_VIEWED":
+            from app.growth.funnel import record_activation
+            record_activation(db, user)
         enqueue(db, f"view-wake:{int(time.time() // 300)}", "observe", priority=80)
     subject = "visitor:" + payload.visitor_id
     # Durable per-visitor caps limit accidental loops; edge rate limits should cover hostile rotating identities.

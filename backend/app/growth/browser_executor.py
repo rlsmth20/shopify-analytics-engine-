@@ -144,6 +144,8 @@ def take(factory, owner):
             db.flush()
             packet = operator.export_packet(db)
         from .acquisition_planner import replenish
+        from .acquisition_review import refresh as refresh_outcome_review
+        outcome_guidance = refresh_outcome_review(db)
         if not any(t.get("stage") not in {"monitor", "reconcile", "deliverability"} for t in packet["tasks"]) and not packet["claimed_tasks"]:
             replenish(db, packet["capacity"])
             db.flush()
@@ -180,7 +182,10 @@ def take(factory, owner):
             from .reconciliation import packet as reconciliation_packet
             task = {**task, "reconciliation": reconciliation_packet(db, task)}
         task = {**task, "active_experiments": packet.get("active_experiments", []),
+                "acquisition_review": {k: outcome_guidance.get(k) for k in
+                    ("north_star", "metrics", "bottleneck", "next_decision_point", "review_evidence_id")},
                 "source_evidence": {"source": evidence.source, "kind": evidence.kind, "data": evidence.data}}
+        task["acquisition_review"]["decisions"] = outcome_guidance.get("decisions", [])[:3]
         setup = get_memory(db, "working", "provider_setup")
         task["provider_setup"] = {key: value[:1000] if isinstance(value, str) else value
             for key, value in setup.items() if key in {"provider", "status", "account", "domain", "ticket_id",

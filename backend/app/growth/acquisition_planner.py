@@ -28,7 +28,10 @@ def mission(db):
         Evidence.data["verified"].as_boolean().is_(True)).group_by(Evidence.subject).having(
         func.min(Evidence.occurred_at) >= started).subquery()
     count = db.scalar(select(func.count()).select_from(first)) or 0
-    return {"target": 10, "qualified": count, "complete": count >= 10,
+    outcome_mission = get_memory(db, "strategic", "outcome_policy").get("version") == "customer_outcomes_v1"
+    return {"target": 10, "qualified": count, "complete": count >= 10 and not outcome_mission,
+            "milestone_complete": count >= 10,
+            "north_star": "paying_customers_and_mrr" if outcome_mission else None,
             "started_at": started, "objective": identity.get("mission")}
 
 
@@ -119,6 +122,7 @@ def history(db):
 
 def context(db, search_history):
     from .funnel import funnel_counts, bottleneck
+    from .outcomes import decision_context
     policy = get_memory(db, "strategic", "operating_policy")
     objective = get_memory(db, "strategic", "acquisition_objective")
     # Owner authority and the requested outcome must survive recency selection
@@ -137,6 +141,9 @@ def context(db, search_history):
         "requested_date": objective.get("requested_date", "")[:32] if isinstance(objective.get("requested_date"), str) else None,
         "requested_first_contacts": objective.get("requested_first_contacts")
             if isinstance(objective.get("requested_first_contacts"), int) else None}
+    if objective.get("north_star"):
+        protected_objective.update(north_star=str(objective["north_star"])[:80],
+                                   volume_is_input=objective.get("volume_is_input") is True)
     memories = {}
     for namespace in ("strategic", "beliefs", "customer", "channel", "learning"):
         memories[namespace] = [{"key": r.key, "value": json.dumps(r.value, default=str)[:1400]}
@@ -145,9 +152,13 @@ def context(db, search_history):
     experiments = [{"id": e.id, "status": e.status, "specification": e.specification,
                    "result": e.result} for e in db.scalars(select(Experiment)
                    .order_by(Experiment.started_at.desc()).limit(5))]
+    learning = get_memory(db, "strategic", "acquisition_learning")
     packet = {"mission": mission(db), "memory": memories,
+        "acquisition_review": {"review_evidence_id": learning.get("review_evidence_id"),
+            "decisions": learning.get("decisions", [])[:3]},
         "operating_policy": protected_policy, "acquisition_objective": protected_objective,
         "funnel": funnel_counts(db), "bottleneck": bottleneck(db),
+        "acquisition_outcomes": decision_context(db),
         # Keep this compact feedback even when verbose memories exhaust context.
         # Previously all search history could be trimmed before memory, leaving
         # the model unaware of the same queries rejected by deterministic code.

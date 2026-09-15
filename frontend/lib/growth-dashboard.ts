@@ -29,6 +29,40 @@ export type GrowthCohort = {
   outcome_linkage_complete: boolean; substantive_reply_rate: number | null; positive_interest_rate: number | null;
 };
 export type GrowthActivityDay = { day: string; first_contacts: number; substantive_replies: number };
+export type GrowthOutcomePeriod = "today" | "last_7_days" | "all_time";
+export type GrowthOutcomeBlock = {
+  metrics: Record<string, number | null>;
+  funnel: Record<string, number | null>;
+  accounting: Record<string, number | null>;
+  rates: Record<string, number | null>;
+  costs: Record<string, number | null>;
+};
+export type GrowthOutcomes = {
+  periods: Partial<Record<GrowthOutcomePeriod, GrowthOutcomeBlock>>;
+  channels: (GrowthOutcomeBlock & { id?: string; channel?: string; dimensions?: Record<string, string | null> })[];
+  cohorts?: (GrowthOutcomeBlock & { id: string; experiment_id: string; channel: string; icp_segment: string | null;
+    offer: string | null; message: string | number | null; positioning: string | null; cta: string | null;
+    maturity: string; mature_contacts: number })[];
+  best: { channel: string | null; icp_segment: string | null; offer: string | null; message: string | number | null };
+  bottleneck: { stage: string; observation: string; recommended_action: string };
+  next_decision_point: { confirmed_contacts: number; target: number; remaining: number; guidance: string };
+  current_experiment: string | null;
+  best_signal?: { interpretation?: string; kind?: string; evidence_ids?: number[]; sample_size?: number };
+};
+export const ACQUISITION_FUNNEL_STAGES = [
+  ["DISCOVERED", "Discovered"], ["QUALIFIED", "Qualified"], ["CONTACT_ATTEMPTED", "Contact attempted"],
+  ["CONFIRMED_CONTACT", "Confirmed contact"], ["DELIVERED", "Delivered email"], ["CONFIRMED_FORM_SUBMISSION", "Confirmed form submission"],
+  ["SUBSTANTIVE_RESPONSE", "Substantive response"], ["POSITIVE_RESPONSE", "Positive response"],
+  ["SITE_VISIT", "Site visit"], ["ACCOUNT_CREATED", "Account created"], ["SHOPIFY_CONNECTED", "Shopify connected"],
+  ["INVENTORY_ANALYSIS_COMPLETED", "Analysis completed"], ["ACTIVATED", "Activated"],
+  ["PRICING_VIEWED", "Pricing viewed"], ["TRIAL_STARTED", "Trial started"], ["CHECKOUT_STARTED", "Checkout started"],
+  ["PAID", "Paid"], ["RETAINED", "Retained"],
+] as const;
+/** Outcome reporting never substitutes global product events for campaign attribution. */
+export function outcomeMetric(value: GrowthCount, format: "number" | "money" | "percent" = "number") {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "UNKNOWN";
+  return format === "money" ? growthMoney(value) : format === "percent" ? growthPercent(value) : growthNumber(value);
+}
 export type GrowthInboxTransport = {
   status?: "disabled" | "configuration_required" | "not_checked" | "poll_failed" | "poll_stale" | "verification_unrecorded" | "verification_stale" | "verified";
   mailbox?: string;
@@ -86,6 +120,7 @@ export function growthInboxView(inbox?: GrowthInboxTransport | null) {
 }
 
 export type GrowthSnapshot = {
+  outcomes?: GrowthOutcomes;
   generated_at?: number;
   execution?: {
     daily_new_contact_cap: number | null; sent_today: number; remaining_capacity: number | null;

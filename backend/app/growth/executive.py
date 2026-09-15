@@ -17,6 +17,7 @@ SIGNALS = {"OPPORTUNITY", "PROSPECT_RESEARCHED", "REPLY_RECEIVED", "ACCESS_REQUE
 
 
 def export_packet(db):
+    from .outcomes import decision_context
     now = time.time()
     window = review_day(now)
     day = window.day
@@ -27,7 +28,7 @@ def export_packet(db):
     if now < window.due:
         return {"day": day, "not_due": True, "timezone": "America/Los_Angeles", "next_due": window.due}
     previous = get_memory(db, "strategic", "executive-packet:" + window.key)
-    if previous.get("schema_version") == 3:
+    if previous.get("schema_version") == 4:
         return previous
     outcomes = list(db.scalars(select(Evidence).where(Evidence.kind.in_(SIGNALS - {"OPPORTUNITY", "IMPLEMENTATION_FIX", "HISTORICAL_PURCHASE_INTENT", "COMMUNITY_SYNTHESIS"})).order_by(Evidence.id.desc()).limit(6)))
     for kind in ("IMPLEMENTATION_FIX", "HISTORICAL_PURCHASE_INTENT"):
@@ -52,7 +53,8 @@ def export_packet(db):
                 "interpretation": community["interpretation"],
                 "next_decision": community["hypothesis_to_evaluate"],
                 "details": "community-export: inspect only this new batch for explicit complaints, terminology and prospect evidence"}
-    result = {"schema_version": 3, "day": day, "timezone": "America/Los_Angeles", "mission": get_memory(db, "strategic", "identity"),
+    result = {"schema_version": 4, "day": day, "timezone": "America/Los_Angeles", "mission": get_memory(db, "strategic", "identity"),
+              "acquisition_outcomes": decision_context(db),
               "strategy": get_memory(db, "strategic", "strategy"), "funnel": funnel.funnel_counts(db),
               "community_learning": community_packet,
               "bottleneck": funnel.bottleneck(db),

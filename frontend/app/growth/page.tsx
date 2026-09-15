@@ -6,11 +6,91 @@ import { API_BASE_URL } from "@/lib/api-base";
 import { authenticatedFetch } from "@/lib/shopify-embedded";
 import { confirmedOutreach, chartWidth, FUNNEL_STAGES, growthLabel as label, growthMoney as money, growthNumber as number,
   growthPercent as percent, growthTime as time, growthInboxView, outcomeLabel, type GrowthActivityDay, type GrowthCohort,
-  type GrowthInboxTransport, type GrowthSnapshot } from "@/lib/growth-dashboard";
+  type GrowthInboxTransport, type GrowthSnapshot, type GrowthOutcomes, type GrowthOutcomePeriod,
+  ACQUISITION_FUNNEL_STAGES, outcomeMetric } from "@/lib/growth-dashboard";
 import styles from "./page.module.css";
 
 function Metric({ name, value, detail }: { name: string; value: string | number; detail?: string }) {
-  return <div className={styles.metric}><span>{name}</span><strong>{value}</strong>{detail && <small>{detail}</small>}</div>;
+  return <div className={styles.metric}><span>{name}</span><strong data-unknown={value === "UNKNOWN" || undefined}>{value}</strong>{detail && <small>{detail}</small>}</div>;
+}
+
+function OutcomesSummary({ outcomes, period, onPeriod, experimentNames = {} }: {
+  outcomes?: GrowthOutcomes; period: GrowthOutcomePeriod; onPeriod: (value: GrowthOutcomePeriod) => void;
+  experimentNames?: Record<string, string>;
+}) {
+  const block = outcomes?.periods[period];
+  const checkpoint = outcomes?.next_decision_point;
+  const periods = [["today", "Today"], ["last_7_days", "Last 7 days"], ["all_time", "All time"]] as const;
+  const metrics = [["paying_customers", "Paying customers"], ["mrr", "MRR"], ["trials", "Trials"],
+    ["shopify_connections", "Shopify connections"], ["positive_responses", "Positive responses"],
+    ["substantive_responses", "Substantive responses"], ["confirmed_contacts", "Confirmed contacts"]] as const;
+  const accounting = [["email_contacts", "Email contacts"], ["delivered_emails", "Delivered emails"],
+    ["bounced_emails", "Bounced emails"], ["form_submissions", "Confirmed forms"], ["reddit_contacts", "Reddit contacts"],
+    ["community_contacts", "Community contacts"], ["other_contacts", "Other contacts"],
+    ["uncertain_submissions", "Uncertain submissions"], ["failed_attempts", "Failed attempts"]] as const;
+  return <section className={styles.section} aria-labelledby="outcomes-title">
+    <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>CUSTOMERS AND VALIDATED DEMAND</p><h2 id="outcomes-title">Is acquisition creating customers?</h2></div>
+      <div className={styles.segmented} role="group" aria-label="Acquisition reporting period">{periods.map(([key, title]) =>
+        <button key={key} aria-pressed={period === key} onClick={() => onPeriod(key)}>{title}</button>)}</div>
+    </div>
+    <div className={styles.outcomeMetrics}>{metrics.map(([key, title]) => <Metric key={key} name={title}
+      value={outcomeMetric(block?.metrics[key], key === "mrr" ? "money" : "number")}
+      detail={key === "confirmed_contacts" ? "Input to learning" : key === "mrr" ? "Attributed recurring revenue" : "Evidence-linked acquisition"} />)}</div>
+    <p className={styles.caption}>Pacific calendar days. Product outcomes require a reliable prospect link. UNKNOWN means evidence is unavailable or incomplete; zero is shown only when observed. Contact volume alone does not establish demand.</p>
+    {!outcomes && <p className={styles.empty}>Customer outcome reporting is not available in this snapshot. Existing activity and message receipts remain available below.</p>}
+    <div className={styles.columns}>
+      <section className={styles.card} aria-labelledby="outcome-funnel-title"><h2 id="outcome-funnel-title">The acquisition funnel</h2>
+        <ol className={styles.outcomeFunnel}>{ACQUISITION_FUNNEL_STAGES.map(([key, title]) => <li key={key}>
+          <span>{title}</span><strong>{outcomeMetric(block?.funnel[key])}</strong></li>)}</ol>
+        <p className={styles.caption}>Recorded stages are independent evidence. A later stage does not fill in missing earlier stages. Channels expose different delivery and visit signals.</p>
+      </section>
+      <section className={styles.card} aria-labelledby="learning-decision-title"><h2 id="learning-decision-title">What the evidence changes</h2>
+        <div className={styles.decision}><span className={styles.eyebrow}>CURRENT BOTTLENECK</span><h3>{outcomes?.bottleneck ? label(outcomes.bottleneck.stage) : "UNKNOWN"}</h3>
+          <p>{outcomes?.bottleneck.observation || "No supported diagnosis yet."}</p><strong>Next action</strong><p>{outcomes?.bottleneck.recommended_action || "Gather attributable merchant outcomes."}</p></div>
+        <dl className={styles.strategy}>
+          <dt>Best signal</dt><dd>{outcomes?.best_signal?.interpretation || "UNKNOWN"}</dd>
+          <dt>Current experiment</dt><dd>{outcomes?.current_experiment ? experimentNames[outcomes.current_experiment] || `Experiment ${outcomes.current_experiment.slice(0, 8)}` : "UNKNOWN"}</dd>
+          <dt>Next decision point</dt><dd>{checkpoint ? `${number(checkpoint.confirmed_contacts)} confirmed contacts · review at ${number(checkpoint.target)} · ${number(checkpoint.remaining)} remaining` : "UNKNOWN"}</dd>
+        </dl><p className={styles.caption}>{checkpoint?.guidance || "Review around 100 confirmed relevant contacts, or earlier when strong positive or negative evidence appears."}</p>
+        <dl className={styles.operations}>{[["channel", "Best channel"], ["icp_segment", "Best ICP segment"], ["offer", "Best offer"], ["message", "Best message / positioning"]].map(([key, title]) => {
+          const value = outcomes?.best[key as keyof GrowthOutcomes["best"]];
+          return <div key={key} className={styles.definitionRow}><dt>{title}</dt><dd>{value == null ? "UNKNOWN" : key === "channel" ? label(String(value)) : typeof value === "number" ? `Variant ${value}` : value}</dd></div>;
+        })}</dl>
+        <p className={styles.caption}>A leading channel or offer needs downstream evidence. Early sample sizes are learning guidelines, not statistical certainty.</p>
+      </section>
+    </div>
+    <div className={styles.outcomeCosts}>{[["model_api_cost", "Model / API cost"], ["cost_per_confirmed_contact", "Cost per confirmed contact"],
+      ["cost_per_positive_response", "Cost per positive response"], ["cost_per_customer", "Cost per customer"]].map(([key, title]) =>
+      <Metric key={key} name={title} value={outcomeMetric(block?.costs[key], "money")} />)}</div>
+    <details className={styles.details}><summary>Contact accounting and conversion rates for this period</summary>
+      <div className={styles.columns}><dl className={styles.operations}>{accounting.map(([key, title]) => <div key={key} className={styles.definitionRow}><dt>{title}</dt><dd>{outcomeMetric(block?.accounting[key])}</dd></div>)}</dl>
+        <dl className={styles.operations}>{Object.entries(block?.rates || {}).map(([key, value]) => <div key={key} className={styles.definitionRow}><dt>{label(key)}</dt><dd>{outcomeMetric(value, "percent")}</dd></div>)}</dl></div>
+      <p className={styles.caption}>Uncertain submissions and failed attempts never count as confirmed contacts. Delivery is separate from provider acceptance. Internal email tests are excluded. Period rates compare events in the selected window; use original contact cohorts for conversion decisions.</p>
+      <dl className={styles.operations}>{[["cost_per_discovered_merchant", "Model/API cost per discovered merchant"], ["cost_per_substantive_response", "Model/API cost per substantive response"],
+        ["cost_per_connected_shopify_store", "Model/API cost per connected store"], ["cac", "Full customer acquisition cost"], ["arpu", "ARPU"], ["churn", "Churn"]].map(([key, title]) =>
+          <div className={styles.definitionRow} key={key}><dt>{title}</dt><dd>{outcomeMetric(block?.costs[key], key === "churn" ? "percent" : "money")}</dd></div>)}</dl>
+    </details>
+    <details className={styles.details}><summary>Compare offers and merchant cohorts · all time</summary>
+      {outcomes?.cohorts?.length ? <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Acquisition cohort outcomes, scroll horizontally"><table className={styles.cohortTable}>
+        <caption>Each original experiment, channel, merchant segment, offer, positioning and CTA stays separate. Thresholds are review guidelines; allow time for responses.</caption>
+        <thead><tr><th scope="col">Cohort hypothesis</th><th scope="col">Learning window</th><th scope="col">Contacts</th><th scope="col">Substantive</th><th scope="col">Positive</th><th scope="col">Connected</th><th scope="col">Paid</th><th scope="col">MRR</th></tr></thead>
+        <tbody>{outcomes.cohorts.map(cohort => <tr key={cohort.id}><th scope="row"><strong>{label(cohort.channel)} · {cohort.icp_segment || "Unknown segment"}</strong>
+          <small>{cohort.offer || "Unknown offer"} · variant {cohort.message ?? "UNKNOWN"}</small><small>{cohort.positioning || "Positioning unknown"}</small><small>CTA: {cohort.cta || "UNKNOWN"}</small>
+          <small>Experiment {cohort.experiment_id.slice(0, 8)} · cohort {cohort.id.slice(0, 8)}</small></th>
+          <td>{label(cohort.maturity)}<small>{number(cohort.mature_contacts)} contacts aged 7+ days</small></td>
+          {["confirmed_contacts", "substantive_responses", "positive_responses", "shopify_connections", "paying_customers", "mrr"].map(key => <td key={key}>{outcomeMetric(cohort.metrics[key], key === "mrr" ? "money" : "number")}</td>)}</tr>)}</tbody>
+      </table></div> : <p className={styles.empty}>No acquisition cohorts are available yet.</p>}
+    </details>
+    <details className={styles.details}><summary>Compare channels by customer outcomes · all time</summary>
+      {outcomes?.channels?.length ? <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Channel outcomes, scroll horizontally">
+        <table><caption>Confirmed contacts supply the sample. Responses, connected stores and customers supply the result.</caption>
+          <thead><tr><th scope="col">Channel</th><th scope="col">Contacts</th><th scope="col">Substantive responses</th><th scope="col">Positive responses</th><th scope="col">Connected</th><th scope="col">Paid</th><th scope="col">MRR</th></tr></thead>
+          <tbody>{outcomes.channels.map((channel, index) => <tr key={channel.id || channel.channel || index}><th scope="row">{label(channel.channel || channel.dimensions?.channel || channel.id)}</th>
+            {["confirmed_contacts", "substantive_responses", "positive_responses", "shopify_connections", "paying_customers", "mrr"].map(key =>
+              <td key={key}>{outcomeMetric(channel.metrics[key], key === "mrr" ? "money" : "number")}</td>)}</tr>)}</tbody>
+        </table></div> : <p className={styles.empty}>No channel comparison is available yet.</p>}
+    </details>
+  </section>;
 }
 
 function InboxMonitoring({ transport }: { transport?: GrowthInboxTransport | null }) {
@@ -78,6 +158,7 @@ export default function GrowthPage() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [funnelScope, setFunnelScope] = useState<"mission" | "all">("mission");
+  const [outcomePeriod, setOutcomePeriod] = useState<GrowthOutcomePeriod>("today");
   const inFlight = useRef<{ signal?: AbortSignal; id: number } | null>(null);
   const requestSequence = useRef(0);
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -138,18 +219,20 @@ export default function GrowthPage() {
         {data && <button onClick={() => void toggle()} disabled={busy} className={styles.quietButton}>{busy ? "Updating…" : data.agent.paused ? "Resume operator" : "Pause operator"}</button>}
       </div>
     </header>
-    <div className={styles.intro}><div><p className={styles.eyebrow}>OWNER’S GROWTH BRIEF</p><h1>From useful conversations<br />to connected stores.</h1>
+    <div className={styles.intro}><div><p className={styles.eyebrow}>OWNER’S GROWTH BRIEF</p><h1>From merchant need<br />to paying customers.</h1>
       <p>The evidence, experiments, and next actions that move Skubase toward paying customers.</p></div>
-      {data && <div className={styles.progress}><span className={styles.milestoneLabel}>FIRST MILESTONE</span><strong>{number(data.mission.qualified_users)}<span> / {number(data.mission.target)}</span></strong><p>qualified users since the mission began</p>
-        <progress max={data.mission.target || 10} value={data.mission.qualified_users} aria-label="Qualified user milestone" /><small>First qualified during the mission · each identity counted once</small></div>}
     </div>
     {error && <div className={styles.notice} role="alert">{error} {data ? "The last successful snapshot is shown below." : <Link href="/login">Sign in</Link>} <button onClick={() => void load()}>Retry</button></div>}
     {!data && !error && <div className={styles.loading} role="status"><span className={styles.loadingDot} />Loading the latest retained evidence…</div>}
     {data && <>
+      <OutcomesSummary outcomes={data.outcomes} period={outcomePeriod} onPeriod={setOutcomePeriod}
+        experimentNames={Object.fromEntries(data.experiments.items.map(experiment => [experiment.id, experiment.specification.hypothesis]))} />
       <section className={styles.hero} aria-labelledby="next-action"><div><p className={styles.eyebrow}>HIGHEST-VALUE NEXT MOVE</p><h2 id="next-action">{label(data.execution?.next_action || data.strategy.next_action || data.agent.next_action)}</h2>
         <p>{data.strategy.bottleneck.recommended_action}</p></div>
         <div className={styles.health}><span className={healthy ? styles.dot : styles.warningDot} />{data.agent.paused ? "Operator paused" : label(data.agent.health || "not started")}<small>Last wake {time(data.agent.last_wake)}</small><small>Current model: {data.agent.model || "No model running"}</small></div>
       </section>
+      <details className={styles.details}><summary>Operations, experiment cohorts and full evidence history</summary>
+      <p className={styles.caption}>Initial mission milestone: {number(data.mission.qualified_users)} / {number(data.mission.target)} qualified users. Each identity counted once; intent and payment evidence remain separate.</p>
       {data.execution && <section className={styles.card} aria-labelledby="execution-title">
         <h2 id="execution-title">Acquisition execution</h2>
         {data.execution.operational_fault && <p className={styles.notice} role="alert">Operational fault: {label(data.execution.operational_fault)}</p>}
@@ -235,6 +318,7 @@ export default function GrowthPage() {
         <InboxMonitoring transport={data.agent.inbox_transport} />
         <details className={styles.details}><summary>Recent activity and evidence</summary>{data.recent_actions.length ? data.recent_actions.map(a => <div key={a.id} className={styles.activity}><span>{label(a.kind)}<small>Evidence {a.id}</small></span><time dateTime={new Date(a.at * 1000).toISOString()}>{time(a.at)}</time></div>) : <p className={styles.empty}>No activity recorded yet.</p>}</details>
       </section></div>
+      </details>
       <footer className={styles.footer}><p>{data.mission.qualified_definition}</p><span>Snapshot {time(data.generated_at)} · refreshes every 30 seconds while visible.</span></footer>
     </>}
   </main>;

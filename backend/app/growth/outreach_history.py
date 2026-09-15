@@ -73,6 +73,7 @@ def history(db, *, before=None, status='sent', limit=25, search='', method=None)
             'subject': matched.subject if matched else None, 'source_url': source, 'message_basis': message_basis,
             'receipt': row.receipt, 'receipt_urls': links, 'experiment_id': row.experiment_id,
             'message_version': row.cohort.get('message_version'),
+            'cohort': row.cohort,
             'qualification_policy': row.cohort.get('qualification_policy'),
             'suppressed': contact.suppressed if contact else None})
     return {'items': items, 'next_cursor': rows[-1].id if more else None}

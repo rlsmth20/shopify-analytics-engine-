@@ -149,6 +149,7 @@ def prepare(db, contact, payload):
 def retain_intent(db, reservation_id, contact, experiment_id, prepared, cohort):
     row = Message(key="workspace:" + reservation_id, contact_id=contact.id,
         experiment_id=experiment_id, direction="out", subject=prepared["subject"],
+        variant=str(cohort.get("message_variant") or cohort.get("variant") or "UNKNOWN")[:64],
         body=prepared["body"], status="draft")
     db.add(row); db.flush()
     remember(db, "outreach_email", row.id, {"provider": PROVIDER, "sender": SENDER,

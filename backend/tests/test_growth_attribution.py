@@ -63,6 +63,24 @@ class GrowthAttributionTests(unittest.TestCase):
             self.assertEqual(db.scalar(select(func.count()).select_from(Evidence).where(
                 Evidence.kind == "IDENTITY_LINK", Evidence.subject == contact.id)), 1)
 
+    def test_analysis_completion_and_activation_require_distinct_real_observations(self):
+        from app.growth.funnel import record_view, record_activation
+        with self.factory() as db:
+            shop_id = self.account(db)
+            user = db.scalar(select(User).where(User.shop_id == shop_id))
+            record_activation(db, user)
+            record_view(db, user, 'INVENTORY_ANALYSIS_VIEWED', False)
+            self.assertIsNone(db.scalar(select(Evidence.id).where(Evidence.kind == 'ACTIVATED')))
+            self.assertIsNone(db.scalar(select(Evidence.id).where(Evidence.kind == 'INVENTORY_ANALYSIS_COMPLETED')))
+            record_view(db, user, 'INVENTORY_ANALYSIS_VIEWED', True)
+            self.assertIsNotNone(db.scalar(select(Evidence.id).where(Evidence.kind == 'INVENTORY_ANALYSIS_COMPLETED')))
+            self.assertIsNone(db.scalar(select(Evidence.id).where(Evidence.kind == 'ACTIVATED')))
+            record_activation(db, user)
+            db.commit()
+            record_activation(db, user)
+            db.commit()
+            self.assertEqual(db.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind == 'ACTIVATED')), 1)
+
     def test_request_after_user_cursor_passes_still_links_account(self):
         with self.factory() as db:
             shop_id = self.account(db)

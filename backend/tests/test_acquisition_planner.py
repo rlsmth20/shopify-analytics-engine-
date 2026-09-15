@@ -309,4 +309,16 @@ class PlannerTests(unittest.TestCase):
             self.assertEqual(get_memory(db,'working','acquisition_planner')['status'],'planning_retry')
         self.assertIsNone(executor.take(self.factory,'one'))
 
+    def test_customer_outcome_mission_continues_after_initial_milestone(self):
+        with self.factory() as db:
+            for n in range(10):
+                record(db, f'connected:{n}', 'SHOPIFY_CONNECTION', f'shop:{n}', {'verified': True})
+            db.flush()
+            self.assertTrue(planner.mission(db)['complete'])
+            remember(db, 'strategic', 'outcome_policy', {'version': 'customer_outcomes_v1'})
+            mission = planner.mission(db)
+            self.assertTrue(mission['milestone_complete'])
+            self.assertFalse(mission['complete'])
+            self.assertEqual(mission['north_star'], 'paying_customers_and_mrr')
+
 if __name__=='__main__':unittest.main()

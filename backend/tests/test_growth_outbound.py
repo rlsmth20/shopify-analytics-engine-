@@ -61,6 +61,24 @@ class OutboundTests(unittest.TestCase):
         with self.factory() as db:
             self.assertIsNotNone(db.scalar(select(Work).where(Work.kind=='observe', Work.status=='ready')))
 
+    def test_contact_cohort_preserves_send_time_facts_and_unknown_motivation(self):
+        reserved = self.reserve(0)
+        with self.factory() as db:
+            row = db.get(FirstContact, reserved['reservation_id'])
+            self.assertEqual(row.cohort['source'], 'https://example.test/question')
+            self.assertEqual(row.cohort['contact_method'], 'shopify_community')
+            self.assertIsNone(row.cohort['industry'])
+            self.assertIsNone(row.cohort['message_variant'])
+            self.assertIsNone(row.cohort['cta'])
+            contact = db.get(Contact, '0')
+            contact.source = 'https://example.test/later'
+            contact.characteristics = {'industry': 'beauty'}
+            db.commit()
+        with self.factory() as db:
+            row = db.get(FirstContact, reserved['reservation_id'])
+            self.assertEqual(row.cohort['source'], 'https://example.test/question')
+            self.assertIsNone(row.cohort['industry'])
+
     def test_twelve_confirmed_eight_uncertain_can_reach_twenty_without_retries(self):
         unknown = []
         for n in range(20):

@@ -210,3 +210,67 @@ test('finite snapshots show confirmed capacity without uncertainty holds', () =>
   assert.doesNotMatch(available.text, /safety hold|before another send/);
   assert.equal(available.meters[0]['aria-valuenow'], 11);
 });
+
+test('outcome metrics preserve unknown values and observed zeros', () => {
+  for (const value of [null, undefined, NaN, Infinity]) {
+    assert.equal(view.outcomeMetric(value), 'UNKNOWN');
+    assert.equal(view.outcomeMetric(value, 'money'), 'UNKNOWN');
+    assert.equal(view.outcomeMetric(value, 'percent'), 'UNKNOWN');
+  }
+  assert.equal(view.outcomeMetric(0), '0');
+  assert.equal(view.outcomeMetric(0, 'money'), '$0.00');
+  assert.equal(view.outcomeMetric(0.2, 'percent'), '20%');
+});
+
+function renderOutcomes(outcomes, period = 'today') {
+  const code = ts.transpileModule(readFileSync(path.join(__dirname, '../app/growth/page.tsx'), 'utf8')
+    + '\nexport { OutcomesSummary as TestOutcomes };', {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const exports = {}, text = [], buttons = [];
+  const jsx = (type, props) => ({ type, props });
+  const dependencies = {
+    react: {}, 'react/jsx-runtime': { jsx, jsxs: jsx },
+    'next/link': { __esModule: true, default: 'a' }, '@/lib/api-base': { API_BASE_URL: '' },
+    '@/lib/shopify-embedded': { authenticatedFetch() { assert.fail('Outcomes reuse existing snapshot'); } },
+    '@/lib/growth-dashboard': view, './page.module.css': { __esModule: true, default: {} },
+  };
+  vm.runInNewContext(code, { exports, require(name) { return dependencies[name]; }, Intl, Date, Number, Math });
+  let selected;
+  function walk(node) {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (typeof node === 'string' || typeof node === 'number') { text.push(String(node)); return; }
+    if (node?.type === 'button') buttons.push(node.props);
+    if (node?.props) walk(typeof node.type === 'function' ? node.type(node.props) : node.props.children);
+  }
+  walk(exports.TestOutcomes({ outcomes, period, onPeriod(value) { selected = value; } }));
+  return { text: text.join(' '), buttons, selected: () => selected };
+}
+
+test('outcome overview keeps uncertainty separate and selects evidence period without inferring stages', () => {
+  const block = { metrics: { paying_customers: null, mrr: null, confirmed_contacts: 12, positive_responses: 0 },
+    funnel: { CONFIRMED_CONTACT: 12, PAID: null }, accounting: { uncertain_submissions: 8, failed_attempts: 3 }, rates: {}, costs: {} };
+  const outcomes = { periods: { today: block, all_time: { ...block, metrics: { ...block.metrics, paying_customers: 1, mrr: 29 } } },
+    best: {}, bottleneck: {}, next_decision_point: { confirmed_contacts: 12, target: 100, remaining: 88 }, channels: [] };
+  const rendered = renderOutcomes(outcomes);
+  assert.match(rendered.text, /Paying customers UNKNOWN/);
+  assert.match(rendered.text, /MRR UNKNOWN/);
+  assert.match(rendered.text, /Positive responses 0/);
+  assert.match(rendered.text, /Confirmed contacts 12/);
+  assert.match(rendered.text, /Uncertain submissions 8 Failed attempts 3/);
+  assert.match(rendered.text, /Shopify connected UNKNOWN/);
+  assert.ok(rendered.text.indexOf('Paying customers') < rendered.text.indexOf('Confirmed contacts'));
+  assert.equal(rendered.buttons[0]['aria-pressed'], true);
+  rendered.buttons[2].onClick();
+  assert.equal(rendered.selected(), 'all_time');
+  const allTime = renderOutcomes(outcomes, 'all_time');
+  assert.match(allTime.text, /Paying customers 1/);
+  assert.match(allTime.text, /MRR \$29\.00/);
+});
+
+test('older snapshots cannot invent attributed customers or channel winners', () => {
+  const rendered = renderOutcomes(undefined);
+  assert.match(rendered.text, /Paying customers UNKNOWN/);
+  assert.match(rendered.text, /Best channel UNKNOWN/);
+  assert.match(rendered.text, /not available in this snapshot/);
+});

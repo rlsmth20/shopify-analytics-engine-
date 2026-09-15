@@ -1,3 +1,15 @@
+# Latest outcome objective
+
+Apply docs/growth/outcome-policy.md. Paying customers and MRR define success.
+The older 1,000-contact direction remains audited history/capacity; volume is an
+input. Use attributed acquisition_outcomes and the current acquisition review to
+choose the next action. Unknown conversions remain UNKNOWN. At roughly 100
+confirmed relevant contacts review downstream results; if a mature 75–100-contact
+cohort has essentially no substantive responses, change a meaningful approach
+before expanding it further. Keep useful acquisition running across channels.
+For new messages freeze message_variant, positioning and cta in the cohort,
+alongside the existing offer/icp/message_version; optional unknown facts stay null.
+
 # Skubase execution policy, revision 1
 
 Owner instruction, September 14, 2026. This policy governs acquisition planning,

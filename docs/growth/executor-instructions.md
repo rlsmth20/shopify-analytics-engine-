@@ -1,3 +1,15 @@
+# Latest outcome objective
+
+Apply docs/growth/outcome-policy.md. Paying customers and MRR define success.
+The older 1,000-contact direction remains audited history/capacity; volume is an
+input. Use attributed acquisition_outcomes and the current acquisition review to
+choose the next action. Unknown conversions remain UNKNOWN. At roughly 100
+confirmed relevant contacts review downstream results; if a mature 75–100-contact
+cohort has essentially no substantive responses, change a meaningful approach
+before expanding it further. Keep useful acquisition running across channels.
+For new messages freeze message_variant, positioning and cta in the cohort,
+alongside the existing offer/icp/message_version; optional unknown facts stay null.
+
 # Latest policy takes precedence
 
 Read docs/growth/current-acquisition-policy.md from the repository root first. The owner selected the existing Google Workspace mailbox info@skubase.io. Use the controlled browser send ledger and email-only ramp described in docs/growth/workspace-email-operations.md. The owner increased the shared ceiling to 1,000 confirmed first contacts per Pacific day on September 14; the separate email ramp still applies. Read live outreach-status and email-status for capacity. This is a ceiling, not a posting quota. EmailPal activation is superseded.

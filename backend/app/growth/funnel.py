@@ -35,8 +35,25 @@ def record_view(db, user, kind, usable):
         return
     delivered = kind.replace("_VIEWED", "_DELIVERED")
     product_event(db, delivered, user.shop_id, f"{delivered}:{user.shop_id}:{int(time.time() // 3600)}")
+    if kind == "INVENTORY_ANALYSIS_VIEWED":
+        product_event(db, "INVENTORY_ANALYSIS_COMPLETED", user.shop_id,
+                      f"analysis-completed:{user.shop_id}:{int(time.time() // 3600)}",
+                      data={"definition": "Server successfully computed a dashboard with inventory SKUs"})
     enqueue(db, f"funnel-wake:{int(time.time() // 300)}", "observe", priority=70)
     db.commit()
+
+
+def record_activation(db, user):
+    """Called only after authenticated rendered-view validation, never on import."""
+    if user.is_admin:
+        return
+    completed = db.scalar(select(Evidence.id).where(Evidence.subject == f"shop:{user.shop_id}",
+        Evidence.kind == "INVENTORY_ANALYSIS_COMPLETED", Evidence.occurred_at > time.time() - 3600))
+    connected = db.scalar(select(ShopifyConnection.id).where(ShopifyConnection.shop_id == user.shop_id))
+    if completed and connected:
+        product_event(db, "ACTIVATED", user.shop_id, f"activated:{user.shop_id}",
+            data={"definition": "Connected Shopify store viewed its successfully computed inventory analysis",
+                  "analysis_evidence_id": completed})
 
 
 def link_known_contacts(db, batch_size=200):
