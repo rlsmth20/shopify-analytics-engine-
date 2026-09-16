@@ -107,6 +107,9 @@ def snapshot(db, now=None):
         if e.kind == "IDENTITY_LINK" and e.source == "authenticated_session" and e.subject.startswith("visitor:") and type(e.data.get("shop_id")) is int:
             visitor_shops[e.subject].add(e.data["shop_id"])
     visitor_links = {visitor: f"shop:{next(iter(shops))}" for visitor, shops in visitor_shops.items() if len(shops) == 1}
+    experiments = list(db.scalars(select(Experiment)))
+    from .validation import attributed_touches, cohort_key, policy as validation_policy, summarize
+    tracked_visits, tracked_shops = attributed_touches(rows, experiments, evidence, visitor_links)
     by_subject, provider_events = defaultdict(list), defaultdict(list)
     for e in evidence:
         key = merchant(e.subject) if e.subject in contacts else visitor_links.get(e.subject, e.subject)
@@ -215,9 +218,15 @@ def snapshot(db, now=None):
                     if e.data.get("type") == "email.bounced":
                         record["bounced"].append((mid, e.occurred_at))
                     record["evidence_ids"].add(e.id)
-        shop_ids = shop_ids_by_merchant[mid]
+        for visit in tracked_visits.get(row.id, []):
+            stages["SITE_VISIT"].append((visitor_links.get(visit.subject, visit.subject), visit.occurred_at))
+            record["evidence_ids"].add(visit.id)
+        attributed_shops = tracked_shops.get(row.id, {})
+        shop_ids = shop_ids_by_merchant[mid] | {int(s.split(":")[1]) for s in attributed_shops}
         product_events = events + [e for shop in shop_ids for e in by_subject[f"shop:{shop}"] if mid != f"shop:{shop}"]
         for e in product_events:
+            if e.subject in attributed_shops and e.occurred_at < attributed_shops[e.subject]:
+                continue
             if e.kind not in PRODUCT or e.occurred_at < row.sent_at or e.data.get("experiment_id") not in (None, row.experiment_id):
                 continue
             linked_client = (e.kind in {"VISITOR", "PRICING_VIEWED"} and e.source == "first_party_browser"
@@ -239,7 +248,6 @@ def snapshot(db, now=None):
 
     # Inbound/organic demand is acquisition evidence even when nobody was sent
     # a first-contact message. These in-memory rows never touch the send ledger.
-    experiments = list(db.scalars(select(Experiment)))
     campaign_map = {label: exp for exp in experiments for label in (exp.id, exp.key)}
     requests = sorted((e for e in evidence if e.kind == "ACCESS_REQUESTED" and e.data.get("verified") is True
                        and e.subject in contacts), key=lambda e: (e.occurred_at, e.id))
@@ -363,7 +371,7 @@ def snapshot(db, now=None):
     for r in records:
         # Merchant URLs and confidence observations belong to the receipt, not
         # the experimental grouping key: otherwise every contact is a cohort.
-        group_dimensions = {k: v for k, v in r["dimensions"].items() if k not in {"source", "shopify_confidence"}}
+        group_dimensions = cohort_key(r["dimensions"], getattr(r["row"], "cohort", {}) or {})
         groups[digest(group_dimensions)].append(r)
     cohorts = []
     for key, items in groups.items():
@@ -393,10 +401,18 @@ def snapshot(db, now=None):
                "interpretation": "One historical owner-reported Reddit membership-intent observation; not a paid customer."} if historical else
               {"kind": "UNKNOWN", "interpretation": "No verified downstream acquisition result recorded."})
     active = list(db.scalars(select(Experiment).where(Experiment.status == "active", Experiment.stop_at > now).order_by(Experiment.started_at.desc())))
+    focus_policy = validation_policy(db)
+    focus_experiment = next((e for e in experiments if e.id == focus_policy.get("experiment_id")), None)
+    focused = None
+    if focus_experiment:
+        focused_records = [r for r in records if r["dimensions"]["experiment_id"] == focus_experiment.id]
+        focused = summarize(focus_experiment, block(focused_records), focused_records, evidence, now)
     return {"generated_at": now, "north_star": "PAYING_CUSTOMERS_AND_MRR", "day_timezone": "America/Los_Angeles",
+            "focused_validation": focused,
             "periods": periods, "cohorts": cohorts, "channels": channels, "best": best, "best_signal": signal,
             "bottleneck": _diagnosis(total), "current_experiment": active[0].id if active else None,
-            "next_decision_point": {"confirmed_contacts": n, "target": target, "remaining": max(0, target - n),
+            "next_decision_point": {"confirmed_contacts": focused["metrics"]["confirmed_contacts"], "target": focused["targets"]["confirmed_contacts"],
+                "remaining": focused["remaining"], "guidance": focused["guidance"]} if focused else {"confirmed_contacts": n, "target": target, "remaining": max(0, target - n),
                 "guidance": "25 early signal / 50 review / 100 stronger decision per cohort; assess response time and earlier strong negative or positive evidence."},
             "limitations": ["Periods count events occurring in the window; cohort rates use original first contacts and subsequent observed outcomes.",
                 "Missing conversion linkage/instrumentation is UNKNOWN; observed_counts exposes only recorded evidence, not measured absence.",
@@ -418,12 +434,14 @@ def review_context(db, now=None):
                 "negative_responses": c["accounting"]["negative_responses"], "evidence_ids": c["evidence_ids"][-12:],
                 "maturity": c["maturity"], "measurement": c["measurement"],
                 "response_observation_available": c["measurement"]["response_observation_available"]} for c in s["cohorts"]],
-            **{k: s[k] for k in ("bottleneck", "next_decision_point", "best", "best_signal", "current_experiment")}}
+            **{k: s[k] for k in ("bottleneck", "next_decision_point", "best", "best_signal", "current_experiment", "focused_validation")}}
 
 
 def decision_context(db, now=None):
     """Bounded planner context: downstream signals dominate, never fill context with history."""
     value = review_context(db, now)
+    if value.get("focused_validation"):
+        value["focused_validation"] = {k: v for k, v in value["focused_validation"].items() if k not in {"funnel", "rates", "guidance"}}
     candidates = sorted(value.pop("cohorts"), key=lambda c: (c["paid"] or 0, c["positive_responses"], c["mature_contacts"]), reverse=True)
     for key in ("funnel", "accounting", "rates", "costs"):
         value.pop(key, None)

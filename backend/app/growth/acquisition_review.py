@@ -121,12 +121,19 @@ def refresh(db, now=None):
     from .outcomes import review_context
     context = review_context(db, now=now)
     result = assess(context, previous)
+    focused = context.get("focused_validation")
+    if focused:
+        result["focused_validation"] = focused
+        old_focus = previous.get("guidance", {}).get("focused_validation", {})
+        if focused["decision"] != old_focus.get("decision"):
+            result["review_due"] = True
     ranked = sorted(result["cohort_decisions"], key=lambda d: (
         d["results"]["paid"] or 0, d["results"]["shopify_connected"] or 0,
         d["results"]["positive_responses"] or 0, d["results"]["substantive_responses"] or 0,
         d["action"] == "INVESTIGATE_AFFECTED_COHORT_DELIVERY",
         d["action"] == "CHANGE_CURRENT_APPROACH"), reverse=True)
     guidance = {"north_star": "PAYING_CUSTOMERS_AND_MRR",
+                "focused_validation": focused,
                 "metrics": result["metrics"], "bottleneck": result["bottleneck"],
                 "next_decision_point": result["next_decision_point"],
                 "best_signal": result["best_signal"],

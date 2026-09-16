@@ -103,6 +103,8 @@ def reserve_contact(db, contact, *, action_key, channel, experiment_id, body, co
     experiment = db.get(Experiment, experiment_id)
     if not experiment or experiment.status != "active" or experiment.stop_at <= now:
         raise GrowthError("An active, unexpired experiment is required. Run operator-export for a real active ID; never invent an experiment ID.")
+    from .validation import admission
+    cohort = admission(db, experiment, channel, cohort, body)
     if channel not in CHANNELS or not body.strip() or not all(cohort.get(k) for k in ("icp", "offer", "message_version")):
         raise GrowthError("Channel, exact message and immutable cohort labels are required")
     if channel_blocker(db, channel):

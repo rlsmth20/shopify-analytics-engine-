@@ -20,6 +20,7 @@ function OutcomesSummary({ outcomes, period, onPeriod, experimentNames = {} }: {
 }) {
   const block = outcomes?.periods[period];
   const checkpoint = outcomes?.next_decision_point;
+  const focus = outcomes?.focused_validation;
   const periods = [["today", "Today"], ["last_7_days", "Last 7 days"], ["all_time", "All time"]] as const;
   const metrics = [["paying_customers", "Paying customers"], ["mrr", "MRR"], ["trials", "Trials"],
     ["shopify_connections", "Shopify connections"], ["positive_responses", "Positive responses"],
@@ -38,6 +39,20 @@ function OutcomesSummary({ outcomes, period, onPeriod, experimentNames = {} }: {
       detail={key === "confirmed_contacts" ? "Input to learning" : key === "mrr" ? "Attributed recurring revenue" : "Evidence-linked acquisition"} />)}</div>
     <p className={styles.caption}>Pacific calendar days. Product outcomes require a reliable prospect link. UNKNOWN means evidence is unavailable or incomplete; zero is shown only when observed. Contact volume alone does not establish demand.</p>
     {!outcomes && <p className={styles.empty}>Customer outcome reporting is not available in this snapshot. Existing activity and message receipts remain available below.</p>}
+    {focus && <section className={styles.card} aria-labelledby="validation-title">
+      <p className={styles.eyebrow}>CURRENT VALIDATION EXPERIMENT</p>
+      <h2 id="validation-title">Reorder recommendations + exportable purchase orders</h2>
+      <p>Shopify merchants with physical inventory complexity. Email and relevant Shopify Community conversations. One offer, one message family.</p>
+      <div className={styles.outcomeMetrics}>
+        <Metric name="Confirmed contacts" value={`${outcomeMetric(focus.metrics.confirmed_contacts)} / ${focus.targets.confirmed_contacts}`} />
+        <Metric name="Substantive replies" value={outcomeMetric(focus.metrics.substantive_responses)} detail="Decision threshold: 3" />
+        <Metric name="Positive replies" value={outcomeMetric(focus.metrics.positive_responses)} detail="Decision threshold: 2" />
+        <Metric name="Health check / connection / activation" value={outcomeMetric(focus.strong_activation_events)} detail="Decision threshold: 1 merchant" />
+        <Metric name="Response rate" value={outcomeMetric(focus.rates.contact_to_substantive_response, "percent")} />
+        <Metric name="Positive response rate" value={outcomeMetric(focus.rates.contact_to_positive_response, "percent")} />
+      </div>
+      <p><strong>Next decision: {label(focus.decision)}</strong></p><p className={styles.caption}>{focus.guidance}</p>
+    </section>}
     <div className={styles.columns}>
       <section className={styles.card} aria-labelledby="outcome-funnel-title"><h2 id="outcome-funnel-title">The acquisition funnel</h2>
         <ol className={styles.outcomeFunnel}>{ACQUISITION_FUNNEL_STAGES.map(([key, title]) => <li key={key}>
@@ -72,7 +87,7 @@ function OutcomesSummary({ outcomes, period, onPeriod, experimentNames = {} }: {
     </details>
     <details className={styles.details}><summary>Compare offers and merchant cohorts · all time</summary>
       {outcomes?.cohorts?.length ? <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Acquisition cohort outcomes, scroll horizontally"><table className={styles.cohortTable}>
-        <caption>Each original experiment, channel, merchant segment, offer, positioning and CTA stays separate. Thresholds are review guidelines; allow time for responses.</caption>
+        <caption>New validation cohorts group by ICP, offer, channel and message family. Historical cohorts remain intact. Allow time for responses.</caption>
         <thead><tr><th scope="col">Cohort hypothesis</th><th scope="col">Learning window</th><th scope="col">Contacts</th><th scope="col">Substantive</th><th scope="col">Positive</th><th scope="col">Connected</th><th scope="col">Paid</th><th scope="col">MRR</th></tr></thead>
         <tbody>{outcomes.cohorts.map(cohort => <tr key={cohort.id}><th scope="row"><strong>{label(cohort.channel)} · {growthText(cohort.icp_segment, "Unknown segment")}</strong>
           <small>{growthText(cohort.offer, "Unknown offer")} · variant {growthText(cohort.message)}</small><small>{growthText(cohort.positioning, "Positioning unknown")}</small><small>CTA: {growthText(cohort.cta)}</small>

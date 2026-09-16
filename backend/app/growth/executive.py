@@ -56,6 +56,7 @@ def export_packet(db):
     result = {"schema_version": 4, "day": day, "timezone": "America/Los_Angeles", "mission": get_memory(db, "strategic", "identity"),
               "acquisition_outcomes": decision_context(db),
               "strategy": get_memory(db, "strategic", "strategy"), "funnel": funnel.funnel_counts(db),
+              "focused_validation": get_memory(db, "strategic", "focused_validation"),
               "community_learning": community_packet,
               "bottleneck": funnel.bottleneck(db),
               "evidence": [{"id": e.id, "kind": e.kind, "source": e.source, "epistemic": e.epistemic, "occurred_at": e.occurred_at,

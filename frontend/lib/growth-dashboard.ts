@@ -50,6 +50,9 @@ export type GrowthOutcomeBlock = {
   costs: Record<string, number | null>;
 };
 export type GrowthOutcomes = {
+  focused_validation?: { experiment_id: string; campaign: string; metrics: Record<string, number | null>;
+    rates: Record<string, number | null>; health_check_requests: number | null; strong_activation_events: number | null;
+    decision: string; targets: { confirmed_contacts: number }; remaining: number; guidance: string } | null;
   periods: Partial<Record<GrowthOutcomePeriod, GrowthOutcomeBlock>>;
   channels: (GrowthOutcomeBlock & { id?: string; channel?: string; dimensions?: Record<string, string | null> })[];
   cohorts?: (GrowthOutcomeBlock & { id: string; experiment_id: unknown; channel: string; icp_segment: unknown;

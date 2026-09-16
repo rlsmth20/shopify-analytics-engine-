@@ -182,8 +182,9 @@ def take(factory, owner):
             from .reconciliation import packet as reconciliation_packet
             task = {**task, "reconciliation": reconciliation_packet(db, task)}
         task = {**task, "active_experiments": packet.get("active_experiments", []),
+                "focused_validation": get_memory(db, "strategic", "focused_validation"),
                 "acquisition_review": {k: outcome_guidance.get(k) for k in
-                    ("north_star", "metrics", "bottleneck", "next_decision_point", "review_evidence_id")},
+                    ("north_star", "metrics", "bottleneck", "next_decision_point", "review_evidence_id", "focused_validation")},
                 "source_evidence": {"source": evidence.source, "kind": evidence.kind, "data": evidence.data}}
         task["acquisition_review"]["decisions"] = outcome_guidance.get("decisions", [])[:3]
         setup = get_memory(db, "working", "provider_setup")

@@ -154,6 +154,7 @@ def context(db, search_history):
                    .order_by(Experiment.started_at.desc()).limit(5))]
     learning = get_memory(db, "strategic", "acquisition_learning")
     packet = {"mission": mission(db), "memory": memories,
+        "focused_validation": get_memory(db, "strategic", "focused_validation"),
         "acquisition_review": {"review_evidence_id": learning.get("review_evidence_id"),
             "decisions": learning.get("decisions", [])[:3]},
         "operating_policy": protected_policy, "acquisition_objective": protected_objective,

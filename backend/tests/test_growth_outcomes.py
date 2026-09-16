@@ -12,6 +12,64 @@ from app.growth.store import record, remember
 
 
 class OutcomeTests(unittest.TestCase):
+    def focus(self):
+        from app.growth.validation import KEY, VERSION, LABELS
+        exp = Experiment(id="focus", key=KEY, specification={"cohort_labels": LABELS, "max_contacts": 50},
+                         started_at=self.now - 864000, stop_at=self.now + 864000)
+        self.db.add(exp)
+        remember(self.db, "strategic", "focused_validation", {"version": VERSION, "active": True, "experiment_id": exp.id})
+        self.db.flush()
+        return exp
+
+    def test_focused_grouping_ignores_industry_and_wording_but_preserves_channels_and_history(self):
+        from app.growth.validation import LABELS, VERSION
+        self.focus()
+        for i, channel in enumerate(["email", "email", "shopify_community"]):
+            _, row = self.merchant("focused" + str(i), experiment="focus", channel=channel)
+            row.cohort = {**LABELS, "cohort_policy": VERSION, "industry": "category" + str(i), "cta": "wording" + str(i)}
+        self.merchant("old-a", variant="A")
+        self.merchant("old-b", variant="B")
+        s = snapshot(self.db, self.now)
+        cohorts = [c for c in s["cohorts"] if c["experiment_id"] == "focus"]
+        self.assertEqual(sorted(c["metrics"]["confirmed_contacts"] for c in cohorts), [1, 2])
+        self.assertEqual(len(s["cohorts"]), 4)
+        self.assertEqual(s["next_decision_point"]["target"], 50)
+        self.assertEqual(s["focused_validation"]["metrics"]["confirmed_contacts"], 3)
+
+    def test_tagged_visit_and_authenticated_conversions_without_claiming_prospect_identity(self):
+        from app.growth.validation import KEY
+        self.focus()
+        contact, row = self.merchant("new-merchant", experiment="focus", age=60)
+        tags = {"utm_source": "email", "utm_medium": "outreach", "utm_campaign": KEY, "utm_content": "outreach-" + contact.id}
+        record(self.db, "visit", "VISITOR", "visitor:opaque", {"attribution": tags, "verified": False},
+               source="first_party_browser", occurred_at=self.now - 30)
+        self.assertEqual(snapshot(self.db, self.now)["periods"]["all_time"]["funnel"]["SITE_VISIT"], 1)
+        record(self.db, "auth", "IDENTITY_LINK", "visitor:opaque", {"shop_id": 42}, source="authenticated_session", occurred_at=self.now - 10)
+        for kind in ["SIGNUP", "SHOPIFY_CONNECTION", "INVENTORY_ANALYSIS_COMPLETED", "TRIAL_STARTED", "SUBSCRIPTION_PURCHASED"]:
+            record(self.db, kind, kind, "shop:42", {"verified": True, "payment_verified": kind == "SUBSCRIPTION_PURCHASED"}, occurred_at=self.now - 15)
+        f = snapshot(self.db, self.now)["periods"]["all_time"]["funnel"]
+        self.assertEqual(f["SITE_VISIT"], 1)
+        for stage in ["ACCOUNT_CREATED", "SHOPIFY_CONNECTED", "INVENTORY_ANALYSIS_COMPLETED", "TRIAL_STARTED", "PAID"]:
+            self.assertEqual(f[stage], 1, stage)
+        self.assertIsNone(contact.shop_id)
+
+    def test_uncertain_wrong_campaign_and_pre_send_links_do_not_attribute(self):
+        from app.growth.validation import KEY
+        self.focus()
+        for i, (status, campaign, age) in enumerate([("uncertain", KEY, 5), ("sent", "wrong", 5), ("sent", KEY, 120)]):
+            contact, _ = self.merchant("bad" + str(i), experiment="focus", status=status, age=60)
+            record(self.db, "v" + str(i), "VISITOR", "visitor:" + str(i), {"attribution": {
+                "utm_source": "email", "utm_medium": "outreach", "utm_campaign": campaign, "utm_content": "outreach-" + contact.id}},
+                source="first_party_browser", occurred_at=self.now - age)
+        self.assertIsNone(snapshot(self.db, self.now)["periods"]["all_time"]["funnel"]["SITE_VISIT"])
+
+    def test_focused_checkpoint_waits_for_responses_then_requires_material_change(self):
+        self.focus()
+        for i in range(50):
+            self.merchant("sample" + str(i), experiment="focus", age=60)
+        self.assertEqual(snapshot(self.db, self.now)["focused_validation"]["decision"], "OBSERVE_RESPONSES")
+        self.assertEqual(snapshot(self.db, self.now + 8 * 86400)["focused_validation"]["decision"], "CHANGE_ONE_MAJOR_VARIABLE")
+
     def setUp(self):
         self.engine = create_engine("sqlite://")
         Base.metadata.create_all(self.engine)

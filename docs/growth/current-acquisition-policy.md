@@ -1,3 +1,16 @@
+# Focused validation takes precedence (September 16, 2026)
+
+Apply [focused validation](focused-validation.md) and the live `focused_validation`
+packet before older volume, offer, channel or cohort guidance below. The next
+experiment tests reorder recommendations + exportable purchase orders for Shopify
+merchants with physical inventory complexity. Prioritize email and genuinely
+relevant Shopify Community; retain form opportunities for later instead of using
+forms to fill unused capacity. One CTA and one message family. No new trivial
+cohorts. Review the next 50 confirmed contacts against 3 substantive replies,
+2 positive replies and 1 health-check request/connection/activation. Customer
+outcomes define success. The historical 1,000-contact instruction is not this
+phase's objective. Read the supplied experiment ID and fixed cohort labels.
+
 # Latest outcome objective
 
 Apply docs/growth/outcome-policy.md. Paying customers and MRR define success.

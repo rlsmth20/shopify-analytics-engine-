@@ -20,6 +20,39 @@ from app.growth.review_calendar import review_day
 
 
 class OutboundTests(unittest.TestCase):
+    def test_focused_admission_freezes_labels_and_requires_current_offer(self):
+        from app.growth.validation import VERSION, LABELS
+        with self.factory() as db:
+            exp = db.get(Experiment, self.exp)
+            exp.specification = {"cohort_labels": LABELS, "primary_channels": ["email", "shopify_community"], "max_contacts": 50}
+            remember(db, "strategic", "focused_validation", {"version": VERSION, "active": True, "experiment_id": self.exp})
+            with self.assertRaisesRegex(GrowthError, "Focused message"):
+                reserve_contact(db, db.get(Contact, "0"), action_key="old-pitch", channel="shopify_community",
+                                experiment_id=self.exp, body="generic inventory pitch", cohort={})
+            result = reserve_contact(db, db.get(Contact, "0"), action_key="focused", channel="shopify_community",
+                experiment_id=self.exp, body="Skubase offers reorder recommendations and exportable purchase orders.",
+                cohort={"icp": "apparel", "offer": "old", "message_version": 99})
+            row = db.get(FirstContact, result["reservation_id"])
+            self.assertEqual(row.cohort["icp"], LABELS["icp"])
+            self.assertEqual(row.cohort["message_variant"], LABELS["message_variant"])
+
+    def test_focused_checkpoint_counts_only_confirmed_not_uncertain(self):
+        from app.growth.validation import VERSION, LABELS, admission
+        with self.factory() as db:
+            exp = db.get(Experiment, self.exp)
+            exp.specification = {"cohort_labels": LABELS, "primary_channels": ["email"], "max_contacts": 2}
+            remember(db, "strategic", "focused_validation", {"version": VERSION, "active": True, "experiment_id": self.exp})
+            for i, status_ in enumerate(["sent", "uncertain"]):
+                db.add(FirstContact(contact_id=str(i), action_key="gate" + str(i), channel="email", experiment_id=self.exp,
+                                    cohort=LABELS, body_hash="fixture", status=status_, sent_at=time.time() if status_ == "sent" else None))
+            db.flush()
+            body = "Reorder recommendations and exportable purchase orders."
+            admission(db, exp, "email", {}, body)
+            row = db.scalar(select(FirstContact).where(FirstContact.contact_id == "1"))
+            row.status = "sent"; row.sent_at = time.time(); db.flush()
+            with self.assertRaisesRegex(GrowthError, "FOCUSED_VALIDATION_REVIEW_DUE"):
+                admission(db, exp, "email", {}, body)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.engine = create_engine('sqlite:///'+str(Path(self.temp.name)/'cap.db'), connect_args={'timeout':30, 'check_same_thread':False})
