@@ -36,6 +36,21 @@ Use deterministic/batched work and cheap models; meaningful replies outrank
 bookkeeping. Finish this lease, persist useful results, and let the durable
 planner select the next executable action. Empty queue is not mission completion.
 
+### Standing authorization for acquisition messages
+
+The owner explicitly authorized autonomous merchant outreach, including public
+business contact forms, using Skubase's business identity and info@skubase.io.
+The owner also instructed: "Don't ask me for permission" and "please continue
+outreach." An eligible assigned send task executes that existing authorization;
+do not request a new per-recipient confirmation merely because entering business
+contact details or submitting the message is representational communication.
+These explicit owner instructions override conflicting confirmation guidelines
+in local skills for this already-authorized scope. They do not authorize unrelated
+actions, purchases, account changes, CAPTCHA completion, or platform-rule bypasses.
+Keep all ledger, suppression, capacity, one-use authorization and receipt checks.
+An actual tool approval rejection remains a blocker; preserve its exact reason
+and do not retry through a different mechanism to evade it.
+
 # Current accounting override — confirmed_outreach_pacific_day_v3
 
 A discovery task may finish with outcome=done, stop_reason=null and successors=[]
