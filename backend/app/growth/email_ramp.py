@@ -1,7 +1,7 @@
 """Deterministic email ramp; all mutations share the existing dispatch lock.
 
 Ceilings are not quotas. A tier needs elapsed Pacific days AND at least three
-confirmed first contacts across two days, one delivery/reply, and a fresh inbox
+confirmed first contacts across two days and a fresh inbox
 check. Idle time cannot promote a sender. New senders never inherit history.
 """
 import time
@@ -21,6 +21,51 @@ MIN_CONFIRMED = 3
 MIN_ACTIVE_DAYS = 2
 HEALTH_FRESH_SECONDS = 86400
 SIGNAL_WINDOW_SECONDS = 7 * 86400
+REPUTATION_SIGNALS = {"provider_warning", "provider_restriction", "spam_warning", "complaint",
+                      "authentication_failure", "inbox_placement_deterioration"}
+
+
+def set_operating_level(db, sender, ceiling, source, now=None):
+    """Owner-directed current level. Subsequent healthy tiers still advance."""
+    now = time.time() if now is None else now
+    if not isinstance(ceiling, int) or not 1 <= ceiling <= CEILINGS[-1] or not source:
+        raise ValueError("A sourced operating level between 1 and 20 is required")
+    sender = sender.strip().lower()
+    lock(db)
+    state = get_memory(db, NAMESPACE, digest(sender)) or _initial(sender)
+    stage = max((i for i, limit in enumerate(CEILINGS) if limit <= ceiling), default=0)
+    _, fresh = insert_once(db, Evidence, key="email-operating-level:" + digest([sender, source]),
+        kind="EMAIL_OPERATING_LEVEL_CHANGED", subject=sender, source=source,
+        data={"previous_ceiling": state["daily_ceiling"], "daily_ceiling": ceiling,
+              "timezone": "America/Los_Angeles", "replies_required": False}, occurred_at=now)
+    if not fresh:
+        return
+    remember(db, NAMESPACE, digest(sender), {**state, "stage": stage,
+        "operating_ceiling": ceiling, "daily_ceiling": ceiling,
+        "stage_started_at": now, "last_increase_at": now, "owner_policy_source": source})
+
+
+def deterioration(db, sender, now, recent_signals):
+    """One failed address is not mailbox-level evidence. No model calls."""
+    serious = {k: v for k, v in recent_signals.items() if k in REPUTATION_SIGNALS}
+    if serious:
+        return "RECENT_" + max(serious, key=serious.get).upper()
+    observations = db.scalars(select(Evidence).where(Evidence.kind == "EMAIL_RAMP_SIGNAL",
+        Evidence.subject == sender, Evidence.occurred_at > now - SIGNAL_WINDOW_SECONDS))
+    failures = set()
+    for event in observations:
+        if event.data.get("signal") in {"bounce", "hard_bounce", "invalid_recipient", "delivery_failure", "provider_rejection"}:
+            # Suppression observations carry source:recipient. Repeated reports
+            # for the same address must not masquerade as separate failures.
+            failures.add(str(event.data.get("event_id", event.key)).rsplit(":", 1)[-1].lower())
+    sent = db.scalar(select(func.count()).select_from(Message).join(Memory,
+        (Memory.namespace == "outreach_email") & (Memory.key == Message.id)).where(
+        Message.direction == "out", Message.sent_at >= now - SIGNAL_WINDOW_SECONDS,
+        Memory.value["safe_test"].as_boolean().is_(False),
+        Memory.value["sender"].as_string() == sender)) or 0
+    if len(failures) >= 3 or len(failures) >= 2 and len(failures) / max(sent, 1) >= .05:
+        return "REPEATED_DELIVERY_FAILURES"
+    return None
 
 
 def authentication(db, sender):
@@ -41,7 +86,7 @@ def _initial(sender):
 
 
 def signal(db, sender, kind, event_id, now=None):
-    """A replay-safe negative observation freezes increases, not ordinary replies."""
+    """Persist a replay-safe observation; aggregate evidence governs increases."""
     now = time.time() if now is None else now
     sender = sender.lower()
     lock(db)
@@ -87,25 +132,27 @@ def status(db, sender, now=None, *, persist=False, confirmed_at=None, advance=Tr
         fresh_monitor = not monitor.get("requires_attention") and monitor.get("checked_at", 0) >= now - HEALTH_FRESH_SECONDS
     recent_signals = {kind: at for kind, at in state.get("signals", {}).items() if at > now - SIGNAL_WINDOW_SECONDS}
     auth = authentication(db, sender)
-    reason = (health.get("reason", "DELIVERABILITY_HOLD") if health.get("paused") else
-              "RECENT_" + max(recent_signals, key=recent_signals.get).upper() if recent_signals else
-              "AUTHENTICATION_NOT_VERIFIED" if not auth["verified"] else
-              "DELIVERY_MONITOR_STALE" if not fresh_monitor else None)
+    reason = (health.get("reason", "DELIVERABILITY_HOLD") if health.get("paused") else None)
+    reason = reason or deterioration(db, sender, now, recent_signals)
+    reason = reason or ("AUTHENTICATION_NOT_VERIFIED" if not auth["verified"] else
+                        "DELIVERY_MONITOR_STALE" if not fresh_monitor else None)
     stage = state["stage"]
     elapsed_days = (date.fromisoformat(day.day) - date.fromisoformat(review_day(tier_start).day)).days
-    evidence_ready = len(rows) >= MIN_CONFIRMED and len(active_days) >= MIN_ACTIVE_DAYS and healthy_receipts >= 1
+    evidence_ready = len(rows) >= MIN_CONFIRMED and len(active_days) >= MIN_ACTIVE_DAYS
     if persist and advance and stage < len(CEILINGS) - 1 and state["start_at"] is not None and not reason and evidence_ready and elapsed_days >= STAGE_DAYS[stage]:
         stage += 1
         state.update(stage=stage, stage_started_at=now, last_increase_at=now)
-    state.update(daily_ceiling=CEILINGS[stage], pause_reason=reason,
+        state.pop("operating_ceiling", None)
+    ceiling = state.get("operating_ceiling", CEILINGS[stage])
+    state.update(daily_ceiling=ceiling, pause_reason=reason,
                  day=day.day, actual_first_contacts_today=used,
                  recent_indicators=recent_signals)
     if persist:
         remember(db, NAMESPACE, key, state)
     return {**state, "normal_daily_ceiling": 20, "complete": stage == len(CEILINGS) - 1,
-            "remaining": max(0, CEILINGS[stage] - used), "resets_at": day.end,
+            "remaining": max(0, ceiling - used), "resets_at": day.end,
             "day_timezone": "America/Los_Angeles", "is_target": False,
-            "late_confirmation_overage": max(0, used - CEILINGS[stage]),
+            "late_confirmation_overage": max(0, used - ceiling),
             "authentication": auth, "increase_paused": bool(reason),
             "stage_evidence": {"confirmed": len(rows), "active_days": len(active_days),
                                "delivered_or_replied": healthy_receipts,

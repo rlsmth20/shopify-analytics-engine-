@@ -158,6 +158,15 @@ class WorkspaceTests(unittest.TestCase):
                 self.assertEqual(saved['attempts'], 0)
                 self.assertGreater(saved['retry_at'], time.time())
             self.assertNotIn('defer_reason', get_memory(db, 'operator_task', form['id']))
+            db.commit()
+            from app.growth import email_ramp
+            email_ramp.set_operating_level(db, workspace_mail.SENDER, 16, 'owner-test')
+            workspace_mail.defer_capped_tasks(db)
+            for task in tasks:
+                released = get_memory(db, 'operator_task', task['id'])
+                self.assertIsNone(released['defer_reason'])
+                self.assertLessEqual(released['retry_at'], time.time())
+                self.assertEqual(released['attempts'], 0)
 
     def test_email_ceiling_does_not_cap_other_channels(self):
         for n in range(5): self.finish(self.reserve(n))

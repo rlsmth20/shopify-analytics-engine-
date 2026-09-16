@@ -60,17 +60,26 @@ Rollback removes only this newly added record by ID if required.
 
 ## Operating policy
 
-The earliest healthy schedule is 5/day on days 1-3, 8/day on days 4-6,
-12/day on days 7-10, 15/day on days 11-14 and 20/day thereafter, in Pacific time.
-The clock begins with actual live first contact, not deployment or safe tests.
-Idle days alone cannot establish reputation. Each increase also needs real send
-and delivery/reply evidence and a recent inbox check. Negative signals freeze
-increases; serious deliverability incidents retain the existing sending hold.
-Each stage requires at least three confirmed messages spread over two days, one
-delivery or reply, and an inbox check within 24 hours. Negative observations freeze
-increases for seven days; unresolved serious provider restrictions keep sending
-paused. These evidence thresholds do not instruct the agent to manufacture traffic.
-Use stronger eligible prospects first; never send merely to satisfy a minimum.
+On September 16, the owner set **16 actual first-contact emails per Pacific day**
+for info@skubase.io, replacing the September 13 operating level of 8/day. This
+is the current level, not a permanent ceiling. Forms, Reddit, community activity,
+replies and controlled tests do not consume email capacity. Audit evidence and
+versioned memory preserve both owner decisions.
+
+After four Pacific days at this level, at least three real first contacts across
+two days, verified authentication and a fresh inbox check, the existing ramp may
+advance to 20/day. Replies and measured deliveries are tracked outcomes, not
+prerequisites for this increase. Idle time alone does not advance the ramp.
+
+An isolated bounce permanently suppresses that recipient but does not freeze the
+mailbox. Increases pause for at least two distinct failed recipients with a 5%+
+seven-day failure rate, or three distinct recent failures, or a credible provider,
+authentication, spam-complaint or placement warning. Repeated receipts for one
+address do not become multiple failures. The sending health hold requires multiple
+failed recipients and a 5%+ bounce rate; existing provider/account restrictions
+remain enforced. A single opt-out is honored immediately without being treated
+as a mailbox-wide reputation incident. Unknown delivery or bounce subtype remains
+unknown. Never manufacture traffic to satisfy ramp evidence.
 
 Controlled tests between verified owned inboxes are now explicitly authorized;
 see `controlled-email-tests.md`. They test delivery, formatting and reply routing

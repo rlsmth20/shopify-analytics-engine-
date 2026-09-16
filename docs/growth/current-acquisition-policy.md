@@ -38,12 +38,13 @@ execution toward that objective; neither capacity nor discovery counts as contac
   mass DMs. Count confirmed first contacts separately from uncertain contacts.
   Email remains subject to its separate evidence-based ramp and provider rules.
   The ramp is an internal deliverability control, not a provider-enforced limit.
-- **Email-specific override, September 13:** The owner authorized more than five
-  first-contact emails daily. The live Workspace sender was advanced to the next
-  existing tier, **8 per Pacific day**, as an owner-directed increase. This is not
-  earned delivery evidence: the recent bounce and pause on automatic increases
-  remain recorded. Further automatic increases to 12, 15 and 20 require the
-  existing ramp evidence and health checks. These are ceilings, not quotas.
+- **Email-specific override, September 16:** The owner set **16 actual first-contact
+  emails per Pacific day**, replacing the September 13 level of 8. This is the
+  current operating level, not a permanent ceiling. Healthy evidence can advance
+  it to 20; replies are not required. An isolated bounce suppresses that recipient
+  without freezing increases. Meaningful aggregate failures or provider,
+  authentication, spam or placement warnings still pause increases. These are
+  ceilings, not quotas. Other acquisition channels do not consume the 16 emails.
   The shared 1,000-contact ceiling also applies to
   forms/community activity. Genuine replies and ordinary operational mail
   are independent of the first-contact ramp. See `email-ramp.md`.

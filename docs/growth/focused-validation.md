@@ -61,6 +61,8 @@ When a Skubase link is included, link the product name using:
 
 Use the actual contact ID from prospect assessment, `email` or `shopify_community`
 as CHANNEL. No email/address in URLs. The product-name link is not a second CTA.
+Email draft bodies are plain text: use a readable plain URL, never HTML anchor
+markup. The Workspace transport handles the email formatting.
 Use the same tags on relevant existing product/health-check paths in substantive
 follow-up. First-party analytics already preserves tags through navigation.
 

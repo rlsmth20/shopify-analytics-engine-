@@ -484,7 +484,8 @@ def delivery_health(db):
         .where(Message.direction == "out", Message.sent_at >= time.time() - 7 * 86400,
                Memory.value["safe_test"].as_boolean().is_(False)).order_by(Message.sent_at.desc()).limit(100)))
     bounces = sum(m.status == "bounced" for m in recent)
-    if len(recent) >= 10 and bounces / len(recent) >= .05:
+    failed_recipients = {m.contact_id for m in recent if m.status == "bounced"}
+    if len(failed_recipients) >= 2 and bounces / len(recent) >= .05:
         remember(db, "working", "outreach_email_health", {"paused": True, "reason": "BOUNCE_RATE_HOLD", "sample_size": len(recent), "bounces": bounces})
 
 
@@ -541,7 +542,7 @@ def poll(factory, work, *, fetch=None):
             process_event(db, "poll:" + digest(result), {"type": kind, "provider_id": provider_id,
                 "recipient": meta["actual_recipient"], "sent_at": sent_at})
             if not meta.get("safe_test") and verdict in {"bounced", "failed", "deferred"} and kind != "bounce":
-                email_ramp.signal(db, meta.get("sender", config()["sender"]), "delivery_failure", "poll:" + digest(result))
+                email_ramp.signal(db, meta.get("sender", config()["sender"]), "delivery_failure", row.id)
             db.commit()
             return {"decision": kind, "message_id": row.id}
         if result.get("status") == "failed":

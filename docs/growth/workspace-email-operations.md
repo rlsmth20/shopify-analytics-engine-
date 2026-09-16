@@ -62,12 +62,13 @@ history; do not resend Earth & City merely to improve its formatting. Aim for
 one relevant benefit and one standalone question. Keep the required affiliation
 and current Shopify review disclosure without a lengthy feature list.
 
-The first real merchant send starts the persistent ramp. On September 13 the owner
-authorized more than five daily emails; the live Workspace ramp was advanced to
-**8 actual first-contact emails per Pacific day** as the next existing tier.
-This owner-directed increase preserves the recent bounce and pause on automatic
-increases. Further automatic increases to 12, 15 and 20 retain the existing
-elapsed-time and delivery/reply evidence requirements.
+The first real merchant send starts the persistent ramp. On September 16 the owner
+set **16 actual first-contact emails per Pacific day**, replacing the earlier 8.
+This current operating level can advance to 20 with healthy sending evidence,
+elapsed time, authentication and fresh monitoring. Replies are not prerequisites.
+One isolated bounce suppresses its recipient without freezing the mailbox ramp.
+Meaningful aggregate deterioration and serious reputation signals still pause
+increases. See `email-ramp.md` for the deterministic criteria.
 Internal diagnostics do not start the clock. Reaching the email ceiling does not
 stop replies, research or other permitted channels. Do not manufacture warming.
 

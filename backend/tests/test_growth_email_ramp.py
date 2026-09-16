@@ -168,7 +168,7 @@ class EmailRampTests(unittest.TestCase):
             self.assertEqual(len(result['recent_indicators']), 4)
             self.assertEqual(db.scalar(select(func.count()).select_from(Evidence).where(Evidence.kind == 'EMAIL_RAMP_SIGNAL')), 4)
 
-    def test_bounce_is_permanent_suppression_and_freezes_increases(self):
+    def test_bounce_is_permanent_suppression_without_freezing_increases(self):
         mid = self.sent(0)
         with self.factory() as db:
             mail.process_event(db, 'hard-bounce', {'type': 'bounce', 'provider_id': 'fixture-0', 'recipient': 'merchant0@fixture.test'})
@@ -176,6 +176,22 @@ class EmailRampTests(unittest.TestCase):
             self.assertTrue(db.get(Contact, '0').suppressed)
             self.assertEqual(db.get(Message, mid).status, 'bounced')
             self.assertIn('bounce', ramp.status(db, SENDER)['recent_indicators'])
+            self.assertFalse(ramp.status(db, SENDER)['increase_paused'])
+
+    def test_mailbox_hold_requires_multiple_failed_recipients(self):
+        with self.factory() as db:
+            for n in range(10):
+                self.ledger(db, n, time.time() - 1)
+            db.flush()
+            rows = list(db.scalars(select(Message)))
+            rows[0].status = 'bounced'
+            db.flush()
+            mail.delivery_health(db)
+            self.assertFalse(get_memory(db, 'working', 'outreach_email_health').get('paused'))
+            rows[1].status = 'bounced'
+            db.flush()
+            mail.delivery_health(db)
+            self.assertEqual(get_memory(db, 'working', 'outreach_email_health')['reason'], 'BOUNCE_RATE_HOLD')
 
     def test_reply_and_safe_test_do_not_use_cap_and_pilot_completion_is_explicit(self):
         first = self.sent(0)
@@ -257,7 +273,7 @@ class EmailRampTests(unittest.TestCase):
             db.commit()
             self.assertEqual(ramp.status(db, SENDER)['recent_indicators'], {})
 
-    def test_bounce_receipt_never_advances_tier_before_its_negative_is_applied(self):
+    def test_isolated_bounce_does_not_freeze_next_healthy_tier(self):
         work = self.prepared(0)
         mail.send(self.factory, work, transport=lambda _: {'provider_id': 'queued-bounce', 'queued': True})
         now = time.time()
@@ -269,8 +285,37 @@ class EmailRampTests(unittest.TestCase):
             mail.process_event(db, 'bounce-at-increase', {'type': 'bounce', 'provider_id': 'queued-bounce', 'recipient': 'merchant0@fixture.test'})
             db.commit()
             result = ramp.status(db, SENDER, persist=True)
-            self.assertEqual(result['daily_ceiling'], 5)
+            self.assertEqual(result['daily_ceiling'], 8)
             self.assertIn('bounce', result['recent_indicators'])
+
+    def test_owner_level_counts_only_emails_and_advances_without_replies(self):
+        start = time.time() - 5 * 86400
+        with self.factory() as db:
+            ramp.status(db, SENDER, start, persist=True, confirmed_at=start)
+            ramp.set_operating_level(db, SENDER, 16, 'owner-fixture', start)
+            for n in range(3):
+                self.ledger(db, n, start + n * 86400)
+            for row in db.scalars(select(Message)):
+                row.status = 'sent'
+            self.ledger(db, 9, time.time(), channel='contact_form')
+            db.commit()
+            before = ramp.status(db, SENDER)
+            self.assertEqual(before['daily_ceiling'], 16)
+            self.assertEqual(before['remaining'], 16)
+            after = ramp.status(db, SENDER, persist=True)
+            self.assertEqual(after['daily_ceiling'], 20)
+            self.assertTrue(after['complete'])
+
+    def test_isolated_bounce_and_optout_do_not_freeze_but_repeated_failures_do(self):
+        with self.factory() as db:
+            ramp.signal(db, SENDER, 'bounce', 'report:a@fixture.test')
+            ramp.signal(db, SENDER, 'bounce', 'another-report:a@fixture.test')
+            ramp.signal(db, SENDER, 'unsubscribe', 'optout:b@fixture.test')
+            db.commit()
+            self.assertFalse(ramp.status(db, SENDER)['increase_paused'])
+            ramp.signal(db, SENDER, 'bounce', 'report:c@fixture.test')
+            db.commit()
+            self.assertEqual(ramp.status(db, SENDER)['pause_reason'], 'REPEATED_DELIVERY_FAILURES')
 
     def test_invalid_recipient_syntax_rejected_without_paid_enrichment(self):
         for invalid in ('user@store..com', '.user@store.com', 'user..name@store.com', 'user@-store.com', 'user@store-.com', 'x' * 65 + '@store.com'):

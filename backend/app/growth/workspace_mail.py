@@ -31,6 +31,17 @@ def defer_capped_tasks(db, now=None):
     from .email_ramp import status as ramp_status
     ramp = ramp_status(db, SENDER, now)
     if ramp['remaining']:
+        for row in db.scalars(select(Memory).where(Memory.namespace == 'operator_task',
+                Memory.value['status'].as_string() == 'pending',
+                Memory.value['defer_reason'].as_string() == 'EMAIL_DAILY_CAP_REACHED')):
+            task = row.value
+            if task.get('lease_until', 0) > now:
+                continue
+            if task.get('contact_id') and db.scalar(select(FirstContact.id).where(FirstContact.contact_id == task['contact_id'])):
+                continue
+            record(db, f"email-cap-release:{task['id']}:{task.get('defer_evidence_id')}:{ramp['daily_ceiling']}",
+                'EMAIL_SEND_CAPACITY_RELEASED', task['id'], {'ceiling': ramp['daily_ceiling']})
+            remember(db, 'operator_task', task['id'], {**task, 'retry_at': now, 'defer_reason': None})
         return 0
     count = 0
     for row in db.scalars(select(Memory).where(Memory.namespace == 'operator_task',
