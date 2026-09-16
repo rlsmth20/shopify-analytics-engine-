@@ -9,7 +9,7 @@ from .policy import GrowthError
 from .store import digest, enqueue, insert_once, record
 from .skills import active_skill
 
-APP_REVIEW_DISCLOSURE = "Skubase is currently in Shopify's review process and is not yet listed in the Shopify App Store."
+APP_REVIEW_DISCLOSURE = "Skubase is not yet listed in the Shopify App Store."
 HEALTH_CHECK_URL = "https://skubase.io/tools/inventory-health-check"
 SERVICE_TEMPLATE_REVISION = "browser-health-check-v1"
 HEALTH_CHECK_SOURCES = [

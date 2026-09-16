@@ -7,6 +7,19 @@ substantive/positive response and no verified attributed customer or MRR. That i
 weak performance, not proof of no demand. Anshul's response (evidence 35118)
 specifically valued reorder recommendations with Excel PO export.
 
+## Shopify review update, September 16
+
+Shopify suspended review reference 116756 until September 30 because checkout used
+the Billing API while App Pricing was enabled. Partner pricing now uses manual
+Billing API pricing, matching the deployed checkout. The owned development store
+reached Shopify's test-charge approval page (evidence 127124); no charge was
+approved. The suspension still requires resubmission after its end date.
+
+Use this concise current disclosure: "Skubase is not yet listed in the Shopify
+App Store." Do not claim review is actively progressing. This handled review
+incident is not a mailbox restriction and must not repeatedly create a global
+channel hold. Keep the review evidence and resubmission obligation separate.
+
 ## Fixed experiment
 
 - Campaign: `reorder-po-validation-v1`. Use the real ID in the live packet.

@@ -238,3 +238,34 @@ historical stockout observations are still needed for richer forecasting.
 References: [Shopify token exchange](https://shopify.dev/docs/apps/build/authentication-authorization/implement-token-exchange),
 [access tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens),
 and [App Bridge](https://shopify.dev/docs/api/app-bridge-library).
+
+
+## September 16: billing-mode suspension and repair
+
+Shopify's verified sender emailed support@skubase.io at 10:48 a.m. Pacific:
+review is suspended until September 30, 2026. Requirement 1.2.1 failed at plan
+selection with "Cannot use billing API when on Shopify app pricing."
+The Partner dashboard independently showed Suspended. This supersedes the
+September 15 support report that the submission was simply awaiting a reviewer.
+
+The deployed `create_shopify_subscription` path uses Shopify's Billing API.
+Partner pricing incorrectly had Shopify App Pricing enabled. Switched the Partner
+pricing setting to Manual pricing (legacy), which uses that existing Billing API.
+Restored manual listing entries and English display names for Starter, Growth
+and Scale, matching the deployed amounts: $29/$99/$199 monthly, $296/$1010/$2030
+annually, with 14-day trials. No merchant subscription or payment was approved.
+
+Verification: confirmed `skubase-test.myshopify.com` is a partner development
+store, then called the existing subscription service for Starter. Shopify returned
+a confirmation URL and the browser displayed "You will not be billed for this
+test charge", $29 every 30 days and the 14-day trial. Evidence 127124 retains the
+test receipt. This verifies the reported plan-selection error is resolved; it is
+not a completed paid transaction or a new review approval.
+
+The review suspension remains until September 30. Recheck all review requirements
+before resubmission; do not repeatedly submit during the suspension or assume the
+configuration change reopens review. Keep this product incident separate from
+mailbox health. Outreach should say the app is not yet listed, without claiming
+active review progress.
+
+Reference: https://shopify.dev/docs/apps/launch/billing/shopify-app-pricing
