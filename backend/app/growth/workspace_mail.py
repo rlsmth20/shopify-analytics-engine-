@@ -38,7 +38,9 @@ def defer_capped_tasks(db, now=None):
             Memory.value['stage'].as_string().in_(['send', 'outreach']))):
         task = row.value
         if (task.get('retry_at', 0) >= ramp['resets_at'] or task.get('lease_until', 0) > now
-                or not (task.get('channel') == 'email' or re.search(r'\bchannel\s*=\s*email\b', task.get('decision', ''), re.I))):
+                or not (task.get('channel') == 'email'
+                        or re.search(r'(?:^|:)(?:send[:-])?email(?:$|:)', task.get('key', ''), re.I)
+                        or re.search(r'\bchannel\s*=\s*email\b', task.get('decision', ''), re.I))):
             continue
         if task.get('contact_id') and db.scalar(select(FirstContact.id).where(FirstContact.contact_id == task['contact_id'])):
             continue

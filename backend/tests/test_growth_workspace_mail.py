@@ -137,6 +137,28 @@ class WorkspaceTests(unittest.TestCase):
             for task in tasks:
                 self.assertNotIn('defer_reason',get_memory(db,'operator_task',task['id']))
 
+    def test_email_channel_in_successor_key_defers_without_spending_a_retry(self):
+        from app.growth import operator
+        with self.factory() as db:
+            for n in range(5):
+                db.add(FirstContact(contact_id='sent-'+str(n), action_key='sent-'+str(n),
+                    channel='email', experiment_id=self.exp, cohort={}, body_hash='fixture',
+                    status='sent', sent_at=time.time()))
+            proof = record(db, 'key-defer-fixture', 'OBSERVATION', 'fixture', {})
+            tasks = [operator.offer(db, key=key, stage='send', source='https://fixture.test',
+                         decision='Send the prepared business inquiry.', evidence_id=proof.id)
+                     for key in ['store-a:send-email', 'store-b:send:email', 'send:store-c:email']]
+            form = operator.offer(db, key='store-d:contact_form', stage='send', source='https://fixture.test',
+                                  decision='Email unavailable; use business form.', evidence_id=proof.id)
+            db.flush()
+            self.assertEqual(workspace_mail.defer_capped_tasks(db), 3)
+            for task in tasks:
+                saved = get_memory(db, 'operator_task', task['id'])
+                self.assertEqual(saved['defer_reason'], 'EMAIL_DAILY_CAP_REACHED')
+                self.assertEqual(saved['attempts'], 0)
+                self.assertGreater(saved['retry_at'], time.time())
+            self.assertNotIn('defer_reason', get_memory(db, 'operator_task', form['id']))
+
     def test_email_ceiling_does_not_cap_other_channels(self):
         for n in range(5): self.finish(self.reserve(n))
         with self.assertRaisesRegex(GrowthError, 'EMAIL_RAMP_DAILY_CEILING'): self.reserve(5)
