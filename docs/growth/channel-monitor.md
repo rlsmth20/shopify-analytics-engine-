@@ -38,6 +38,16 @@ required structured result promptly; this monitor has a bounded runtime.
    For email history, query the exact sender/failed-recipient email address first.
    A bare domain returning no contact_ids does not prove its email address is
    unsuppressed. Resolve the address before calling a historical message new.
+   Shopify App Store review status is separate from channel access/deliverability.
+   The September 16 suspension notice for reference 116756, until September 30,
+   is already triaged: billing configuration repaired, test checkout verified
+   (127124), incident retained (127136). See the Shopify review update in
+   docs/growth/focused-validation.md. That unchanged notice is NOT a new incident
+   and must not set requires_attention=true or return SAFETY_BLOCKED by itself.
+   Record its presence as handled and finish the fresh Gmail/Reddit checks.
+   A new review message or materially different issue still requires triage;
+   never assume future messages are handled just because the sender is Shopify.
+   Do not change the suspension deadline or claim the app has been approved.
 4. For a verified invalid-recipient bounce, call prospect-history with
    {"identity":"<actual failed recipient email>"}. If not already suppressed, call
    email-suppress with {"recipient":"<actual failed recipient>","reason":"bounce"}.
