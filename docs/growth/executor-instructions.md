@@ -191,6 +191,12 @@ that fact in the fresh observation and continue the same task if no other issue
 remains. Preserve the bounce and ramp-increase pause. Do not stop acquisition or
 create a recovery task merely to suppress an address already suppressed. Actual
 provider restrictions, systemic failures and inaccessible channels remain blockers.
+A single merchant form's age/identity gate or broken required field is a
+CHANNEL_BLOCKED result for that route, not SAFETY_BLOCKED for the shared inboxes.
+Do not ask the owner to clear a low-value prospect's gate or repeat the same route
+after an unrelated inbox recovery. Retain the exact failure, leave any uncertain
+submission protected, and let the supervisor select another eligible merchant.
+Do not retry the blocked route without evidence that its access condition changed.
 An ordinary out-of-office or automated receipt with no opt-out, rejection,
 delivery error or substantive question is not an actionable merchant reply.
 Retain AUTOMATED once, do not respond, do not create a reply successor, and do

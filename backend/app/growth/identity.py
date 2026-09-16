@@ -41,6 +41,10 @@ def identity_match(identity):
     if canonical.startswith("shopify-community:"):
         variants.append("shopify_community:" + canonical.split(":", 1)[1])
     exact = func.lower(Contact.identity).in_(variants)
+    if "@" in canonical:
+        # A storefront identity can carry a verified email without a separate
+        # email alias. Read the same exact route that sending/suppression use.
+        exact = or_(exact, func.lower(Contact.email) == canonical)
     for prefix, host in (("shopify-community:", "community.shopify.com"), ("reddit:", "reddit.com")):
         if canonical.startswith(prefix):
             bare = canonical.split(":", 1)[1]
@@ -116,9 +120,12 @@ def merchant_view(db, identity):
     messages = list(db.scalars(select(Message).where(Message.contact_id.in_(ids)).order_by(Message.created_at.desc()).limit(12)))
     touches = [r.value for r in db.scalars(select(Memory).where(Memory.namespace == "merchant_touch",
                 Memory.value["contact_id"].as_string().in_(ids)).order_by(Memory.updated_at.desc()).limit(12))]
-    suppressed = any(c.suppressed or c.status in INELIGIBLE for c in rows)
+    canonical = canonical_identity(identity)
+    suppression = get_memory(db, "email_suppression", digest(canonical)) if "@" in canonical else {}
+    suppressed = bool(suppression) or any(c.suppressed or c.status in INELIGIBLE for c in rows)
     return {"merchant": merchant or {"routes": [{"identity": identity}]}, "contact_ids": ids,
-        "suppressed": suppressed, "first_contacts": [{"id": r.id, "channel": r.channel, "status": r.status,
+        "suppressed": suppressed, "email_suppression": suppression or None,
+        "first_contacts": [{"id": r.id, "channel": r.channel, "status": r.status,
             "receipt": r.receipt, "sent_at": r.sent_at, "cohort": r.cohort} for r in first],
         "recent_messages": [{"id": m.id, "direction": m.direction, "classification": m.classification, "subject": m.subject,
                             "campaign_id": m.experiment_id, "reply_to_id": m.reply_to_id,
