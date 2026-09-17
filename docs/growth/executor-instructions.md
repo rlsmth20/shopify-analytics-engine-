@@ -1,5 +1,14 @@
 # Focused validation takes precedence (September 16, 2026)
 
+Current disclosure for all new drafts: "Skubase is not yet listed in the Shopify
+App Store." The September 16 review suspension (116756, until September 30) is
+already triaged in evidence 127136; the billing mismatch was repaired. Its
+unchanged notice is not a mailbox/channel incident. Apply this to send-stage
+Gmail checks as well as monitor tasks. New or materially different incidents
+still require attention. Stale draft copy requires correction before reservation,
+not a global channel hold. Never alter an authorized/reserved body or retry an
+uncertain send; retain that task for separate correction/reconciliation.
+
 Apply [focused validation](focused-validation.md) and the live `focused_validation`
 packet before older volume, offer, channel or cohort guidance below. The next
 experiment tests reorder recommendations + exportable purchase orders for Shopify
@@ -314,8 +323,8 @@ Keep payload files in .growth-deploy, not the repository root.
   if approved copy is needed. Concise obvious Skubase advertisement/affiliation,
   one verified store/product fact, supported inventory/reorder benefit and one
   concrete question or free health-check offer. Ask whether inventory/reordering
-  is a problem; do not imply it is known. Include Shopify review in progress/not
-  yet in App Store. No AI introduction, invented human/private-data access or
+  is a problem; do not imply it is known. Include the current not-yet-listed
+  disclosure above. No AI introduction, invented human/private-data access or
   features. Lead with benefits, not disclaimers. Skubase already exports supplier
   POs and buying plans as Excel files; never describe PO export as a feature gap.
   Do not append "I can't promise", "without promising a feature or delivery date"

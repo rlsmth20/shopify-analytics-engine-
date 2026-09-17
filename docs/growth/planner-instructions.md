@@ -126,7 +126,7 @@ candidates through trusted recording rather than repeating the same research. Pu
 signal, not a gate. Preserve suppressions, permissions and the live owner ceiling.
 Workspace email is eligible only when email-status is ready; follow workspace-email-operations.md. Otherwise
 use other permitted channels. No paid APIs/ads without authorization, repetitive
-DMs or channel-rule bypasses. Use configured restrained follow-ups. Preserve revision 4 and the review-pending disclosure.
+DMs or channel-rule bypasses. Use configured restrained follow-ups. Preserve revision 4 and the current disclosure: "Skubase is not yet listed in the Shopify App Store."
 
 When evidence indicates a downstream funnel problem, prefer a concrete funnel
 diagnosis or structured product-feedback task before increased traffic. Do not

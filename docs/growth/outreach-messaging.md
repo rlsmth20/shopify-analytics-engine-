@@ -49,8 +49,8 @@ Lead with what Skubase does and the practical benefit to this merchant. Aim for
 1. Obvious promotional disclosure: "Skubase promotion:" and identify the app.
 2. One verified merchant fact or their actual public question.
 3. One or two relevant, verified capabilities and the benefit to their workflow.
-4. The owner-requested disclosure: "Skubase is currently in Shopify's review
-   process and is not yet listed in the Shopify App Store."
+4. The current disclosure: "Skubase is not yet listed in the Shopify App Store."
+   Review is suspended until September 30; do not claim active review progress.
 5. One concrete question OR one low-friction offer, such as a free five-product
    inventory health check. Do not stack several calls to action.
 
@@ -120,8 +120,7 @@ or evidence that an experiment performed better.
 and exportable purchase orders. It uses sales, stock and supplier lead times to
 prioritize reorders, then lets you build supplier POs and export them as Excel files
 with quantities, costs and totals. That gives you a practical purchasing list to
-share with suppliers. Skubase is currently in Shopify's review process and is not
-yet listed in the Shopify App Store. Would a free inventory health check on five
+share with suppliers. Skubase is not yet listed in the Shopify App Store. Would a free inventory health check on five
 regularly restocked products be useful?"
 
 Adapt this to the participant's own verified statement; do not paste identical
