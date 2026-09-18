@@ -68,6 +68,7 @@ def enqueue_recovery(db):
             Evidence.kind == "EXECUTION_FAULT", Evidence.occurred_at >= row.reserved_at).limit(1))
         if row.reserved_at >= now - 600 and not failed_send:
             continue
+        receipt_completion = row.status == "reserved" or bool(failed_send)
         previous = get_memory(db, "outreach_reconciliation", row.id)
         # A reviewed uncertain send remains held. Reinspect on new evidence,
         # not every poll; this must not become another monitoring busy loop.
@@ -76,14 +77,14 @@ def enqueue_recovery(db):
             continue
         existing = get_memory(db, operator.NAMESPACE, previous.get("task_id", ""))
         if existing.get("status") in {"pending", "running"} and existing.get("attempts", 0) < operator.MAX_ATTEMPTS:
-            if failed_send and not existing.get("receipt_completion"):
+            if receipt_completion and not existing.get("receipt_completion"):
                 offer_review(db, row, receipt_completion=True)
                 return
             continue
         if existing.get("attempts", 0) >= operator.MAX_ATTEMPTS and not previous.get("retry_at"):
             remember(db, "outreach_reconciliation", row.id, {**previous, "retry_at": now + 3600})
             continue
-        offer_review(db, row, receipt_completion=bool(failed_send))
+        offer_review(db, row, receipt_completion=receipt_completion)
         # One owned review at a time; do not hold the shared send lock while
         # materializing the entire historical backlog over a remote connection.
         return

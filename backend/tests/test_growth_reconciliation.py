@@ -121,6 +121,15 @@ class ReconciliationTests(unittest.TestCase):
             self.assertIn(proof, ids)
             self.assertNotIn(unrelated, ids)
 
+    def test_expired_reserved_admission_promotes_existing_recovery_without_a_fault(self):
+        from app.growth.reconciliation import enqueue_recovery, offer_review
+        reservation, _ = self.reserve_fixture(2, priority_review=False)
+        with self.factory() as db:
+            offer_review(db, db.get(FirstContact, reservation), receipt_completion=False)
+            enqueue_recovery(db)
+            recovery = get_memory(db, 'outreach_reconciliation', reservation)
+            self.assertTrue(get_memory(db, 'operator_task', recovery['task_id'])['receipt_completion'])
+
     def test_unrelated_evidence_cannot_release_and_live_owner_is_not_reconciled(self):
         reservation, proof = self.reserve_fixture(0)
         for n in range(1,20): self.reserve_fixture(n, sent=True)
