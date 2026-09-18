@@ -288,6 +288,11 @@ Keep payload files in .growth-deploy, not the repository root.
   assigned stage evidence IDs and a concise trace-based reason.
   Use evidence_ids from reconciliation.events[].id; the task's top-level
   evidence_id identifies the reservation intent and is NOT no-send proof.
+  If reconciliation.events is empty and no actual sent receipt is available,
+  return uncertain with evidence_ids=[] immediately. A retained draft or
+  send_authorized=false alone does not prove that no external Send occurred.
+  Do not return not_sent without an assigned trace evidence ID, and do not
+  repeat research to compensate for missing historical execution evidence.
   A Send click, interrupted/missing trace, unchanged form, CAPTCHA, or missing success receipt
   is NOT no-effect proof; return uncertain in these cases. sent requires an actual
   publication/provider confirmation; receipt is its exact URL/text, not a claim
