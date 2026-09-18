@@ -36,6 +36,12 @@ For each relevant, individually reviewed first contact:
    Keep the existing assessment; a payload-format correction does not require
    new merchant research. See the browser send payload fields in
    `executor-instructions.md` before constructing this request.
+   Preserve the assessed contact's exact `identity`, not just its `contact_id`.
+   Reservation lookup uses `identity`; changing an assessed email identity to a
+   store domain can create a second contact and detach receipt recovery from the
+   assigned task. Read the retained assessment/history to recover the exact
+   identity. Do not create a new identity or reassess to work around an identity
+   mismatch. Link verified aliases with `prospect-link` when needed.
 3. Use the returned `email` object exactly. It adds a separate Rainer signature, the configured business name,
    owner-supplied mailing address and reply-unsubscribe footer. Do not duplicate
    that footer in the proposed body. Keep one inventory question and no em dashes.
@@ -51,6 +57,10 @@ For each relevant, individually reviewed first contact:
    Verify sender, recipient, subject and complete body against the reserved text.
    Immediately before Send, call `outreach-authorize` with the reservation ID.
    Click once within its 30-second deadline. An expired authorization cannot be reused.
+   The returned deadline field is `submit_before` (UTC Unix seconds). A successful
+   response containing that field is a usable authorization; do not report it as
+   missing. If the deadline expires before the click, record the actual no-click
+   observation and let receipt recovery release the unused admission.
 5. Open the actual Gmail Sent conversation and match recipient, subject and body.
    Complete with `outcome=sent` and its exact Gmail thread URL as `receipt`.
    A draft, generic inbox URL or success assumption is not a receipt. If uncertain,
