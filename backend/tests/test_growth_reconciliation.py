@@ -75,6 +75,51 @@ class ReconciliationTests(unittest.TestCase):
             self.assertEqual(db.get(FirstContact,reservation).status,'uncertain')
             self.assertEqual(status(db)['remaining'],1)
 
+    def test_alias_reservation_recovers_original_trace_before_uncertain_backlog(self):
+        from app.growth.reconciliation import enqueue_recovery, packet, apply_result
+        from app.growth.operator import claim
+        stale, _ = self.reserve_fixture(1, uncertain=True)
+        reservation, proof = self.reserve_fixture(2, priority_review=False)
+        with self.factory() as db:
+            row = db.get(FirstContact, reservation)
+            original = db.get(Contact, row.contact_id)
+            original.identity = 'hello@merchant.test'
+            storefront = Contact(identity='merchant.test', email=original.identity,
+                                 source='https://merchant.test/contact')
+            db.add(storefront); db.flush()
+            original_id = original.id
+            row.contact_id = storefront.id
+            # A fault belongs to the email-identity task, not the reservation's
+            # storefront row. Recovery must discover this without manual seeding.
+            send = db.get(Evidence, proof).subject
+            record(db, 'executor-failure:alias', 'EXECUTION_FAULT', send,
+                   {'fault': 'Submission outcome does not belong to this task'})
+            enqueue_recovery(db)
+            recovery = get_memory(db, 'outreach_reconciliation', reservation)
+            task = get_memory(db, 'operator_task', recovery['task_id'])
+            self.assertTrue(task['receipt_completion'])
+            self.assertFalse(get_memory(db, 'outreach_reconciliation', stale))
+            retained = packet(db, task)
+            self.assertIn(proof, [e['id'] for e in retained['events']])
+            task = claim(db, task['id'], executor='fixture-worker')
+            stage = record(db, 'alias-review', 'ACQUISITION_STAGE_RESULT', task['id'], {})
+            apply_result(db, task, self.recovered(task, proof), stage)
+            self.assertIsNone(db.get(FirstContact, reservation))
+            self.assertEqual(get_memory(db, 'operator_task', send)['status'], 'excluded')
+            self.assertEqual(db.get(FirstContact, stale).status, 'uncertain')
+            self.assertNotEqual(original_id, storefront.id)
+
+    def test_unrelated_merchant_trace_is_not_available_to_alias_recovery(self):
+        from app.growth.reconciliation import packet
+        reservation, proof = self.reserve_fixture(0)
+        _, unrelated = self.reserve_fixture(1)
+        with self.factory() as db:
+            recovery = get_memory(db, 'outreach_reconciliation', reservation)
+            task = get_memory(db, 'operator_task', recovery['task_id'])
+            ids = [e['id'] for e in packet(db, task)['events']]
+            self.assertIn(proof, ids)
+            self.assertNotIn(unrelated, ids)
+
     def test_unrelated_evidence_cannot_release_and_live_owner_is_not_reconciled(self):
         reservation, proof = self.reserve_fixture(0)
         for n in range(1,20): self.reserve_fixture(n, sent=True)

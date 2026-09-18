@@ -20,6 +20,18 @@ from app.growth.review_calendar import review_day
 
 
 class OutboundTests(unittest.TestCase):
+    def test_assigned_contact_identity_cannot_silently_create_another_prospect(self):
+        from app.growth.outbound import operator_action
+        with self.factory() as db:
+            with self.assertRaisesRegex(GrowthError, 'identity must match'):
+                operator_action(db, 'outreach-reserve', {
+                    'contact_id': '0', 'identity': 'another-store.test',
+                    'organization': 'Fixture', 'source': 'https://another-store.test',
+                    'channel': 'contact_form', 'channel_rules_source': 'fixture',
+                    'relevance_evidence': 'Fixture physical products'})
+            self.assertIsNone(db.scalar(select(Contact).where(Contact.identity == 'another-store.test')))
+            self.assertIsNone(db.scalar(select(FirstContact)))
+
     def test_focused_admission_freezes_labels_and_requires_current_offer(self):
         from app.growth.validation import VERSION, LABELS
         with self.factory() as db:

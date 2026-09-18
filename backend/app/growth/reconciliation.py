@@ -12,6 +12,14 @@ from .store import get_memory, record, remember
 
 REVIEW_VERSION = 2  # Resume the original browser owner for delayed receipts.
 
+def reservation_contact_ids(db, row):
+    """Recover across verified routes, never a guessed company-name match."""
+    from .identity import matching_contacts
+    contact = db.get(Contact, row.contact_id)
+    if not contact:
+        return [row.contact_id]
+    return list({row.contact_id, *(c.id for c in matching_contacts(db, contact.email or contact.identity))})
+
 def offer_review(db, row, *, receipt_completion=False):
     from . import operator
     previous = get_memory(db, "outreach_reconciliation", row.id)
@@ -44,15 +52,17 @@ def enqueue_recovery(db):
     if runnable:
         return
     for row in db.scalars(select(FirstContact).where(
-            FirstContact.status.in_(["reserved", "uncertain"]))):
+            FirstContact.status.in_(["reserved", "uncertain"]))
+            .order_by((FirstContact.status == "reserved").desc(), FirstContact.reserved_at)):
+        contact_ids = reservation_contact_ids(db, row)
         active = db.scalar(select(Memory.id).where(Memory.namespace == operator.NAMESPACE,
-            Memory.value["contact_id"].as_string() == row.contact_id,
+            Memory.value["contact_id"].as_string().in_(contact_ids),
             Memory.value["status"].as_string() == "running",
             Memory.value["lease_until"].as_float() > now))
         if active:
             continue
         send_tasks = select(Memory.key).where(Memory.namespace == operator.NAMESPACE,
-            Memory.value["contact_id"].as_string() == row.contact_id,
+            Memory.value["contact_id"].as_string().in_(contact_ids),
             Memory.value["stage"].as_string().in_(["send", "outreach"]))
         failed_send = db.scalar(select(Evidence.id).where(Evidence.subject.in_(send_tasks),
             Evidence.kind == "EXECUTION_FAULT", Evidence.occurred_at >= row.reserved_at).limit(1))
@@ -81,7 +91,7 @@ def packet(db, task):
     if not row:
         raise GrowthError("Reservation already reconciled")
     task_ids = [r.key for r in db.scalars(select(Memory).where(Memory.namespace == "operator_task",
-        Memory.value["contact_id"].as_string() == row.contact_id,
+        Memory.value["contact_id"].as_string().in_(reservation_contact_ids(db, row)),
         Memory.value["stage"].as_string().in_(["send", "outreach"])))]
     events = list(db.scalars(select(Evidence).where(Evidence.subject.in_(task_ids),
         Evidence.kind.in_(["ACQUISITION_STAGE_RESULT", "EXECUTION_FAULT"]),
@@ -117,6 +127,7 @@ def apply_result(db, task, result, stage_event):
         if not proofs or not set(proofs).issubset(allowed):
             raise GrowthError("No-send recovery requires IDs from reconciliation.events: " + str(sorted(allowed)))
     reservation_id = row.id
+    contact_ids = reservation_contact_ids(db, row)
     if outcome == "not_sent":
         if row.status != "reserved":
             raise GrowthError("Uncertain or confirmed external submissions cannot be released by a no-click report")
@@ -130,7 +141,7 @@ def apply_result(db, task, result, stage_event):
         # Terminalize obsolete send attempts before creating one fresh successor.
         # It must obtain a new admission; the expired reservation stays invalid.
         for old in db.scalars(select(Memory).where(Memory.namespace == operator.NAMESPACE,
-                Memory.value["contact_id"].as_string() == task["contact_id"],
+                Memory.value["contact_id"].as_string().in_(contact_ids),
                 Memory.value["stage"].as_string().in_(["send", "outreach"]))):
             if old.key != task["id"]:
                 remember(db, operator.NAMESPACE, old.key, {**old.value, "status": "excluded",

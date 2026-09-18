@@ -299,6 +299,10 @@ def operator_action(db, action, payload):
         raise GrowthError("Canonical merchant identity required")
     lock(db)
     contact = existing_contact(db, identity)
+    if payload.get("contact_id"):
+        assigned = db.get(Contact, payload["contact_id"])
+        if not assigned or canonical_identity(assigned.identity) != identity or not contact or contact.id != assigned.id:
+            raise GrowthError("Reservation identity must match the assigned contact; reuse its assessed identity instead of creating another prospect")
     if not contact:
         contact = Contact(identity=identity, organization=payload["organization"], source=payload["source"])
         db.add(contact); db.flush()

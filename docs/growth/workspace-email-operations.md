@@ -36,7 +36,7 @@ For each relevant, individually reviewed first contact:
    Keep the existing assessment; a payload-format correction does not require
    new merchant research. See the browser send payload fields in
    `executor-instructions.md` before constructing this request.
-   Preserve the assessed contact's exact `identity`, not just its `contact_id`.
+   Include the assigned `contact_id` and preserve that contact's exact `identity`.
    Reservation lookup uses `identity`; changing an assessed email identity to a
    store domain can create a second contact and detach receipt recovery from the
    assigned task. Read the retained assessment/history to recover the exact
