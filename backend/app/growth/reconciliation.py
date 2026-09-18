@@ -76,6 +76,9 @@ def enqueue_recovery(db):
             continue
         existing = get_memory(db, operator.NAMESPACE, previous.get("task_id", ""))
         if existing.get("status") in {"pending", "running"} and existing.get("attempts", 0) < operator.MAX_ATTEMPTS:
+            if failed_send and not existing.get("receipt_completion"):
+                offer_review(db, row, receipt_completion=True)
+                return
             continue
         if existing.get("attempts", 0) >= operator.MAX_ATTEMPTS and not previous.get("retry_at"):
             remember(db, "outreach_reconciliation", row.id, {**previous, "retry_at": now + 3600})

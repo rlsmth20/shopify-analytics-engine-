@@ -76,7 +76,7 @@ class ReconciliationTests(unittest.TestCase):
             self.assertEqual(status(db)['remaining'],1)
 
     def test_alias_reservation_recovers_original_trace_before_uncertain_backlog(self):
-        from app.growth.reconciliation import enqueue_recovery, packet, apply_result
+        from app.growth.reconciliation import enqueue_recovery, packet, apply_result, offer_review
         from app.growth.operator import claim
         stale, _ = self.reserve_fixture(1, uncertain=True)
         reservation, proof = self.reserve_fixture(2, priority_review=False)
@@ -89,6 +89,7 @@ class ReconciliationTests(unittest.TestCase):
             db.add(storefront); db.flush()
             original_id = original.id
             row.contact_id = storefront.id
+            offer_review(db, row, receipt_completion=False)
             # A fault belongs to the email-identity task, not the reservation's
             # storefront row. Recovery must discover this without manual seeding.
             send = db.get(Evidence, proof).subject
