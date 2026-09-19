@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useId, useState, type ReactNode } from "react";
+import { reportPage } from "@/lib/chart-interaction";
 
 export type ReportOption = {
   label: string;
@@ -113,11 +114,11 @@ export function ReportFilters({
             <span className="report-filter-muted">No filters applied</span>
           ) : (
             activeFilters.map((filter) => (
-              <span key={filter.key} className="report-filter-chip">
+              <button type="button" key={filter.key} className="report-filter-chip" onClick={() => onChange(filter.key, "")} aria-label={`Remove ${filter.label} filter`}>
                 {filter.label}:{" "}
                 {filter.options.find((option) => option.value === values[filter.key])?.label ??
-                  values[filter.key]}
-              </span>
+                  values[filter.key]} <span aria-hidden="true">×</span>
+              </button>
             ))
           )}
         </div>
@@ -199,6 +200,17 @@ export function ReportTable<T>({
   loading?: boolean;
   emptyState: ReactNode;
 }) {
+  const [pageState, setPageState] = useState<{ rows: T[]; page: number } | null>(null);
+  const [pageSize, setPageSize] = useState(25);
+  const [compact, setCompact] = useState(false);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
+  const tableId = useId();
+  const identityColumn = columns.find(column => column.key === "product") ?? columns[0];
+  const orderedColumns = identityColumn ? [identityColumn, ...columns.filter(column => column !== identityColumn)] : columns;
+  const visibleColumns = orderedColumns.filter(column => column === identityColumn || !hiddenColumns.includes(column.key));
+  // Sorting/filtering produces a new row set; begin at its first page.
+  const page = reportPage(pageState?.rows === rows ? pageState.page : 0, pageSize, rows.length);
+  const visibleRows = rows.slice(page.start, page.end);
   if (loading) {
     return (
       <ReportEmptyState
@@ -213,21 +225,34 @@ export function ReportTable<T>({
   }
 
   return (
-    <div className="report-table-wrap">
-      <table className="report-table">
+    <div className={`report-table-shell${compact ? " report-table-compact" : ""}`}>
+      <div className="report-table-tools">
+        <p role="status"><strong>{(page.start + 1).toLocaleString()}–{page.end.toLocaleString()}</strong> of {rows.length.toLocaleString()} rows</p>
+        <div className="report-table-options">
+          <label>Rows <select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPageState(null); }}>{[25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
+          <button type="button" aria-pressed={compact} onClick={() => setCompact(!compact)} className="chart-reset">Compact rows</button>
+          <details className="report-column-picker"><summary>Columns <span aria-hidden="true">⌄</span></summary><div>
+            {orderedColumns.map(column => <label key={column.key}><input type="checkbox" checked={column === identityColumn || !hiddenColumns.includes(column.key)} disabled={column === identityColumn} onChange={event => setHiddenColumns(current => event.target.checked ? current.filter(key => key !== column.key) : [...current, column.key])} />{column.label}</label>)}
+            <button type="button" className="chart-reset" onClick={() => setHiddenColumns([])}>Show all columns</button>
+          </div></details>
+        </div>
+      </div>
+      <div className="report-table-wrap" role="region" aria-label="Report results, scroll for more columns" tabIndex={0}>
+      <table className="report-table" id={tableId}>
+        <caption className="sr-only">Report results. Select a column heading to sort.</caption>
         <thead>
           <tr>
-            {columns.map((column) => {
+            {visibleColumns.map((column) => {
               const sorted = sortKey === column.key;
               return (
-                <th key={column.key} className={`align-${column.align ?? "left"}`}>
+                <th scope="col" key={column.key} aria-sort={sorted ? (sortDirection === "asc" ? "ascending" : "descending") : "none"} className={`align-${column.align ?? "left"}`}>
                   <button
                     type="button"
                     onClick={() => onSort(column.key)}
                     className={sorted ? "report-sort report-sort-active" : "report-sort"}
                   >
                     <span>{column.label}</span>
-                    <span aria-hidden>{sorted ? (sortDirection === "asc" ? "^" : "v") : ""}</span>
+                    <span aria-hidden>{sorted ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}</span>
                   </button>
                 </th>
               );
@@ -235,24 +260,25 @@ export function ReportTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {visibleRows.map((row, index) => {
             const key = rowKey(row);
             const expanded = selectedRowKey === key;
             return (
               <Fragment key={key}>
                 <tr
                   className={expanded ? "report-row report-row-expanded" : "report-row"}
-                  onClick={() => onRowClick?.(row)}
+                  onClick={(event) => { if (!(event.target as HTMLElement).closest("a,button,input,select,label")) onRowClick?.(row); }}
                 >
-                  {columns.map((column) => (
+                  {visibleColumns.map((column, columnIndex) => (
                     <td key={column.key} className={`align-${column.align ?? "left"}`}>
                       {column.render(row)}
+                      {columnIndex === 0 && onRowClick ? <button type="button" className="report-row-toggle" aria-expanded={expanded} aria-controls={renderRowDetails ? `${tableId}-detail-${index}` : undefined} onClick={() => onRowClick(row)}>{expanded ? "Close details" : "View details"}</button> : null}
                     </td>
                   ))}
                 </tr>
                 {expanded && renderRowDetails ? (
-                  <tr className="report-detail-row">
-                    <td colSpan={columns.length}>{renderRowDetails(row)}</td>
+                  <tr className="report-detail-row" id={`${tableId}-detail-${index}`}>
+                    <td colSpan={visibleColumns.length}><div className="report-detail-content">{renderRowDetails(row)}</div></td>
                   </tr>
                 ) : null}
               </Fragment>
@@ -260,6 +286,11 @@ export function ReportTable<T>({
           })}
         </tbody>
       </table>
+      </div>
+      <div className="report-pagination" aria-label="Report pages">
+        <span>Page {page.index + 1} of {page.count}</span>
+        <div><button type="button" disabled={page.index === 0} onClick={() => setPageState({ rows, page: page.index - 1 })}>← Previous</button><button type="button" disabled={page.index === page.count - 1} onClick={() => setPageState({ rows, page: page.index + 1 })}>Next →</button></div>
+      </div>
     </div>
   );
 }

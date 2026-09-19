@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { ChartCard } from "@/components/chart-card";
+import { HorizontalBarChart } from "@/components/charts";
 import { InventoryValueChart } from "@/components/inventory-value-chart";
 import { EmptyState } from "@/components/empty-state";
 import { KpiCard } from "@/components/kpi-card";
@@ -35,30 +36,8 @@ function formatKpiValue(value: number | null, unit: InventoryHealthResponse["kpi
   return numberFormatter.format(value);
 }
 
-function maxBucketValue(items: InventoryHealthBucket[]): number {
-  return Math.max(...items.map((item) => item.value), 1);
-}
-
 function BucketBars({ items }: { items: InventoryHealthBucket[] }) {
-  const maxValue = maxBucketValue(items);
-  return (
-    <div className="bar-list">
-      {items.map((item) => (
-        <div key={item.label} className="bar-row">
-          <div className="bar-row-meta">
-            <span>{item.label}</span>
-            <strong>{numberFormatter.format(item.value)}</strong>
-          </div>
-          <div className="bar-track">
-            <div
-              className="bar-fill"
-              style={{ width: `${(item.value / maxValue) * 100}%` }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <HorizontalBarChart points={items} valueFormatter={value => numberFormatter.format(value)} />;
 }
 
 function RiskList({

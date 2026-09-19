@@ -53,6 +53,6 @@
   .dashboard :global(.hbar-row), .dashboard :global(.diverging-row) { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; }
   .dashboard :global(.hbar-track), .dashboard :global(.diverging-track) { grid-column: 1 / -1; grid-row: 2; }
   .dashboard :global(.hbar-value), .dashboard :global(.diverging-value) { grid-column: 2; grid-row: 1; }
-  .dashboard :global(.chart-area) { height: 210px; min-width: 430px; }
+  .dashboard :global(.chart-area) { min-width: 0; }
   .revenuePlot { overflow-x: auto; padding-bottom: 8px; }
 }
