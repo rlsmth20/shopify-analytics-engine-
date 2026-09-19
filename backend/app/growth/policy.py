@@ -80,6 +80,9 @@ REPLY_CLASSES = {"SUBSTANTIVE_POSITIVE", "SUBSTANTIVE_NEUTRAL", "SUBSTANTIVE_NEG
 def classify_reply(text, headers=None):
     headers = {k.lower(): str(v).lower() for k, v in (headers or {}).items()}
     lower = text.lower().replace("\u2019", "'").split("\non ")[0].split("\n>")[0][:4000]
+    # MIME/plain-text wrapping must not turn "not\ninterested" into interest.
+    # Strip quoted history before collapsing whitespace so its boundaries survive.
+    lower = " ".join(lower.split())
     explicit_opt_out = re.search(
         r"\b(?:stop|cease)\s+(?:emailing|contacting|messaging)\b"
         r"|\bleave\s+(?:me|us)\s+alone\b"

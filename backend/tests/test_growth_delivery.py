@@ -166,3 +166,23 @@ class GrowthDeliveryTests(unittest.TestCase):
         self.assertEqual(classify_reply("I don\u2019t want a health check."), "SUBSTANTIVE_NEGATIVE")
         self.assertEqual(classify_reply("Can Skubase help me stop stockouts?"), "QUESTION")
         self.assertEqual(classify_reply("Yes, please send me the health check."), "SUBSTANTIVE_POSITIVE")
+
+    def test_wrapped_decline_suppresses_without_counting_quoted_offer_as_interest(self):
+        contact_id, _ = self.requested_message("wrapped-decline")
+        text = ("Hello,\n\nThank you for reaching out. We\u2019re not\n"
+                "interested at this time, but we wish you continued success.\n\n"
+                "On Sat, Sep 19, Rainer wrote:\n> Would you be interested?\n"
+                "> To opt out, reply unsubscribe.")
+        with self.factory() as db:
+            message = messaging.ingest_reply(db, provider_id="wrapped-refusal",
+                sender="wrapped-decline@example.test", recipients=["info@skubase.io"], text=text)
+            db.commit()
+            self.assertEqual(message.classification, "SUBSTANTIVE_NEGATIVE")
+            self.assertEqual(message.body, text)
+            self.assertTrue(db.get(Contact, contact_id).suppressed)
+            self.assertEqual(db.get(Contact, contact_id).status, "declined")
+            event = db.scalar(select(Evidence).where(Evidence.key == "reply:wrapped-refusal"))
+            self.assertEqual(event.data["classification"], "SUBSTANTIVE_NEGATIVE")
+        self.assertEqual(classify_reply("Please stop\r\ncontacting us."), "UNSUBSCRIBE")
+        self.assertEqual(classify_reply("Yes, please send\nme the details.\n> not interested"),
+                         "SUBSTANTIVE_POSITIVE")
