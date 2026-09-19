@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { trackGrowthEvent } from "@/lib/analytics";
+import { downloadSpreadsheet } from "@/lib/spreadsheet-export";
 import { analyzeInventoryHealth, containsSampleHealthRows, HEALTH_CHECK_MAX_BYTES, HEALTH_CHECK_TEMPLATE, HEALTH_STATUS, healthResultsCsv,
   type HealthRow, type HealthSettings, type HealthStatus } from "@/lib/inventory-health-check";
 import styles from "./inventory-health-checker.module.css";
@@ -28,6 +29,8 @@ export function InventoryHealthChecker() {
   const [filter, setFilter] = useState<HealthStatus | "all">("all");
   const [shown, setShown] = useState(50);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const filtered = useMemo(() => (rows || []).filter(row => (filter === "all" || row.status === filter) &&
     row.sku.toLowerCase().includes(search.trim().toLowerCase())), [rows, filter, search]);
   const totals = useMemo(() => {
@@ -43,7 +46,7 @@ export function InventoryHealthChecker() {
     return { counts, knownExcessCost, missingCost };
   }, [rows]);
   const money = (n: number) => new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: n > 0 && n < 100 ? 2 : 0 }).format(n);
-  const invalidate = () => { setRows(null); setErrors([]); };
+  const invalidate = () => { setRows(null); setErrors([]); setExportError(null); };
 
   return <div className={styles.checker}>
     <form className={styles.form} onSubmit={event => {
@@ -57,7 +60,7 @@ export function InventoryHealthChecker() {
       // Sample runs are product demonstrations, not merchant acquisition evidence.
       if (!result.errors.length && !isSample) void trackGrowthEvent("CALCULATOR_USED");
     }}>
-      <div className={styles.stepHeading}><span>1</span><div><h2>Start with a SKU summary</h2><p>No account or app installation required. Your SKU entries are processed in this browser and are not sent to Skubase.</p></div></div>
+      <div className={styles.stepHeading}><span>1</span><div><h2>Start with a SKU summary</h2><p>No account or app installation required. Analysis runs in your browser. Results are sent to Skubase only if you choose an Excel download.</p></div></div>
       <div className={styles.toolbar}>
         <button type="button" className="button button-secondary" onClick={() => { setCsv(HEALTH_CHECK_TEMPLATE); setSample(true); invalidate(); }}>Try sample data</button>
         <button type="button" className="button button-ghost" onClick={() => download(HEALTH_CHECK_TEMPLATE, "skubase-inventory-summary-template.csv")}>Download template</button>
@@ -92,8 +95,20 @@ export function InventoryHealthChecker() {
 
     {rows && <section className={styles.results} aria-label="Inventory health results">
       <div className={styles.resultHeading}><div><p className={styles.eyebrow}>{sample ? "Sample results · Not your store" : "Your inventory summary"}</p><h2>{number(rows.length)} SKUs, prioritized for review</h2><p role="status">{number(totals.counts.stockout_risk)} stockout risks and {number(totals.counts.reorder_review)} additional reorder reviews under your assumptions.</p><p>{settings.salesDays}-day sales period · {settings.targetCoverDays}-day stock target · Costs in {currency}</p></div>
-        <button type="button" className="button button-secondary" onClick={() => download(healthResultsCsv(rows, currency,
-          { salesDays: Number(settings.salesDays), defaultLeadDays: Number(settings.defaultLeadDays), targetCoverDays: Number(settings.targetCoverDays) }), "skubase-inventory-health-check.csv")}>Download results</button></div>
+        <div className={styles.exportActions}>
+          <button type="button" className="button button-secondary" disabled={exporting} aria-describedby="health-export-privacy" onClick={async () => {
+            setExporting(true); setExportError(null);
+            try { await downloadSpreadsheet({ kind: "inventory_health", rows, currency, sample, settings: {
+              salesDays: Number(settings.salesDays), defaultLeadDays: Number(settings.defaultLeadDays), targetCoverDays: Number(settings.targetCoverDays),
+            } }, `skubase-inventory-health-check${sample ? '-sample' : ''}.xlsx`); }
+            catch (err) { setExportError(err instanceof Error ? err.message : "Couldn't create the Excel file. Try again or download CSV."); }
+            finally { setExporting(false); }
+          }}>{exporting ? "Preparing Excel…" : "Download Excel"}</button>
+          <button type="button" className="button button-ghost" onClick={() => download(healthResultsCsv(rows, currency,
+            { salesDays: Number(settings.salesDays), defaultLeadDays: Number(settings.defaultLeadDays), targetCoverDays: Number(settings.targetCoverDays) }), "skubase-inventory-health-check.csv")}>Download CSV</button>
+        </div></div>
+      <p id="health-export-privacy" className={styles.hint}>Excel includes charts and formatted tables. It sends these results to Skubase for formatting without saving them. CSV downloads stay in your browser.</p>
+      {exportError ? <p role="alert" className={styles.error}>{exportError}</p> : null}
       <div className={styles.overview}>
         <div className={styles.distribution} aria-label="SKU counts by review priority">{statuses.map(status => <button type="button" key={status} onClick={() => { setFilter(filter === status ? "all" : status); setShown(50); }} className={styles.distributionRow} aria-pressed={filter === status}>
           <span>{HEALTH_STATUS[status].label}</span><span className={styles.track}><span data-status={status} style={{ width: `${totals.counts[status] / rows.length * 100}%` }} /></span><strong>{number(totals.counts[status])}</strong>

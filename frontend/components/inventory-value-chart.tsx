@@ -8,6 +8,7 @@ import { API_BASE_URL } from "@/lib/api-base";
 import { currencyFormatter, numberFormatter } from "@/lib/app-helpers";
 import { authenticatedFetch, isDemoActive } from "@/lib/shopify-embedded";
 import { exportReportRowsCsv } from "@/lib/report-export";
+import { downloadSpreadsheet } from "@/lib/spreadsheet-export";
 
 type ValuePoint = { date: string; cost_value: number; retail_value: number; total_units: number };
 type Metric = "cost_value" | "retail_value" | "total_units";
@@ -21,6 +22,8 @@ export function InventoryValueChart() {
   const [error, setError] = useState<string | null>(null);
   const [sample, setSample] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     const demo = isDemoActive();
@@ -68,12 +71,19 @@ export function InventoryValueChart() {
           {Object.entries(METRICS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}
         </select>
       </label>
+      <button type="button" className="button button-secondary" disabled={loading || !!error || points.length === 0 || exporting} onClick={async () => {
+        setExporting(true); setExportError(null);
+        try { await downloadSpreadsheet({ kind: "inventory_history", points, sample }, `skubase-inventory-${days}d${sample ? '-sample' : ''}.xlsx`); }
+        catch (err) { setExportError(err instanceof Error ? err.message : "Couldn't create the Excel file. Try again or export CSV."); }
+        finally { setExporting(false); }
+      }}>{exporting ? "Preparing Excel…" : "Export Excel"}</button>
       <button type="button" className="button button-secondary" disabled={loading || !!error || points.length === 0} onClick={() => exportReportRowsCsv({
         filename: `skubase-inventory-${days}d${sample ? '-sample' : ''}.csv`, rows: points,
         columns: [{ label: "Date (UTC)", value: (point) => point.date }, { label: "Recorded-cost subtotal (USD)", value: (point) => point.cost_value },
           { label: "Retail value", value: (point) => point.retail_value }, { label: "Units on hand", value: (point) => point.total_units }],
       })}>Export CSV</button>
     </div>
+    {exportError ? <p role="alert" className="section-copy">{exportError}</p> : null}
     {sample ? <p className="section-copy">Sample inventory history · illustration only</p> : null}
     {loading ? <p className="section-copy" role="status">Loading inventory history…</p> : error ? <div role="alert"><p>{error}</p><button type="button" className="button button-secondary" onClick={() => setAttempt((previous) => previous + 1)}>Retry history</button></div> : points.length === 0 ?
       <div className="chart-history-empty"><strong>Your history starts with your first sync.</strong><p>Daily snapshots appear here once you have inventory. Past dates are not filled with estimates.</p><Link href="/store-sync" className="button button-primary">Sync Shopify inventory</Link></div> : <>

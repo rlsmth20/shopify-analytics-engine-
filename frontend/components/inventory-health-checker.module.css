@@ -68,3 +68,4 @@
 .checker :is(button,input,select,textarea,summary,a,[tabindex]):focus-visible { outline:3px solid #4c7952; outline-offset:3px; }
 @media(max-width:900px) { .settings { grid-template-columns:repeat(2,minmax(0,1fr)); } .overview { grid-template-columns:1fr; } .nextStep { align-items:flex-start; flex-direction:column; } }
 @media(max-width:560px) { .resultHeading { flex-direction:column; } .settings { grid-template-columns:1fr; } .distributionRow { grid-template-columns:128px minmax(35px,1fr) 32px; gap:8px; font-size:12px; } .toolbar { align-items:stretch; flex-direction:column; } .resultFilters { align-items:stretch; flex-direction:column; } }
+.exportActions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
