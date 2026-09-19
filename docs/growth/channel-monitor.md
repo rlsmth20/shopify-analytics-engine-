@@ -14,6 +14,15 @@ or restoration fails, retain the concrete blocker. Do not repeatedly launch.
 Keep payload files in .growth-deploy and never print credentials. Return the
 required structured result promptly; this monitor has a bounded runtime.
 
+Use the exact commands and payloads below; no repository search is needed. The
+child shell is Windows PowerShell 5.1 and may not have rg. Write each payload to a
+distinct task-specific JSON file using ConvertTo-Json and Set-Content -Encoding
+UTF8. Never reuse the monitor-start payload for prospect-history: history requires
+{"identity":"actual-email@example.com"}, not task_id/lease_token. A failed command
+did not record a check. If a command is still running, poll its session ID instead
+of repeating it. Reserve the last 45 seconds to complete step 6, even if the check
+is incomplete and requires_attention must be true.
+
 1. Call scripts/growth-review.ps1 -Action operator-monitor-start -File <JSON>
    with {"task_id":"<assigned id>","lease_token":"<assigned lease_token>"}.
    Retain the returned check_id; it supplies the observation timestamp.
@@ -74,7 +83,12 @@ required structured result promptly; this monitor has a bounded runtime.
    channels. Never invent a timestamp or mark uninspected channels clear. Each
    observation must be at most 800 characters; complete within the check window.
 7. Return done, stop_reason=null and successors=[] for a clear check. Retain its
-   evidence ID and sources. For actual actionable human messages, retain exact
+   evidence ID from the successful operator-monitor response and sources. The
+   check_id returned by operator-monitor-start is only the start record, not proof
+   of a completed check. Do not say "recorded" or return done unless step 6 actually
+   succeeded for this task and lease. If recording failed, retain the exact error
+   and return blocked; do not invent an evidence ID or a successful observation.
+   For actual actionable human messages, retain exact
    text/source and a reply successor tied to the existing merchant. For unresolved
    access/incidents, return blocked with SAFETY_BLOCKED and a concrete next step.
    The supervisor resumes acquisition itself. Do not reserve contacts or seed
