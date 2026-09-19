@@ -298,6 +298,16 @@ Keep payload files in .growth-deploy, not the repository root.
   publication/provider confirmation; receipt is its exact URL/text, not a claim
   that a click succeeded. Otherwise receipt=null. Existing uncertain submissions
   must remain uncertain unless an actual success receipt is found.
+  Google Workspace email requires the actual Sent conversation URL. An inbox
+  compose URL plus "Message sent" is not an acceptable ledger receipt. If that
+  receipt was rejected, do not return it again. Read the authenticated business
+  mailbox's Sent folder, locate the reserved recipient and subject, open the
+  existing message, match its full body, and retain the observed Sent-thread URL.
+  This read-only lookup is permitted even if the original compose tab closed;
+  never reconstruct a thread URL or send again. If access or matching fails,
+  return uncertain instead of repeatedly asserting the rejected receipt.
+  Bound trace reading to relevant original tool observations. Do not print raw
+  JSONL files or recursively expand prior recovery traces embedded in tool output.
   Return done, stop_reason=null, successors=[] after reviewing; the supervisor
   commits release/receipt/continued hold and selects the next work automatically.
 - monitor: recover an incomplete channel check; no research or outbound sends.
