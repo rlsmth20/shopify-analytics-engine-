@@ -42,7 +42,13 @@ For each relevant, individually reviewed first contact:
    assigned task. Read the retained assessment/history to recover the exact
    identity. Do not create a new identity or reassess to work around an identity
    mismatch. Link verified aliases with `prospect-link` when needed.
-3. Use the returned `email` object exactly. It adds a separate Rainer signature, the configured business name,
+3. Retain the successful `reservation_id` and `email` response. Do not repeat
+   `outreach-reserve` to confirm success or retrieve the same response. Poll a
+   running shell session using its returned session ID. A duplicate error from an
+   accidental second call does not undo the first reservation. Check its current
+   history before proceeding; only a still-valid, unattempted pending reservation
+   can continue to composition. Uncertain or sent messages must never be retried.
+   Use the returned `email` object exactly. It adds a separate Rainer signature, the configured business name,
    owner-supplied mailing address and reply-unsubscribe footer. Do not duplicate
    that footer in the proposed body. Keep one inventory question and no em dashes.
 4. **Preserve the layout:** focus the Gmail message body and paste the returned

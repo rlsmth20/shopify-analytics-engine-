@@ -365,7 +365,16 @@ Keep payload files in .growth-deploy, not the repository root.
   Never invent an experiment ID or reuse an expired historical example.
 - send/outreach for Workspace email: read workspace-email-operations.md. Use
   outreach-reserve with channel=email, recipient, subject and email_source plus
-  the common fields below. Paste returned email.html_body with format=html into
+  the common fields below. Call the reservation command once. A successful result
+  containing reservation_id and email is the handoff to composing the draft;
+  retain that result and do not run outreach-reserve again to retrieve or confirm
+  it. If a shell call is still running, poll its returned session_id rather than
+  starting the command again. If you accidentally repeat the command, its duplicate
+  error does not invalidate the earlier successful reservation: retain the original
+  result, read current prospect history, and continue only if that exact reservation
+  remains pending, unattempted and valid. Never submit an expired, uncertain or
+  already-sent reservation; use receipt reconciliation when its state is unclear.
+  Paste returned email.html_body with format=html into
   the focused body, never setValue. Visually inspect the draft screenshot for
   paragraph gaps and separate signature/address/opt-out before authorization.
   Use its returned exact email body and footer, verify
