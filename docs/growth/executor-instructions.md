@@ -41,6 +41,18 @@ Markdown filenames. Use scripts/growth-review.ps1 -Action outreach-status or
 -Action email-status only when this stage needs live status; planner uses its
 supplied packet without extra tool calls.
 
+For an assigned contact, use `contact_identity` verbatim as the `identity` in
+outreach-reserve and prospect-history, preserving `contact_id`. Do not substitute
+the recipient email, source hostname, or another linked identity. Read the
+supplied merchant_history before making a redundant history request.
+The executor shell may be Windows PowerShell 5.1: use compatible syntax, and
+fall back to Select-String if rg is unavailable. Avoid `??`, `&&`, and unsupported
+Set-Content options. These tooling differences do not require merchant research.
+Prepare the draft before the final live mailbox/Reddit checks when practical.
+If those checks expire while composing or correcting a payload, refresh the
+actual checks with operator-monitor-start/operator-monitor before authorization;
+never invent a timestamp or weaken the freshness gate.
+
 ## Execution-first owner policy (revision 1, September 14)
 
 Use docs/growth/operating-policy.md for owner authority and constraint handling.

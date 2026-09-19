@@ -207,6 +207,7 @@ def take(factory, owner):
             from .identity import merchant_view
             contact = db.get(Contact, task["contact_id"])
             if contact:
+                task["contact_identity"] = contact.identity
                 task["merchant_history"] = merchant_view(db, contact.identity)
         db.commit()
         return task

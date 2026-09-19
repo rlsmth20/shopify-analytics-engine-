@@ -53,6 +53,21 @@ class ExecutionTests(unittest.TestCase):
             self.assertEqual(view['current_blocker'], 'CODEX_USAGE_LIMIT')
             self.assertEqual(view['next_wake_retry'], retry)
 
+    def test_assigned_packet_preserves_identity_distinct_from_recipient(self):
+        with self.factory() as db:
+            contact = Contact(identity='merchant.example', email='orders@merchant.example',
+                              source='https://merchant.example/contact')
+            db.add(contact)
+            db.flush()
+            offered = offer(db, key='identity-reply', source=contact.source, stage='reply',
+                            contact_id=contact.id, decision='Read the existing conversation',
+                            evidence_id=self.task['evidence_id'])
+            db.commit()
+        task = executor.take(self.factory, 'identity-worker')
+        self.assertEqual(task['id'], offered['id'])
+        self.assertEqual(task['contact_identity'], 'merchant.example')
+        self.assertNotEqual(task['contact_identity'], 'orders@merchant.example')
+
     def test_completed_reply_without_successor_resumes_existing_acquisition(self):
         with self.factory() as db:
             reply = offer(db, key='automatic-reply', source='https://example.com/thread',
