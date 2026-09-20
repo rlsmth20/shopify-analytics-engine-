@@ -99,6 +99,39 @@ class ExecutionTests(unittest.TestCase):
             resumed = executor.take(self.factory, 'checkpoint-worker')
         self.assertEqual(resumed['id'], queued['id'])
 
+    def test_stale_inbox_check_runs_with_full_closed_send_backlog(self):
+        with self.factory() as db:
+            old = time.time() - 4 * 3600
+            check = record(db, 'last-inbox-check', 'CHANNEL_MONITOR', 'inbox', {}, occurred_at=old)
+            remember(db, 'working', 'browser_safety_check',
+                {'checked_at': old, 'evidence_id': check.id, 'requires_attention': False})
+            for i in range(8):
+                offer(db, key='closed-send-' + str(i), source='https://example.com/contact',
+                    stage='send', decision='Prepared first contact', priority=100, evidence_id=check.id)
+            db.commit()
+        with patch('app.growth.acquisition_review.refresh', return_value={
+                'focused_validation': {'remaining': 0}}):
+            task = executor.take(self.factory, 'inbox-worker')
+        self.assertEqual(task['stage'], 'monitor')
+        self.assertTrue(task['key'].startswith('browser-recovery:'))
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'working', 'browser_safety_check')['checked_at'], old)
+            self.assertEqual(list(db.scalars(select(FirstContact))), [])
+        # Selection alone must not fabricate a new completed inbox check.
+        with self.assertRaisesRegex(GrowthError, 'fresh channel observations'):
+            executor.accept(self.factory, 'inbox-worker', task, self.result())
+        with self.factory() as db:
+            check = record(db, 'fresh-inbox-fixture', 'CHANNEL_MONITOR', 'inbox',
+                {'lease_token': task['lease_token']})
+            remember(db, 'working', 'browser_safety_check',
+                {'checked_at': time.time(), 'evidence_id': check.id, 'requires_attention': False})
+            db.commit()
+        executor.accept(self.factory, 'inbox-worker', task, self.result())
+        with patch('app.growth.acquisition_review.refresh', return_value={
+                'focused_validation': {'remaining': 0}}):
+            next_task = executor.take(self.factory, 'inbox-worker')
+        self.assertEqual(next_task['id'], self.task['id'])
+
     def test_packet_retains_only_recent_suppressed_terminal_replies(self):
         with self.factory() as db:
             contact = Contact(identity='declined.example', email='info@declined.example',

@@ -94,6 +94,11 @@ replies, 2 positive replies and 1 verified health-check request, Shopify connect
 or strong activation. Genuine strong signals or severe negative delivery evidence
 justify earlier review. Allow the last contact seven days to respond before
 treating silence as negative; this does not require idle time or stop conversations.
+The executor schedules a leased Gmail/retained-Reddit inbox check when the prior
+check is three hours old, even with enrollment closed. Completed
+checks require fresh browser evidence. Prepared first-contact tasks remain queued
+and are excluded before the bounded work selection, so they cannot hide replies,
+receipt reconciliation or discovery behind a full send backlog.
 
 The persistent acquisition review and scheduled strategic review receive the
 focused results. On the checkpoint, verify reply coverage/delivery, identify the

@@ -140,7 +140,10 @@ def take(factory, owner):
         packet = operator.export_packet(db)
         safety = get_memory(db, "working", "browser_safety_check")
         recovery = get_memory(db, "working", "browser_monitor_recovery")
-        if safety.get("requires_attention") and not packet["claimed_tasks"]:
+        # Inbox observation must continue when there are no new sends to trigger
+        # pre-send checks. Reuse the leased monitor and its existing recovery.
+        monitor_due = bool(safety.get("checked_at") and time.time() - safety["checked_at"] >= 3 * 3600)
+        if (safety.get("requires_attention") or monitor_due) and not packet["claimed_tasks"]:
             existing = get_memory(db, operator.NAMESPACE, recovery.get("task_id", ""))
             if (existing.get("status") == "running" and existing.get("lease_until", 0) <= time.time()
                     and existing.get("attempts", 0) >= operator.MAX_ATTEMPTS):
@@ -165,15 +168,15 @@ def take(factory, owner):
         focus = outcome_guidance.get("focused_validation") or {}
         enrollment_closed = focus.get("remaining") == 0
         if enrollment_closed:
-            packet["tasks"] = [t for t in packet["tasks"] if t.get("stage") not in {"send", "outreach"}]
+            packet = operator.export_packet(db, exclude_first_contacts=True)
         if not any(t.get("stage") not in {"monitor", "reconcile", "deliverability"} for t in packet["tasks"]) and not packet["claimed_tasks"]:
             replenish(db, packet["capacity"])
             db.flush()
-            packet = operator.export_packet(db)
+            packet = operator.export_packet(db, exclude_first_contacts=enrollment_closed)
         if enrollment_closed:
             packet["tasks"] = [t for t in packet["tasks"] if t.get("stage") not in {"send", "outreach"}]
         tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")
-                 or t.get("key", "").startswith("community-inbox:")]
+                 or t.get("key", "").startswith(("community-inbox:", "browser-recovery:"))]
         if safety.get("requires_attention"):
             tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile", "deliverability"}]
         if not packet["capacity"].get("dispatch_remaining", packet["capacity"]["remaining"]):

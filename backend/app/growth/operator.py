@@ -89,7 +89,7 @@ def complete(db, *, task_id, lease_token, evidence_id, outcome, next_step, now=N
     return item
 
 
-def export_packet(db):
+def export_packet(db, *, exclude_first_contacts=False):
     # Import the old manually maintained backlog once; retain the original memory.
     legacy = get_memory(db, "working", "operator_pipeline")
     for item in legacy.get("items", [])[:12]:
@@ -148,11 +148,14 @@ def export_packet(db):
     # behind newer terminal history or high-priority tasks with live leases.
     from sqlalchemy import case
     stage = Memory.value["stage"].as_string()
+    if exclude_first_contacts:
+        active = (*active, stage.not_in(["send", "outreach"]))
     capacity = status(db, now)
     available = [r.value for r in db.scalars(select(Memory).where(*active, lease <= now, attempts < MAX_ATTEMPTS,
         func.coalesce(Memory.value["retry_at"].as_float(), 0) <= now)
         .order_by(case((stage == "reply", 0),
-                      ((stage == "monitor") & Memory.value["key"].as_string().startswith("community-inbox:"), 1),
+                      ((stage == "monitor") & or_(Memory.value["key"].as_string().startswith("community-inbox:"),
+                                                 Memory.value["key"].as_string().startswith("browser-recovery:")), 1),
                       (stage == "monitor", 1 if get_memory(db, "working", "browser_safety_check").get("requires_attention") else 4),
                       ((stage == "reconcile") & Memory.value["receipt_completion"].as_boolean().is_(True), 2),
                       (stage == "deliverability", 2),
