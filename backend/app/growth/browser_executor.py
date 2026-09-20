@@ -438,7 +438,8 @@ def execute(factory, owner, task, *, codex, repo):
     codex = resolve_codex(codex)
     from .acquisition_usage import begin, route, retain
     model, effort = route(task.get("stage"))
-    budget = {"plan": 120, "discover": 300, "qualify": 120, "prepare": 180, "monitor": 180, "reconcile": 180}.get(task.get("stage"), 360)
+    budget = {"plan": 120, "discover": 300, "qualify": 120, "prepare": 180, "monitor": 180,
+              "reconcile": 180, "send": 600, "outreach": 600}.get(task.get("stage"), 360)
     with factory() as db:
         runs = list(db.scalars(select(Usage).where(Usage.result["task_id"].as_string() == task["id"],
                                                  Usage.outcome != RUNTIME_UNAVAILABLE)))

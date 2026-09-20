@@ -389,6 +389,21 @@ Keep payload files in .growth-deploy, not the repository root.
   Select an actual ID from the assigned active_experiments or operator-export.
   Never invent an experiment ID or reuse an expired historical example.
 - send/outreach for Workspace email: read workspace-email-operations.md. Use
+  the existing prepared facts and exact active experiment from your packet.
+  This is execution, not another research or strategy review. For browser-only
+  work initialize the available `cua` browser API; do not load native Windows
+  computer-control skill documents when no native Windows action is needed.
+  Finish required documentation and browser initialization BEFORE monitor-start,
+  so the five-minute observation window is spent on live checks and submission.
+  Select only `.readiness` from `email-status` JSON; do not print campaign history.
+  Reuse `handled_recent_replies` for unchanged suppressed messages rather than
+  repeatedly querying the same histories. New messages still require review.
+  Include `action_key` in the reservation payload, using the assigned task's
+  stable key verbatim. Missing required fields are not a reason to start a new
+  research branch. After reserve succeeds, proceed directly to compose, exact
+  body inspection, one-use authorization, Send and receipt. If the check expires,
+  renew actual observations; never extend its timestamp or bypass authorization.
+  Use
   outreach-reserve with channel=email, recipient, subject and email_source plus
   the common fields below. Call the reservation command once. A successful result
   containing reservation_id and email is the handoff to composing the draft;
