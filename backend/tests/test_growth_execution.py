@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
@@ -67,6 +68,36 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(task['id'], offered['id'])
         self.assertEqual(task['contact_identity'], 'merchant.example')
         self.assertNotEqual(task['contact_identity'], 'orders@merchant.example')
+
+    def test_closed_enrollment_retains_sends_without_consuming_attempts(self):
+        with self.factory() as db:
+            queued = offer(db, key='checkpoint-send', source='https://example.com/contact',
+                stage='send', decision='Prepared first contact', priority=90,
+                evidence_id=self.task['evidence_id'])
+            db.commit()
+        with patch('app.growth.acquisition_review.refresh', return_value={
+                'focused_validation': {'remaining': 0, 'decision': 'OBSERVE_RESPONSES'}}):
+            task = executor.take(self.factory, 'checkpoint-worker')
+        self.assertEqual(task['stage'], 'discover')
+        with self.factory() as db:
+            retained = get_memory(db, 'operator_task', queued['id'])
+            self.assertEqual(retained['status'], 'pending')
+            self.assertEqual(retained.get('attempts', 0), 0)
+            self.assertEqual(list(db.scalars(select(FirstContact))), [])
+            reply = offer(db, key='checkpoint-reply', source='https://example.com/thread',
+                stage='reply', decision='Respond to genuine interest',
+                evidence_id=self.task['evidence_id'])
+            db.commit()
+        executor.accept(self.factory, 'checkpoint-worker', task, self.result())
+        with patch('app.growth.acquisition_review.refresh', return_value={
+                'focused_validation': {'remaining': 0}}):
+            task = executor.take(self.factory, 'checkpoint-worker')
+        self.assertEqual(task['id'], reply['id'])
+        executor.accept(self.factory, 'checkpoint-worker', task, self.result())
+        with patch('app.growth.acquisition_review.refresh', return_value={
+                'focused_validation': {'remaining': 1}}):
+            resumed = executor.take(self.factory, 'checkpoint-worker')
+        self.assertEqual(resumed['id'], queued['id'])
 
     def test_packet_retains_only_recent_suppressed_terminal_replies(self):
         with self.factory() as db:

@@ -160,10 +160,18 @@ def take(factory, owner):
         from .acquisition_planner import replenish
         from .acquisition_review import refresh as refresh_outcome_review
         outcome_guidance = refresh_outcome_review(db)
+        # Enrollment review is not a send attempt. Retain prepared work without
+        # spending model calls/retries on tasks that admission will refuse.
+        focus = outcome_guidance.get("focused_validation") or {}
+        enrollment_closed = focus.get("remaining") == 0
+        if enrollment_closed:
+            packet["tasks"] = [t for t in packet["tasks"] if t.get("stage") not in {"send", "outreach"}]
         if not any(t.get("stage") not in {"monitor", "reconcile", "deliverability"} for t in packet["tasks"]) and not packet["claimed_tasks"]:
             replenish(db, packet["capacity"])
             db.flush()
             packet = operator.export_packet(db)
+        if enrollment_closed:
+            packet["tasks"] = [t for t in packet["tasks"] if t.get("stage") not in {"send", "outreach"}]
         tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")
                  or t.get("key", "").startswith("community-inbox:")]
         if safety.get("requires_attention"):
