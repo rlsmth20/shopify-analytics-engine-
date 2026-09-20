@@ -53,6 +53,25 @@ try {
         $growthReservationJson = $growthReservation | ConvertTo-Json -Depth 30
         Set-Content -LiteralPath $growthResultFile -Value $growthReservationJson -Encoding UTF8
         $growthReservationJson
+    } elseif ($Action -eq 'operator-monitor-start') {
+        # The check is already created when stdout returns. Preserve its exact
+        # ID and expiry instead of making the browser worker repeat the start.
+        $growthMonitorOutput = python @growthArguments
+        if ($LASTEXITCODE -ne 0) { throw 'Executive operation failed.' }
+        $growthMonitor = ($growthMonitorOutput -join "`n") | ConvertFrom-Json
+        $growthMonitorInput = Get-Content -LiteralPath $growthArguments[-1] -Raw | ConvertFrom-Json
+        if ($growthMonitor.check_id -le 0 -or $growthMonitorInput.lease_token -notmatch '^[a-f0-9]{32}$') {
+            throw 'Monitor response missing a valid check ID or lease; inspect retained evidence.'
+        }
+        $growthResultDirectory = Join-Path $growthRepo '.growth-deploy'
+        New-Item -ItemType Directory -Path $growthResultDirectory -Force | Out-Null
+        $growthResultFile = Join-Path $growthResultDirectory ('operator-monitor-start-' + $growthMonitorInput.lease_token + '.json')
+        $growthMonitor | Add-Member -NotePropertyName result_file -NotePropertyValue $growthResultFile -Force
+        $growthMonitor | Add-Member -NotePropertyName task_id -NotePropertyValue $growthMonitorInput.task_id -Force
+        $growthMonitor | Add-Member -NotePropertyName lease_token -NotePropertyValue $growthMonitorInput.lease_token -Force
+        $growthMonitorJson = $growthMonitor | ConvertTo-Json -Depth 10
+        Set-Content -LiteralPath $growthResultFile -Value $growthMonitorJson -Encoding UTF8
+        $growthMonitorJson
     } else {
         python @growthArguments
         if ($LASTEXITCODE -ne 0) { throw 'Executive operation failed.' }

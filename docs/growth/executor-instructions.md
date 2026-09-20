@@ -269,6 +269,13 @@ this bounded check, record requires_attention=true with the actual failure.
 Before reading live Gmail/Reddit for a new check, call
 `scripts/growth-review.ps1 -Action operator-monitor-start -File <absolute JSON path>`
 with {task_id,lease_token} from the assigned task. Save the returned check_id.
+The CLI retains the exact response at `result_file`, also discoverable as
+`.growth-deploy/operator-monitor-start-<lease_token>.json`. If output appears
+missing, finish polling any returned command session and read this file before
+claiming no check ID was returned. Match its task and lease to this task; preserve
+the original `started_at` and `expires_at`. An expired check requires fresh live
+observations under a new valid check; never reuse old observations or invent a
+timestamp. Do not repeat monitor-start merely because its stdout was overlooked.
 Then perform the actual fresh observations. This machine-recorded start avoids
 guessed Unix timestamps; do not type or calculate checked_at yourself.
 To retain those actual browser checks, use `scripts/growth-review.ps1 -Action operator-monitor
