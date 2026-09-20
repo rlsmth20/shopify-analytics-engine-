@@ -44,6 +44,10 @@ is incomplete and requires_attention must be true.
    genuine merchant replies and opt-outs. Automated acknowledgments, newsletters,
    DMARC reports, internal sb-check threads and historical EmailPal support mail
    are not customer interest. Do not reread unchanged operational threads.
+   Consult assigned handled_recent_replies for exact retained messages already
+   suppressed. Match sender, subject and reply text; an unchanged match is handled,
+   not a new reply task or attention flag. The bounded list does not certify other
+   messages as handled and does not replace fresh inbox observations.
    Before treating a visible opt-out or decline as actionable, use prospect-history
    to check whether that exact message is already recorded and the merchant is
    suppressed. If both are confirmed, it is handled evidence even if still unread

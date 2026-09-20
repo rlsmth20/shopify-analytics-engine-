@@ -322,6 +322,15 @@ Keep payload files in .growth-deploy, not the repository root.
   JSONL files or recursively expand prior recovery traces embedded in tool output.
   Return done, stop_reason=null, successors=[] after reviewing; the supervisor
   commits release/receipt/continued hold and selects the next work automatically.
+- All inbox checks, including pre-send checks: consult assigned
+  handled_recent_replies. These are exact retained messages from already suppressed
+  contacts, not new work just because they remain visible or unread. Match sender,
+  subject and reply text. Preserve suppression; do not create another reply task
+  or mark requires_attention for the same handled message. New messages or changed
+  content still require inspection, and an inaccessible channel is never clear.
+  Do not infer handled status for a message absent from this bounded list; use
+  prospect-history for its exact sender when needed. This context does not replace
+  fresh Gmail/Reddit observations or authorize contacting a suppressed merchant.
 - monitor: recover an incomplete channel check; no research or outbound sends.
   Resolve individual delivery failures within this task. For a verified invalid
   recipient, read `prospect-history` with `{"identity":"<actual failed recipient email>"}`.

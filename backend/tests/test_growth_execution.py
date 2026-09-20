@@ -12,7 +12,7 @@ from app.db.base import Base
 from app.growth.engine import bootstrap
 from app.growth import browser_executor as executor
 from app.growth.execution import state
-from app.growth.models import Contact, Evidence, FirstContact, Memory, Work
+from app.growth.models import Contact, Evidence, FirstContact, Memory, Message, Work
 from app.growth.operator import offer
 from app.growth.policy import GrowthError
 from app.growth.store import claim, enqueue, finish, get_memory, record, remember
@@ -67,6 +67,44 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(task['id'], offered['id'])
         self.assertEqual(task['contact_identity'], 'merchant.example')
         self.assertNotEqual(task['contact_identity'], 'orders@merchant.example')
+
+    def test_packet_retains_only_recent_suppressed_terminal_replies(self):
+        with self.factory() as db:
+            contact = Contact(identity='declined.example', email='info@declined.example',
+                              source='fixture', suppressed=True, status='declined')
+            unresolved = Contact(identity='unresolved.example', source='fixture', suppressed=False)
+            db.add_all([contact, unresolved])
+            db.flush()
+            for key, cid, classification, age in (
+                ('handled', contact.id, 'SUBSTANTIVE_NEGATIVE', 10),
+                ('new-question', contact.id, 'QUESTION', 0),
+                ('unsuppressed', unresolved.id, 'SUBSTANTIVE_NEGATIVE', 0),
+                ('old', contact.id, 'UNSUBSCRIBE', 31 * 86400),
+            ):
+                db.add(Message(key=key, contact_id=cid, direction='in', subject=key,
+                    body='Not interested. ' * 70, classification=classification,
+                    created_at=time.time() - age, status='received'))
+            reply = offer(db, key='handled-context', source='https://example.com/thread',
+                stage='reply', decision='Inspect new inbound', evidence_id=self.task['evidence_id'])
+            remember(db, 'working', 'browser_safety_check',
+                     {'requires_attention': True, 'evidence_id': self.task['evidence_id']})
+            remember(db, 'working', 'browser_monitor_recovery', {'retry_at': time.time() + 3600})
+            db.commit()
+        task = executor.take(self.factory, 'context-worker')
+        self.assertEqual(task['id'], reply['id'])
+        self.assertEqual(len(task['handled_recent_replies']), 1)
+        item = task['handled_recent_replies'][0]
+        self.assertEqual(item['subject'], 'handled')
+        self.assertEqual(item['sender'], 'info@declined.example')
+        self.assertTrue(item['suppressed'])
+        self.assertEqual(len(item['reply_excerpt']), 500)
+        with self.factory() as db:
+            self.assertTrue(get_memory(db, 'working', 'browser_safety_check')['requires_attention'])
+            for i in range(12):
+                db.add(Message(key='extra-' + str(i), contact_id=item['contact_id'], direction='in',
+                    body='No thanks', classification='SUBSTANTIVE_NEGATIVE', status='received'))
+            db.commit()
+            self.assertEqual(len(executor.handled_replies(db)), 8)
 
     def test_completed_reply_without_successor_resumes_existing_acquisition(self):
         with self.factory() as db:

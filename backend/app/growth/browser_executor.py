@@ -14,7 +14,7 @@ import threading
 import time
 
 from . import operator
-from .models import Contact, Evidence, FirstContact, Memory, Usage, uid
+from .models import Contact, Evidence, FirstContact, Memory, Message, Usage, uid
 from sqlalchemy import select, func
 from sqlalchemy.engine import make_url
 from .outbound import lock, status
@@ -97,6 +97,20 @@ def receipt_session(task, folder):
                         and task["reservation_id"] in line):
                     return session
     return None
+
+
+def handled_replies(db):
+    """Bounded exact-message context, never authority to clear a fresh inbox check."""
+    rows = db.execute(select(Message, Contact).join(Contact, Contact.id == Message.contact_id)
+        .where(Message.direction == "in", Contact.suppressed.is_(True),
+               Message.classification.in_(["UNSUBSCRIBE", "SUBSTANTIVE_NEGATIVE", "DELIVERY_FAILURE"]),
+               Message.created_at >= time.time() - 30 * 86400)
+        .order_by(Message.created_at.desc(), Message.id).limit(8)).all()
+    return [{"message_id": m.id, "contact_id": c.id, "identity": c.identity,
+             "sender": c.email, "subject": m.subject, "received_at": m.created_at,
+             "classification": m.classification, "suppressed": True,
+             "contact_status": c.status, "reply_excerpt": m.body[:500]}
+            for m, c in rows]
 
 
 def take(factory, owner):
@@ -187,6 +201,8 @@ def take(factory, owner):
                     ("north_star", "metrics", "bottleneck", "next_decision_point", "review_evidence_id", "focused_validation")},
                 "source_evidence": {"source": evidence.source, "kind": evidence.kind, "data": evidence.data}}
         task["acquisition_review"]["decisions"] = outcome_guidance.get("decisions", [])[:3]
+        if task.get("stage") in {"monitor", "reply", "send", "outreach"}:
+            task["handled_recent_replies"] = handled_replies(db)
         setup = get_memory(db, "working", "provider_setup")
         task["provider_setup"] = {key: value[:1000] if isinstance(value, str) else value
             for key, value in setup.items() if key in {"provider", "status", "account", "domain", "ticket_id",
