@@ -59,6 +59,37 @@ class OperatorTests(unittest.TestCase):
             with self.assertRaises(GrowthError):
                 operator_action(db,'operator-monitor',{**payload,'lease_token':'different-lease'})
 
+    def test_reddit_failure_does_not_block_fresh_verified_email(self):
+        from app.growth.outbound import require_browser_safety
+        with self.factory() as db:
+            task = claim(db, self.task['id'])
+            context = {'task_id': task['id'], 'lease_token': task['lease_token']}
+            start = operator_action(db, 'operator-monitor-start', context)
+            remember(db, 'working', 'browser_executor', {'owner': 'fixture'})
+            payload = {**context, 'check_id': start['check_id'], 'mailbox': 'info@skubase.io',
+                'requires_attention': True, 'channel_attention': {'email': False, 'reddit': True, 'global': False},
+                'observations': [
+                    {'source': 'https://mail.google.com/mail/u/4/', 'observation': 'Fixture fresh business inbox clear'},
+                    {'source': 'https://www.reddit.com/chat/', 'observation': 'Fixture chat loading failure'}]}
+            operator_action(db, 'operator-monitor', payload)
+            require_browser_safety(db, 'email')
+            with self.assertRaises(GrowthError):
+                require_browser_safety(db, 'reddit')
+            with patch('app.growth.outbound.time.time', return_value=start['started_at'] + 301):
+                with self.assertRaises(GrowthError):
+                    require_browser_safety(db, 'email')
+            for flags in ({'email': True, 'reddit': False, 'global': False},
+                          {'email': False, 'reddit': False, 'global': True}):
+                operator_action(db, 'operator-monitor', {**payload, 'channel_attention': flags})
+                with self.assertRaises(GrowthError):
+                    require_browser_safety(db, 'email')
+            with self.assertRaises(GrowthError):
+                operator_action(db, 'operator-monitor', {**payload, 'requires_attention': False})
+            legacy = {k: v for k, v in payload.items() if k != 'channel_attention'}
+            operator_action(db, 'operator-monitor', legacy)
+            with self.assertRaises(GrowthError):
+                require_browser_safety(db, 'email')
+
     def test_restart_duplicate_claim_recovery_and_stale_completion(self):
         now = time.time()
         with self.factory() as db:

@@ -221,12 +221,16 @@ def operator_action(db, action, payload):
         attention = payload.get("requires_attention")
         if not isinstance(attention, bool):
             raise GrowthError("Explicit reply/incident attention state required")
-        event = record(db, "browser-monitor:" + digest([payload["task_id"], observed_at, observations]),
+        scoped = payload.get("channel_attention")
+        if scoped is not None and (not isinstance(scoped, dict) or set(scoped) != {"email", "reddit", "global"}
+                or any(not isinstance(v, bool) for v in scoped.values()) or attention != any(scoped.values())):
+            raise GrowthError("Channel attention must explicitly cover email, reddit and global and match overall attention")
+        event = record(db, "browser-monitor:" + digest([payload["task_id"], observed_at, observations, attention, scoped]),
             "CHANNEL_MONITOR", payload["task_id"], {"observations": observations, "mailbox": payload["mailbox"],
-                "requires_attention": attention, "lease_token": payload["lease_token"], "check_id": payload.get("check_id")},
+                "requires_attention": attention, "channel_attention": scoped, "lease_token": payload["lease_token"], "check_id": payload.get("check_id")},
             source="authenticated_browser_executor", occurred_at=observed_at)
         remember(db, "working", "browser_safety_check", {"checked_at": observed_at,
-            "evidence_id": event.id, "requires_attention": attention})
+            "evidence_id": event.id, "requires_attention": attention, "channel_attention": scoped})
         return {"evidence_id": event.id, "checked_at": observed_at, "requires_attention": attention}
     if action == "operator-assess":
         from .eligibility import assess

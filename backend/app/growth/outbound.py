@@ -260,14 +260,21 @@ def reconcile_not_sent(db, reservation_id, evidence_id):
     return {"released":reservation_id, "capacity":status(db)}
 
 
-def require_browser_safety(db):
+def browser_attention(safety, channel=None):
+    scoped = safety.get("channel_attention")
+    if channel == "email" and isinstance(scoped, dict) and set(scoped) == {"email", "reddit", "global"}:
+        return scoped["global"] or scoped["email"]
+    return safety.get("requires_attention", False)
+
+
+def require_browser_safety(db, channel=None):
     executor = get_memory(db, "working", "browser_executor")
     if executor.get("owner"):
         safety = get_memory(db, "working", "browser_safety_check")
         evidence = db.get(Evidence, safety.get("evidence_id")) if safety.get("evidence_id") else None
         invalidated = evidence and db.scalar(select(Evidence.id).where(Evidence.kind == "EVIDENCE_INVALIDATED",
             Evidence.subject == str(evidence.id)).limit(1))
-        if invalidated or safety.get("requires_attention") or time.time() - safety.get("checked_at", 0) > 300 or not evidence or evidence.kind != "CHANNEL_MONITOR" or time.time() - evidence.occurred_at > 300:
+        if invalidated or browser_attention(safety, channel) or time.time() - safety.get("checked_at", 0) > 300 or not evidence or evidence.kind != "CHANNEL_MONITOR" or time.time() - evidence.occurred_at > 300:
             raise GrowthError("Fresh essential browser reply/safety checks required before first contact")
 
 
@@ -278,7 +285,8 @@ def operator_action(db, action, payload):
     if action == "outreach-backfill":
         return backfill(db)
     if action == "outreach-authorize":
-        require_browser_safety(db)
+        reservation = db.get(FirstContact, payload["reservation_id"])
+        require_browser_safety(db, reservation.channel if reservation else None)
         return authorize_submission(db, payload["reservation_id"])
     if action == "outreach-complete":
         return complete(db, payload["reservation_id"], receipt=payload.get("receipt"), outcome=payload["outcome"])
@@ -286,7 +294,7 @@ def operator_action(db, action, payload):
         return reconcile_not_sent(db,payload["reservation_id"],payload["evidence_id"])
     if action != "outreach-reserve":
         raise GrowthError("Unknown outreach operation")
-    require_browser_safety(db)
+    require_browser_safety(db, payload.get("channel"))
     # Channel rules are reviewed by the authenticated operator, not guessed from keywords.
     if not payload.get("channel_rules_source") or not payload.get("relevance_evidence"):
         raise GrowthError("Current channel-rule and merchant relevance evidence required")

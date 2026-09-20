@@ -17,7 +17,7 @@ from . import operator
 from .models import Contact, Evidence, FirstContact, Memory, Message, Usage, uid
 from sqlalchemy import select, func
 from sqlalchemy.engine import make_url
-from .outbound import lock, status
+from .outbound import lock, status, browser_attention
 from .policy import GrowthError
 from .store import digest, get_memory, record, remember
 from .process_job import ProcessJob
@@ -177,7 +177,7 @@ def take(factory, owner):
             packet["tasks"] = [t for t in packet["tasks"] if t.get("stage") not in {"send", "outreach"}]
         tasks = [t for t in packet["tasks"] if t.get("stage") != "monitor" or safety.get("requires_attention")
                  or t.get("key", "").startswith(("community-inbox:", "browser-recovery:"))]
-        if safety.get("requires_attention"):
+        if browser_attention(safety, "email"):
             tasks = [t for t in tasks if t.get("stage") in {"reply", "monitor", "reconcile", "deliverability"}]
         if not packet["capacity"].get("dispatch_remaining", packet["capacity"]["remaining"]):
             tasks = [t for t in tasks if t.get("stage") not in {"send", "outreach"}]
@@ -297,7 +297,7 @@ def accept(factory, owner, task, result):
             failures = recovery.get("failures", 0) + 1 if safety.get("requires_attention") else 0
             remember(db, "working", "browser_monitor_recovery", {**recovery, "failures": failures,
                 "retry_at": time.time() + min(3600, 900 * 2 ** min(failures - 1, 2)) if failures else 0})
-            if not safety.get("requires_attention"):
+            if not browser_attention(safety, "email"):
                 # Only resume pre-admission failures. Any reservation, including
                 # an uncertain receipt, forbids replay. Preserve retry counts.
                 for row in db.scalars(select(Memory).where(Memory.namespace == operator.NAMESPACE,

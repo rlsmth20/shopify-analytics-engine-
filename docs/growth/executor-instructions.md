@@ -285,6 +285,15 @@ mailbox="info@skubase.io", requires_attention boolean, and observations containi
 2–5 {source: HTTPS URL, observation: concise actual observation} objects covering
 business Gmail and Reddit. It writes to the same production DB as admission and
 returns the evidence ID. Do not use ad-hoc Python/SQLite or old safety-write helpers.
+Include `channel_attention: {email: boolean, reddit: boolean, global: boolean}`.
+Set overall `requires_attention` to the OR of those three flags. A Reddit loading
+shell is `reddit=true`, not an email failure. When fresh business Gmail evidence
+is clear and no cross-channel incident exists, use `email=false, global=false`;
+email may proceed while the Reddit check remains outstanding. Unresolved merchant
+replies, identity-wide opt-outs or incidents affecting all channels use `global=true`
+until handled. Never label an unread mailbox clear. Legacy checks without explicit
+channel flags retain their conservative global behavior. The five-minute freshness,
+lease, sender, suppression and exact-send-receipt requirements still apply.
 Keep payload files in .growth-deploy, not the repository root.
 
 ## Stages

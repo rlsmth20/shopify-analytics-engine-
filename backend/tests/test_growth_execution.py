@@ -99,6 +99,22 @@ class ExecutionTests(unittest.TestCase):
             resumed = executor.take(self.factory, 'checkpoint-worker')
         self.assertEqual(resumed['id'], queued['id'])
 
+    def test_reddit_only_incident_keeps_email_work_selectable(self):
+        with self.factory() as db:
+            queued = offer(db, key='email-during-reddit-outage', source='https://example.com/contact',
+                stage='send', decision='Send eligible business email', priority=100,
+                evidence_id=self.task['evidence_id'])
+            remember(db, 'working', 'browser_safety_check', {'checked_at': time.time(),
+                'evidence_id': self.task['evidence_id'], 'requires_attention': True,
+                'channel_attention': {'email': False, 'reddit': True, 'global': False}})
+            remember(db, 'working', 'browser_monitor_recovery', {'retry_at': time.time() + 3600})
+            db.commit()
+        task = executor.take(self.factory, 'email-worker')
+        self.assertEqual(task['id'], queued['id'])
+        with self.factory() as db:
+            self.assertTrue(get_memory(db, 'working', 'browser_safety_check')['requires_attention'])
+            self.assertEqual(list(db.scalars(select(FirstContact))), [])
+
     def test_stale_inbox_check_runs_with_full_closed_send_backlog(self):
         with self.factory() as db:
             old = time.time() - 4 * 3600
