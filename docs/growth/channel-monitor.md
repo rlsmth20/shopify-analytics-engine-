@@ -66,6 +66,15 @@ is incomplete and requires_attention must be true.
    A new review message or materially different issue still requires triage;
    never assume future messages are handled just because the sender is Shopify.
    Do not change the suspension deadline or claim the app has been approved.
+   Known handled merchant message, September 19: info@lore-collectibles.com,
+   subject "Re: A practical reorder workflow for Lore Collectibles", says
+   "We're not interested at this time". Reply evidence 170298 was corrected to
+   SUBSTANTIVE_NEGATIVE with audit 170408; contact
+   008b7d5cab474730bf4d478ba98a4150 is suppressed with status declined. This exact
+   unchanged message needs no response, acknowledgment or new reply task. Keep its
+   suppression and cite those IDs as handled evidence. Its continued presence in
+   the inbox must not set requires_attention=true. This applies only to that exact
+   retained decline; inspect any genuinely new message or different request normally.
 4. For a verified invalid-recipient bounce, call prospect-history with
    {"identity":"<actual failed recipient email>"}. If not already suppressed, call
    email-suppress with {"recipient":"<actual failed recipient>","reason":"bounce"}.
