@@ -377,7 +377,12 @@ Keep payload files in .growth-deploy, not the repository root.
   the common fields below. Call the reservation command once. A successful result
   containing reservation_id and email is the handoff to composing the draft;
   retain that result and do not run outreach-reserve again to retrieve or confirm
-  it. If a shell call is still running, poll its returned session_id rather than
+  it. The CLI saves this exact JSON at result_file, also discoverable as
+  .growth-deploy/outreach-reservation-<reservation_id>.json. Read that file if
+  output seems missing; do not claim the exact email object was lost without
+  checking this retained response. The file does not override expiry, suppression,
+  authorization or uncertainty protections.
+  If a shell call is still running, poll its returned session_id rather than
   starting the command again. If you accidentally repeat the command, its duplicate
   error does not invalidate the earlier successful reservation: retain the original
   result, read current prospect history, and continue only if that exact reservation

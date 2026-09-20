@@ -38,8 +38,25 @@ try {
         $growthArguments += @('--file', (Resolve-Path -LiteralPath $File).Path)
     }
     Set-Location (Join-Path $growthRepo 'backend')
-    python @growthArguments
-    if ($LASTEXITCODE -ne 0) { throw 'Executive operation failed.' }
+    if ($Action -eq 'outreach-reserve') {
+        # Retain the exact handoff once; missing tool output must not repeat a mutation.
+        $growthReservationOutput = python @growthArguments
+        if ($LASTEXITCODE -ne 0) { throw 'Executive operation failed.' }
+        $growthReservation = ($growthReservationOutput -join "`n") | ConvertFrom-Json
+        if ($growthReservation.reservation_id -notmatch '^[a-f0-9]{32}$') {
+            throw 'Reservation response missing a valid ID; reconcile without reserving again.'
+        }
+        $growthResultDirectory = Join-Path $growthRepo '.growth-deploy'
+        New-Item -ItemType Directory -Path $growthResultDirectory -Force | Out-Null
+        $growthResultFile = Join-Path $growthResultDirectory ('outreach-reservation-' + $growthReservation.reservation_id + '.json')
+        $growthReservation | Add-Member -NotePropertyName result_file -NotePropertyValue $growthResultFile -Force
+        $growthReservationJson = $growthReservation | ConvertTo-Json -Depth 30
+        Set-Content -LiteralPath $growthResultFile -Value $growthReservationJson -Encoding UTF8
+        $growthReservationJson
+    } else {
+        python @growthArguments
+        if ($LASTEXITCODE -ne 0) { throw 'Executive operation failed.' }
+    }
 } finally {
     $env:DATABASE_URL = $growthPriorDatabase
     $growthVariables = $null

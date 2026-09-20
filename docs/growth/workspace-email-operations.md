@@ -48,6 +48,13 @@ For each relevant, individually reviewed first contact:
    accidental second call does not undo the first reservation. Check its current
    history before proceeding; only a still-valid, unattempted pending reservation
    can continue to composition. Uncertain or sent messages must never be retried.
+   The CLI also saves the exact successful response to its returned `result_file`,
+   `.growth-deploy/outreach-reservation-<reservation_id>.json`. If tool output seems
+   missing, read that file with Get-Content -Raw and ConvertFrom-Json before giving
+   up. It contains the exact email body and HTML; do not reconstruct them or reserve
+   again. A saved response is not proof of current eligibility or of a send: current
+   suppression, expiry, authorization and receipt checks still apply. If the file
+   is absent, retain uncertainty rather than inventing its contents.
    Use the returned `email` object exactly. It adds a separate Rainer signature, the configured business name,
    owner-supplied mailing address and reply-unsubscribe footer. Do not duplicate
    that footer in the proposed body. Keep one inventory question and no em dashes.
