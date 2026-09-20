@@ -1,5 +1,18 @@
 # Reorder and purchase-order validation
 
+## September 20 owner override: second cohort open
+
+The owner explicitly requested: "Unpause it. Create a new 50 person cohort."
+The active enrollment is now `reorder-po-validation-v2`: a separate batch of 50
+new merchants using the same ICP, offer, CTA and `reorder_po_v1` message family.
+Use the experiment ID and canonical labels in live `strategic/focused_validation`,
+and use the active campaign in attribution URLs. The first cohort stays at 50,
+under observation; its September 26 response window does not block this batch.
+This is an owner-authorized continuation, not evidence the first batch succeeded.
+Keep the 16-email Pacific-day allowance and all suppression, duplicate and
+uncertain-contact protections. Review the new batch at 50; do not create unlimited
+additional batches. The original experiment details below remain historical.
+
 Owner direction, September 16, 2026. This supersedes volume-first acquisition and
 generic inventory-health-check first-contact copy for this phase. Historical
 messages and outcomes remain unchanged. The 171-contact baseline has one verified
