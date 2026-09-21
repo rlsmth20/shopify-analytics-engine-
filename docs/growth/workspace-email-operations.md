@@ -72,7 +72,16 @@ For each relevant, individually reviewed first contact:
    Click once within its 30-second deadline. An expired authorization cannot be reused.
    The returned deadline field is `submit_before` (UTC Unix seconds). A successful
    response containing that field is a usable authorization; do not report it as
-   missing. If the deadline expires before the click, record the actual no-click
+   missing. Run authorization as its own command, after recording the monitor,
+   with a 30-second command wait. If the command returns a session ID, poll that
+   same session promptly; do not issue another authorization. The CLI retains
+   the exact result at `.growth-deploy/outreach-authorization-<reservation_id>.json`.
+   If stdout is missing, read that exact file immediately, not a directory listing
+   or prospect-history call. The input JSON is not the authorization result.
+   Use the returned `submit_before` unchanged and click once before it expires;
+   successful authorization is expected to mark the message `sending` before
+   the click. That state alone is not evidence that an external send occurred.
+   If the deadline expires before the click, record the actual no-click
    observation and let receipt recovery release the unused admission.
 5. Open the actual Gmail Sent conversation and match recipient, subject and body.
    Complete with `outcome=sent` and its exact Gmail thread URL as `receipt`.

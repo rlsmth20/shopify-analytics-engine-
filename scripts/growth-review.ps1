@@ -53,6 +53,25 @@ try {
         $growthReservationJson = $growthReservation | ConvertTo-Json -Depth 30
         Set-Content -LiteralPath $growthResultFile -Value $growthReservationJson -Encoding UTF8
         $growthReservationJson
+    } elseif ($Action -eq 'outreach-authorize') {
+        # Preserve the one-use result, not a second authorization. Reading this
+        # file never extends its deadline or permits replaying an expired send.
+        $growthAuthorizationOutput = python @growthArguments
+        if ($LASTEXITCODE -ne 0) { throw 'Executive operation failed.' }
+        $growthAuthorization = ($growthAuthorizationOutput -join "`n") | ConvertFrom-Json
+        $growthAuthorizationInput = Get-Content -LiteralPath $growthArguments[-1] -Raw | ConvertFrom-Json
+        if ($growthAuthorization.reservation_id -notmatch '^[a-f0-9]{32}$' -or
+            $growthAuthorization.reservation_id -ne $growthAuthorizationInput.reservation_id -or
+            $growthAuthorization.submit_before -le 0) {
+            throw 'Invalid authorization response; reconcile without authorizing again.'
+        }
+        $growthResultDirectory = Join-Path $growthRepo '.growth-deploy'
+        New-Item -ItemType Directory -Path $growthResultDirectory -Force | Out-Null
+        $growthResultFile = Join-Path $growthResultDirectory ('outreach-authorization-' + $growthAuthorization.reservation_id + '.json')
+        $growthAuthorization | Add-Member -NotePropertyName result_file -NotePropertyValue $growthResultFile -Force
+        $growthAuthorizationJson = $growthAuthorization | ConvertTo-Json -Depth 10
+        Set-Content -LiteralPath $growthResultFile -Value $growthAuthorizationJson -Encoding UTF8
+        $growthAuthorizationJson
     } elseif ($Action -eq 'operator-monitor-start') {
         # The check is already created when stdout returns. Preserve its exact
         # ID and expiry instead of making the browser worker repeat the start.

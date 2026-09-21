@@ -114,6 +114,15 @@ Immediately before the single external submission, call
 30-second deadline. Authorization is one-use; expiry or repeated authorization
 requires receipt/no-effect reconciliation, never another click. Completion records
 actual receipts even when late. Uncertain outcomes do not create a global hold or consume the ceiling.
+Run authorization alone, after monitor recording, with a 30-second command wait.
+Poll any returned session promptly. A successful result with `submit_before` is
+the permit: proceed to the verified Send control without more research/history
+queries. If output is missing, read the exact retained result at
+`.growth-deploy/outreach-authorization-<reservation_id>.json`, not the input JSON.
+This file preserves the original deadline; it never renews permission. A local
+message state of `sending` is expected after authorization, before the browser
+click, and is not a reason to abandon a still-valid permit. Never infer a sent
+receipt from that state or reuse an expired permit.
 Keep those merchants protected, track uncertainty by channel, and contact other
 eligible merchants. Actual operational incidents apply to the affected channel. `SEND_IN_FLIGHT` is a temporary dispatch wait. Continue other useful work.
 These rules supersede all older held-slot/quota wording below.
