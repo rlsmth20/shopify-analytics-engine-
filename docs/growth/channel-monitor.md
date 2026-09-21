@@ -35,6 +35,14 @@ is incomplete and requires_attention must be true.
    Retain the returned check_id; it supplies the observation timestamp. A successful
    response is sufficient: do not call monitor-start again to confirm it. Use the
    remaining runtime for actual inbox observations and the completion record.
+   The CLI also saves the exact result at
+   `.growth-deploy/operator-monitor-start-<assigned lease_token>.json`.
+   If stdout seems missing, poll the original command session, then read that
+   exact file. It contains check_id, task_id, lease_token, started_at and expires_at.
+   Match the assigned task/lease and preserve the original expiry. The input JSON
+   is not the result. Do not claim a missing ID without reading this retained file,
+   and do not start a second check merely because stdout was overlooked. An
+   actually expired check requires new live observations, never a copied timestamp.
 2. Open https://mail.google.com/mail/u/4/ and verify the visible Google account
    is info@skubase.io before inspecting messages. If the index changed, use the
    account chooser to select that business account. The generic Gmail homepage
@@ -70,6 +78,11 @@ is incomplete and requires_attention must be true.
    A new review message or materially different issue still requires triage;
    never assume future messages are handled just because the sender is Shopify.
    Do not change the suspension deadline or claim the app has been approved.
+   The September 19 Workspace "[Reminder] Your Google Workspace free trial is
+   ending" notice says the paid subscription starts the following day. It is
+   informational, not a payment failure or sending restriction (186995; triage
+   187078). Do not change billing or mark attention for this unchanged reminder.
+   New payment failures, suspension or authentication warnings still need triage.
    Known handled merchant message, September 19: info@lore-collectibles.com,
    subject "Re: A practical reorder workflow for Lore Collectibles", says
    "We're not interested at this time". Reply evidence 170298 was corrected to
@@ -86,6 +99,11 @@ is incomplete and requires_attention must be true.
    is handled evidence. Preserve its negative ramp signal. email-status transport
    ready/blockers is distinct from the pause on increasing ramp volume. Actual
    provider restrictions or systemic delivery problems must remain blocked.
+   The unchanged invalid-recipient notices for sales@leighshop.co.uk and
+   info@thenascent.ca have already been checked and both addresses are suppressed
+   (retained checks 186995 and 187574). Reuse that evidence for those exact
+   notices instead of repeating full history lookups every wake. Inspect a new
+   recipient, different failure or changed message normally; keep suppression.
 5. Inspect the retained Reddit chat/notification URL for new replies. Use the
    existing Skubase account. Allow the page to load using normal state reads;
    do not assume a loading pane is an empty inbox. No searching or posting.
@@ -98,11 +116,16 @@ is incomplete and requires_attention must be true.
 6. Record operator-monitor using this exact payload shape:
    {"task_id":"<assigned id>","lease_token":"<assigned lease_token>",
     "check_id":<returned integer>,"mailbox":"info@skubase.io",
-    "requires_attention":false,"observations":[
+    "requires_attention":false,
+    "channel_attention":{"email":false,"reddit":false,"global":false},
+    "observations":[
       {"source":"<actual HTTPS Gmail URL>","observation":"<bounded observed facts>"},
       {"source":"<actual HTTPS Reddit URL>","observation":"<bounded observed facts>"}]}
-   Use true for unresolved incidents, actionable replies or inaccessible required
-   channels. Never invent a timestamp or mark uninspected channels clear. Each
+   Set requires_attention to the OR of the three channel_attention flags.
+   Reddit loading/access failure alone sets reddit=true, not email/global=true.
+   An unresolved merchant reply or identity-wide opt-out sets global=true until
+   handled. An actual mailbox problem sets email=true. Never invent a timestamp
+   or mark uninspected channels clear. Each
    observation must be at most 800 characters; complete within the check window.
 7. Return done, stop_reason=null and successors=[] for a clear check. Retain its
    evidence ID from the successful operator-monitor response and sources. The
