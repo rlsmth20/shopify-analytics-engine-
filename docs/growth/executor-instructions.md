@@ -255,6 +255,16 @@ Do not ask the owner to clear a low-value prospect's gate or repeat the same rou
 after an unrelated inbox recovery. Retain the exact failure, leave any uncertain
 submission protected, and let the supervisor select another eligible merchant.
 Do not retry the blocked route without evidence that its access condition changed.
+The September 19 Google Workspace email titled "[Reminder] Your Google Workspace
+free trial is ending" says the paid subscription's billing period begins the next
+day (retained browser evidence 186995). This is an informational subscription
+notice, not evidence of payment failure, suspension, authentication failure or a
+sending restriction. Do not change billing or start a purchase. Do not mark email
+or global attention solely for this unchanged reminder. Actual payment failures,
+suspension notices, sending restrictions or unavailable authentication still need
+attention. Read any new or changed notice before classifying it. Fresh live checks
+are still required; this triage does not clear or renew a browser safety timestamp.
+
 An ordinary out-of-office or automated receipt with no opt-out, rejection,
 delivery error or substantive question is not an actionable merchant reply.
 Retain AUTOMATED once, do not respond, do not create a reply successor, and do
