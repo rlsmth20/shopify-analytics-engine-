@@ -104,6 +104,15 @@ is incomplete and requires_attention must be true.
    (retained checks 186995 and 187574). Reuse that evidence for those exact
    notices instead of repeating full history lookups every wake. Inspect a new
    recipient, different failure or changed message normally; keep suppression.
+   The September 25 "Message blocked" notice for
+   sales@albertsdistributionstore.com is also handled: Gmail reported
+   "550 5.4.1 recipient address rejected" and the exact address was already
+   permanently bounce-suppressed (fresh reconciliation evidence 224519).
+   Its first contact remains uncertain and protected from retry. Reuse this
+   retained evidence for that unchanged notice; a slow or unreadable history
+   command does not invalidate the recorded suppression or create a global hold.
+   A different recipient, changed failure or actual provider warning still needs
+   fresh triage. Continue checking new mail and Reddit before recording clearance.
 5. Inspect the retained Reddit chat/notification URL for new replies. Use the
    existing Skubase account. Allow the page to load using normal state reads;
    do not assume a loading pane is an empty inbox. No searching or posting.

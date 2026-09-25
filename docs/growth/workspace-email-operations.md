@@ -119,6 +119,13 @@ on ramp increases. Distinguish `ramp.increase_paused` from transport `ready` and
 `blockers`: a pause on raising volume is not a global send pause. Escalate actual
 provider restrictions or systemic delivery deterioration; do not clear them.
 
+Handled delivery notice, September 25: sales@albertsdistributionstore.com returned
+"550 5.4.1 recipient address rejected". Fresh reconciliation evidence 224519
+verified permanent bounce suppression for that exact address and preserved the
+uncertain first contact against retry. The unchanged notice is not a new mailbox
+restriction. Reuse this evidence instead of repeating history lookups; an unreadable
+lookup does not undo suppression. Inspect changed failures or new warnings normally.
+
 Authentication was verified by an actual received internal diagnostic with SPF,
 DKIM and DMARC passing (evidence 22221). Existing Google MX and operational records
 remain intact. Unused EmailPal subdomain records are historical setup, not an active
