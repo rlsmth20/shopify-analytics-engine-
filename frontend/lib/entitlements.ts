@@ -38,19 +38,25 @@ export function invalidateEntitlementsCache(): void {
   inflight = null;
 }
 
-async function requestEntitlements(fresh: boolean): Promise<Entitlements> {
+async function requestEntitlements(fresh: boolean, allowRecovery = false): Promise<Entitlements> {
   const url = `${API_BASE}/billing/entitlements${fresh ? "?fresh=1" : ""}`;
   const response = await authenticatedFetch(url, { credentials: "include" });
   const body = await response.json().catch(() => null);
   if (!response.ok || !body) {
     throw new Error(typeof body?.detail === "string" ? body.detail : "Your plan could not be checked. Please try again.");
   }
-  if (body.billing_status_loaded !== true || body.billing_status_error ||
+  if (body.billing_status_loaded !== true || (body.billing_status_error && !allowRecovery) ||
       !Array.isArray(body.capabilities) || !body.capabilities.every((value: unknown) => typeof value === "string") ||
       typeof body.plan_id !== "string" || typeof body.plan_name !== "string" || typeof body.subscription_status !== "string") {
     throw new Error("Your plan could not be checked. Please try again.");
   }
   return body as Entitlements;
+}
+
+// Billing needs recovery metadata even when feature gates must fail closed.
+// Never put an unverified billing response into the entitlement cache.
+export function fetchBillingStatus(): Promise<Entitlements> {
+  return requestEntitlements(true, true);
 }
 
 export async function fetchEntitlements(options?: { fresh?: boolean }): Promise<Entitlements> {

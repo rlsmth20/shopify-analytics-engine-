@@ -145,6 +145,32 @@ def _resolve_installed_user(db: DbSession, token: str, claims: ShopifySessionCla
     return user
 
 
+def recover_rejected_shopify_connection(
+    db: DbSession, *, conn: ShopifyConnection, session_token: str, rejected_access_token: str,
+) -> None:
+    """Recover a revoked grant using a verified session for this exact shop.
+
+    An uninstall webhook can arrive after the merchant reinstalls. Token expiry
+    alone cannot establish that the saved grant still belongs to this install.
+    Serialize recovery and reuse a grant another request already replaced.
+    """
+    claims = verify_shopify_session_token(session_token)
+    if claims.shop_domain != conn.shopify_domain:
+        raise ShopifySessionTokenError("Shopify recovery workspace mismatch.")
+    from app.services.shopify_oauth import exchange_session_token, persist_connection, shopify_connection_lock
+
+    with shopify_connection_lock(db, claims.shop_domain):
+        db.refresh(conn)
+        if conn.access_token == rejected_access_token or not conn.access_token or conn.uninstalled_at is not None:
+            payload = exchange_session_token(shop_domain=claims.shop_domain, session_token=session_token)
+            persist_connection(db, shop_id=conn.shop_id, shop_domain=claims.shop_domain,
+                               token_payload=payload, commit=False)
+            # This verified grant supersedes uninstall events from before recovery.
+            # Ordinary token refreshes keep their existing installation timestamp.
+            conn.installed_at = datetime.now(timezone.utc)
+        db.commit()
+
+
 def _decode_json(value: str) -> dict[str, Any]:
     try:
         decoded = base64.urlsafe_b64decode(_pad_base64(value)).decode("utf-8")

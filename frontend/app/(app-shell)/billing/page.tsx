@@ -2,17 +2,18 @@
 
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-guard";
 import { SectionCard } from "@/components/section-card";
-import { fetchEntitlements, type Entitlements } from "@/lib/entitlements";
+import { fetchBillingStatus, invalidateEntitlementsCache, type Entitlements } from "@/lib/entitlements";
 import { getStripePortalAction } from "@/lib/billing-view";
 import { PRICING_TIERS } from "@/lib/plans";
 import {
   authenticatedFetch,
   isEmbeddedShopifyContext,
   redirectTopLevel,
+  reconnectShopify,
 } from "@/lib/shopify-embedded";
 
 const API_BASE = APP_API_BASE_URL;
@@ -48,16 +49,24 @@ export default function BillingPage() {
     return days > 0 ? days : 0;
   })();
 
+  const loadBilling = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setSub(null);
+    invalidateEntitlementsCache();
+    try {
+      setSub(await fetchBillingStatus());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     setEmbeddedBilling(isEmbeddedShopifyContext());
-    setLoading(true);
-    // fresh: merchants land here right after approving a plan change — show
-    // live status, never a cached snapshot.
-    fetchEntitlements({ fresh: true })
-      .then((data) => setSub(data))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
-  }, []);
+    void loadBilling();
+  }, [loadBilling]);
 
   async function openStripePortal() {
     setPortalLoading(true);
@@ -109,24 +118,11 @@ export default function BillingPage() {
   }
 
   async function reauthorizeShopify() {
-    if (!sub?.shopify_domain) {
-      setShopifyPlanNotice(
-        "We could not determine your store domain. Reconnect from the Store Sync page."
-      );
-      return;
-    }
-    const params = new URLSearchParams({ shop: sub.shopify_domain });
-    const res = await authenticatedFetch(
-      `${API_BASE}/integrations/shopify/install?${params}`,
-      { credentials: "include" }
-    ).catch(() => null);
-    const body = await res?.json().catch(() => null);
-    if (body?.authorize_url) {
-      redirectTopLevel(body.authorize_url);
-    } else {
-      setShopifyPlanNotice(
-        "Could not start Shopify re-authorization. Try the Store Sync page."
-      );
+    setShopifyPlanNotice(null);
+    try {
+      await reconnectShopify(sub?.shopify_domain ?? undefined);
+    } catch (e) {
+      setShopifyPlanNotice(e instanceof Error ? e.message : "Could not reconnect Shopify. Please try again.");
     }
   }
 
@@ -168,12 +164,26 @@ export default function BillingPage() {
   if (loading) {
     return <div className="page-loading">Loading billing...</div>;
   }
-  if (error && !sub) {
+  if (error || sub?.billing_status_error) {
+    const needsReconnect = sub?.billing_status_error === "shopify_unauthorized";
     return (
-      <div className="page-error">
-        <p className="page-error-title">Could not load billing</p>
-        <p className="page-error-copy">{error}</p>
-      </div>
+      <SectionCard>
+        <div role="alert">
+          <h2 className="section-title">{needsReconnect ? "Reconnect Shopify to check your plan" : "We could not verify your plan"}</h2>
+          <p className="section-copy">
+            {needsReconnect
+              ? "Your Shopify connection needs to be renewed. Reconnect your store, then choose a plan to request approval again. Your saved data is kept."
+              : error || "Shopify billing is temporarily unavailable. Retry to check your current plan before making changes."}
+          </p>
+        </div>
+        <div className="button-row">
+          <button type="button" className="button button-primary" onClick={() => void loadBilling()}>Retry billing check</button>
+          {embeddedBilling || sub?.shopify_domain ? (
+            <button type="button" className="button button-ghost" onClick={() => void reauthorizeShopify()}>Reconnect Shopify</button>
+          ) : null}
+        </div>
+        {shopifyPlanNotice ? <p role="alert" className="auth-error">{shopifyPlanNotice}</p> : null}
+      </SectionCard>
     );
   }
   if (!sub) return null;
@@ -260,23 +270,6 @@ export default function BillingPage() {
                 : "Subscriptions are billed through Shopify. Connect your Shopify store to pick a plan."}
             </p>
           </div>
-
-          {isShopifyBilling && sub.billing_status_error === "shopify_unauthorized" ? (
-            <div className="import-error" role="alert" style={{ marginBottom: "16px" }}>
-              <strong>Shopify connection needs attention.</strong> Your store&apos;s
-              access token is no longer valid, so billing and sync calls are
-              failing. Re-authorize to fix it - your data and settings are kept.
-              <div className="button-row" style={{ marginTop: "12px" }}>
-                <button
-                  type="button"
-                  className="button button-primary"
-                  onClick={() => void reauthorizeShopify()}
-                >
-                  Re-authorize skubase
-                </button>
-              </div>
-            </div>
-          ) : null}
 
           <div className="button-row">
             {isShopifyBilling ? (

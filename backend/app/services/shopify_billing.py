@@ -82,6 +82,7 @@ def current_shopify_subscription_summary(
     *,
     user: User,
     use_cache: bool = True,
+    session_token: str | None = None,
 ) -> dict:
     conn = _connection_for_shop(db, shop_id=user.shop_id)
     if conn is None:
@@ -96,9 +97,13 @@ def current_shopify_subscription_summary(
         if cached is not None and time.monotonic() - cached[0] < SUMMARY_CACHE_TTL_SECONDS:
             return dict(cached[1])
 
-    summary = _live_shopify_subscription_summary(db, user=user, conn=conn)
-    with _summary_cache_lock:
-        _summary_cache[user.shop_id] = (time.monotonic(), dict(summary))
+    summary = _live_shopify_subscription_summary(db, user=user, conn=conn, session_token=session_token)
+    # A failed lookup must never delay recovery on the next authenticated read.
+    if not summary.get("billing_status_error"):
+        with _summary_cache_lock:
+            _summary_cache[user.shop_id] = (time.monotonic(), dict(summary))
+    else:
+        invalidate_shopify_billing_cache(user.shop_id)
     return summary
 
 
@@ -107,10 +112,11 @@ def _live_shopify_subscription_summary(
     *,
     user: User,
     conn: ShopifyConnection,
+    session_token: str | None = None,
 ) -> dict:
     _refresh_token_if_needed(db, conn)
     try:
-        active = _fetch_active_subscription(conn)
+        active = _fetch_subscription_with_recovery(db, conn=conn, session_token=session_token)
     except ShopifyBillingAuthError:
         logger.warning(
             "Shopify billing lookup unauthorized for shop_id=%s shop_domain=%s; using mirrored local subscription state",
@@ -169,6 +175,30 @@ def _live_shopify_subscription_summary(
         "stripe_configured": False,
         "shopify_billing_test": SHOPIFY_BILLING_TEST,
     }
+
+
+def _fetch_subscription_with_recovery(
+    db: DbSession, *, conn: ShopifyConnection, session_token: str | None,
+) -> dict[str, Any] | None:
+    rejected_token = conn.access_token
+    try:
+        return _fetch_active_subscription(conn)
+    except ShopifyBillingAuthError:
+        if not session_token:
+            raise
+        from app.services.shopify_oauth import ShopifyTokenExchangeError, ShopifyTokenExchangeRejected
+        from app.services.shopify_session_tokens import (
+            ShopifySessionTokenError, recover_rejected_shopify_connection,
+        )
+        try:
+            recover_rejected_shopify_connection(db, conn=conn, session_token=session_token,
+                                                rejected_access_token=rejected_token)
+        except (ShopifySessionTokenError, ShopifyTokenExchangeRejected) as exc:
+            raise ShopifyBillingAuthError("Shopify connection needs re-authorization.") from exc
+        except ShopifyTokenExchangeError as exc:
+            raise ShopifyBillingError("Shopify connection recovery is temporarily unavailable.") from exc
+        # Retry only this read, once. Never replay a charge-creation mutation.
+        return _fetch_active_subscription(conn)
 
 
 def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:

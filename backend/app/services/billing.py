@@ -433,6 +433,7 @@ def current_subscription_summary(
     *,
     user: User,
     fresh_shopify: bool = False,
+    shopify_session_token: str | None = None,
 ) -> dict:
     """Frontend-friendly view of the current user's subscription.
 
@@ -441,7 +442,7 @@ def current_subscription_summary(
     """
     if has_active_shopify_connection(db, shop_id=user.shop_id):
         return current_shopify_subscription_summary(
-            db, user=user, use_cache=not fresh_shopify
+            db, user=user, use_cache=not fresh_shopify, session_token=shopify_session_token
         )
 
     sub = db.scalar(select(Subscription).where(Subscription.shop_id == user.shop_id))
@@ -484,13 +485,15 @@ def current_entitlements_summary(
     *,
     user: User,
     fresh_shopify: bool = False,
+    shopify_session_token: str | None = None,
 ) -> dict:
     """Canonical billing + entitlement view for frontend feature gates.
 
     Shopify-installed merchants are governed by Shopify Managed Pricing status.
     Direct web users may still use Stripe and direct trial access.
     """
-    raw = current_subscription_summary(db, user=user, fresh_shopify=fresh_shopify)
+    raw = current_subscription_summary(db, user=user, fresh_shopify=fresh_shopify,
+                                       shopify_session_token=shopify_session_token)
     is_shopify_installed = bool(raw.get("shopify_installed"))
     status = str(raw.get("status") or "inactive")
     raw_plan = str(raw.get("plan") or "none")

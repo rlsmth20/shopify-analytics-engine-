@@ -63,3 +63,15 @@ test("unavailable or malformed plans are not cached as a downgrade", async () =>
     assert.equal(f.entitlementHas({}, 'forecast'), false);
   }
 });
+
+
+test("billing recovery metadata never becomes cached feature access", async () => {
+  const f = fixture();
+  const recovery = f.fetchBillingStatus();
+  f.requests[0].resolve({...plan('scale'), billing_status_error:'shopify_unauthorized'});
+  assert.equal((await recovery).billing_status_error, 'shopify_unauthorized');
+  const gate = f.fetchEntitlements();
+  assert.equal(f.requests.length, 2);
+  f.requests[1].resolve({...plan('scale'), billing_status_error:'shopify_unauthorized'});
+  await assert.rejects(gate, /could not be checked/);
+});

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
 from starlette.concurrency import run_in_threadpool
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, _bearer_token
 from app.db.models import User
 from app.db.session import get_db_session
 from app.growth.funnel import product_event
@@ -94,13 +94,15 @@ def my_subscription(
 
 @router.get("/entitlements")
 def my_entitlements(
+    request: Request,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
     fresh: bool = False,
 ) -> dict:
     # `fresh=1` bypasses the short-TTL Shopify billing cache — the billing
     # page uses it so a just-approved plan change shows immediately.
-    return current_entitlements_summary(db, user=user, fresh_shopify=fresh)
+    return current_entitlements_summary(db, user=user, fresh_shopify=fresh,
+                                        shopify_session_token=_bearer_token(request))
 
 
 @router.post("/shopify/subscribe", response_model=CheckoutResponse)
