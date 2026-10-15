@@ -21,6 +21,13 @@ After code deployment, drain active work before restarting it. Retained local
 executor traces diagnose failures; durable DB evidence determines actual outcomes.
 Never replace a missing receipt with an assumption of delivery.
 
+October 15, 2026: planner replenishment uses the same channel-scoped safety
+decision as executor admission. A Reddit-only login problem does not stop email
+discovery. Email/global attention and legacy unscoped attention still stop
+replenishment; actual sends retain fresh channel checks. Preserve the Reddit
+attention flag until a genuine check succeeds. This repairs the empty-queue stall
+after the first two V4 emails, without seeding prospects or resetting reservations.
+
 The hourly oversight checks genuine replies and faults without duplicating the
 executor. Complete the existing executive review once after 9 a.m. Pacific each
 day. Unchanged monitoring remains quiet. Model/API dollar allocation stays UNKNOWN

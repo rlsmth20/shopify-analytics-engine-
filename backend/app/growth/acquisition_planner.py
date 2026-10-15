@@ -258,11 +258,14 @@ def admit_hypotheses(db, task, result, event):
 def replenish(db, capacity, now=None):
     """Called under existing outbound lock by the persistent supervisor only."""
     from .operator import offer
+    from .outbound import browser_attention
     now = time.time() if now is None else now
     mission_state = mission(db)
     if mission_state["complete"] or mission_state.get("missing_identity") or capacity["remaining"] == 0:
         return None
-    if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold") or get_memory(db, "working", "browser_safety_check").get("requires_attention"):
+    # Match executor admission: Reddit-only access problems must not starve
+    # email discovery. Actual sends still require fresh channel-specific checks.
+    if get_memory(db, "working", "control").get("paused") or get_memory(db, "working", "acquisition_hold") or browser_attention(get_memory(db, "working", "browser_safety_check"), "email"):
         return None
     # Receipt reviews protect their contact, not unrelated acquisition capacity.
     active = db.scalar(select(Memory.id).where(Memory.namespace == "operator_task",

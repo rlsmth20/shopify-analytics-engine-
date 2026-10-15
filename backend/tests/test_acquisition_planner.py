@@ -161,6 +161,37 @@ class PlannerTests(unittest.TestCase):
         with self.factory() as db:
             self.assertEqual(status(db)['uncertain_contact_count'],8)
 
+    def test_reddit_only_attention_keeps_email_discovery_running(self):
+        safety = {'requires_attention': True, 'checked_at': time.time(),
+                  'evidence_id': 1,
+                  'channel_attention': {'email': False, 'reddit': True, 'global': False}}
+        with self.factory() as db:
+            remember(db, 'working', 'browser_safety_check', safety)
+            remember(db, 'working', 'browser_monitor_recovery', {'retry_at': time.time() + 3600})
+            db.commit()
+        task = executor.take(self.factory, 'worker')
+        self.assertIsNotNone(task)
+        self.assertEqual(task['stage'], 'plan')
+        executor.accept(self.factory, 'worker', task, self.result())
+        discovery = executor.take(self.factory, 'worker')
+        self.assertEqual(discovery['stage'], 'discover')
+        with self.factory() as db:
+            self.assertEqual(get_memory(db, 'working', 'browser_safety_check'), safety)
+            self.assertIsNone(db.scalar(select(FirstContact)))
+
+    def test_email_global_and_unscoped_attention_still_block_replenishment(self):
+        for safety in [
+            {'requires_attention': True},
+            {'requires_attention': True, 'channel_attention': {'email': True, 'reddit': False, 'global': False}},
+            {'requires_attention': True, 'channel_attention': {'email': False, 'reddit': False, 'global': True}},
+            {'requires_attention': True, 'channel_attention': {'reddit': True}},
+        ]:
+            with self.subTest(safety=safety), self.factory() as db:
+                remember(db, 'working', 'browser_safety_check', safety)
+                self.assertIsNone(planner.replenish(db, {'remaining': 15}))
+                self.assertIsNone(db.scalar(select(Memory).where(Memory.namespace == 'operator_task')))
+                db.rollback()
+
     def test_pending_retry_hold_capacity_mission_and_competing_executor(self):
         with self.factory() as db:
             self.assertIsNone(planner.replenish(db,{'remaining':0}))
