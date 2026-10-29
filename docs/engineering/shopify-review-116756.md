@@ -269,3 +269,33 @@ mailbox health. Outreach should say the app is not yet listed, without claiming
 active review progress.
 
 Reference: https://shopify.dev/docs/apps/launch/billing/shopify-app-pricing
+
+## September 30: fixes resubmitted
+
+After the suspension ended, Partner Dashboard showed Paused with Submit fixes
+available. Live pricing independently confirmed Manual pricing (legacy), with
+App Pricing not enabled and all three prices and 14-day trials matching the
+Billing API implementation. The listing and automated common-error checks passed.
+
+Corrected listing content encountered during verification: removed unsupported
+Auto-restock, Expiry dates and Back-in-stock alerts tags; replaced real-time,
+instant and guaranteed outcome claims with synced-data planning descriptions;
+and replaced obsolete magic-link reviewer instructions with the embedded
+Shopify session-token flow. Saved these changes before submitting fixes.
+
+Shopify then confirmed **Submitted**, **We're assigning a reviewer to your
+submission**, and **Success! We received your submission.** Evidence **266654**
+records the receipt and updates `strategic/shopify_review`. Screenshot:
+`.growth-deploy/shopify-submitted-2026-09-30.png`.
+
+The fresh [self-review](shopify-submission-self-review-2026-09-30.md) checked 31
+requirements: 28 likely passing, zero likely failing and three verification
+limits. Non-USD reporting, the complete live charge lifecycle and completed live
+plan changes remain unverified. The 24 backend and 15 frontend focused checks
+passed. No charge was approved and no application source or deployment changed.
+
+The app is not approved or listed. Monitor support@skubase.io for new reviewer
+correspondence; do not resubmit or withdraw while Submitted. Preserve the prior
+suspension and repair evidence. This review creates no mailbox restriction or
+acquisition hold. Merchant-facing disclosure remains: Skubase is not yet listed
+in the Shopify App Store.

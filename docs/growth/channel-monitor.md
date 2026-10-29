@@ -11,13 +11,48 @@ already available, use its browser APIs directly. Do not load native Windows
 Computer Use documentation, initialize native automation, or search for another
 runtime just to inspect an available browser tab. Read each needed document once;
 only fetch a missing section if a tool explicitly reports truncated output.
-If browser inventory has no Chrome surface, try one bounded restoration before
-reporting it unavailable: use the installed Computer Use skill and its documented
-@oai/sky launch_app({app:"chrome.exe"}) through node_repl, then refresh browser
-inventory and open the dedicated mailbox URL below. Read the current skill
-guidance first. Do not use shell UI automation, change security settings or
-attempt to unlock a locked desktop. If the supported launch tool is unavailable
-or restoration fails, retain the concrete blocker. Do not repeatedly launch.
+For connected Chrome, reuse an existing tab with getTab when possible. If a new
+tab is needed, follow createBrowserTab's Chrome options: use a short sessionName
+and omit visible. The visible option belongs to the in-app browser (iab), not
+Chrome. Monitor 379326 passed visible:true to Chrome and received "Capability is
+not available: visibility" before inspecting Reddit. This is not evidence of a
+missing Chrome connection. This correction does not clear any channel flag,
+authenticate Reddit, or override a tool safety stop; record actual access and
+observations on the next normally scheduled leased check.
+If browser inventory has no Chrome surface, use the installed Windows Computer
+Use skill through the separate node_repl tool, after reading its guidance and
+confirmations. This tool can be deferred rather than present in the initial
+tool declarations. Before reporting it unavailable, use functions.exec to inspect
+only its catalog entries:
+
+```javascript
+text(ALL_TOOLS.filter(t => t.name.startsWith("mcp__node_repl__")));
+```
+
+Read the returned schema and use the exact exposed tool name through `tools`
+inside functions.exec. A missing direct namespace is not evidence that the tool
+is unavailable. This metadata lookup performs no browser or native actions.
+Finding the tool does NOT clear an earlier Computer Use URL/policy stop. Such a
+stop remains a blocker until supported recovery; do not use discovery, a new
+lease, another runtime or a fresh process to bypass it.
+Do not import @oai/sky in mcp__cua_repl.js:
+cua_repl is the browser runtime and may report an unconfigured Sky RPC service.
+That error does not establish that the separate node_repl tool is unavailable.
+In node_repl, initialize @oai/sky and list existing windows first. Select the
+returned Work Chrome window and verify info@skubase.io in the visible UI. A
+working native Chrome window is a valid observation surface even if the browser
+extension inventory remains empty. Use documented native actions and fresh
+window observations for the checks below. Only if Chrome is absent, try one
+documented launch_app({app:"chrome.exe"}), then list windows again. Do not use
+shell UI automation, change security settings, automate authentication dialogs,
+or attempt to unlock a locked desktop. If node_repl is unavailable or its own
+native call fails, retain that exact tool/error as the blocker; do not substitute
+cua_repl, repeatedly launch, or claim another Google login is required.
+After tool initialization and BEFORE reading mailbox or Reddit contents, complete
+step 1 (operator-monitor-start). Only observations made after that returned
+started_at can support step 6. Never start a check after inspecting messages and
+attach the earlier observations to it. If a tool stops Computer Use, obey the
+stop and record the check as incomplete; do not retry through a different tool.
 Keep payload files in .growth-deploy and never print credentials. Return the
 required structured result promptly; this monitor has a bounded runtime.
 
@@ -43,11 +78,18 @@ is incomplete and requires_attention must be true.
    is not the result. Do not claim a missing ID without reading this retained file,
    and do not start a second check merely because stdout was overlooked. An
    actually expired check requires new live observations, never a copied timestamp.
-2. Open https://mail.google.com/mail/u/4/ and verify the visible Google account
-   is info@skubase.io before inspecting messages. If the index changed, use the
-   account chooser to select that business account. The generic Gmail homepage
-   can select personal mail; do not read or use it. Reopen a fresh tab if an old
-   handle is unattached. Genuine login or permission barriers remain blockers.
+2. Prefer the existing Gmail tab in the current connected Chrome inventory
+   whose title identifies info@skubase.io, then verify that business account in
+   the visible UI before inspecting messages. Google account indexes belong to
+   each Chrome profile; the historical task source /mail/u/4/ is not an identity
+   guarantee. After the owner connected the Work profile on October 15, inventory
+   exposed its business inbox at https://mail.google.com/mail/u/0/#inbox.
+   Use current inventory and visible identity rather than forcing either index.
+   If necessary, use the account chooser to select info@skubase.io. The generic
+   Gmail homepage can select personal mail; do not read or use it. Reopen a fresh
+   tab if an old handle is unattached. Genuine login or permission barriers remain
+   blockers. The restored extension connection is a changed access condition,
+   not mailbox coverage or permission to bypass any new tool stop.
 3. Inspect recent business mail, including Shopify review/support mail. Prioritize
    genuine merchant replies and opt-outs. Automated acknowledgments, newsletters,
    DMARC reports, internal sb-check threads and historical EmailPal support mail
@@ -69,6 +111,20 @@ is incomplete and requires_attention must be true.
    A bare domain returning no contact_ids does not prove its email address is
    unsuppressed. Resolve the address before calling a historical message new.
    Shopify App Store review status is separate from channel access/deliverability.
+   The October 14 08:24 Pacific "Action required: Issues with your app
+   submission" message for reference 116756 is already triaged in 375283 and
+   375426. Requirement 1.2.2 concerns app billing after reinstall; the local
+   repair still needs deployment and live verification. This exact unchanged
+   message is NOT a new channel incident and does not set global/email attention.
+   Its connected Work Gmail thread is
+   https://mail.google.com/mail/u/0/#inbox/FMfcgzQhWxQjzsxgKVXdqtxLRTNqPZML.
+   Monitor 381328 incorrectly called this same October 14 08:24 message new;
+   the retained browser trace confirms its sender, timestamp, subject and request
+   match 375283. A different account-index/thread URL is not a new review request.
+   Do not enqueue another reply task for that unchanged notice.
+   Preserve its response deadline and repair work; do not claim resolution or
+   approval. Materially new feedback still needs triage. This exception never
+   certifies mailbox coverage or clears an actual browser-tool access barrier.
    The September 16 suspension notice for reference 116756, until September 30,
    is already triaged: billing configuration repaired, test checkout verified
    (127124), incident retained (127136). See the Shopify review update in
@@ -92,7 +148,8 @@ is incomplete and requires_attention must be true.
    suppression and cite those IDs as handled evidence. Its continued presence in
    the inbox must not set requires_attention=true. This applies only to that exact
    retained decline; inspect any genuinely new message or different request normally.
-4. For a verified invalid-recipient bounce, call prospect-history with
+4. For every recipient-specific delivery failure, including "Message blocked"
+   and "remote server misconfigured", call prospect-history with
    {"identity":"<actual failed recipient email>"}. If not already suppressed, call
    email-suppress with {"recipient":"<actual failed recipient>","reason":"bounce"}.
    Never retry the address. A retained notice for an already suppressed merchant
@@ -113,6 +170,39 @@ is incomplete and requires_attention must be true.
    command does not invalidate the recorded suppression or create a global hold.
    A different recipient, changed failure or actual provider warning still needs
    fresh triage. Continue checking new mail and Reddit before recording clearance.
+   October 16 Sunny Supply delay is also handled: info@sunny.supply,
+   subject "A practical reorder workflow for Sunny Supply", dated Oct 16 at
+   6:47 p.m. Pacific, says Gmail will retry for 46 more hours. Full notice 397601
+   records Action: delayed, Status: 4.4.1 and recipient-server connection timeout;
+   daily review 404703 already triaged it. Contact ec607d566be141cba18de011c1f77199
+   is suppressed with status bounced. Monitor 407221 saw this same notice after
+   recovering authenticated info@skubase.io access. Its continued presence alone
+   must not hold the whole email channel. Never manually retry the recipient;
+   preserve suppression and the ramp-increase pause. Inspect a changed failure,
+   new recipient or actual provider restriction normally. Perform a fresh normal
+   monitor before clearance; this guidance does not refresh safety timestamps.
+   October 17 Veloworks delay is handled (monitor 410371, reconciliation
+   410437): henry@velo.works, subject "Reorder planning for Veloworks", temporary
+   delivery incomplete with a 47-hour Gmail retry notice. Contact
+   10ff6bf19c984ab2a5e72e55feef2c1f was verified suppressed=true/status=bounced.
+   The monitor record also persisted despite missing command stdout. Do not
+   repeat suppression or hold unrelated email solely because stdout was absent.
+   Sunny Supply's retained delay also showed a 21-hour countdown in that check;
+   a decreasing countdown alone does not undo its existing suppression.
+   Never manually retry either recipient. Preserve negative delivery signals and
+   the ramp-increase pause; inspect genuinely changed failures and systemic or
+   provider warnings. A fresh normal monitor is still required for clearance.
+   October 4 retained failures are also handled (delivery evidence 294757,
+   295509, 298413; suppression reconciliation 301006):
+   - hello@entropybright.com: 550 5.4.1 recipient address rejected/access denied.
+   - support@dogandcatproducts.com: 554 5.7.1 remote relay access denied.
+   - infobuyvacuumparts@gmail.com: 550 5.1.1 address not found.
+   All three exact recipients are permanently bounce-suppressed. Unchanged notices
+   do not become unresolved again because their subject says blocked or server
+   misconfigured. Preserve the repeated-delivery-failures ramp-increase pause;
+   it is separate from an email-channel hold. A daily email cap is also separate
+   from channel health. Inspect changed notices, other recipients and sender-wide
+   restrictions normally. This retained evidence never replaces fresh inbox checks.
 5. Inspect the retained Reddit chat/notification URL for new replies. Use the
    existing Skubase account. Allow the page to load using normal state reads;
    do not assume a loading pane is an empty inbox. No searching or posting.

@@ -1,5 +1,17 @@
 # Reorder and purchase-order validation
 
+## October 3 owner override: third cohort open
+
+The owner requested a new cohort without waiting through days with no outreach.
+`reorder-po-validation-v3` is now a separate bounded batch of 50 new merchants,
+experiment `156612c609ed4fda929e18d283bc0b71`, authorized by evidence `289567`.
+Use the same ICP, offer, CTA and message family. Live `strategic/focused_validation`
+is authoritative. Preserve v1 and v2; v2 stays at 50 under observation through
+October 4 at approximately 10:32 a.m. Pacific, independently of v3 enrollment.
+This is owner-authorized continuation, not evidence of predecessor success.
+Keep the persisted email ramp, suppressions, uncertain-send protections and
+actual browser/channel restrictions. Review v3 at 25 and 50 confirmed contacts.
+
 ## September 20 owner override: second cohort open
 
 The owner explicitly requested: "Unpause it. Create a new 50 person cohort."

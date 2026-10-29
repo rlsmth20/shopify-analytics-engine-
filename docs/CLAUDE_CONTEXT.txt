@@ -1,0 +1,297 @@
+SKUBASE — CONTEXT AND HANDOFF FOR CLAUDE
+Prepared October 15, 2026. Repository snapshot, not a live production guarantee.
+
+Use this file to understand the app before responding to the owner's next request.
+It does not authorize deployments, external messages, purchases, authentication,
+or changes to the running growth system. Follow the owner's actual task and
+AGENTS.md. Recheck current files and state before changing anything.
+
+1. PRODUCT
+
+Skubase (https://skubase.io) is a Shopify-focused inventory planning and purchasing
+app. Older files call it Inventory Command or Shopify Inventory Decision Engine.
+Those are historical names for this repository, not separate products.
+
+The central value proposition is helping merchants decide what to reorder and
+turn those recommendations into exportable purchase orders. The app also has
+inventory health, forecasting, supplier, reporting, and operational workflows.
+Keep the experience understandable to a merchant, with clear next actions and
+honest explanations of missing data. Do not invent stock, cost, revenue, forecast
+confidence, or product capabilities when underlying evidence is absent.
+
+Current code surfaces include:
+- Dashboard and prioritized Action Queue.
+- Inventory health/analytics, demand forecasts, and lead-time settings.
+- Purchase orders, exports, receipt workflows, and stock transfers.
+- Supplier views, bundle opportunities, and liquidation/dead-stock views.
+- Reports and spreadsheet exports, scheduled reports, alerts and notifications.
+- Shopify connection/sync, Stocky migration/import, and ShipStation import.
+- Account, billing, support/feedback, and privacy requests.
+- Ask Skubase inventory assistant with controlled model access and local fallback.
+- Public pricing, features, blog, inventory-health-check and calculator pages.
+- Separate administrative growth/outreach functionality.
+
+Presence of a page is not proof that every underlying workflow is production
+verified. Confirm behavior and plan entitlement before promising a feature.
+Skubase DOES support exportable purchase orders.
+
+2. REPOSITORY AND STACK
+
+Local repository: C:\Users\Rainer\Shopify_Analytics_Engine
+Current branch at handoff: feat/persistent-skubase-growth
+Current HEAD at handoff: 58fadaf81c240fc262c325ba644b6bee6384eecc
+
+frontend/
+  Next.js App Router, TypeScript, React. package.json declares Next ^15,
+  React/React DOM ^19, TypeScript ^5. Check package-lock.json for resolved versions.
+  app/(app-shell)/ contains authenticated workspace pages.
+  app/globals.css contains shared styling and responsive layouts.
+  components/ contains the shell and reusable presentation components.
+  lib/api.ts and lib/api-v2.ts contain HTTP client helpers.
+  lib/api-base.ts resolves the backend URL.
+  lib/workspace-navigation.ts defines workspace navigation.
+  lib/plans.ts defines plan/capability presentation; tiers are Starter/Growth/Scale.
+  lib/entitlements.ts, lib/billing-view.ts and lib/shopify-embedded.ts are important
+  to billing and embedded-app behavior.
+  tests/ contains existing Node .test.cjs tests.
+
+backend/
+  Python, FastAPI, SQLAlchemy 2, Pydantic 2; PostgreSQL in production.
+  app/main.py creates the app, registers routes and starts/stops background workers.
+  app/api/routes/ is the HTTP route layer.
+  app/services/ contains business logic.
+  app/integrations/ contains Shopify client/mapping code.
+  app/db/ contains database models, sessions and initialization.
+  app/growth/ is the persistent acquisition subsystem; treat it as separate from
+  merchant-facing inventory features.
+  tests/ contains Python tests, including Shopify installation/privacy/billing.
+
+docs/ contains product, engineering, design and growth records.
+scripts/ contains existing growth review/executor/verification tooling.
+
+Important: README.md and docs/engineering/architecture.md contain old MVP claims
+such as "no real auth", "no background jobs or webhooks", and a manual-token-only
+connection flow. These are stale. Current code has authentication, embedded
+Shopify integration, billing, background scheduling and webhook processing.
+Use current implementation and dated release notes to resolve disagreements.
+
+3. ARCHITECTURAL RULES
+
+Read AGENTS.md first. Its key requirements are:
+- Do not modify backend logic unless explicitly requested.
+- Keep frontend/backend separate; communicate through HTTP contracts.
+- Never introduce runtime imports across frontend/backend boundaries.
+- Keep FastAPI routes thin; put business logic in services.
+- Frontend edits must preserve existing API contracts.
+- Keep changes minimal, clean and easy to review.
+- Update relevant docs when changing workflow, environment or deployment behavior.
+
+Inventory action flow:
+  UI -> HTTP client -> FastAPI actions route -> services/action_feed.py ->
+  services/inventory_engine.py -> ranked inventory recommendations.
+Persisted shop/product/inventory/order data and shop settings underpin the feed.
+Demo/mock data exists; never present it as a merchant's verified live inventory.
+
+Authentication includes server-side sessions and a standalone magic-link flow,
+plus embedded Shopify authentication. Do not replace the Shopify review testing
+instructions with obsolete magic-link-only instructions.
+Preserve tenant/shop isolation, session boundaries, and cache protections.
+Do not expose unverified paid entitlements when billing checks fail.
+
+Ask Skubase is evidence-bounded and has spending/access gates, no external tools
+or inventory mutations, and an honest deterministic fallback. Do not remove
+those gates or introduce paid API usage to work around another service's limit.
+See docs/engineering/ask-skubase-luna.md before changing it.
+
+4. LOCAL DEVELOPMENT AND CHECKS
+
+Use PowerShell from the appropriate directory. Use a local database for tests;
+never accidentally run development initialization against production.
+
+Backend, from backend/:
+  python -m pip install -r requirements.txt
+  python -m app.db.init_db
+  uvicorn app.main:app --reload --port 8000
+
+Frontend, from frontend/:
+  npm install
+  npm run dev
+  npm run typecheck
+  npm run build
+
+Default local frontend/backend addresses are localhost:3000 and localhost:8000.
+Local database default is sqlite:///./shopify_analytics_engine.db.
+Relevant environment variable NAMES include DATABASE_URL, FRONTEND_ORIGIN,
+NEXT_PUBLIC_API_BASE_URL and IS_PRODUCTION. This is not an exhaustive deployment
+configuration; inspect the relevant code/example config for the task.
+No credentials or environment values are included in this handoff.
+
+Run existing focused tests appropriate to the change. Frontend tests live under
+frontend/tests/; backend tests under backend/tests/. Inspect their conventions
+before invoking them. For layout work, verify actual rendered mobile and desktop
+pages, not only CSS or a successful build. Do not claim local tests prove live
+Shopify billing behavior or production deployment.
+
+5. CURRENT PRODUCT WORK: MOBILE REPORTS FIX
+
+The owner provided a phone screenshot showing Reports & exports broken:
+the report delivery preferences card was squeezed into a narrow left sliver,
+while Recent workspace history occupied/overlapped the rest of the screen.
+
+A local fix is already present in frontend/app/globals.css and is UNCOMMITTED:
+- Report administration cards and form fields can shrink with min-width: 0.
+- Report administration grid stacks in one column at widths <=1200px.
+- Mobile form columns use minmax(0, 1fr).
+- The grid is no longer incorrectly grouped with a mobile flex layout override.
+- Small-screen select/toggle controls have at least 44px touch targets.
+
+Prior local verification covered viewport widths 320, 390, 430, 768, 840, 1024,
+1100, 1200, 1280 and 1440px, using the actual frontend with an isolated mock API.
+No horizontal overflow was found. Cards stacked at <=1200px and used two columns
+on wider screens. Long email input, controls and Save-button reachability above
+bottom navigation were checked. Typecheck/build passed; no JS errors observed.
+This is NOT DEPLOYED. Preserve this work and inspect the diff before editing.
+
+Optional local visual evidence (outside the repo):
+C:\Users\Rainer\.codex\visualizations\2026\09\07\01a0794f-f863-7df3-8f0c-667c360517ab\reports-mobile-390.png
+C:\Users\Rainer\.codex\visualizations\2026\09\07\01a0794f-f863-7df3-8f0c-667c360517ab\reports-responsive-results.json
+
+6. CURRENT CRITICAL PRODUCT ISSUE: SHOPIFY BILLING AFTER REINSTALL
+
+Shopify review reference: 116756. Status: In review / Action required.
+The app is NOT confirmed approved or listed in the Shopify App Store.
+An email field saying "Fully visible" is not proof of approval/listing.
+
+October 14 reviewer screenshots reported requirement 1.2.2: after reinstall,
+Plan and billing could not verify billing or offer another approval request.
+Production logs showed rejected Shopify tokens. Two local defects were reproduced:
+- A stored offline grant could be revoked by uninstall despite future expiry.
+- Frontend error handling discarded recovery metadata and hid reconnect controls.
+
+Tested local repair commit: 901936422167ffd8e7eb6e39b715a5969e772ebb
+Read docs/engineering/shopify-billing-reinstall-2026-10-14.md for full detail.
+The repair renews a rejected same-shop offline grant using a verified session,
+handles concurrent recovery and delayed uninstall ordering, retries a billing
+READ once, avoids caching failed checks, and exposes Retry/Reconnect controls.
+It does NOT automatically replay subscription creation after uncertainty.
+
+Recorded verification: 54 focused tests passed, frontend typecheck/build passed,
+and billing GraphQL operations validated against Admin API 2026-04.
+Status: LOCAL TESTED; NOT DEPLOYED; NOT LIVE-LIFECYCLE VERIFIED; NOT SUBMITTED.
+Preserve source and regression tests.
+
+Required sequence before calling it resolved:
+1. Verify the correct Skubase frontend/backend deployment targets and access.
+2. Deploy the exact tested current source, including compatible frontend/backend.
+3. On the owner's development store, verify partnerDevelopment and an explicitly
+   identified TEST charge before any approval.
+4. Verify decline -> retry approval -> approve -> uninstall/reinstall -> renewed
+   approval -> plan change, retaining real browser and subscription-state proof.
+5. Only then prepare review resolution evidence within the owner's authorization.
+
+No real paid charge, withdrawal, or review submission is authorized by test results.
+Manual Billing API pricing remains enabled. Preserve existing plan/trial settings.
+Do not switch pricing modes or change prices as a workaround.
+Review email requested a response within 14 days of October 14, approximately
+October 28; the exact dashboard deadline has not been independently inspected.
+
+7. DEPLOYMENT AND ACCESS
+
+Frontend: Vercel. Backend: Railway, managed PostgreSQL.
+Verified saved frontend project ID: prj_vUAxpfJd3IiQ84ygFnrwZzUeDqgq.
+At the last access check this project was not visible to the connected Vercel
+team and CLI credentials were absent. Do not link to unrelated Leadforge or
+IntelliCart projects. The owner was already asked to restore the correct access.
+Shopify Partners remained at login; a later attempt reported a CAPTCHA load error.
+Do not automate authentication or bypass the CAPTCHA/access barrier.
+
+Public page/API availability does not prove a new release is deployed.
+An executor restart is not a production API/frontend deployment.
+Do not repeat unchanged owner notifications or request another Gmail login.
+Current access may have changed after this snapshot; verify through supported tools.
+
+8. PRESERVE CURRENT WORK
+
+At handoff, tracked modifications exist in:
+- docs/engineering/shopify-review-116756.md
+- docs/growth/channel-monitor.md
+- docs/growth/executor-instructions.md
+- docs/growth/focused-validation.md
+- frontend/app/globals.css
+
+Additional untracked material includes docs/design-review/,
+docs/skubase-design-drafts.zip, the September 30 submission self-review document,
+remote attachments and an operational payload. Do not delete or overwrite them.
+Inspect git status/diff before working. Do not reset/clean/stash others' work.
+
+HEAD 58fadaf repairs a LOCAL growth planner bug: Reddit-only attention had blocked
+email discovery. Its email-scoped gate now matches executor admission. Nineteen
+planner and six operator tests passed; the existing scheduled executor loaded it
+at a verified safe boundary. This did not deploy the customer-facing app.
+
+9. GROWTH SYSTEM — ONLY RELEVANT IF THE OWNER ASKS ABOUT IT
+
+A persistent executor is already operating. Do not start a second sender,
+manually seed discovery, or replace it with manual outreach. Preserve its leases,
+reservations, suppressions, attribution, experiment IDs and daily ramp.
+
+Latest observed snapshot (October 15, approximately 15:41 Pacific):
+- Active experiment: reorder-po-validation-v4.
+- ID: c8e0484e51ca435d8223bdc8f4b67f0b.
+- 11 confirmed first-contact emails with retained Gmail Sent-thread receipts.
+- Zero recorded substantive or positive replies. Customers, MRR, activation,
+  health checks/connections and attributed costs remain UNKNOWN.
+- Gmail checks succeeded. Reddit remained logged out; Community reply coverage
+  was also incomplete. Those channel limitations must not create a global hold.
+- Daily October 15 executive review is complete, evidence 380886.
+
+V4 changes only the ICP: Shopify merchants with a CURRENT recurring supplier-
+replenishment buying workflow, supported by a cheap public/cached fact.
+Keep the offer, positioning and message family fixed. Offer: reorder
+recommendations plus exportable purchase orders. CTA:
+"Would you be interested in seeing what Skubase recommends for your store?"
+Inspect early signals at 25 confirmed contacts, close/review at 50, allow seven
+days after the last contact for responses. Do not count uncertainty or automated
+acknowledgments/newsletters/provider mail as demand. Do not treat test-store
+product events as paying merchants. Do not relabel historical experiments.
+
+Selected sender: info@skubase.io (Google Workspace); support@skubase.io receives
+Shopify review correspondence. The Work Chrome extension IS installed/connected.
+Older setup requests are obsolete. Never ask for another installation/login
+solely because old notes say access failed. Obey any new tool safety stop.
+
+Use exact reserved email body/footer, verify sender, authorize once, retain exact
+Sent-thread proof. Never retry an uncertain send to find out if it happened.
+Suppress opt-outs/declines/hard bounces across linked identities. Preserve no-
+follow-up promises. Current persisted ramp was stage 4, 20 first contacts/day,
+with increases paused for bounces; read live state rather than resetting it.
+No paid API substitution to bypass Codex usage backoff; no personal Gmail sending.
+
+The October 14 Shopify notice is already triaged (375283/375426/381475). It is a
+product review obligation, not a mailbox restriction. Preserve the deadline and
+repair work without repeatedly holding acquisition for the same unchanged mail.
+
+Authoritative policy and operations references:
+  docs/growth/focused-validation.md
+  docs/growth/current-acquisition-policy.md
+  docs/growth/workspace-email-operations.md
+  docs/growth/channel-monitor.md
+  docs/growth/executor-instructions.md
+  docs/growth/continuous-operation.md
+Live strategic/focused_validation and canonical labels outrank old volume goals.
+Success means paying customers and repeatable merchant interest, not send counts.
+
+10. HOW TO COLLABORATE WITH THE OWNER
+
+The owner prefers action, plain language and concise updates. Avoid repetitive
+permission questions when work is already authorized. Make concrete progress and
+test it, but distinguish a local fix from a deployed/live-verified result.
+Do not bury the main point in implementation jargon. For UI changes, show the
+actual rendered result and explain the visible improvement.
+
+Start the next task by inspecting its relevant current source and existing diff.
+For mobile work, begin with the Reports page, shared shell, globals.css and the
+existing mobile fix. For billing work, begin with the dated reinstall document
+and regression tests. Do not redo completed repairs or silently discard them.
+If this file is supplied without repository access, request the specific source
+files needed for the owner's task rather than guessing implementation details.

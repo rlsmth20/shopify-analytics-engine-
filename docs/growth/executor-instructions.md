@@ -367,11 +367,12 @@ Keep payload files in .growth-deploy, not the repository root.
   prospect-history for its exact sender when needed. This context does not replace
   fresh Gmail/Reddit observations or authorize contacting a suppressed merchant.
 - monitor: recover an incomplete channel check; no research or outbound sends.
-  Resolve individual delivery failures within this task. For a verified invalid
-  recipient, read `prospect-history` with `{"identity":"<actual failed recipient email>"}`.
+  Resolve individual delivery failures within this task. For every recipient-specific
+  delivery failure, including blocked-message and remote-server-misconfiguration
+  notices, read `prospect-history` with `{"identity":"<actual failed recipient email>"}`.
   If not yet suppressed, call `email-suppress` with
   `{"recipient":"<actual failed recipient>","reason":"bounce"}` and verify
-  suppression. An old address-not-found notice for an already suppressed merchant
+  suppression. An unchanged recipient failure for an already suppressed merchant
   is handled evidence, not an unresolved global incident. Preserve its bounce
   and ramp-increase pause; do not retry the merchant or clear delivery warnings.
   When fresh inbox checks find no other unresolved issue and `email-status`
@@ -409,9 +410,22 @@ Keep payload files in .growth-deploy, not the repository root.
   Never invent an experiment ID or reuse an expired historical example.
 - send/outreach for Workspace email: read workspace-email-operations.md. Use
   the existing prepared facts and exact active experiment from your packet.
-  This is execution, not another research or strategy review. For browser-only
-  work initialize the available `cua` browser API; do not load native Windows
-  computer-control skill documents when no native Windows action is needed.
+  This is execution, not another research or strategy review. When Chrome is
+  available in the connected browser inventory, use the documented `cua` browser
+  API. If it is absent, use the installed Windows Computer Use skill through the
+  separate node_repl tool, following its guidance and confirmations. It may be
+  deferred: before declaring it unavailable, inspect
+  `ALL_TOOLS.filter(t => t.name.startsWith("mcp__node_repl__"))` using
+  functions.exec, then read the returned schema and use its exact tool name
+  through `tools`. Absence from the initial direct namespaces is not absence
+  from the catalog. Metadata discovery never clears a prior URL/policy stop;
+  preserve that blocker until supported recovery, without alternate-tool retries.
+  Never import @oai/sky into cua_repl. List existing native windows before any
+  launch, select the returned Work Chrome window, and verify info@skubase.io in
+  the visible UI. A working native window is valid even when the extension
+  inventory is empty. Do not change authentication or security settings. An
+  actual tool denial remains a blocker. This tool selection changes none of the
+  fresh-channel-check, exact-body, one-use authorization or receipt requirements.
   Finish required documentation and browser initialization BEFORE monitor-start,
   so the five-minute observation window is spent on live checks and submission.
   Select only `.readiness` from `email-status` JSON; do not print campaign history.
