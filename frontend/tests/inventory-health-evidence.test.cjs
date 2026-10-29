@@ -30,6 +30,7 @@ function renderHealth(health) {
     react: { useEffect() {}, useMemo: calculate => calculate(), useState: initial => [[health, null, false][stateIndex++] ?? initial, () => {}] },
     "next/link": { __esModule: true, default: "a" },
     "@/components/chart-card": { ChartCard: "ChartCard" },
+    "@/components/charts": { HorizontalBarChart: "HorizontalBarChart" },
     "@/components/inventory-value-chart": { InventoryValueChart: "InventoryValueChart" },
     "@/components/empty-state": { EmptyState: "EmptyState" },
     "@/components/kpi-card": { KpiCard: "KpiCard" },

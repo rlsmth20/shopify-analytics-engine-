@@ -152,6 +152,13 @@ export function redirectTopLevel(url: string): void {
   // inside the app iframe, so navigation must escape to the top window.
   try {
     if (window.top && window.top !== window.self) {
+      // App Bridge intercepts window.open(url, "_top") and performs the
+      // top-level navigation Shopify supports; assigning top.location from a
+      // cross-origin iframe can be blocked by the browser's framebusting rules.
+      if (window.shopify && typeof window.open === "function") {
+        window.open(url, "_top");
+        return;
+      }
       window.top.location.href = url;
       return;
     }

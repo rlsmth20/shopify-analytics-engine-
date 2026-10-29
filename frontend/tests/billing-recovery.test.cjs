@@ -40,7 +40,7 @@ test('rejected grant shows recovery, hides stale paid plan, and retry restores p
   const f=harness(async()=>body);
   let ui=await f.settle();
   assert.match(ui.text,/Reconnect Shopify to check your plan/);
-  assert.equal(ui.button('Choose Starter'),undefined);
+  assert.doesNotMatch(ui.text,/Current plan/);
   ui.button('Reconnect Shopify').props.onClick(); await new Promise(setImmediate);
   assert.deepEqual(f.reconnects,['fixture.myshopify.com']);
   body=inactive;
@@ -50,12 +50,23 @@ test('rejected grant shows recovery, hides stale paid plan, and retry restores p
   assert.equal(f.posts.length,1);
 });
 
+test('after reinstall a failed billing check still lets the merchant request plan approval (Shopify 1.2.2)',async()=>{
+  const f=harness(async()=>({...inactive,plan_id:'scale',subscription_status:'active',billing_status_error:'shopify_unauthorized'}));
+  const ui=await f.settle();
+  assert.ok(ui.button('Retry billing check'));
+  ui.button('Choose Starter').props.onClick(); await new Promise(setImmediate);
+  assert.equal(f.posts.length,1);
+  assert.equal(f.posts[0].url,'https://fixture.test/billing/shopify/subscribe');
+  assert.deepEqual(f.redirects,['https://fixture.myshopify.com/approval']);
+});
+
 test('network failure remains retryable without approving or assuming a plan',async()=>{
   let fail=true;
   const f=harness(async()=>{if(fail)throw new Error('offline');return inactive;});
   let ui=await f.settle();
   assert.ok(ui.button('Retry billing check'));
-  assert.equal(ui.button('Choose Starter'),undefined);
+  assert.ok(ui.button('Choose Starter'));
+  assert.doesNotMatch(ui.text,/Current plan/);
   assert.equal(f.posts.length,0);
   fail=false;ui.button('Retry billing check').props.onClick();ui=await f.settle();
   assert.ok(ui.button('Choose Starter'));

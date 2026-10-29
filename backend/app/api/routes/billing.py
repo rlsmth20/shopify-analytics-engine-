@@ -110,6 +110,7 @@ def start_shopify_subscription(
     payload: CheckoutRequest,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[DbSession, Depends(get_db_session)],
+    request: Request = None,
 ) -> CheckoutResponse:
     """Create a Shopify app subscription and return its confirmation URL.
 
@@ -126,7 +127,10 @@ def start_shopify_subscription(
             ),
         )
     try:
-        url = create_shopify_subscription(db, user=user, plan=payload.plan)
+        url = create_shopify_subscription(
+            db, user=user, plan=payload.plan,
+            session_token=_bearer_token(request) if request is not None else None,
+        )
         if not user.is_admin:
             from app.growth.store import digest
             product_event(db, "CHECKOUT_STARTED", user.shop_id, "checkout:" + digest(url), data={"tier": payload.plan})

@@ -170,6 +170,37 @@ class BillingReinstallTests(unittest.TestCase):
             self.assertIsNone(conn.uninstalled_at)
         self.assertEqual(self.exchange.call_count, 2)
 
+    def test_plan_request_right_after_reinstall_recovers_the_grant(self):
+        self.get()
+        # Reinstall revoked the saved grant; merchant goes straight to a plan.
+        self.grant = 'reinstalled-grant'
+        result = self.choose()
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(len(self.creations), 1)
+        self.assertTrue(self.creations[0]['test'])
+        self.assertEqual(self.exchange.call_count, 2)
+
+    def test_plan_request_without_session_token_asks_for_reauthorization(self):
+        self.get()
+        self.grant = 'reinstalled-grant'
+        from app.api.deps import get_current_user
+        with self.sessions() as db:
+            from app.db.models import User
+            user = db.scalar(select(User))
+        self.client.app.dependency_overrides[get_current_user] = lambda: user
+        result = self.client.post('/billing/shopify/subscribe', json={'plan': 'scale_monthly'})
+        self.assertEqual(result.status_code, 409)
+        self.assertEqual(self.creations, [])
+
+    def test_plan_request_with_unrecoverable_grant_does_not_loop(self):
+        self.get()
+        self.grant = 'new-grant'
+        self.exchange.side_effect = None
+        self.exchange.return_value = {**GRANT, 'access_token': 'also-rejected'}
+        self.assertEqual(self.choose().status_code, 409)
+        self.assertEqual(self.creations, [])
+        self.assertEqual(self.exchange.call_count, 2)
+
     def test_unknown_charge_result_is_not_replayed(self):
         self.get()
         def outage(conn, query, variables):

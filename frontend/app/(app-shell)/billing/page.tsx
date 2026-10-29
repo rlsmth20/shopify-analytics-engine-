@@ -161,29 +161,98 @@ export default function BillingPage() {
     }
   }
 
+  function renderShopifyPlans(isActive: boolean, currentPlanId: string | null) {
+    return (
+      <SectionCard>
+        <div className="section-heading">
+          <div>
+            <p className="section-eyebrow">Plans</p>
+            <h2 className="section-title section-title-small">
+              {isActive ? "Change your plan" : "Choose your plan"}
+            </h2>
+          </div>
+        </div>
+        <p className="section-copy">
+          Billing runs through Shopify - skubase never collects payment
+          details. Charges appear on your Shopify invoice.
+        </p>
+        <div className="pricing-grid" style={{ marginTop: "24px" }}>
+          {PRICING_TIERS.map((tier) => {
+            const current = currentPlanId === tier.key && isActive;
+            const subscribing = subscribingPlan === tier.monthly.plan;
+            return (
+              <article key={tier.key} className={`pricing-card billing-plan-card ${tier.featured ? "pricing-card-featured" : ""}${current ? " billing-plan-card-current" : ""}`}>
+                <div className="billing-plan-card-head">
+                  <h3 className="pricing-card-title">{tier.name}</h3>
+                  {current ? <span className="status-badge status-succeeded">Current</span> : null}
+                </div>
+                <p className="pricing-card-price">
+                  {tier.monthly.price}<span>/mo</span>
+                </p>
+                <p className="section-copy">{tier.pitch}</p>
+                <p className="pricing-card-limit">{tier.limit}</p>
+                <button
+                  type="button"
+                  className={`button ${current ? "button-ghost" : "button-primary"} button-full`}
+                  disabled={current || subscribingPlan !== null}
+                  onClick={() => void chooseShopifyPlan(tier.monthly.plan)}
+                >
+                  {current
+                    ? "Current plan"
+                    : subscribing
+                    ? "Opening Shopify approval..."
+                    : isActive
+                    ? `Switch to ${tier.name}`
+                    : `Choose ${tier.name}`}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+        {shopifyPlanNotice ? (
+          <p className="auth-error" role="alert" style={{ marginTop: "16px" }}>
+            {shopifyPlanNotice}
+          </p>
+        ) : null}
+        <p className="section-copy" style={{ marginTop: "16px" }}>
+          Every plan starts with a 14-day free trial. You approve the charge
+          on Shopify&apos;s confirmation page, and it appears on your regular
+          Shopify invoice.
+        </p>
+      </SectionCard>
+    );
+  }
+
   if (loading) {
     return <div className="page-loading">Loading billing...</div>;
   }
   if (error || sub?.billing_status_error) {
     const needsReconnect = sub?.billing_status_error === "shopify_unauthorized";
+    // Shopify requires that a merchant can always request plan approval again
+    // (e.g. after reinstall), so an unverified status never hides the plans.
+    // No plan is marked current: stale paid state is not shown as verified.
+    const canChoosePlan = embeddedBilling || Boolean(sub?.is_shopify_installed);
     return (
-      <SectionCard>
-        <div role="alert">
-          <h2 className="section-title">{needsReconnect ? "Reconnect Shopify to check your plan" : "We could not verify your plan"}</h2>
-          <p className="section-copy">
-            {needsReconnect
-              ? "Your Shopify connection needs to be renewed. Reconnect your store, then choose a plan to request approval again. Your saved data is kept."
-              : error || "Shopify billing is temporarily unavailable. Retry to check your current plan before making changes."}
-          </p>
-        </div>
-        <div className="button-row">
-          <button type="button" className="button button-primary" onClick={() => void loadBilling()}>Retry billing check</button>
-          {embeddedBilling || sub?.shopify_domain ? (
-            <button type="button" className="button button-ghost" onClick={() => void reauthorizeShopify()}>Reconnect Shopify</button>
-          ) : null}
-        </div>
-        {shopifyPlanNotice ? <p role="alert" className="auth-error">{shopifyPlanNotice}</p> : null}
-      </SectionCard>
+      <div className="page-stack">
+        <SectionCard>
+          <div role="alert">
+            <h2 className="section-title">{needsReconnect ? "Reconnect Shopify to check your plan" : "We could not verify your plan"}</h2>
+            <p className="section-copy">
+              {needsReconnect
+                ? "Your Shopify connection needs to be renewed. Choose a plan below to request approval again, or reconnect your store. Your saved data is kept."
+                : `${error || "Shopify billing is temporarily unavailable."} Retry to check your current plan${canChoosePlan ? ", or choose a plan below to request approval" : ""}.`}
+            </p>
+          </div>
+          <div className="button-row">
+            <button type="button" className="button button-primary" onClick={() => void loadBilling()}>Retry billing check</button>
+            {embeddedBilling || sub?.shopify_domain ? (
+              <button type="button" className="button button-ghost" onClick={() => void reauthorizeShopify()}>Reconnect Shopify</button>
+            ) : null}
+          </div>
+          {shopifyPlanNotice && !canChoosePlan ? <p role="alert" className="auth-error">{shopifyPlanNotice}</p> : null}
+        </SectionCard>
+        {canChoosePlan ? renderShopifyPlans(false, null) : null}
+      </div>
     );
   }
   if (!sub) return null;
@@ -330,65 +399,7 @@ export default function BillingPage() {
         </SectionCard>
       </div>
 
-      {isShopifyBilling ? (
-        <SectionCard>
-          <div className="section-heading">
-            <div>
-              <p className="section-eyebrow">Plans</p>
-              <h2 className="section-title section-title-small">
-                {isActive ? "Change your plan" : "Choose your plan"}
-              </h2>
-            </div>
-          </div>
-          <p className="section-copy">
-            Billing runs through Shopify - skubase never collects payment
-            details. Charges appear on your Shopify invoice.
-          </p>
-          <div className="pricing-grid" style={{ marginTop: "24px" }}>
-            {PRICING_TIERS.map((tier) => {
-              const current = sub.plan_id === tier.key && isActive;
-              const subscribing = subscribingPlan === tier.monthly.plan;
-              return (
-                <article key={tier.key} className={`pricing-card billing-plan-card ${tier.featured ? "pricing-card-featured" : ""}${current ? " billing-plan-card-current" : ""}`}>
-                  <div className="billing-plan-card-head">
-                    <h3 className="pricing-card-title">{tier.name}</h3>
-                    {current ? <span className="status-badge status-succeeded">Current</span> : null}
-                  </div>
-                  <p className="pricing-card-price">
-                    {tier.monthly.price}<span>/mo</span>
-                  </p>
-                  <p className="section-copy">{tier.pitch}</p>
-                  <p className="pricing-card-limit">{tier.limit}</p>
-                  <button
-                    type="button"
-                    className={`button ${current ? "button-ghost" : "button-primary"} button-full`}
-                    disabled={current || subscribingPlan !== null}
-                    onClick={() => void chooseShopifyPlan(tier.monthly.plan)}
-                  >
-                    {current
-                      ? "Current plan"
-                      : subscribing
-                      ? "Opening Shopify approval..."
-                      : isActive
-                      ? `Switch to ${tier.name}`
-                      : `Choose ${tier.name}`}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-          {shopifyPlanNotice ? (
-            <p className="auth-error" role="alert" style={{ marginTop: "16px" }}>
-              {shopifyPlanNotice}
-            </p>
-          ) : null}
-          <p className="section-copy" style={{ marginTop: "16px" }}>
-            Every plan starts with a 14-day free trial. You approve the charge
-            on Shopify&apos;s confirmation page, and it appears on your regular
-            Shopify invoice.
-          </p>
-        </SectionCard>
-      ) : null}
+      {isShopifyBilling ? renderShopifyPlans(isActive, sub.plan_id) : null}
 
       <SectionCard>
         <div className="section-heading">

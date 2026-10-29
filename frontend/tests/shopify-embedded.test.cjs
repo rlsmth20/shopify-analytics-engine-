@@ -124,6 +124,16 @@ test("reconnect uses the authorized URL returned by the backend", async () => {
   assert.equal(window.top.location.href, authorizeUrl);
 });
 
+test("with App Bridge loaded, top-level navigation goes through window.open _top", async () => {
+  const authorizeUrl = "https://fixture.myshopify.com/admin/oauth/authorize?fixture=1";
+  const { api, window } = fixture({ response: new Response(JSON.stringify({ authorize_url: authorizeUrl })) });
+  const opened = [];
+  window.open = (url, target) => { opened.push([url, target]); return undefined; };
+  await api.reconnectShopify();
+  assert.deepEqual(opened, [[authorizeUrl, "_top"]]);
+  assert.equal(window.top.location.href, "https://admin.shopify.com");
+});
+
 test("failed reconnect surfaces an error without navigating", async () => {
   const { api, window } = fixture({ response: new Response(JSON.stringify({ detail: "Integration unavailable" }), { status: 503 }) });
   await assert.rejects(api.reconnectShopify(), /Integration unavailable/);

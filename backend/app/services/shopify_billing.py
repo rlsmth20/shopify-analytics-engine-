@@ -186,29 +186,52 @@ def _fetch_subscription_with_recovery(
     except ShopifyBillingAuthError:
         if not session_token:
             raise
-        from app.services.shopify_oauth import ShopifyTokenExchangeError, ShopifyTokenExchangeRejected
-        from app.services.shopify_session_tokens import (
-            ShopifySessionTokenError, recover_rejected_shopify_connection,
-        )
-        try:
-            recover_rejected_shopify_connection(db, conn=conn, session_token=session_token,
-                                                rejected_access_token=rejected_token)
-        except (ShopifySessionTokenError, ShopifyTokenExchangeRejected) as exc:
-            raise ShopifyBillingAuthError("Shopify connection needs re-authorization.") from exc
-        except ShopifyTokenExchangeError as exc:
-            raise ShopifyBillingError("Shopify connection recovery is temporarily unavailable.") from exc
-        # Retry only this read, once. Never replay a charge-creation mutation.
+        _recover_connection(db, conn=conn, session_token=session_token, rejected_token=rejected_token)
+        # Retry only this read, once.
         return _fetch_active_subscription(conn)
 
 
-def create_shopify_subscription(db: DbSession, *, user: User, plan: str) -> str:
+def _recover_connection(
+    db: DbSession, *, conn: ShopifyConnection, session_token: str, rejected_token: str,
+) -> None:
+    from app.services.shopify_oauth import ShopifyTokenExchangeError, ShopifyTokenExchangeRejected
+    from app.services.shopify_session_tokens import (
+        ShopifySessionTokenError, recover_rejected_shopify_connection,
+    )
+    try:
+        recover_rejected_shopify_connection(db, conn=conn, session_token=session_token,
+                                            rejected_access_token=rejected_token)
+    except (ShopifySessionTokenError, ShopifyTokenExchangeRejected) as exc:
+        raise ShopifyBillingAuthError("Shopify connection needs re-authorization.") from exc
+    except ShopifyTokenExchangeError as exc:
+        raise ShopifyBillingError("Shopify connection recovery is temporarily unavailable.") from exc
+
+
+def create_shopify_subscription(
+    db: DbSession, *, user: User, plan: str, session_token: str | None = None,
+) -> str:
     conn = _connection_for_shop(db, shop_id=user.shop_id)
     if conn is None:
         raise RuntimeError("No active Shopify connection for this workspace.")
     if plan not in SHOPIFY_PLAN_AMOUNTS:
         raise RuntimeError(f"Unknown Shopify billing plan '{plan}'.")
     _refresh_token_if_needed(db, conn)
+    rejected_token = conn.access_token
+    try:
+        return _create_shopify_subscription(db, user=user, conn=conn, plan=plan)
+    except ShopifyBillingAuthError:
+        # A 401/403 means Shopify rejected the credentials and never ran the
+        # mutation, so one retry after a verified reinstall recovery cannot
+        # double-charge. Any other uncertain outcome is never replayed.
+        if not session_token:
+            raise
+        _recover_connection(db, conn=conn, session_token=session_token, rejected_token=rejected_token)
+        return _create_shopify_subscription(db, user=user, conn=conn, plan=plan)
 
+
+def _create_shopify_subscription(
+    db: DbSession, *, user: User, conn: ShopifyConnection, plan: str,
+) -> str:
     return_url = _return_url(conn.shopify_domain)
     variables = {
         "name": SHOPIFY_PLAN_NAMES[plan],
