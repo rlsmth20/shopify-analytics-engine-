@@ -70,6 +70,11 @@ Current routes:
 - location: `backend/app/config/lead_time.py`
 - purpose: hold default lead-time inputs, vendor/category lead-time maps, and the default mock-fallback flag used when DB settings do not exist
 
+### Logging
+
+- `app/main.py` calls `configure_logging()` at import so `app.*` INFO records reach stdout under uvicorn, which only configures its own loggers
+- `LOG_LEVEL` (default `INFO`) sets the `app` logger level; a host that already installed a root handler keeps it
+
 ### Mock Data Layer
 
 - location: `backend/app/mock_data.py`

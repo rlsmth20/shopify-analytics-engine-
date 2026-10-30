@@ -9,6 +9,32 @@ from app.db.init_db import init_db
 
 logger = logging.getLogger(__name__)
 
+
+def configure_logging() -> None:
+    """Make application INFO logs visible under uvicorn.
+
+    Uvicorn configures only its own loggers. The root logger keeps Python's
+    default (WARNING, no handler), so every ``logger.info`` in ``app.*`` --
+    auth diagnostics, sync progress, webhook receipts -- was dropped in
+    production. Install a root handler when nothing else has, and apply
+    LOG_LEVEL to the ``app`` logger either way so a host that already
+    configured logging still sees our records.
+    """
+    level_name = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
+    level = logging.getLevelName(level_name)
+    if not isinstance(level, int):
+        level = logging.INFO
+    root = logging.getLogger()
+    if not root.handlers:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        )
+    logging.getLogger("app").setLevel(level)
+
+
+configure_logging()
+
 from app.api.routes.actions import auth_scoped_router as auth_scoped_actions_router, router as actions_router
 from app.api.routes.ai_chat import router as ai_chat_router
 from app.api.routes.admin import router as admin_router
