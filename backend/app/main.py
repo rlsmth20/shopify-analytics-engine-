@@ -63,7 +63,11 @@ from app.api.routes.transfers import router as transfers_router
 from app.api.routes.waitlist import router as waitlist_router
 from app.api.routes.contact import router as contact_router
 from app.services.alert_scheduler import start_alert_scheduler, stop_alert_scheduler
-from app.services.shopify_sync_jobs import recover_interrupted_sync_runs
+from app.services.shopify_sync_jobs import (
+    recover_interrupted_sync_runs,
+    start_sync_scheduler,
+    stop_sync_scheduler,
+)
 from app.api.routes.growth import router as growth_router
 from app.growth.worker import start as start_growth, stop as stop_growth
 from app.services.shopify_webhook_queue import start as start_webhooks, stop as stop_webhooks
@@ -85,12 +89,14 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Could not recover interrupted Shopify sync runs")
     start_alert_scheduler()
+    start_sync_scheduler()
     start_growth()
     start_webhooks()
     try:
         yield
     finally:
         await stop_alert_scheduler()
+        await stop_sync_scheduler()
         await stop_growth()
         await stop_webhooks()
 

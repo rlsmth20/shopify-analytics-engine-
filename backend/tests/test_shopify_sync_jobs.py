@@ -190,6 +190,51 @@ class SyncJobTests(unittest.TestCase):
         # One lookup per variant and per line item would be 80+ here.
         self.assertLess(len(selects), 20, selects)
 
+    def test_due_stores_are_installed_ones_without_a_recent_run(self):
+        now = datetime.now(timezone.utc)
+        interval = timedelta(hours=6)
+        with self.factory() as db:
+            self.assertEqual(jobs.due_shop_ids(db, now=now, interval=interval), [self.shop_id])
+            db.add(ShopifySyncRun(shop_id=self.shop_id, status="failed", started_at=now - timedelta(hours=1)))
+            db.commit()
+            self.assertEqual(jobs.due_shop_ids(db, now=now, interval=interval), [])
+            self.assertEqual(jobs.due_shop_ids(db, now=now + timedelta(hours=6), interval=interval), [self.shop_id])
+            conn = db.scalar(select(ShopifyConnection).where(ShopifyConnection.shop_id == self.shop_id))
+            conn.uninstalled_at = now
+            db.commit()
+            self.assertEqual(jobs.due_shop_ids(db, now=now + timedelta(days=1), interval=interval), [])
+
+    def test_scheduled_tick_syncs_due_stores_and_respects_live_runs(self):
+        with patch.object(sync, "_gql", side_effect=shopify()):
+            self.assertEqual(jobs.run_due_syncs(factory=self.factory), 1)
+            # Not due again until the interval passes, whatever the outcome.
+            self.assertEqual(jobs.run_due_syncs(factory=self.factory), 0)
+        status = self.status().json()
+        self.assertEqual((status["status"], status["triggered_by"]), ("succeeded", "scheduled"))
+        self.assertEqual(status["result"]["variants_imported"], 1)
+        # A live manual run is left alone rather than raced.
+        later = datetime.now(timezone.utc) + timedelta(days=1)
+        with self.factory() as db:
+            queued = ShopifySyncRun(shop_id=self.shop_id, status="queued", started_at=later - timedelta(minutes=5))
+            db.add(queued)
+            db.commit()
+        self.assertEqual(jobs.run_due_syncs(factory=self.factory, now=later), 0)
+
+    def test_scheduled_order_window_covers_the_gap_since_the_last_success(self):
+        now = datetime.now(timezone.utc)
+        self.assertEqual(jobs.order_window_days(None, now), 60)
+        self.assertEqual(jobs.order_window_days(now - timedelta(hours=6), now), 3)
+        self.assertEqual(jobs.order_window_days(now - timedelta(days=10), now), 12)
+        self.assertEqual(jobs.order_window_days(now - timedelta(days=200), now), 60)
+        # Naive timestamps from SQLite are treated as UTC.
+        self.assertEqual(jobs.order_window_days((now - timedelta(days=4)).replace(tzinfo=None), now), 6)
+        with self.factory() as db:
+            run_id = jobs.start_run(db, shop_id=self.shop_id).id
+        with patch.object(sync, "_ingest_orders", wraps=sync._ingest_orders) as orders, \
+                patch.object(sync, "_gql", side_effect=shopify()):
+            jobs.execute_run(run_id, factory=self.factory, order_days_back=5)
+        self.assertEqual(orders.call_args.kwargs["days_back"], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

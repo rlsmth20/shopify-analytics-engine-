@@ -10,15 +10,22 @@ and the page polls the run.
 The row is also the per-shop lock. It is created under the per-shop
 connection lock (a thread lock plus a Postgres transaction advisory lock), so
 two workers cannot both find no active run and start one each.
+
+The same machinery drives the automatic refresh: a loop started from the app
+lifespan syncs every installed store whose newest run is older than
+SHOPIFY_AUTO_SYNC_INTERVAL_SECONDS, so alerts and the action queue no longer
+depend on a merchant remembering to click Sync now.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import threading
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session as DbSession
 
 from app.db.models import ShopifyConnection, ShopifySyncRun
@@ -32,22 +39,54 @@ ACTIVE_STATUSES = ("queued", "running")
 IN_PROGRESS_MESSAGE = "A sync for this store is already running. Wait for it to finish."
 ABANDONED_MESSAGE = "The sync did not finish within the expected time. Run it again."
 INTERRUPTED_MESSAGE = "The sync was interrupted by a server restart. Run it again."
+FULL_ORDER_WINDOW_DAYS = 60
+MIN_ORDER_WINDOW_DAYS = 3
+
+_task: asyncio.Task[None] | None = None
 
 
 class SyncInProgress(RuntimeError):
     """Another run for this shop is queued or running."""
 
 
+def _env_int(name: str, default: int, *, minimum: int) -> int:
+    try:
+        return max(minimum, int(os.getenv(name, str(default))))
+    except ValueError:
+        logger.warning("Invalid %s=%r; using %s", name, os.getenv(name), default)
+        return default
+
+
 def lease_seconds() -> int:
     """How long a queued/running row keeps its claim before it counts as abandoned."""
-    try:
-        return max(60, int(os.getenv("SHOPIFY_SYNC_LEASE_SECONDS", "3600")))
-    except ValueError:
-        return 3600
+    return _env_int("SHOPIFY_SYNC_LEASE_SECONDS", 3600, minimum=60)
+
+
+def auto_sync_enabled() -> bool:
+    return os.getenv("SHOPIFY_AUTO_SYNC_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def auto_sync_interval_seconds() -> int:
+    """A store is due when its newest run (any outcome) is older than this."""
+    return _env_int("SHOPIFY_AUTO_SYNC_INTERVAL_SECONDS", 6 * 60 * 60, minimum=15 * 60)
+
+
+def auto_sync_check_seconds() -> int:
+    return _env_int("SHOPIFY_AUTO_SYNC_CHECK_SECONDS", 15 * 60, minimum=60)
+
+
+def auto_sync_batch_size() -> int:
+    return _env_int("SHOPIFY_AUTO_SYNC_MAX_SHOPS_PER_TICK", 10, minimum=1)
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _as_aware(value: datetime | None) -> datetime | None:
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 def active_run(db: DbSession, shop_id: int) -> ShopifySyncRun | None:
@@ -100,7 +139,7 @@ def start_run(db: DbSession, *, shop_id: int, triggered_by: str = "manual") -> S
     return run
 
 
-def execute_run(run_id: int, *, factory=SessionLocal) -> dict | None:
+def execute_run(run_id: int, *, factory=SessionLocal, order_days_back: int = FULL_ORDER_WINDOW_DAYS) -> dict | None:
     """Perform a queued run in its own session. Never raises; failures live on the row."""
     with factory() as db:
         run = db.get(ShopifySyncRun, run_id)
@@ -108,7 +147,7 @@ def execute_run(run_id: int, *, factory=SessionLocal) -> dict | None:
             return None
         shop_id = run.shop_id
         try:
-            return sync_shop_now(db, shop_id=shop_id, run=run)
+            return sync_shop_now(db, shop_id=shop_id, run=run, order_days_back=order_days_back)
         except Exception as exc:
             db.rollback()
             # sync_shop_now records product-stage failures itself; anything
@@ -170,3 +209,117 @@ def serialize_run(run: ShopifySyncRun) -> dict:
         # The dict the Store Sync page renders, present once the run finished.
         "result": run.summary,
     }
+
+
+# ---------- Automatic refresh ----------
+
+
+def due_shop_ids(db: DbSession, *, now: datetime, interval: timedelta) -> list[int]:
+    """Installed stores whose newest run started more than ``interval`` ago, or never.
+
+    The newest run of any outcome counts, so a store whose sync keeps
+    failing is retried once per interval rather than every tick. Oldest
+    first, so a batch limit still reaches every store eventually.
+    """
+    latest = (
+        select(ShopifySyncRun.shop_id, func.max(ShopifySyncRun.started_at).label("last_started"))
+        .group_by(ShopifySyncRun.shop_id)
+        .subquery()
+    )
+    rows = db.execute(
+        select(ShopifyConnection.shop_id)
+        .outerjoin(latest, latest.c.shop_id == ShopifyConnection.shop_id)
+        .where(
+            ShopifyConnection.access_token != "",
+            ShopifyConnection.uninstalled_at.is_(None),
+            or_(latest.c.last_started.is_(None), latest.c.last_started < now - interval),
+        )
+        .order_by(latest.c.last_started.asc().nulls_first(), ShopifyConnection.shop_id)
+    ).all()
+    return [int(shop_id) for (shop_id,) in rows]
+
+
+def order_window_days(last_success: datetime | None, now: datetime) -> int:
+    """Days of orders a scheduled run must re-read to stay complete.
+
+    Imported lines are keyed by Shopify line id, so re-reading is safe but
+    costs Shopify pages. After a recent successful run only the gap plus a
+    two-day margin is needed; without one, the full window applies.
+    """
+    last_success = _as_aware(last_success)
+    if last_success is None:
+        return FULL_ORDER_WINDOW_DAYS
+    gap_days = max(0, (now - last_success).days) + 2
+    return max(MIN_ORDER_WINDOW_DAYS, min(FULL_ORDER_WINDOW_DAYS, gap_days))
+
+
+def _last_successful_sync(db: DbSession, shop_id: int) -> datetime | None:
+    return db.scalar(
+        select(func.max(ShopifySyncRun.finished_at)).where(
+            ShopifySyncRun.shop_id == shop_id, ShopifySyncRun.status == "succeeded"
+        )
+    )
+
+
+def run_due_syncs(*, factory=SessionLocal, now: datetime | None = None) -> int:
+    """Sync every due store in turn. Returns the number of runs executed."""
+    now = now or _utcnow()
+    interval = timedelta(seconds=auto_sync_interval_seconds())
+    with factory() as db:
+        shop_ids = due_shop_ids(db, now=now, interval=interval)[: auto_sync_batch_size()]
+    executed = 0
+    for shop_id in shop_ids:
+        try:
+            with factory() as db:
+                days_back = order_window_days(_last_successful_sync(db, shop_id), now)
+                run_id = start_run(db, shop_id=shop_id, triggered_by="scheduled").id
+        except SyncInProgress:
+            continue  # a merchant beat us to it; the lock did its job
+        except RuntimeError as exc:
+            logger.info("Automatic Shopify sync skipped shop_id=%s: %s", shop_id, exc)
+            continue
+        except Exception:
+            logger.exception("Automatic Shopify sync could not start for shop_id=%s", shop_id)
+            continue
+        execute_run(run_id, factory=factory, order_days_back=days_back)
+        executed += 1
+    return executed
+
+
+async def _scheduler_loop() -> None:
+    logger.info(
+        "Automatic Shopify sync enabled; per-store interval=%ss, checked every %ss",
+        auto_sync_interval_seconds(),
+        auto_sync_check_seconds(),
+    )
+    await asyncio.sleep(60)  # let startup and the health check settle first
+    while True:
+        try:
+            count = await asyncio.to_thread(run_due_syncs)
+            if count:
+                logger.info("Automatic Shopify sync executed %s run(s)", count)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Automatic Shopify sync tick failed")
+        await asyncio.sleep(auto_sync_check_seconds())
+
+
+def start_sync_scheduler() -> None:
+    global _task
+    if not auto_sync_enabled():
+        logger.info("Automatic Shopify sync disabled by env")
+        return
+    if _task is not None and not _task.done():
+        return
+    _task = asyncio.create_task(_scheduler_loop())
+
+
+async def stop_sync_scheduler() -> None:
+    global _task
+    if _task is None:
+        return
+    _task.cancel()
+    with suppress(asyncio.CancelledError):
+        await _task
+    _task = None

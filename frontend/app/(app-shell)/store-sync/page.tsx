@@ -244,7 +244,10 @@ export default function StoreSyncPage() {
               Connected to <strong>{connection.shopify_domain}</strong>. Last
               sync: {formatRelative(connection.last_sync_at)}.
             </p>
-            <p className="section-copy" style={{ margin: "10px 0 18px" }}>Read-only sync · your Shopify stock and orders stay unchanged.</p>
+            <p className="section-copy" style={{ margin: "10px 0 18px" }}>
+              Read-only sync · your Shopify stock and orders stay unchanged. Skubase refreshes this store
+              automatically about every six hours; use Sync now after large catalog or stock changes.
+            </p>
             <div className="button-row">
               <button
                 type="button"

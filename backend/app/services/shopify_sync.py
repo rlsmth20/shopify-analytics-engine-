@@ -679,11 +679,14 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
     return stats
 
 
-def sync_shop_now(db: DbSession, *, shop_id: int, run: ShopifySyncRun | None = None) -> dict:
+def sync_shop_now(
+    db: DbSession, *, shop_id: int, run: ShopifySyncRun | None = None, order_days_back: int = 60
+) -> dict:
     """Run a full sync: products + inventory + recent orders. Returns a summary.
 
     ``run`` is the queued row created by shopify_sync_jobs.start_run, which
     also serialises runs per shop; without one a fresh row is recorded.
+    ``order_days_back`` lets scheduled refreshes re-read only the recent gap.
     """
     conn = db.scalar(
         select(ShopifyConnection).where(ShopifyConnection.shop_id == shop_id)
@@ -756,7 +759,8 @@ def sync_shop_now(db: DbSession, *, shop_id: int, run: ShopifySyncRun | None = N
     else:
         try:
             order_stats = _ingest_orders(
-                db, shop_id=shop_id, domain=conn.shopify_domain, token=token
+                db, shop_id=shop_id, domain=conn.shopify_domain, token=token,
+                days_back=order_days_back,
             )
             line_items_count = int(order_stats.get("line_items_imported") or 0)
         except Exception as exc:
