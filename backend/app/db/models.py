@@ -191,6 +191,11 @@ class ShopifySyncRun(Base):
     products_count: Mapped[int] = mapped_column(default=0)
     inventory_rows_count: Mapped[int] = mapped_column(default=0)
     order_line_items_count: Mapped[int] = mapped_column(default=0)
+    # "manual" (Store Sync button) or "scheduled" (background refresh).
+    triggered_by: Mapped[str] = mapped_column(String(16), default="manual", server_default="manual")
+    # The result dict the Store Sync page renders. Stored because the sync
+    # finishes after the request that started it has already returned.
+    summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     shop: Mapped[Shop] = relationship(back_populates="sync_runs")
 

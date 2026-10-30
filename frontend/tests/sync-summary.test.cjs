@@ -9,7 +9,7 @@ const compiled = ts.transpileModule(fs.readFileSync(path.join(__dirname, "../lib
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 vm.runInNewContext(compiled, { exports: output });
-const { getSyncNotice, isSyncResult } = output;
+const { getSyncNotice, isSyncResult, isSyncRunStatus, isSyncRunActive } = output;
 const complete = { status: "succeeded", variants_imported: 26, order_line_items_count: 0 };
 
 test("an empty paid-order window does not tell merchants to reconnect", () => {
@@ -41,4 +41,13 @@ test("malformed successful HTTP responses cannot become a completed sync", () =>
   }
   assert.equal(isSyncResult(complete), true);
   assert.equal(isSyncResult({ ...complete, status: "partial" }), true);
+});
+test("sync runs are followed only while queued or running, and only when well formed", () => {
+  for (const value of [null, {}, { run_id: 0, status: "queued" }, { run_id: 1, status: "done" }, { run_id: "1", status: "queued" }]) {
+    assert.equal(isSyncRunStatus(value), false);
+  }
+  assert.equal(isSyncRunStatus({ run_id: 7, status: "failed", error_message: "x", result: null }), true);
+  assert.equal(isSyncRunActive({ run_id: 1, status: "queued" }), true);
+  assert.equal(isSyncRunActive({ run_id: 1, status: "running" }), true);
+  for (const status of ["succeeded", "partial", "failed"]) assert.equal(isSyncRunActive({ run_id: 1, status }), false);
 });

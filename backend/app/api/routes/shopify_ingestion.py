@@ -1,4 +1,4 @@
-"""Shopify integration — OAuth install/callback + manual sync trigger."""
+"""Shopify integration — OAuth install/callback + background sync trigger."""
 from typing import Annotated, Optional, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -20,6 +20,13 @@ from app.services.shopify_oauth import (
     persist_connection,
     shopify_connection_lock,
     verify_callback_hmac,
+)
+from app.services.shopify_sync_jobs import (
+    SyncInProgress,
+    find_run,
+    run_in_background,
+    serialize_run,
+    start_run,
 )
 
 
@@ -130,16 +137,36 @@ def my_connection(
     }
 
 
-@router.post("/sync")
+@router.post("/sync", status_code=status.HTTP_202_ACCEPTED)
 def trigger_sync(
     user: Annotated[User, Depends(require_active_access)],
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> dict:
-    """Run a one-shot ingestion against this shop's Shopify connection."""
-    from app.services.shopify_sync import sync_shop_now
+    """Queue a sync of this shop's Shopify connection and return the run to poll.
 
+    The traversal runs in the background: large catalogs exceed request
+    timeouts, and one live run per shop keeps a second click from racing the
+    first into the inventory unique constraint. 409 means a run is already
+    queued or running; poll GET /sync/status for it.
+    """
     try:
-        result = sync_shop_now(db, shop_id=user.shop_id)
+        run = start_run(db, shop_id=user.shop_id, triggered_by="manual")
+    except SyncInProgress as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return result
+    run_in_background(run.id)
+    return serialize_run(run)
+
+
+@router.get("/sync/status")
+def sync_status(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[DbSession, Depends(get_db_session)],
+    run_id: int | None = Query(default=None, description="A run id from POST /sync; omit for the latest run."),
+) -> dict:
+    """The state of one sync run, or the latest, for the caller's shop only."""
+    run = find_run(db, shop_id=user.shop_id, run_id=run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="No sync run found for this workspace.")
+    return serialize_run(run)

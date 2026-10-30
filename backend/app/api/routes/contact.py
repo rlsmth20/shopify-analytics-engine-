@@ -8,9 +8,10 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.services import rate_limit
 from app.services.transactional_email import send_contact_notification
 
 router = APIRouter(prefix="/contact", tags=["contact"])
@@ -39,14 +40,16 @@ class ContactResponse(BaseModel):
 
 
 @router.post("/submit", response_model=ContactResponse)
-def submit(request: ContactRequest) -> ContactResponse:
+def submit(payload: ContactRequest, request: Request) -> ContactResponse:
+    # Every submission becomes an email to the operator inbox.
+    rate_limit.enforce(request, ("contact_ip", None), ("contact_email", str(payload.email).lower()))
     # FastAPI runs synchronous endpoints in its thread pool. Wait for the
     # provider acknowledgement so a failed send is not reported as success.
     delivered = send_contact_notification(
-        name=request.name,
-        email=request.email,
-        contact_type=request.type,
-        message=request.message,
+        name=payload.name,
+        email=payload.email,
+        contact_type=payload.type,
+        message=payload.message,
     )
     if not delivered:
         raise HTTPException(

@@ -89,9 +89,12 @@ def _gql(domain: str, token: str, query: str, variables: Optional[dict] = None) 
     raise RuntimeError("Shopify rate-limited the sync. Try again shortly.")
 
 
+# Page sizes are bounded by Shopify's 1,000-point cap on a single query's
+# requested cost (connections cost first x node cost, nested objects 1 each),
+# not by our throughput. Overflow beyond the nested `first` is paged separately.
 PRODUCTS_QUERY = """
 query Products($cursor: String) {
-  products(first: 10, after: $cursor) {
+  products(first: 12, after: $cursor) {
     pageInfo { hasNextPage endCursor }
     edges {
       node {
@@ -122,7 +125,7 @@ query Products($cursor: String) {
 
 ORDERS_QUERY = """
 query Orders($cursor: String, $query: String) {
-  orders(first: 5, after: $cursor, query: $query) {
+  orders(first: 8, after: $cursor, query: $query) {
     pageInfo { hasNextPage endCursor }
     edges {
       node {
@@ -283,7 +286,13 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
     seen_cursors: set[str] = set()
     products_scanned = 0
     variants_imported = 0
-    inventory_snapshot: dict[int, int] = {}
+    # One SELECT for the whole catalog instead of one per variant: a few
+    # thousand ORM rows are cheap next to a few thousand 200ms round trips.
+    products_by_variant: dict[str, Product] = {
+        product.shopify_variant_id: product
+        for product in db.scalars(select(Product).where(Product.shop_id == shop_id)).all()
+    }
+    tracked_quantities: list[tuple[Product, int]] = []
     while True:
         result = _gql(domain, token, PRODUCTS_QUERY, {"cursor": cursor})
         # Surface GraphQL-level errors so we can see scope / permission failures.
@@ -343,12 +352,7 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
                 if inventory_eligible and (not isinstance(qty, int) or isinstance(qty, bool)):
                     raise RuntimeError("Shopify did not return a tracked inventory quantity. Please retry the sync.")
 
-                product = db.scalar(
-                    select(Product).where(
-                        Product.shop_id == shop_id,
-                        Product.shopify_variant_id == shopify_variant_id,
-                    )
-                )
+                product = products_by_variant.get(shopify_variant_id)
                 if product is None:
                     product = Product(
                         shop_id=shop_id,
@@ -363,7 +367,7 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
                         cost=cost,
                     )
                     db.add(product)
-                    db.flush()
+                    products_by_variant[shopify_variant_id] = product
                 else:
                     product.shopify_product_id = shopify_product_id
                     product.sku = sku
@@ -376,7 +380,7 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
                         product.cost = cost
 
                 if inventory_eligible:
-                    inventory_snapshot[product.id] = qty
+                    tracked_quantities.append((product, qty))
                 variants_imported += 1
         page_info = products["pageInfo"]
         if not page_info["hasNextPage"]:
@@ -388,6 +392,8 @@ def _ingest_products(db: DbSession, *, shop_id: int, domain: str, token: str) ->
 
     # Reconcile only after every page is validated. A failed traversal leaves the
     # previous inventory intact, and the caller rolls back uncommitted metadata.
+    db.flush()  # one round trip assigns ids to every new product
+    inventory_snapshot: dict[int, int] = {product.id: qty for product, qty in tracked_quantities}
     existing_inventory = db.scalars(
         select(Inventory).where(Inventory.shop_id == shop_id)
     ).all()
@@ -509,6 +515,15 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
         normalized_sku = (sku or "").strip().lower()
         if normalized_sku:
             sku_to_products[normalized_sku].append(int(pid))
+    # Keys already imported for this window, one query instead of one per line.
+    # Imported rows carry the order's createdAt, so anything Shopify can return
+    # for `created_at:>=since` is covered by the margin below.
+    imported_line_keys: set[str] = set(db.scalars(
+        select(OrderLineItem.shopify_order_id).where(
+            OrderLineItem.shop_id == shop_id,
+            OrderLineItem.created_at >= since_dt - timedelta(days=1),
+        )
+    ).all())
 
     logger.info(
         "Shopify order ingest start: shop_domain=%s request_type=orders_graphql since=%s query=%s products_indexed=%s",
@@ -608,22 +623,18 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
                     stats["line_items_skipped"] += 1
                     order_counts["line_items_skipped"] += 1
                     continue
-                exists = db.scalar(
-                    select(OrderLineItem.id).where(
-                        OrderLineItem.shop_id == shop_id,
-                        OrderLineItem.shopify_order_id == f"{order_id}:{line_id}",
-                    )
-                )
-                if exists is not None:
+                line_key = f"{order_id}:{line_id}"
+                if line_key in imported_line_keys:
                     skip_reasons["already_imported"] += 1
                     stats["line_items_skipped"] += 1
                     order_counts["line_items_skipped"] += 1
                     continue
+                imported_line_keys.add(line_key)
 
                 db.add(
                     OrderLineItem(
                         shop_id=shop_id,
-                        shopify_order_id=f"{order_id}:{line_id}",
+                        shopify_order_id=line_key,
                         product_id=product_id,
                         sku=sku,
                         quantity=qty,
@@ -668,8 +679,15 @@ def _ingest_orders(db: DbSession, *, shop_id: int, domain: str, token: str, days
     return stats
 
 
-def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
-    """Run a full sync: products + inventory + recent orders. Returns a summary."""
+def sync_shop_now(
+    db: DbSession, *, shop_id: int, run: ShopifySyncRun | None = None, order_days_back: int = 60
+) -> dict:
+    """Run a full sync: products + inventory + recent orders. Returns a summary.
+
+    ``run`` is the queued row created by shopify_sync_jobs.start_run, which
+    also serialises runs per shop; without one a fresh row is recorded.
+    ``order_days_back`` lets scheduled refreshes re-read only the recent gap.
+    """
     conn = db.scalar(
         select(ShopifyConnection).where(ShopifyConnection.shop_id == shop_id)
     )
@@ -684,8 +702,11 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
         )
         raise RuntimeError("No active Shopify connection for this workspace.")
 
-    run = ShopifySyncRun(shop_id=shop_id, status="running")
-    db.add(run)
+    if run is None:
+        run = ShopifySyncRun(shop_id=shop_id, status="running")
+        db.add(run)
+    else:
+        run.status = "running"
     db.commit()
     db.refresh(run)
 
@@ -738,7 +759,8 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
     else:
         try:
             order_stats = _ingest_orders(
-                db, shop_id=shop_id, domain=conn.shopify_domain, token=token
+                db, shop_id=shop_id, domain=conn.shopify_domain, token=token,
+                days_back=order_days_back,
             )
             line_items_count = int(order_stats.get("line_items_imported") or 0)
         except Exception as exc:
@@ -752,8 +774,7 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
     run.error_message = orders_error[:1000] if orders_error else None
     run.finished_at = datetime.now(timezone.utc)
     conn.last_sync_at = datetime.now(timezone.utc)
-    db.commit()
-    return {
+    result = {
         "status": run.status,
         "products_count": products_count,
         "products_scanned": int(product_stats.get("products_scanned") or 0),
@@ -777,6 +798,10 @@ def sync_shop_now(db: DbSession, *, shop_id: int) -> dict:
         "orders_error": orders_error,
         "duration_seconds": time.monotonic() - started_at,
     }
+    # Stored so the Store Sync page can show the outcome after polling.
+    run.summary = result
+    db.commit()
+    return result
 
 
 def _friendly_sync_error(exc: Exception) -> str:

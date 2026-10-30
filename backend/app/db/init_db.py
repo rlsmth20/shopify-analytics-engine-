@@ -198,6 +198,13 @@ def run_safe_migrations() -> None:
                     "ALTER TABLE shopify_connections ADD COLUMN IF NOT EXISTS "
                     "refresh_token_expires_at TIMESTAMP WITH TIME ZONE"
                 ))
+                conn.execute(text(
+                    "ALTER TABLE shopify_sync_runs ADD COLUMN IF NOT EXISTS "
+                    "triggered_by VARCHAR(16) DEFAULT 'manual' NOT NULL"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE shopify_sync_runs ADD COLUMN IF NOT EXISTS summary JSON"
+                ))
             else:
                 # SQLite: check column existence via PRAGMA before adding.
                 result = conn.execute(text("PRAGMA table_info(purchase_orders)"))
@@ -325,6 +332,17 @@ def run_safe_migrations() -> None:
                     if column_name not in connection_columns:
                         conn.execute(text(
                             f"ALTER TABLE shopify_connections ADD COLUMN {column_name} {column_type}"
+                        ))
+                result = conn.execute(text("PRAGMA table_info(shopify_sync_runs)"))
+                sync_run_columns = {row[1] for row in result}
+                sqlite_sync_run_columns = {
+                    "triggered_by": "VARCHAR(16) DEFAULT 'manual' NOT NULL",
+                    "summary": "JSON",
+                }
+                for column_name, column_type in sqlite_sync_run_columns.items():
+                    if column_name not in sync_run_columns:
+                        conn.execute(text(
+                            f"ALTER TABLE shopify_sync_runs ADD COLUMN {column_name} {column_type}"
                         ))
             conn.commit()
         except Exception:

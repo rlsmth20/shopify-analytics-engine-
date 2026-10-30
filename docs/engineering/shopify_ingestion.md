@@ -143,3 +143,20 @@ The engine also adds the global safety buffer to derive `target_coverage_days`.
 - incomplete order history will distort `days_since_last_sale`
 - refunds, edits, and bundles can complicate simple unit-based sales aggregation
 - Shopify does not directly solve lead times, buffers, or supplier planning inputs
+
+## Sync Execution
+
+- `POST /integrations/shopify/sync` only creates a `shopify_sync_runs` row with status `queued` and returns `202` with `run_id`; `app/services/shopify_sync_jobs.py` runs the traversal on a daemon thread.
+- One live run per shop: the row is created under the per-shop connection lock (thread lock plus Postgres advisory lock), and a second request gets `409` while a run is `queued` or `running`.
+- `GET /integrations/shopify/sync/status?run_id=...` (or without `run_id` for the latest run) returns `status`, `error_message`, and `result`, the summary dict stored on the row when the run finishes.
+- Rows left active by a crash are closed at startup (`recover_interrupted_sync_runs`) and, as a fallback, after `SHOPIFY_SYNC_LEASE_SECONDS` (default one hour).
+- The traversal preloads the shop's products and the already-imported order line keys once, instead of issuing one SELECT per variant and per line item.
+
+## Automatic Refresh
+
+- `start_sync_scheduler()` (app lifespan) runs `run_due_syncs()` every `SHOPIFY_AUTO_SYNC_CHECK_SECONDS` (default 15 minutes) on a worker thread.
+- A store is due when it has an installed connection and its newest `shopify_sync_runs` row, of any outcome, started more than `SHOPIFY_AUTO_SYNC_INTERVAL_SECONDS` ago (default 6 hours). Failing stores are therefore retried once per interval, not every tick. At most `SHOPIFY_AUTO_SYNC_MAX_SHOPS_PER_TICK` stores run per tick, oldest first.
+- Scheduled runs use the same `start_run` / `execute_run` path as the button, so a merchant clicking Sync now during a scheduled run gets `409` and the page follows the run in progress.
+- Scheduled runs re-read only the orders since the last successful run plus a two-day margin (minimum three days, maximum sixty); the catalog and inventory traversal is always complete because it reconciles inventory rows.
+- `SHOPIFY_AUTO_SYNC_ENABLED=false` turns the loop off; the manual button keeps working.
+- Why: `shop_skus` marks sales history incomplete once the last successful sync is older than two days, which demotes every SKU to a monitor state and silences dead-stock and overstock alerts. Before this loop nothing synced a store unless someone clicked the button.

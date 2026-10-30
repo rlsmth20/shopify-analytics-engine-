@@ -127,6 +127,8 @@ class SpreadsheetExportTests(unittest.TestCase):
     def test_lead_export_retains_administrator_authorization(self):
         from app.api.routes.inventory_risk_snapshot import router as leads_router
         from app.db.session import get_db_session
+        from app.services import rate_limit
+        rate_limit.reset()
         app = FastAPI()
         app.include_router(leads_router)
         app.dependency_overrides[get_db_session] = lambda: None

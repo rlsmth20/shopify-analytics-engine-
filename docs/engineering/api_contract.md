@@ -101,87 +101,53 @@ Every action includes:
 - `excess_units: number`
 - `cash_tied_up: number`
 
-## `POST /integrations/shopify/ingest`
+## `POST /integrations/shopify/sync`
 
-Triggers a manual ingest for one Shopify shop.
+Queues a sync of the caller's connected Shopify store. Requires an active
+session with access (`require_active_access`).
 
 Side effect:
 
-- creates a `shopify_sync_runs` record
-- marks the run `running` at start
-- updates the run to `succeeded` or `failed` when the ingest finishes
+- creates a `shopify_sync_runs` record with status `queued` and returns at once
+- a background thread marks the run `running`, imports products, inventory, and recent orders, then stores the outcome on the run
+- only one run per shop may be `queued` or `running` at a time
 
-Request body:
+Response body (`202`):
 
-- `shopify_domain: string`
-- `access_token: string`
-
-Response body:
-
-- `shops`
-- `products`
-- `inventory_rows`
-- `order_line_items`
-
-Each count object includes:
-
-- `processed: number`
-- `inserted: number`
-- `updated: number`
-- `skipped: number`
+- `run_id: number`
+- `status: "queued"`
+- `triggered_by: "manual" | "scheduled"`
+- `started_at: string`
+- `finished_at: null`
+- `error_message: null`
+- `result: null`
 
 Errors:
 
-- `400` for invalid input
-- `502` for Shopify fetch failures
+- `400` when the workspace has no active Shopify connection
+- `409` when a run for this shop is already queued or running (poll the status route)
 
-## `GET /integrations/shopify/sync-status`
+## `GET /integrations/shopify/sync/status`
 
-Returns the latest recorded ingest run for one shop.
+Returns one sync run, or the latest, for the caller's shop only.
 
 Query params:
 
-- `shopify_domain: string`
+- `run_id: number` (optional; omit for the latest run)
 
 Response body:
 
-- `shop_id: number | null`
-- `shopify_domain: string`
-- `latest_run: ShopifySyncRun | null`
-
-`latest_run` fields:
-
-- `id: number`
-- `shop_id: number`
-- `started_at: string`
+- `run_id: number`
+- `status: "queued" | "running" | "succeeded" | "partial" | "failed"`
+- `triggered_by: string`
+- `started_at: string | null`
 - `finished_at: string | null`
-- `status: "running" | "succeeded" | "failed"`
 - `error_message: string | null`
-- `products_count: number`
-- `inventory_rows_count: number`
-- `order_line_items_count: number`
+- `result: object | null` (the sync summary rendered by the Store Sync page; present once the run finished)
 
-If the shop has never been ingested, the endpoint returns `latest_run: null`.
+Errors:
 
-Example response:
-
-```json
-{
-  "shop_id": 1,
-  "shopify_domain": "store-name.myshopify.com",
-  "latest_run": {
-    "id": 7,
-    "shop_id": 1,
-    "started_at": "2026-04-17T19:34:11.000000Z",
-    "finished_at": "2026-04-17T19:34:22.000000Z",
-    "status": "succeeded",
-    "error_message": null,
-    "products_count": 42,
-    "inventory_rows_count": 42,
-    "order_line_items_count": 118
-  }
-}
-```
+- `404` when the run does not exist or belongs to another shop
 
 ## `GET /shop-settings`
 

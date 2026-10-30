@@ -70,6 +70,18 @@ Current routes:
 - location: `backend/app/config/lead_time.py`
 - purpose: hold default lead-time inputs, vendor/category lead-time maps, and the default mock-fallback flag used when DB settings do not exist
 
+### Logging
+
+- `app/main.py` calls `configure_logging()` at import so `app.*` INFO records reach stdout under uvicorn, which only configures its own loggers
+- `LOG_LEVEL` (default `INFO`) sets the `app` logger level; a host that already installed a root handler keeps it
+
+### Rate Limits
+
+- `app/services/rate_limit.py` holds in-process sliding-window counters for the unauthenticated routes that send email or store submissions: magic-link requests (per address and per target email, including a daily cap), contact, waitlist signup, and snapshot lead capture
+- `app/services/admin_access.py` compares `X-Admin-Token` in constant time and locks an address out after repeated failures
+- the client address is the last `X-Forwarded-For` hop (appended by Railway's edge); limits reset on restart and count per worker, which is enough to stop send loops but is not an exact quota
+- `RATE_LIMIT_<NAME>=requests/seconds` overrides one policy; `RATE_LIMITS_ENABLED=false` disables them for local load tests
+
 ### Mock Data Layer
 
 - location: `backend/app/mock_data.py`

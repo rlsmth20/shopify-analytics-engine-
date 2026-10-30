@@ -26,6 +26,7 @@ from app.services.auth import (
     mark_magic_link_token_used,
     revoke_session,
 )
+from app.services import rate_limit
 from app.services.transactional_email import send_magic_link_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -94,8 +95,22 @@ def _build_me_response(user: User) -> MeResponse:
 @router.post("/magic-link/request", response_model=MagicLinkResponse)
 def request_magic_link(
     payload: MagicLinkRequest,
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> MagicLinkResponse:
+    email = str(payload.email).lower().strip()
+    # Tokens stay valid for 15 minutes, so repeat requests rarely help the
+    # user; without a ceiling this route is an inbox-bombing primitive.
+    rate_limit.enforce(
+        request,
+        ("magic_link_ip", None),
+        ("magic_link_email", email),
+        ("magic_link_email_daily", email),
+        detail={
+            "code": "rate_limited",
+            "message": "Too many sign-in requests. Use the link already in your inbox, or try again in a few minutes.",
+        },
+    )
     raw_token = issue_magic_link_token(db, email=payload.email)
     callback_url = f"{FRONTEND_URL}/auth/callback?token={raw_token}"
     if payload.return_to in {"/dashboard", "/import-stocky", "/import-shipstation"}:

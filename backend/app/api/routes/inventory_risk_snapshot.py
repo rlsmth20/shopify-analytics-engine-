@@ -3,18 +3,19 @@ from __future__ import annotations
 
 import csv
 import io
-import os
 from datetime import datetime, timezone
 from typing import Annotated, Literal, Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from app.db.models import InventoryRiskSnapshotLead
 from app.db.session import get_db_session
+from app.services import rate_limit
+from app.services.admin_access import require_admin_token
 from app.services.spreadsheet_exports import leads_workbook, MIME
 
 router = APIRouter(prefix="/inventory-risk-snapshot", tags=["inventory-risk-snapshot"])
@@ -31,15 +32,11 @@ InventoryIssue = Literal[
 LeadStatus = Literal["New", "Reviewing", "Snapshot sent", "Demo booked", "Not qualified"]
 
 
-def _check_admin_token(token: Optional[str]) -> None:
-    expected = os.getenv("ADMIN_BOOTSTRAP_TOKEN")
-    if not expected:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Admin export is disabled (ADMIN_BOOTSTRAP_TOKEN not set).",
-        )
-    if not token or token != expected:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin token.")
+def _check_admin_token(request: Request, token: Optional[str]) -> None:
+    require_admin_token(
+        request, token,
+        disabled_detail="Admin export is disabled (ADMIN_BOOTSTRAP_TOKEN not set).",
+    )
 
 
 def _normalize_store_url(value: str) -> str:
@@ -122,22 +119,24 @@ def _to_response(lead: InventoryRiskSnapshotLead) -> SnapshotLeadResponse:
 
 @router.post("/leads", response_model=SnapshotLeadResponse)
 def create_snapshot_lead(
-    request: SnapshotLeadRequest,
+    payload: SnapshotLeadRequest,
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
 ) -> SnapshotLeadResponse:
+    rate_limit.enforce(request, ("lead_ip", None))
     lead = InventoryRiskSnapshotLead(
-        first_name=request.first_name,
-        email=str(request.email).lower().strip(),
-        company_name=request.company_name,
-        store_url=request.store_url,
-        approximate_sku_count=request.approximate_sku_count,
-        biggest_inventory_issue=request.biggest_inventory_issue,
-        source=request.source,
-        utm_source=request.utm_source,
-        utm_medium=request.utm_medium,
-        utm_campaign=request.utm_campaign,
-        utm_content=request.utm_content,
-        utm_term=request.utm_term,
+        first_name=payload.first_name,
+        email=str(payload.email).lower().strip(),
+        company_name=payload.company_name,
+        store_url=payload.store_url,
+        approximate_sku_count=payload.approximate_sku_count,
+        biggest_inventory_issue=payload.biggest_inventory_issue,
+        source=payload.source,
+        utm_source=payload.utm_source,
+        utm_medium=payload.utm_medium,
+        utm_campaign=payload.utm_campaign,
+        utm_content=payload.utm_content,
+        utm_term=payload.utm_term,
         status="New",
     )
     db.add(lead)
@@ -148,12 +147,13 @@ def create_snapshot_lead(
 
 @router.get("/leads", response_model=list[SnapshotLeadResponse])
 def list_snapshot_leads(
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
     x_admin_token: Annotated[Optional[str], Header(alias="X-Admin-Token")] = None,
     status_filter: Optional[LeadStatus] = None,
     limit: int = 200,
 ) -> list[SnapshotLeadResponse]:
-    _check_admin_token(x_admin_token)
+    _check_admin_token(request, x_admin_token)
     query = select(InventoryRiskSnapshotLead).order_by(InventoryRiskSnapshotLead.created_at.desc())
     if status_filter:
         query = query.where(InventoryRiskSnapshotLead.status == status_filter)
@@ -163,12 +163,13 @@ def list_snapshot_leads(
 
 @router.get("/leads/export.csv")
 def export_snapshot_leads_csv(
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
     x_admin_token: Annotated[Optional[str], Header(alias="X-Admin-Token")] = None,
 ) -> Response:
     """Legacy CSV export — kept as a fallback. Prefer /leads/export.xlsx for
     the formatted workbook with a Summary tab."""
-    _check_admin_token(x_admin_token)
+    _check_admin_token(request, x_admin_token)
     leads = db.scalars(
         select(InventoryRiskSnapshotLead).order_by(InventoryRiskSnapshotLead.created_at.desc())
     ).all()
@@ -197,12 +198,13 @@ def export_snapshot_leads_csv(
 
 @router.get("/leads/export.xlsx")
 def export_snapshot_leads_xlsx(
+    request: Request,
     db: Annotated[DbSession, Depends(get_db_session)],
     x_admin_token: Annotated[Optional[str], Header(alias="X-Admin-Token")] = None,
 ) -> Response:
     """Formatted xlsx export — Summary tab (native Excel charts) plus a
     filterable Leads tab. Same auth model as the CSV endpoint."""
-    _check_admin_token(x_admin_token)
+    _check_admin_token(request, x_admin_token)
     leads = db.scalars(
         select(InventoryRiskSnapshotLead).order_by(InventoryRiskSnapshotLead.created_at.desc())
     ).all()

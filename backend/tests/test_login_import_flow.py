@@ -15,11 +15,12 @@ from app.api.routes import auth as auth_routes, stocky_import as stocky_routes, 
 from app.db.base import Base
 from app.db.models import Inventory, Product, Shop, User
 from app.db.session import get_db_session
-from app.services import auth, stocky_import, shipstation_import
+from app.services import auth, rate_limit, stocky_import, shipstation_import
 
 
 class LoginImportFlowTests(unittest.TestCase):
     def setUp(self):
+        rate_limit.reset()
         self.folder = tempfile.TemporaryDirectory()
         self.engine = create_engine('sqlite:///' + str(Path(self.folder.name) / 'fixture.db'), connect_args={'check_same_thread': False})
         Base.metadata.create_all(self.engine)

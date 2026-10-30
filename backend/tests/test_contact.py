@@ -6,10 +6,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routes.contact import router
+from app.services import rate_limit
 
 
 class ContactTests(unittest.TestCase):
     def setUp(self):
+        rate_limit.reset()
         app = FastAPI()
         app.include_router(router)
         self.client = TestClient(app)
