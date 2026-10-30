@@ -4,13 +4,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.db.models import WaitlistSignup
 from app.db.session import session_scope
+from app.services import rate_limit
 from app.services.transactional_email import send_waitlist_confirmation
 
 
@@ -35,11 +36,14 @@ class WaitlistSignupResponse(BaseModel):
 
 @router.post("/signup", response_model=WaitlistSignupResponse)
 def signup(
-    request: WaitlistSignupRequest,
+    payload: WaitlistSignupRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
 ) -> WaitlistSignupResponse:
-    email = request.email.lower().strip()
-    domain = (request.shopify_domain or "").strip().lower() or None
+    # Each new address triggers a confirmation email from our domain.
+    rate_limit.enforce(request, ("waitlist_ip", None))
+    email = payload.email.lower().strip()
+    domain = (payload.shopify_domain or "").strip().lower() or None
 
     with session_scope() as session:
         # If they're already on the list, return their existing record
@@ -50,10 +54,10 @@ def signup(
             # Update domain/source/note if the latest submission has them
             if domain and not existing.shopify_domain:
                 existing.shopify_domain = domain
-            if request.source and not existing.source:
-                existing.source = request.source
-            if request.note and not existing.note:
-                existing.note = request.note
+            if payload.source and not existing.source:
+                existing.source = payload.source
+            if payload.note and not existing.note:
+                existing.note = payload.note
             session.commit()
             session.refresh(existing)
             return WaitlistSignupResponse(
@@ -68,8 +72,8 @@ def signup(
         record = WaitlistSignup(
             email=email,
             shopify_domain=domain,
-            source=request.source,
-            note=request.note,
+            source=payload.source,
+            note=payload.note,
         )
         session.add(record)
         try:

@@ -1,6 +1,7 @@
 "use client";
 
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
+import { loginError } from "@/lib/login";
 import { useState } from "react";
 
 const API_BASE = APP_API_BASE_URL;
@@ -43,7 +44,7 @@ export function WaitlistForm({
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(body?.detail || `Request failed (${res.status}).`);
+        throw new Error(loginError(body));
       }
       setSuccess(true);
       setEmail("");
