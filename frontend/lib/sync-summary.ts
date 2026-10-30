@@ -46,3 +46,28 @@ export function getSyncNotice(result: SyncResult): { warning: boolean; title: st
 export function unmatchedSyncItems(result: SyncResult): number {
   return Math.max(0, (result.line_items_skipped ?? 0) - (result.line_item_skip_reasons?.already_imported ?? 0));
 }
+
+export type SyncRunState = "queued" | "running" | "succeeded" | "partial" | "failed";
+
+export type SyncRunStatus = {
+  run_id: number;
+  status: SyncRunState;
+  triggered_by?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error_message?: string | null;
+  result?: unknown;
+};
+
+const RUN_STATES: readonly string[] = ["queued", "running", "succeeded", "partial", "failed"];
+
+export function isSyncRunStatus(value: unknown): value is SyncRunStatus {
+  if (!value || typeof value !== "object") return false;
+  const run = value as Record<string, unknown>;
+  return typeof run.run_id === "number" && Number.isSafeInteger(run.run_id) && run.run_id > 0 &&
+    typeof run.status === "string" && RUN_STATES.includes(run.status);
+}
+
+export function isSyncRunActive(run: SyncRunStatus): boolean {
+  return run.status === "queued" || run.status === "running";
+}

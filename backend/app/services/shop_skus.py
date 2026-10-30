@@ -163,7 +163,7 @@ def load_skus_for_shop(db: Session, shop_id: int) -> List[SkuDetail]:
     }
     latest_finished_sync = db.scalar(
         select(ShopifySyncRun)
-        .where(ShopifySyncRun.shop_id == shop_id, ShopifySyncRun.status != "running")
+        .where(ShopifySyncRun.shop_id == shop_id, ShopifySyncRun.status.notin_(("queued", "running")))
         .order_by(ShopifySyncRun.id.desc())
         .limit(1)
     )

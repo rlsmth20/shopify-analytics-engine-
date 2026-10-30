@@ -115,9 +115,10 @@ Current action flow:
 
 Current sync flow:
 
-1. User submits Shopify domain and access token from the Store Sync page
-2. `POST /integrations/shopify/ingest` calls the ingestion service
-3. Backend persists shops, products, inventory, order line items, settings-related data, and sync-run status
+1. Merchant connects Shopify through OAuth (website login or App Store install) and clicks Sync now on the Store Sync page
+2. `POST /integrations/shopify/sync` creates a `shopify_sync_runs` row (one live run per shop) and returns 202; the traversal runs on a background thread
+3. The page polls `GET /integrations/shopify/sync/status?run_id=...` until the run is `succeeded`, `partial`, or `failed`, then shows the stored result
+4. Backend persists products, inventory, order line items, and the run outcome
 
 ## Deployment Notes
 

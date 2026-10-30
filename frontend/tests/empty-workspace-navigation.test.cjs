@@ -34,6 +34,11 @@ function harness(file, { props, component = "default", dashboard, connection } =
         return [slots.get(key), next => slots.set(key, typeof next === "function" ? next(slots.get(key)) : next)];
       },
       useMemo: calculate => calculate(),
+      useRef(initial) {
+        const key = cursor++;
+        if (!slots.has(key)) slots.set(key, { current: initial });
+        return slots.get(key);
+      },
       useEffect(callback, dependencies) {
         const key = cursor++, old = slots.get(key);
         if (!old || dependencies.some((value, index) => value !== old.dependencies[index])) {

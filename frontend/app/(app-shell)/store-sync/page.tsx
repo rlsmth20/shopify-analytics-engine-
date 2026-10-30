@@ -2,11 +2,19 @@
 
 import { API_BASE_URL as APP_API_BASE_URL } from "@/lib/api-base";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { SectionCard } from "@/components/section-card";
 import { BrowserHealthCheckOption } from "@/components/browser-health-check-option";
-import { getSyncNotice, isSyncResult, unmatchedSyncItems, type SyncResult } from "@/lib/sync-summary";
+import {
+  getSyncNotice,
+  isSyncResult,
+  isSyncRunActive,
+  isSyncRunStatus,
+  unmatchedSyncItems,
+  type SyncResult,
+  type SyncRunStatus,
+} from "@/lib/sync-summary";
 import {
   authenticatedFetch,
   getEmbeddedShopifyContext,
@@ -14,6 +22,14 @@ import {
 } from "@/lib/shopify-embedded";
 
 const API_BASE = APP_API_BASE_URL;
+const POLL_INTERVAL_MS = 2_500;
+// A very large store can take longer than this; the run keeps going on the
+// server and the last-sync time updates when it finishes.
+const POLL_LIMIT_MS = 20 * 60 * 1_000;
+const STILL_RUNNING_MESSAGE =
+  "This sync is still running in the background. The last sync time updates when it finishes.";
+const UNCONFIRMED_MESSAGE =
+  "Shopify's sync result could not be confirmed. Check the last sync time, then try again.";
 
 type Connection = {
   connected: boolean;
@@ -32,6 +48,21 @@ function formatRelative(iso: string | null): string {
   }
 }
 
+async function fetchSyncRun(runId?: number, signal?: AbortSignal): Promise<SyncRunStatus | null> {
+  const query = runId ? `?run_id=${runId}` : "";
+  const res = await authenticatedFetch(`${API_BASE}/integrations/shopify/sync/status${query}`, {
+    credentials: "include",
+    signal,
+  });
+  if (res.status === 404) return null;
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(typeof body?.detail === "string" ? body.detail : `Could not read the sync status (${res.status}).`);
+  }
+  if (!isSyncRunStatus(body)) throw new Error("Could not read the sync status. Please try again.");
+  return body;
+}
+
 export default function StoreSyncPage() {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [connectionLoading, setConnectionLoading] = useState(true);
@@ -41,11 +72,13 @@ export default function StoreSyncPage() {
   const [installError, setInstallError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncInfo, setSyncInfo] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const pollController = useRef<AbortController | null>(null);
 
   const syncNotice = syncResult ? getSyncNotice(syncResult) : null;
 
-  async function loadConnection() {
+  async function loadConnection(): Promise<Connection | null> {
     setConnectionLoading(true);
     setConnectionError(null);
     try {
@@ -59,20 +92,79 @@ export default function StoreSyncPage() {
       }
       if (typeof body?.connected !== "boolean") throw new Error("Could not read your Shopify connection. Please try again.");
       setConnection(body);
+      return body as Connection;
     } catch (error) {
       setConnectionError(error instanceof Error ? error.message : "Could not load your Shopify connection.");
+      return null;
     } finally {
       setConnectionLoading(false);
     }
   }
 
+  // The sync runs on the server after POST /sync returns; poll its run until
+  // it finishes so the page can show the stored result or the failure.
+  async function followSyncRun(runId: number, signal: AbortSignal) {
+    const startedAt = Date.now();
+    setSyncing(true);
+    try {
+      while (!signal.aborted) {
+        const run = await fetchSyncRun(runId, signal);
+        if (!run) throw new Error("The sync run could not be found. Check the last sync time, then try again.");
+        if (!isSyncRunActive(run)) {
+          if (run.status === "failed") {
+            setSyncError(run.error_message || "Sync failed. Please try again.");
+          } else if (isSyncResult(run.result)) {
+            setSyncResult(run.result);
+          } else {
+            setSyncError(UNCONFIRMED_MESSAGE);
+          }
+          void loadConnection();
+          return;
+        }
+        if (Date.now() - startedAt > POLL_LIMIT_MS) {
+          setSyncInfo(STILL_RUNNING_MESSAGE);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+    } catch (error) {
+      if (signal.aborted) return;
+      setSyncError(error instanceof Error ? error.message : UNCONFIRMED_MESSAGE);
+      void loadConnection();
+    } finally {
+      if (!signal.aborted) setSyncing(false);
+    }
+  }
+
+  function startFollowing(runId: number) {
+    pollController.current?.abort();
+    const controller = new AbortController();
+    pollController.current = controller;
+    void followSyncRun(runId, controller.signal);
+  }
+
   useEffect(() => {
     setEmbeddedShop(getEmbeddedShopifyContext()?.shop || null);
-    void loadConnection();
+    const controller = new AbortController();
+    void loadConnection()
+      .then((loaded) => {
+        if (!loaded?.connected || controller.signal.aborted) return null;
+        // A run started from another tab is shown in progress here too.
+        return fetchSyncRun(undefined, controller.signal);
+      })
+      .then((run) => {
+        if (run && !controller.signal.aborted && isSyncRunActive(run)) startFollowing(run.run_id);
+      })
+      .catch(() => undefined);
+    return () => {
+      controller.abort();
+      pollController.current?.abort();
+    };
   }, []);
 
   async function handleSyncNow() {
     setSyncError(null);
+    setSyncInfo(null);
     setSyncResult(null);
     setSyncing(true);
     try {
@@ -81,21 +173,30 @@ export default function StoreSyncPage() {
         credentials: "include",
       });
       const body = await res.json().catch(() => null);
+      if (res.status === 409) {
+        // Another run owns this store right now; follow it instead.
+        const latest = await fetchSyncRun();
+        if (latest && isSyncRunActive(latest)) {
+          startFollowing(latest.run_id);
+          return;
+        }
+        setSyncError(typeof body?.detail === "string" ? body.detail : "A sync is already running. Please wait for it to finish.");
+        setSyncing(false);
+        return;
+      }
       if (!res.ok) {
         setSyncError(typeof body?.detail === "string" ? body.detail : `Sync failed (${res.status}).`);
+        setSyncing(false);
         return;
       }
-      if (!isSyncResult(body)) {
-        setSyncError("Shopify's sync result could not be confirmed. Check the last sync time, then try again.");
-        void loadConnection();
+      if (!isSyncRunStatus(body)) {
+        setSyncError("The sync could not be started. Please try again.");
+        setSyncing(false);
         return;
       }
-      setSyncResult(body);
-      void loadConnection();
+      startFollowing(body.run_id);
     } catch {
-      setSyncError("The connection was interrupted before sync could be confirmed. Check the last sync time, then try again.");
-      void loadConnection();
-    } finally {
+      setSyncError("The connection was interrupted before sync could be started. Check the last sync time, then try again.");
       setSyncing(false);
     }
   }
@@ -163,9 +264,19 @@ export default function StoreSyncPage() {
               </button>
             </div>
             {installError ? <p className="auth-error" role="alert">{installError}</p> : null}
+            {syncing ? (
+              <p className="section-copy" role="status" style={{ marginTop: "16px" }}>
+                Syncing products, inventory, and recent orders. You can leave this page; the sync keeps running.
+              </p>
+            ) : null}
             {syncError ? (
               <p className="auth-error" style={{ marginTop: "16px" }}>
                 {syncError}
+              </p>
+            ) : null}
+            {syncInfo ? (
+              <p className="section-copy" role="status" style={{ marginTop: "16px" }}>
+                {syncInfo}
               </p>
             ) : null}
             {syncResult ? (
